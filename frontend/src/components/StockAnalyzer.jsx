@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import axios from 'axios'
-import { Search, Loader2, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react'
+import { Plus, Loader2, TrendingUp, TrendingDown, AlertCircle, X } from 'lucide-react'
 import PriceChart from './PriceChart'
 import IndicatorsChart from './IndicatorsChart'
 import SignalsList from './SignalsList'
@@ -12,9 +12,7 @@ function StockAnalyzer() {
   const [days, setDays] = useState('365')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [data, setData] = useState(null)
-  const [showRSI, setShowRSI] = useState(false)
-  const [showMACD, setShowMACD] = useState(false)
+  const [charts, setCharts] = useState([])
   const [syncedMouseDate, setSyncedMouseDate] = useState(null)
 
   const analyzeStock = async () => {
@@ -25,7 +23,6 @@ function StockAnalyzer() {
 
     setLoading(true)
     setError(null)
-    setData(null)
 
     try {
       const response = await axios.get(`${API_URL}/analyze`, {
@@ -34,12 +31,36 @@ function StockAnalyzer() {
           days: days
         }
       })
-      setData(response.data)
+
+      // Add new chart to the array
+      const newChart = {
+        id: Date.now(),
+        symbol: symbol.toUpperCase(),
+        days: days,
+        data: response.data,
+        showRSI: false,
+        showMACD: false
+      }
+      setCharts(prevCharts => [...prevCharts, newChart])
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to analyze stock. Please check the symbol and try again.')
     } finally {
       setLoading(false)
     }
+  }
+
+  const removeChart = (chartId) => {
+    setCharts(prevCharts => prevCharts.filter(chart => chart.id !== chartId))
+  }
+
+  const updateChartIndicator = (chartId, indicator, value) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart =>
+        chart.id === chartId
+          ? { ...chart, [indicator]: value }
+          : chart
+      )
+    )
   }
 
   const handleKeyPress = (e) => {
@@ -48,25 +69,24 @@ function StockAnalyzer() {
     }
   }
 
-  const changeTimeRange = async (newDays) => {
-    if (!symbol.trim() || !data) return
-
-    setDays(newDays)
-    setLoading(true)
-    setError(null)
-
+  const changeTimeRange = async (chartId, chartSymbol, newDays) => {
     try {
       const response = await axios.get(`${API_URL}/analyze`, {
         params: {
-          symbol: symbol.toUpperCase(),
+          symbol: chartSymbol,
           days: newDays
         }
       })
-      setData(response.data)
+
+      setCharts(prevCharts =>
+        prevCharts.map(chart =>
+          chart.id === chartId
+            ? { ...chart, days: newDays, data: response.data }
+            : chart
+        )
+      )
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to analyze stock. Please check the symbol and try again.')
-    } finally {
-      setLoading(false)
+      setError(err.response?.data?.error || 'Failed to update chart.')
     }
   }
 
@@ -120,12 +140,12 @@ function StockAnalyzer() {
               {loading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  Analyzing...
+                  Loading...
                 </>
               ) : (
                 <>
-                  <Search className="w-5 h-5" />
-                  Analyze
+                  <Plus className="w-5 h-5" />
+                  Add Chart
                 </>
               )}
             </button>
@@ -139,79 +159,91 @@ function StockAnalyzer() {
         )}
       </div>
 
-      {/* Results Section */}
-      {data && (
+      {/* Charts Section */}
+      {charts.length > 0 && (
         <div className="space-y-6">
-          {/* Price Chart */}
-          <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
-            <h3 className="text-lg font-semibold mb-4 text-slate-100">{symbol}</h3>
-            <PriceChart
-              prices={data.prices}
-              indicators={data.indicators}
-              signals={data.signals}
-              syncedMouseDate={syncedMouseDate}
-              setSyncedMouseDate={setSyncedMouseDate}
-            />
+          {charts.map((chart) => (
+            <div key={chart.id} className="space-y-6">
+              {/* Price Chart */}
+              <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 relative">
+                {/* Close button */}
+                <button
+                  onClick={() => removeChart(chart.id)}
+                  className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                  title="Remove chart"
+                >
+                  <X className="w-5 h-5" />
+                </button>
 
-            {/* Controls: Time Range + Indicators */}
-            <div className="flex justify-between items-center mt-6 flex-wrap gap-4">
-              {/* Time Range Selector */}
-              <div className="flex gap-2 flex-wrap">
-                {timeRanges.map((range) => (
-                  <button
-                    key={range.label}
-                    onClick={() => changeTimeRange(range.days)}
-                    disabled={loading}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                      days === range.days
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {range.label}
-                  </button>
-                ))}
+                <h3 className="text-lg font-semibold mb-4 text-slate-100 pr-12">{chart.symbol}</h3>
+                <PriceChart
+                  prices={chart.data.prices}
+                  indicators={chart.data.indicators}
+                  signals={chart.data.signals}
+                  syncedMouseDate={syncedMouseDate}
+                  setSyncedMouseDate={setSyncedMouseDate}
+                />
+
+                {/* Controls: Time Range + Indicators */}
+                <div className="flex justify-between items-center mt-6 flex-wrap gap-4">
+                  {/* Time Range Selector */}
+                  <div className="flex gap-2 flex-wrap">
+                    {timeRanges.map((range) => (
+                      <button
+                        key={range.label}
+                        onClick={() => changeTimeRange(chart.id, chart.symbol, range.days)}
+                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                          chart.days === range.days
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                      >
+                        {range.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Indicator Toggle Buttons */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => updateChartIndicator(chart.id, 'showRSI', !chart.showRSI)}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        chart.showRSI
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      RSI
+                    </button>
+                    <button
+                      onClick={() => updateChartIndicator(chart.id, 'showMACD', !chart.showMACD)}
+                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        chart.showMACD
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      MACD
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              {/* Indicator Toggle Buttons */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowRSI(!showRSI)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    showRSI
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                  }`}
-                >
-                  RSI
-                </button>
-                <button
-                  onClick={() => setShowMACD(!showMACD)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    showMACD
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                  }`}
-                >
-                  MACD
-                </button>
-              </div>
+              {/* Technical Indicators */}
+              {(chart.showRSI || chart.showMACD) && (
+                <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
+                  <h3 className="text-lg font-semibold mb-4 text-slate-100">Technical Indicators</h3>
+                  <IndicatorsChart
+                    indicators={chart.data.indicators}
+                    showRSI={chart.showRSI}
+                    showMACD={chart.showMACD}
+                    syncedMouseDate={syncedMouseDate}
+                    setSyncedMouseDate={setSyncedMouseDate}
+                  />
+                </div>
+              )}
             </div>
-          </div>
-
-          {/* Technical Indicators */}
-          {(showRSI || showMACD) && (
-            <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
-              <h3 className="text-lg font-semibold mb-4 text-slate-100">Technical Indicators</h3>
-              <IndicatorsChart
-                indicators={data.indicators}
-                showRSI={showRSI}
-                showMACD={showMACD}
-                syncedMouseDate={syncedMouseDate}
-                setSyncedMouseDate={setSyncedMouseDate}
-              />
-            </div>
-          )}
+          ))}
         </div>
       )}
     </div>
