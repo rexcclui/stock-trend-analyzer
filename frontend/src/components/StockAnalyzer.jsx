@@ -16,6 +16,7 @@ function StockAnalyzer() {
   const [charts, setCharts] = useState([])
   const [syncedMouseDate, setSyncedMouseDate] = useState(null)
   const [stockHistory, setStockHistory] = useState([])
+  const [displayColumns, setDisplayColumns] = useState(1)
 
   // Load stock history from localStorage on mount
   useEffect(() => {
@@ -194,7 +195,7 @@ function StockAnalyzer() {
               className="w-full px-4 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-slate-400"
             />
           </div>
-          <div className="flex items-end">
+          <div className="flex items-end gap-4">
             <button
               onClick={analyzeStock}
               disabled={loading}
@@ -212,6 +213,22 @@ function StockAnalyzer() {
                 </>
               )}
             </button>
+            <div className="flex flex-col">
+              <label className="block text-xs font-medium text-slate-300 mb-1">
+                Display Columns
+              </label>
+              <select
+                value={displayColumns}
+                onChange={(e) => setDisplayColumns(Number(e.target.value))}
+                className="px-3 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                {[1, 2, 3, 4, 5, 6].map((num) => (
+                  <option key={num} value={num}>
+                    {num}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -224,7 +241,12 @@ function StockAnalyzer() {
 
       {/* Charts Section */}
       {charts.length > 0 && (
-        <div className="space-y-6">
+        <div
+          className="grid gap-6"
+          style={{
+            gridTemplateColumns: `repeat(${displayColumns}, minmax(0, 1fr))`
+          }}
+        >
           {charts.map((chart) => (
             <div key={chart.id} className="space-y-6">
               {/* Price Chart */}
