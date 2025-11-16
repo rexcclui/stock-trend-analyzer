@@ -54,7 +54,47 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     })
 
     const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
-    const intercept = (sumY - slope * sumX) / n
+    let intercept = (sumY - slope * sumX) / n
+
+    // Balance the channel: ensure at least 40% of data points are above and below the mid line
+    const balanceChannel = () => {
+      const maxIterations = 50
+      const minPercentage = 0.40 // At least 40% on each side
+
+      for (let iteration = 0; iteration < maxIterations; iteration++) {
+        let countAbove = 0
+        let countBelow = 0
+
+        recentData.forEach((point, index) => {
+          const predictedY = slope * index + intercept
+          if (point.close > predictedY) {
+            countAbove++
+          } else if (point.close < predictedY) {
+            countBelow++
+          }
+        })
+
+        const percentAbove = countAbove / n
+        const percentBelow = countBelow / n
+
+        // Check if distribution is balanced
+        if (percentAbove >= minPercentage && percentBelow >= minPercentage) {
+          break // Channel is balanced
+        }
+
+        // Adjust intercept to balance the channel
+        // If too many points above, shift line up; if too many below, shift down
+        if (percentAbove < minPercentage) {
+          // Too few points above, shift line down
+          intercept -= intercept * 0.01
+        } else if (percentBelow < minPercentage) {
+          // Too few points below, shift line up
+          intercept += intercept * 0.01
+        }
+      }
+    }
+
+    balanceChannel()
 
     // Calculate distances from regression line to find channel bounds
     const distances = recentData.map((point, index) => {
@@ -84,7 +124,25 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       }
     })
 
-    return { channelData, slope, intercept, channelWidth, stdDev, recentDataCount }
+    // Calculate final distribution for display
+    let finalCountAbove = 0
+    let finalCountBelow = 0
+    recentData.forEach((point, index) => {
+      const predictedY = slope * index + intercept
+      if (point.close > predictedY) finalCountAbove++
+      else if (point.close < predictedY) finalCountBelow++
+    })
+
+    return {
+      channelData,
+      slope,
+      intercept,
+      channelWidth,
+      stdDev,
+      recentDataCount,
+      percentAbove: (finalCountAbove / n * 100).toFixed(1),
+      percentBelow: (finalCountBelow / n * 100).toFixed(1)
+    }
   }
 
   // Calculate volume-weighted zone colors
@@ -530,7 +588,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 stroke="#3b82f6"
                 strokeWidth={1.5}
                 dot={false}
-                name={`Trend Line (${slopeChannelInfo.recentDataCount} pts)`}
+                name={`Trend (${slopeChannelInfo.recentDataCount}pts: ${slopeChannelInfo.percentAbove}%↑ ${slopeChannelInfo.percentBelow}%↓)`}
                 strokeDasharray="3 3"
               />
               <Line
