@@ -6,6 +6,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const chartContainerRef = useRef(null)
   const [localDataPercent, setLocalDataPercent] = useState(slopeChannelDataPercent)
   const [localWidthMultiplier, setLocalWidthMultiplier] = useState(slopeChannelWidthMultiplier)
+  const [controlsVisible, setControlsVisible] = useState(false)
 
   // Sync local state with props
   useEffect(() => {
@@ -47,13 +48,21 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     if (!data || data.length < 10) return null
 
     // Find the best channel by starting from the last point and extending backwards
+    // Tests different lookback periods and stdev multipliers, scoring by boundary touches
     const findBestChannel = () => {
       const minPoints = 20
       const maxPoints = Math.floor(data.length * (slopeChannelDataPercent / 100))
       const stepSize = Math.max(5, Math.floor((maxPoints - minPoints) / 20)) // Test ~20 different windows
 
-      let bestScore = -Infinity
+      // Test stdev multipliers from 1 to 4 with 0.25 increments
+      const stdevMultipliers = []
+      for (let mult = 1.0; mult <= 4.0; mult += 0.25) {
+        stdevMultipliers.push(mult)
+      }
+
+      let bestTouchCount = 0
       let bestCount = minPoints
+      let bestStdevMult = 2.5
 
       // Try different lookback periods
       for (let count = minPoints; count <= maxPoints; count += stepSize) {
@@ -73,62 +82,118 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
         const intercept = (sumY - slope * sumX) / n
 
-        // Calculate distribution
-        let countAbove = 0
-        let countBelow = 0
-        const distances = []
-
-        testData.forEach((point, index) => {
+        // Calculate distances from regression line
+        const distances = testData.map((point, index) => {
           const predictedY = slope * index + intercept
-          const distance = point.close - predictedY
-          distances.push(distance)
-
-          if (point.close > predictedY) countAbove++
-          else if (point.close < predictedY) countBelow++
+          return point.close - predictedY
         })
 
-        const percentAbove = countAbove / n
-        const percentBelow = countBelow / n
+        // Calculate standard deviation
+        const meanDistance = distances.reduce((a, b) => a + b, 0) / distances.length
+        const variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
+        const stdDev = Math.sqrt(variance)
 
-        // Calculate R² (coefficient of determination) - measures fit quality
-        const meanY = sumY / n
-        let ssTotal = 0
-        let ssResidual = 0
+        // Try different stdev multipliers for this lookback period
+        for (const stdevMult of stdevMultipliers) {
+          const channelWidth = stdDev * stdevMult
 
-        testData.forEach((point, index) => {
-          const predictedY = slope * index + intercept
-          ssTotal += Math.pow(point.close - meanY, 2)
-          ssResidual += Math.pow(point.close - predictedY, 2)
-        })
+          // Count how many points touch or almost touch (within 5%) the upper or lower bounds
+          let touchCount = 0
+          const touchTolerance = 0.05 // 5% tolerance
 
-        const rSquared = 1 - (ssResidual / ssTotal)
+          testData.forEach((point, index) => {
+            const predictedY = slope * index + intercept
+            const upperBound = predictedY + channelWidth
+            const lowerBound = predictedY - channelWidth
 
-        // Score this channel based on multiple criteria
-        const balanceScore = 1 - Math.abs(percentAbove - 0.5) * 2 // Prefer 50/50 distribution, max score 1
-        const fitScore = rSquared // Higher R² means better linear fit
-        const minDistributionMet = (percentAbove >= 0.4 && percentBelow >= 0.4) ? 1 : 0 // Must meet minimum
+            const distanceToUpper = Math.abs(point.close - upperBound)
+            const distanceToLower = Math.abs(point.close - lowerBound)
+            const boundRange = channelWidth * 2
 
-        // Combined score: balance (40%), fit quality (40%), meets minimum (20%)
-        const score = (balanceScore * 0.4 + fitScore * 0.4 + minDistributionMet * 0.2)
+            // Check if price is within 5% of either boundary
+            if (distanceToUpper <= boundRange * touchTolerance ||
+                distanceToLower <= boundRange * touchTolerance) {
+              touchCount++
+            }
+          })
 
-        if (score > bestScore && minDistributionMet === 1) {
-          bestScore = score
-          bestCount = count
+          // Update best if this combination has more touches
+          if (touchCount > bestTouchCount) {
+            bestTouchCount = touchCount
+            bestCount = count
+            bestStdevMult = stdevMult
+          }
         }
       }
 
-      // Also test the maximum to ensure we don't miss it
+      // Also test the maximum lookback to ensure we don't miss it
       if (maxPoints > minPoints && (maxPoints - bestCount) > stepSize) {
-        bestCount = maxPoints
+        const testData = data.slice(-maxPoints)
+
+        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
+        const n = testData.length
+
+        testData.forEach((point, index) => {
+          sumX += index
+          sumY += point.close
+          sumXY += index * point.close
+          sumX2 += index * index
+        })
+
+        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+        const intercept = (sumY - slope * sumX) / n
+
+        const distances = testData.map((point, index) => {
+          const predictedY = slope * index + intercept
+          return point.close - predictedY
+        })
+
+        const meanDistance = distances.reduce((a, b) => a + b, 0) / distances.length
+        const variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
+        const stdDev = Math.sqrt(variance)
+
+        for (const stdevMult of stdevMultipliers) {
+          const channelWidth = stdDev * stdevMult
+
+          let touchCount = 0
+          const touchTolerance = 0.05
+
+          testData.forEach((point, index) => {
+            const predictedY = slope * index + intercept
+            const upperBound = predictedY + channelWidth
+            const lowerBound = predictedY - channelWidth
+
+            const distanceToUpper = Math.abs(point.close - upperBound)
+            const distanceToLower = Math.abs(point.close - lowerBound)
+            const boundRange = channelWidth * 2
+
+            if (distanceToUpper <= boundRange * touchTolerance ||
+                distanceToLower <= boundRange * touchTolerance) {
+              touchCount++
+            }
+          })
+
+          if (touchCount > bestTouchCount) {
+            bestTouchCount = touchCount
+            bestCount = maxPoints
+            bestStdevMult = stdevMult
+          }
+        }
       }
 
-      return bestCount
+      return { count: bestCount, stdevMultiplier: bestStdevMult, touches: bestTouchCount }
     }
 
-    const recentDataCount = findBestChannel()
+    // Find best channel parameters (lookback count and stdev multiplier)
+    const bestChannelParams = findBestChannel()
+    const recentDataCount = bestChannelParams.count
+    const optimalStdevMult = bestChannelParams.stdevMultiplier
+    const touchCount = bestChannelParams.touches
+
+    // Use last N data points (counting backwards from the most recent point)
     const recentData = data.slice(-recentDataCount)
 
-    // Calculate linear regression (best fit line)
+    // Calculate linear regression (best fit line) for the selected lookback period
     let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
     const n = recentData.length
 
@@ -144,46 +209,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
     let intercept = (sumY - slope * sumX) / n
 
-    // Balance the channel: ensure at least 40% of data points are above and below the mid line
-    const balanceChannel = () => {
-      const maxIterations = 50
-      const minPercentage = 0.40 // At least 40% on each side
-
-      for (let iteration = 0; iteration < maxIterations; iteration++) {
-        let countAbove = 0
-        let countBelow = 0
-
-        recentData.forEach((point, index) => {
-          const predictedY = slope * index + intercept
-          if (point.close > predictedY) {
-            countAbove++
-          } else if (point.close < predictedY) {
-            countBelow++
-          }
-        })
-
-        const percentAbove = countAbove / n
-        const percentBelow = countBelow / n
-
-        // Check if distribution is balanced
-        if (percentAbove >= minPercentage && percentBelow >= minPercentage) {
-          break // Channel is balanced
-        }
-
-        // Adjust intercept to balance the channel
-        // If too many points above, shift line up; if too many below, shift down
-        if (percentAbove < minPercentage) {
-          // Too few points above, shift line down
-          intercept -= intercept * 0.01
-        } else if (percentBelow < minPercentage) {
-          // Too few points below, shift line up
-          intercept += intercept * 0.01
-        }
-      }
-    }
-
-    balanceChannel()
-
     // Calculate distances from regression line to find channel bounds
     const distances = recentData.map((point, index) => {
       const predictedY = slope * index + intercept
@@ -195,30 +220,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
     const stdDev = Math.sqrt(variance)
 
-    // Channel bounds using configurable width multiplier
-    let channelWidth = stdDev * slopeChannelWidthMultiplier
-
-    // Extend channel to ensure at least one data point touches upper or lower bound
-    const extendChannelToData = () => {
-      const tolerance = 0.01 // 1% tolerance for "touching"
-
-      // Find max deviation above and below the trend line
-      const maxAbove = Math.max(...distances)
-      const maxBelow = Math.abs(Math.min(...distances))
-      const maxDeviation = Math.max(maxAbove, maxBelow)
-
-      // If no data point is close to the boundary, extend the channel
-      if (maxDeviation > channelWidth * (1 + tolerance)) {
-        // Extend channel width to reach the furthest point
-        channelWidth = maxDeviation * 1.02 // Add 2% margin
-      }
-    }
-
-    extendChannelToData()
+    // Use the optimal stdev multiplier found by the best-fit algorithm
+    let channelWidth = stdDev * optimalStdevMult
 
     // Calculate channel lines for all data points
     const channelData = data.map((point, globalIndex) => {
-      // Adjust index relative to the start of recent data
+      // Adjust index relative to the start of recent data (counting backwards from last point)
       const startOfRecentData = data.length - recentDataCount
       const adjustedIndex = globalIndex - startOfRecentData
 
@@ -252,9 +259,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     const rSquared = 1 - (ssResidual / ssTotal)
 
-    // Calculate effective multiplier after extension
-    const effectiveMultiplier = channelWidth / stdDev
-
     return {
       channelData,
       slope,
@@ -264,7 +268,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       recentDataCount,
       percentAbove: (finalCountAbove / n * 100).toFixed(1),
       percentBelow: (finalCountBelow / n * 100).toFixed(1),
-      effectiveMultiplier,
+      optimalStdevMult,
+      touchCount,
       rSquared
     }
   }
@@ -670,8 +675,48 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   return (
     <div ref={chartContainerRef} style={{ width: '100%', height: chartHeight, position: 'relative' }}>
-      {/* Slope Channel Controls Overlay */}
-      {slopeChannelEnabled && slopeChannelInfo && onSlopeChannelParamsChange && (
+      {/* Slope Channel Controls Toggle Button */}
+      {slopeChannelEnabled && slopeChannelInfo && onSlopeChannelParamsChange && !controlsVisible && (
+        <button
+          onClick={() => setControlsVisible(true)}
+          style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            background: 'rgba(30, 41, 59, 0.9)',
+            border: '1px solid rgb(71, 85, 105)',
+            borderRadius: '6px',
+            padding: '8px 12px',
+            zIndex: 10,
+            cursor: 'pointer',
+            color: 'rgb(226, 232, 240)',
+            fontSize: '11px',
+            fontWeight: '500',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            backdropFilter: 'blur(4px)',
+            transition: 'all 0.2s'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(30, 41, 59, 1)'
+            e.currentTarget.style.borderColor = 'rgb(139, 92, 246)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(30, 41, 59, 0.9)'
+            e.currentTarget.style.borderColor = 'rgb(71, 85, 105)'
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"/>
+          </svg>
+          Controls
+        </button>
+      )}
+
+      {/* Slope Channel Controls Panel */}
+      {slopeChannelEnabled && slopeChannelInfo && onSlopeChannelParamsChange && controlsVisible && (
         <div
           style={{
             position: 'absolute',
@@ -686,8 +731,38 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             backdropFilter: 'blur(4px)'
           }}
         >
-          <div style={{ fontSize: '12px', fontWeight: '600', color: 'rgb(226, 232, 240)', marginBottom: '10px' }}>
-            Channel Controls
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <div style={{ fontSize: '12px', fontWeight: '600', color: 'rgb(226, 232, 240)' }}>
+              Channel Controls
+            </div>
+            <button
+              onClick={() => setControlsVisible(false)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: 'rgb(148, 163, 184)',
+                padding: '2px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '4px',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(71, 85, 105, 0.5)'
+                e.currentTarget.style.color = 'rgb(226, 232, 240)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+                e.currentTarget.style.color = 'rgb(148, 163, 184)'
+              }}
+              title="Hide controls"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M18 6L6 18M6 6l12 12"/>
+              </svg>
+            </button>
           </div>
 
           {/* Lookback Period */}
@@ -758,8 +833,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgb(71, 85, 105)' }}>
             <div style={{ fontSize: '10px', color: 'rgb(148, 163, 184)', lineHeight: '1.4' }}>
               <div>Points: {slopeChannelInfo.recentDataCount}</div>
+              <div>Touches: {slopeChannelInfo.touchCount} ({((slopeChannelInfo.touchCount / slopeChannelInfo.recentDataCount) * 100).toFixed(1)}%)</div>
+              <div>StdDev: {slopeChannelInfo.optimalStdevMult.toFixed(2)}σ</div>
               <div>R²: {(slopeChannelInfo.rSquared * 100).toFixed(1)}%</div>
-              <div>StdDev: ${slopeChannelInfo.stdDev.toFixed(2)}</div>
             </div>
           </div>
         </div>
@@ -811,7 +887,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 stroke="#10b981"
                 strokeWidth={1.5}
                 dot={false}
-                name={`Upper (+${slopeChannelInfo.effectiveMultiplier.toFixed(2)}σ=$${slopeChannelInfo.stdDev.toFixed(2)})`}
+                name={`Upper (+${slopeChannelInfo.optimalStdevMult.toFixed(2)}σ)`}
                 strokeDasharray="3 3"
               />
               <Line
@@ -820,7 +896,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 stroke="#3b82f6"
                 strokeWidth={1.5}
                 dot={false}
-                name={`Trend (${slopeChannelInfo.recentDataCount}pts: ${slopeChannelInfo.percentAbove}%↑ ${slopeChannelInfo.percentBelow}%↓ R²=${(slopeChannelInfo.rSquared * 100).toFixed(1)}%)`}
+                name={`Trend (${slopeChannelInfo.recentDataCount}pts, ${slopeChannelInfo.touchCount} touches, R²=${(slopeChannelInfo.rSquared * 100).toFixed(1)}%)`}
                 strokeDasharray="3 3"
               />
               <Line
@@ -829,7 +905,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 stroke="#ef4444"
                 strokeWidth={1.5}
                 dot={false}
-                name={`Lower (-${slopeChannelInfo.effectiveMultiplier.toFixed(2)}σ=$${slopeChannelInfo.stdDev.toFixed(2)})`}
+                name={`Lower (-${slopeChannelInfo.optimalStdevMult.toFixed(2)}σ)`}
                 strokeDasharray="3 3"
               />
             </>
