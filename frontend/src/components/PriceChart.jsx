@@ -63,9 +63,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       let bestCount = minPoints
       let bestStdevMult = 2.5
 
-      // Try different lookback periods: -20, -21, -22, -23... incrementing by 1
+      // Try different lookback periods: 20, 21, 22, 23... incrementing by 1
+      // Data comes in NEWEST-FIRST, so slice(0, count) gets the most recent N points
       for (let count = minPoints; count <= maxPoints; count++) {
-        const testData = data.slice(-count)
+        const testData = data.slice(0, count)
 
         // Calculate regression for this window
         let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
@@ -134,8 +135,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const optimalStdevMult = bestChannelParams.stdevMultiplier
     const touchCount = bestChannelParams.touches
 
-    // Use last N data points (counting backwards from the most recent point)
-    const recentData = data.slice(-recentDataCount)
+    // Use first N data points (data is NEWEST-FIRST, so first N = most recent N)
+    const recentData = data.slice(0, recentDataCount)
 
     // Calculate linear regression (best fit line) for the selected lookback period
     let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
@@ -168,18 +169,15 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     let channelWidth = stdDev * optimalStdevMult
 
     // Calculate channel lines ONLY for the recent data period (lookback window)
-    // Don't show channel for older historical data
-    const startOfRecentData = data.length - recentDataCount
+    // Data is NEWEST-FIRST, so first N indices are most recent
     const channelData = data.map((point, globalIndex) => {
-      // Only calculate channel for the lookback period
-      if (globalIndex < startOfRecentData) {
-        return null // No channel for historical data before lookback period
+      // Only calculate channel for the recent lookback period (first N points)
+      if (globalIndex >= recentDataCount) {
+        return null // No channel for older historical data
       }
 
-      // Adjust index relative to the start of recent data (0 = first point in lookback)
-      const adjustedIndex = globalIndex - startOfRecentData
-
-      const midValue = slope * adjustedIndex + intercept
+      // globalIndex already represents position in recent data (0 = most recent)
+      const midValue = slope * globalIndex + intercept
       return {
         upper: midValue + channelWidth,
         mid: midValue,
