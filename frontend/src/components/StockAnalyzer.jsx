@@ -21,6 +21,8 @@ function StockAnalyzer() {
   const [chartHeight, setChartHeight] = useState(400)
   const [smaDialogOpen, setSmaDialogOpen] = useState(false)
   const [editingSmaChartId, setEditingSmaChartId] = useState(null)
+  const [slopeChannelDialogOpen, setSlopeChannelDialogOpen] = useState(false)
+  const [editingSlopeChannelChartId, setEditingSlopeChannelChartId] = useState(null)
   const [globalZoomRange, setGlobalZoomRange] = useState({ start: 0, end: null })
 
   // Load stock history from localStorage on mount
@@ -89,7 +91,9 @@ function StockAnalyzer() {
         showRSI: false,
         showMACD: false,
         smaPeriods: [],
-        smaVisibility: {}
+        smaVisibility: {},
+        slopeChannelEnabled: false,
+        slopeChannelZones: 5
       }
       setCharts(prevCharts => [...prevCharts, newChart])
 
@@ -180,6 +184,44 @@ function StockAnalyzer() {
             ...chart,
             smaPeriods: newPeriods,
             smaVisibility: newVisibility
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const openSlopeChannelDialog = (chartId) => {
+    setEditingSlopeChannelChartId(chartId)
+    setSlopeChannelDialogOpen(true)
+  }
+
+  const closeSlopeChannelDialog = () => {
+    setSlopeChannelDialogOpen(false)
+    setEditingSlopeChannelChartId(null)
+  }
+
+  const toggleSlopeChannel = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            slopeChannelEnabled: !chart.slopeChannelEnabled
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const updateSlopeChannelZones = (chartId, zones) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            slopeChannelZones: zones
           }
         }
         return chart
@@ -422,6 +464,14 @@ function StockAnalyzer() {
                   <h3 className="text-lg font-semibold text-slate-100">{chart.symbol}</h3>
                   <div className="flex gap-2">
                     <button
+                      onClick={() => openSlopeChannelDialog(chart.id)}
+                      className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
+                      title="Configure Slope Channel"
+                    >
+                      <Settings className="w-4 h-4" />
+                      Slope Channel
+                    </button>
+                    <button
                       onClick={() => openSmaDialog(chart.id)}
                       className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
                       title="Configure SMA"
@@ -461,6 +511,8 @@ function StockAnalyzer() {
                   smaVisibility={chart.smaVisibility}
                   onToggleSma={(period) => toggleSmaVisibility(chart.id, period)}
                   onDeleteSma={(period) => deleteSma(chart.id, period)}
+                  slopeChannelEnabled={chart.slopeChannelEnabled}
+                  slopeChannelZones={chart.slopeChannelZones}
                   chartHeight={chartHeight}
                   days={days}
                   zoomRange={globalZoomRange}
@@ -564,6 +616,80 @@ function StockAnalyzer() {
                   <div className="pt-3 border-t border-slate-700">
                     <button
                       onClick={closeSmaDialog}
+                      className="w-full px-4 py-2 bg-slate-700 text-slate-100 rounded-lg hover:bg-slate-600 transition-colors"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Slope Channel Configuration Dialog */}
+      {slopeChannelDialogOpen && editingSlopeChannelChartId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={closeSlopeChannelDialog}>
+          <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-100">Configure Slope Channel</h3>
+              <button
+                onClick={closeSlopeChannelDialog}
+                className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {(() => {
+              const chart = charts.find(c => c.id === editingSlopeChannelChartId)
+              if (!chart) return null
+
+              return (
+                <div className="space-y-4">
+                  {/* Show Best Last Channel Checkbox */}
+                  <div className="flex items-center gap-3 p-3 bg-slate-700 rounded-lg">
+                    <input
+                      type="checkbox"
+                      id="showBestLastChannel"
+                      checked={chart.slopeChannelEnabled}
+                      onChange={() => toggleSlopeChannel(editingSlopeChannelChartId)}
+                      className="w-5 h-5 text-purple-600 bg-slate-600 border-slate-500 rounded focus:ring-2 focus:ring-purple-500 cursor-pointer"
+                    />
+                    <label htmlFor="showBestLastChannel" className="text-slate-100 cursor-pointer flex-1">
+                      Show Best Last Channel
+                    </label>
+                  </div>
+
+                  {/* Number of Zones */}
+                  {chart.slopeChannelEnabled && (
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-slate-300">
+                        Number of Zones (3-10)
+                      </label>
+                      <input
+                        type="number"
+                        min="3"
+                        max="10"
+                        value={chart.slopeChannelZones}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value)
+                          if (!isNaN(value) && value >= 3 && value <= 10) {
+                            updateSlopeChannelZones(editingSlopeChannelChartId, value)
+                          }
+                        }}
+                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                      <p className="text-xs text-slate-400">
+                        The channel will be divided into parallel zones with volume-weighted colors
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="pt-3 border-t border-slate-700">
+                    <button
+                      onClick={closeSlopeChannelDialog}
                       className="w-full px-4 py-2 bg-slate-700 text-slate-100 rounded-lg hover:bg-slate-600 transition-colors"
                     >
                       Done
