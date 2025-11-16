@@ -93,7 +93,9 @@ function StockAnalyzer() {
         smaPeriods: [],
         smaVisibility: {},
         slopeChannelEnabled: false,
-        slopeChannelZones: 5
+        slopeChannelZones: 5,
+        slopeChannelDataPercent: 30,
+        slopeChannelWidthMultiplier: 2.5
       }
       setCharts(prevCharts => [...prevCharts, newChart])
 
@@ -222,6 +224,20 @@ function StockAnalyzer() {
           return {
             ...chart,
             slopeChannelZones: zones
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const updateSlopeChannelParams = (chartId, params) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            ...params
           }
         }
         return chart
@@ -513,6 +529,8 @@ function StockAnalyzer() {
                   onDeleteSma={(period) => deleteSma(chart.id, period)}
                   slopeChannelEnabled={chart.slopeChannelEnabled}
                   slopeChannelZones={chart.slopeChannelZones}
+                  slopeChannelDataPercent={chart.slopeChannelDataPercent}
+                  slopeChannelWidthMultiplier={chart.slopeChannelWidthMultiplier}
                   chartHeight={chartHeight}
                   days={days}
                   zoomRange={globalZoomRange}
@@ -662,29 +680,97 @@ function StockAnalyzer() {
                     </label>
                   </div>
 
-                  {/* Number of Zones */}
+                  {/* Configuration Parameters */}
                   {chart.slopeChannelEnabled && (
-                    <div className="space-y-2">
-                      <label className="block text-sm font-medium text-slate-300">
-                        Number of Zones (3-10)
-                      </label>
-                      <input
-                        type="number"
-                        min="3"
-                        max="10"
-                        value={chart.slopeChannelZones}
-                        onChange={(e) => {
-                          const value = parseInt(e.target.value)
-                          if (!isNaN(value) && value >= 3 && value <= 10) {
-                            updateSlopeChannelZones(editingSlopeChannelChartId, value)
-                          }
+                    <>
+                      {/* Number of Zones */}
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-slate-300">
+                          Number of Zones (3-10)
+                        </label>
+                        <input
+                          type="number"
+                          min="3"
+                          max="10"
+                          value={chart.slopeChannelZones}
+                          onChange={(e) => {
+                            const value = parseInt(e.target.value)
+                            if (!isNaN(value) && value >= 3 && value <= 10) {
+                              updateSlopeChannelZones(editingSlopeChannelChartId, value)
+                            }
+                          }}
+                          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                        <p className="text-xs text-slate-400">
+                          The channel will be divided into parallel zones with volume-weighted colors
+                        </p>
+                      </div>
+
+                      {/* Recent Data Percentage */}
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-slate-300">
+                          Lookback Period (10-100%)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="10"
+                            max="100"
+                            step="5"
+                            value={chart.slopeChannelDataPercent}
+                            onChange={(e) => {
+                              updateSlopeChannelParams(editingSlopeChannelChartId, {
+                                slopeChannelDataPercent: parseInt(e.target.value)
+                              })
+                            }}
+                            className="flex-1"
+                          />
+                          <span className="text-slate-300 font-mono text-sm w-12">{chart.slopeChannelDataPercent}%</span>
+                        </div>
+                        <p className="text-xs text-slate-400">
+                          Uses the most recent {chart.slopeChannelDataPercent}% of chart data (rightmost points) for trend calculation. Lower % = more responsive to recent price action.
+                        </p>
+                      </div>
+
+                      {/* Channel Width Multiplier */}
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-slate-300">
+                          Channel Width Multiplier (1.0-4.0σ)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min="1"
+                            max="4"
+                            step="0.1"
+                            value={chart.slopeChannelWidthMultiplier}
+                            onChange={(e) => {
+                              updateSlopeChannelParams(editingSlopeChannelChartId, {
+                                slopeChannelWidthMultiplier: parseFloat(e.target.value)
+                              })
+                            }}
+                            className="flex-1"
+                          />
+                          <span className="text-slate-300 font-mono text-sm w-12">{chart.slopeChannelWidthMultiplier.toFixed(1)}σ</span>
+                        </div>
+                        <p className="text-xs text-slate-400">
+                          Channel width = {chart.slopeChannelWidthMultiplier.toFixed(1)} × standard deviation from trend line. Higher values = wider channel to capture more price action.
+                        </p>
+                      </div>
+
+                      {/* Recalculate Button */}
+                      <button
+                        onClick={() => {
+                          // Force recalculation by toggling off and on
+                          toggleSlopeChannel(editingSlopeChannelChartId)
+                          setTimeout(() => toggleSlopeChannel(editingSlopeChannelChartId), 10)
                         }}
-                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      />
-                      <p className="text-xs text-slate-400">
-                        The channel will be divided into parallel zones with volume-weighted colors
-                      </p>
-                    </div>
+                        className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Settings className="w-4 h-4" />
+                        Recalculate Channel
+                      </button>
+                    </>
                   )}
 
                   <div className="pt-3 border-t border-slate-700">

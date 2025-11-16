@@ -2,7 +2,7 @@ import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 import { X } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, slopeChannelEnabled = false, slopeChannelZones = 5, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, slopeChannelEnabled = false, slopeChannelZones = 5, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
 
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
@@ -35,8 +35,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const calculateSlopeChannel = (data) => {
     if (!data || data.length < 10) return null
 
-    // Use recent data for the channel (e.g., 30% of visible data or at least 20 points)
-    const recentDataCount = Math.max(20, Math.floor(data.length * 0.3))
+    // Use configurable percentage of recent data for the channel
+    const dataPercentDecimal = slopeChannelDataPercent / 100
+    const recentDataCount = Math.max(20, Math.floor(data.length * dataPercentDecimal))
     const recentData = data.slice(-recentDataCount)
 
     // Calculate linear regression (best fit line)
@@ -66,8 +67,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
     const stdDev = Math.sqrt(variance)
 
-    // Channel bounds (±2 standard deviations)
-    const channelWidth = stdDev * 2.5
+    // Channel bounds using configurable width multiplier
+    const channelWidth = stdDev * slopeChannelWidthMultiplier
 
     // Calculate channel lines for all data points
     const channelData = data.map((point, globalIndex) => {
@@ -83,7 +84,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       }
     })
 
-    return { channelData, slope, intercept, channelWidth }
+    return { channelData, slope, intercept, channelWidth, stdDev, recentDataCount }
   }
 
   // Calculate volume-weighted zone colors
@@ -512,7 +513,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           <Customized component={CustomZoneBands} />
 
           {/* Slope Channel Lines */}
-          {slopeChannelEnabled && (
+          {slopeChannelEnabled && slopeChannelInfo && (
             <>
               <Line
                 type="monotone"
@@ -520,7 +521,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 stroke="#10b981"
                 strokeWidth={1.5}
                 dot={false}
-                name="Upper Channel"
+                name={`Upper (+${slopeChannelWidthMultiplier.toFixed(1)}σ=$${slopeChannelInfo.stdDev.toFixed(2)})`}
                 strokeDasharray="3 3"
               />
               <Line
@@ -529,7 +530,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 stroke="#3b82f6"
                 strokeWidth={1.5}
                 dot={false}
-                name="Mid Channel"
+                name={`Trend Line (${slopeChannelInfo.recentDataCount} pts)`}
                 strokeDasharray="3 3"
               />
               <Line
@@ -538,7 +539,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 stroke="#ef4444"
                 strokeWidth={1.5}
                 dot={false}
-                name="Lower Channel"
+                name={`Lower (-${slopeChannelWidthMultiplier.toFixed(1)}σ=$${slopeChannelInfo.stdDev.toFixed(2)})`}
                 strokeDasharray="3 3"
               />
             </>
