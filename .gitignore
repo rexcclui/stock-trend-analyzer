@@ -1,0 +1,20 @@
+# Java / Maven
+target/
+*.log
+*.iml
+.idea/
+*.classpath
+*.project
+*.settings/
+
+# Node / React
+node_modules/
+dist/
+build/
+
+# OS
+.DS_Store
+
+# Env / secrets
+.env
+*.local
