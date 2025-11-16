@@ -121,32 +121,6 @@ function StockAnalyzer() {
       {/* Results Section */}
       {data && (
         <div className="space-y-6">
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-gradient-to-br from-purple-900/50 to-purple-800/50 p-6 rounded-lg border border-purple-700">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-purple-300">Market Trend</p>
-                  <p className={`text-2xl font-bold mt-2 ${getTrendColor(data.trend)}`}>
-                    {data.trend?.replace(/_/g, ' ')}
-                  </p>
-                </div>
-                <div className={getTrendColor(data.trend)}>
-                  {getTrendIcon(data.trend)}
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-br from-blue-900/50 to-blue-800/50 p-6 rounded-lg border border-blue-700">
-              <div>
-                <p className="text-sm font-medium text-blue-300">Recommendation</p>
-                <p className="text-xl font-bold mt-2 text-blue-100">
-                  {data.recommendation}
-                </p>
-              </div>
-            </div>
-          </div>
-
           {/* Price Chart */}
           <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
             <h3 className="text-lg font-semibold mb-4 text-slate-100">Price Chart with Signals</h3>
@@ -161,12 +135,6 @@ function StockAnalyzer() {
           <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
             <h3 className="text-lg font-semibold mb-4 text-slate-100">Technical Indicators</h3>
             <IndicatorsChart indicators={data.indicators} />
-          </div>
-
-          {/* Signals List */}
-          <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
-            <h3 className="text-lg font-semibold mb-4 text-slate-100">Trading Signals</h3>
-            <SignalsList signals={data.signals} />
           </div>
         </div>
       )}
