@@ -1,7 +1,16 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { X } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
 
 function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, chartHeight = 400, days = '365' }) {
+  const [zoomRange, setZoomRange] = useState({ start: 0, end: null })
+  const chartContainerRef = useRef(null)
+
+  // Reset zoom when prices change
+  useEffect(() => {
+    setZoomRange({ start: 0, end: null })
+  }, [prices.length])
+
   // Calculate SMA for a given period
   const calculateSMA = (data, period) => {
     const smaData = []
@@ -42,6 +51,52 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     return dataPoint
   }).reverse() // Show oldest to newest
+
+  // Apply zoom range to chart data
+  const endIndex = zoomRange.end === null ? chartData.length : zoomRange.end
+  const visibleChartData = chartData.slice(zoomRange.start, endIndex)
+
+  // Handle mouse wheel for zoom
+  const handleWheel = (e) => {
+    e.preventDefault()
+    const delta = e.deltaY
+    const zoomFactor = 0.1 // 10% zoom per scroll
+    const currentRange = endIndex - zoomRange.start
+    const zoomAmount = Math.max(1, Math.floor(currentRange * zoomFactor))
+
+    if (delta < 0) {
+      // Scroll up - Zoom in (show less data)
+      const newRange = Math.max(10, currentRange - zoomAmount)
+      const reduction = currentRange - newRange
+      const newStart = Math.min(chartData.length - newRange, zoomRange.start + Math.floor(reduction / 2))
+      const newEnd = Math.min(chartData.length, newStart + newRange)
+      setZoomRange({ start: newStart, end: newEnd })
+    } else {
+      // Scroll down - Zoom out (show more data)
+      const newRange = Math.min(chartData.length, currentRange + zoomAmount)
+      const expansion = newRange - currentRange
+      const newStart = Math.max(0, zoomRange.start - Math.floor(expansion / 2))
+      const newEnd = Math.min(chartData.length, newStart + newRange)
+
+      // If we've reached full view, set end to null
+      if (newStart === 0 && newEnd === chartData.length) {
+        setZoomRange({ start: 0, end: null })
+      } else {
+        setZoomRange({ start: newStart, end: newEnd })
+      }
+    }
+  }
+
+  // Add wheel event listener
+  useEffect(() => {
+    const chartElement = chartContainerRef.current
+    if (chartElement) {
+      chartElement.addEventListener('wheel', handleWheel, { passive: false })
+      return () => {
+        chartElement.removeEventListener('wheel', handleWheel)
+      }
+    }
+  }, [zoomRange, chartData.length])
 
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
@@ -93,10 +148,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     if (index > 0 && currentDate) {
       // Find the current data point index
-      const currentDataIndex = chartData.findIndex(d => d.date === currentDate)
+      const currentDataIndex = visibleChartData.findIndex(d => d.date === currentDate)
 
       if (currentDataIndex > 0) {
-        const prevDate = chartData[currentDataIndex - 1]?.date
+        const prevDate = visibleChartData[currentDataIndex - 1]?.date
 
         if (prevDate) {
           const current = new Date(currentDate)
@@ -188,10 +243,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
   return (
-    <div style={{ width: '100%', height: chartHeight }}>
+    <div ref={chartContainerRef} style={{ width: '100%', height: chartHeight }}>
       <ResponsiveContainer>
         <LineChart
-          data={chartData}
+          data={visibleChartData}
           margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
@@ -200,7 +255,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           <XAxis
             dataKey="date"
             tick={<CustomXAxisTick />}
-            interval={Math.floor(chartData.length / 10)}
+            interval={Math.floor(visibleChartData.length / 10)}
             stroke="#475569"
           />
           <YAxis domain={['auto', 'auto']} tick={{ fill: '#94a3b8' }} stroke="#475569" />

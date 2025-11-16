@@ -1,6 +1,16 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { useState, useRef, useEffect } from 'react'
 
 function IndicatorsChart({ indicators, showRSI = true, showMACD = true, syncedMouseDate, setSyncedMouseDate }) {
+  const [zoomRange, setZoomRange] = useState({ start: 0, end: null })
+  const rsiChartRef = useRef(null)
+  const macdChartRef = useRef(null)
+
+  // Reset zoom when indicators change
+  useEffect(() => {
+    setZoomRange({ start: 0, end: null })
+  }, [indicators.length])
+
   const chartData = [...indicators].reverse().map(ind => ({
     date: ind.date,
     rsi: ind.rsi,
@@ -8,6 +18,63 @@ function IndicatorsChart({ indicators, showRSI = true, showMACD = true, syncedMo
     macdSignal: ind.macdSignal,
     macdHistogram: ind.macdHistogram,
   }))
+
+  // Apply zoom range to chart data
+  const endIndex = zoomRange.end === null ? chartData.length : zoomRange.end
+  const visibleChartData = chartData.slice(zoomRange.start, endIndex)
+
+  // Handle mouse wheel for zoom
+  const handleWheel = (e) => {
+    e.preventDefault()
+    const delta = e.deltaY
+    const zoomFactor = 0.1 // 10% zoom per scroll
+    const currentRange = endIndex - zoomRange.start
+    const zoomAmount = Math.max(1, Math.floor(currentRange * zoomFactor))
+
+    if (delta < 0) {
+      // Scroll up - Zoom in (show less data)
+      const newRange = Math.max(10, currentRange - zoomAmount)
+      const reduction = currentRange - newRange
+      const newStart = Math.min(chartData.length - newRange, zoomRange.start + Math.floor(reduction / 2))
+      const newEnd = Math.min(chartData.length, newStart + newRange)
+      setZoomRange({ start: newStart, end: newEnd })
+    } else {
+      // Scroll down - Zoom out (show more data)
+      const newRange = Math.min(chartData.length, currentRange + zoomAmount)
+      const expansion = newRange - currentRange
+      const newStart = Math.max(0, zoomRange.start - Math.floor(expansion / 2))
+      const newEnd = Math.min(chartData.length, newStart + newRange)
+
+      // If we've reached full view, set end to null
+      if (newStart === 0 && newEnd === chartData.length) {
+        setZoomRange({ start: 0, end: null })
+      } else {
+        setZoomRange({ start: newStart, end: newEnd })
+      }
+    }
+  }
+
+  // Add wheel event listeners
+  useEffect(() => {
+    const rsiElement = rsiChartRef.current
+    const macdElement = macdChartRef.current
+
+    if (rsiElement) {
+      rsiElement.addEventListener('wheel', handleWheel, { passive: false })
+    }
+    if (macdElement) {
+      macdElement.addEventListener('wheel', handleWheel, { passive: false })
+    }
+
+    return () => {
+      if (rsiElement) {
+        rsiElement.removeEventListener('wheel', handleWheel)
+      }
+      if (macdElement) {
+        macdElement.removeEventListener('wheel', handleWheel)
+      }
+    }
+  }, [zoomRange, chartData.length])
 
   const handleMouseMove = (e) => {
     if (e && e.activeLabel) {
@@ -22,11 +89,11 @@ function IndicatorsChart({ indicators, showRSI = true, showMACD = true, syncedMo
   return (
     <div className="space-y-6">
       {/* RSI Chart */}
-      {showRSI && <div>
+      {showRSI && <div ref={rsiChartRef}>
         <h4 className="text-md font-semibold mb-2 text-slate-200">RSI (Relative Strength Index)</h4>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart
-            data={chartData}
+            data={visibleChartData}
             margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
@@ -35,7 +102,7 @@ function IndicatorsChart({ indicators, showRSI = true, showMACD = true, syncedMo
             <XAxis
               dataKey="date"
               tick={{ fontSize: 12, fill: '#94a3b8' }}
-              interval={Math.floor(chartData.length / 10)}
+              interval={Math.floor(visibleChartData.length / 10)}
               stroke="#475569"
             />
             <YAxis domain={[0, 100]} tick={{ fill: '#94a3b8' }} stroke="#475569" />
@@ -64,11 +131,11 @@ function IndicatorsChart({ indicators, showRSI = true, showMACD = true, syncedMo
       </div>}
 
       {/* MACD Chart */}
-      {showMACD && <div>
+      {showMACD && <div ref={macdChartRef}>
         <h4 className="text-md font-semibold mb-2 text-slate-200">MACD (Moving Average Convergence Divergence)</h4>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart
-            data={chartData}
+            data={visibleChartData}
             margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
@@ -77,7 +144,7 @@ function IndicatorsChart({ indicators, showRSI = true, showMACD = true, syncedMo
             <XAxis
               dataKey="date"
               tick={{ fontSize: 12, fill: '#94a3b8' }}
-              interval={Math.floor(chartData.length / 10)}
+              interval={Math.floor(visibleChartData.length / 10)}
               stroke="#475569"
             />
             <YAxis tick={{ fill: '#94a3b8' }} stroke="#475569" />
