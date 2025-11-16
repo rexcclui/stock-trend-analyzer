@@ -9,31 +9,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     }
   }).reverse() // Show oldest to newest
 
-  // Prepare signal markers
-  const buySignals = signals
-    .filter(s => s.type === 'BUY')
-    .map(s => {
-      const priceData = prices.find(p => p.date === s.date)
-      return {
-        date: s.date,
-        price: s.price,
-        close: priceData?.close || s.price,
-        type: 'BUY'
-      }
-    })
-
-  const sellSignals = signals
-    .filter(s => s.type === 'SELL')
-    .map(s => {
-      const priceData = prices.find(p => p.date === s.date)
-      return {
-        date: s.date,
-        price: s.price,
-        close: priceData?.close || s.price,
-        type: 'SELL'
-      }
-    })
-
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       return (
@@ -93,18 +68,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           />
         </LineChart>
       </ResponsiveContainer>
-
-      {/* Buy/Sell Markers */}
-      <div className="flex gap-4 mt-4 justify-center">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-          <span className="text-sm text-slate-300">Buy Signals: {buySignals.length}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-          <span className="text-sm text-slate-300">Sell Signals: {sellSignals.length}</span>
-        </div>
-      </div>
     </div>
   )
 }
