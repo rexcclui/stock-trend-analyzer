@@ -1,4 +1,4 @@
-import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
 import { X } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 
@@ -413,6 +413,65 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return { ...point, ...zoneData }
   })
 
+  // Custom component to render zone bands
+  const CustomZoneBands = (props) => {
+    if (!slopeChannelEnabled || zoneColors.length === 0) return null
+
+    const { xAxisMap, yAxisMap, chartWidth, chartHeight } = props
+    const xAxis = xAxisMap?.[0]
+    const yAxis = yAxisMap?.[0]
+
+    if (!xAxis || !yAxis) return null
+
+    return (
+      <g>
+        {zoneColors.map((zone, zoneIndex) => {
+          const points = chartDataWithZones.map((point, index) => {
+            const lower = point[`zone${zoneIndex}Lower`]
+            const upper = point[`zone${zoneIndex}Upper`]
+
+            if (lower === undefined || upper === undefined) return null
+
+            const x = xAxis.scale(point.date)
+            const yLower = yAxis.scale(lower)
+            const yUpper = yAxis.scale(upper)
+
+            return { x, yLower, yUpper, index }
+          }).filter(p => p !== null)
+
+          if (points.length < 2) return null
+
+          // Create path for the zone band
+          let pathData = `M ${points[0].x} ${points[0].yUpper}`
+
+          // Draw top boundary (upper line)
+          for (let i = 1; i < points.length; i++) {
+            pathData += ` L ${points[i].x} ${points[i].yUpper}`
+          }
+
+          // Draw right side and bottom boundary (lower line, reversed)
+          pathData += ` L ${points[points.length - 1].x} ${points[points.length - 1].yLower}`
+          for (let i = points.length - 2; i >= 0; i--) {
+            pathData += ` L ${points[i].x} ${points[i].yLower}`
+          }
+
+          // Close path
+          pathData += ' Z'
+
+          return (
+            <path
+              key={`zone-band-${zoneIndex}`}
+              d={pathData}
+              fill={zone.color}
+              fillOpacity={0.3}
+              stroke="none"
+            />
+          )
+        })}
+      </g>
+    )
+  }
+
   return (
     <div ref={chartContainerRef} style={{ width: '100%', height: chartHeight }}>
       <ResponsiveContainer>
@@ -449,18 +508,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             />
           )}
 
-          {/* Slope Channel Zones as Areas */}
-          {slopeChannelEnabled && zoneColors.map((zone, index) => (
-            <Area
-              key={`zone-area-${index}`}
-              type="monotone"
-              dataKey={`zone${index}Upper`}
-              stroke="none"
-              fill={zone.color}
-              fillOpacity={0.3}
-              isAnimationActive={false}
-            />
-          ))}
+          {/* Slope Channel Zones as Custom Bands */}
+          <Customized component={CustomZoneBands} />
 
           {/* Slope Channel Lines */}
           {slopeChannelEnabled && (
