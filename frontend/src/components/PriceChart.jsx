@@ -155,7 +155,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const CustomXAxisTick = ({ x, y, payload, index }) => {
     const currentDate = payload.value
     const isLongPeriod = parseInt(days) >= 1095 // 3Y or more
-    const isShortPeriod = parseInt(days) < 365 // Less than 1Y
+    const isMediumPeriod = parseInt(days) >= 365 && parseInt(days) < 1095 // 1Y to 3Y
 
     let color = '#94a3b8' // Default color
 
@@ -175,7 +175,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             if (current.getFullYear() !== previous.getFullYear()) {
               color = '#3b82f6' // Blue for year change
             }
-          } else if (isShortPeriod) {
+          } else if (isMediumPeriod) {
+            // For 1Y to 3Y, change color when month changes
+            if (current.getMonth() !== previous.getMonth()) {
+              color = '#10b981' // Green for month change
+            }
+          } else {
             // For < 1Y, change color when month changes
             if (current.getMonth() !== previous.getMonth()) {
               color = '#10b981' // Green for month change
