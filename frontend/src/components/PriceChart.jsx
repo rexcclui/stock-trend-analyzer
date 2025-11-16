@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
 import { X } from 'lucide-react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, slopeChannelEnabled = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -16,6 +16,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
   // No need to reset here to avoid infinite loop
+
+  // Reset optimized parameters when volume weighted mode changes
+  useEffect(() => {
+    setOptimizedLookbackCount(null)
+    setOptimizedStdevMult(null)
+  }, [slopeChannelVolumeWeighted])
 
   // Calculate SMA for a given period
   const calculateSMA = (data, period) => {
@@ -42,8 +48,24 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Calculate Slope Channel using linear regression
   // If useStoredParams is true and we have stored params, use them; otherwise optimize
-  const calculateSlopeChannel = (data, useStoredParams = true) => {
+  const calculateSlopeChannel = (data, useStoredParams = true, volumeWeighted = false) => {
     if (!data || data.length < 10) return null
+
+    // Calculate volume threshold (20th percentile) if volume weighting is enabled
+    let volumeThreshold = 0
+    if (volumeWeighted) {
+      const volumes = data.map(d => d.volume || 0).filter(v => v > 0).sort((a, b) => a - b)
+      if (volumes.length > 0) {
+        const percentileIndex = Math.floor(volumes.length * 0.2)
+        volumeThreshold = volumes[percentileIndex]
+      }
+    }
+
+    // Helper function to check if a point should be included based on volume
+    const shouldIncludePoint = (point) => {
+      if (!volumeWeighted) return true
+      return (point.volume || 0) > volumeThreshold
+    }
 
     let recentDataCount, optimalStdevMult, touchCount
 
@@ -75,23 +97,32 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       for (let count = minPoints; count <= maxPoints; count++) {
         const testData = data.slice(0, count)
 
-        // Calculate regression for this window
-        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
-        const n = testData.length
+        // Filter data based on volume if volume weighting is enabled
+        // Create array of included points with their original indices
+        const includedPoints = testData
+          .map((point, index) => ({ point, originalIndex: index }))
+          .filter(({ point }) => shouldIncludePoint(point))
 
-        testData.forEach((point, index) => {
-          sumX += index
+        // Need minimum points for regression
+        if (includedPoints.length < 10) continue
+
+        // Calculate regression for this window using only included points
+        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
+        const n = includedPoints.length
+
+        includedPoints.forEach(({ point, originalIndex }) => {
+          sumX += originalIndex
           sumY += point.close
-          sumXY += index * point.close
-          sumX2 += index * index
+          sumXY += originalIndex * point.close
+          sumX2 += originalIndex * originalIndex
         })
 
         const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
         const intercept = (sumY - slope * sumX) / n
 
-        // Calculate distances from regression line
-        const distances = testData.map((point, index) => {
-          const predictedY = slope * index + intercept
+        // Calculate distances from regression line for included points only
+        const distances = includedPoints.map(({ point, originalIndex }) => {
+          const predictedY = slope * originalIndex + intercept
           return point.close - predictedY
         })
 
@@ -105,13 +136,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         for (const stdevMult of stdevMultipliers) {
           const channelWidth = stdDev * stdevMult
 
-          // Count how many points are OUTSIDE the channel bounds
+          // Count how many points are OUTSIDE the channel bounds (only check included points)
           let outsideCount = 0
           let touchCount = 0
           const touchTolerance = 0.05 // 5% tolerance for touch counting
 
-          testData.forEach((point, index) => {
-            const predictedY = slope * index + intercept
+          includedPoints.forEach(({ point, originalIndex }) => {
+            const predictedY = slope * originalIndex + intercept
             const upperBound = predictedY + channelWidth
             const lowerBound = predictedY - channelWidth
 
@@ -592,7 +623,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // Calculate slope channel ONLY on the data that will be displayed
   // This prevents mismatch when period changes and indicators haven't updated yet
   const displayPrices = prices.slice(0, dataLength)
-  const slopeChannelInfo = slopeChannelEnabled ? calculateSlopeChannel(displayPrices) : null
+  const slopeChannelInfo = slopeChannelEnabled ? calculateSlopeChannel(displayPrices, true, slopeChannelVolumeWeighted) : null
   const zoneColors = slopeChannelEnabled && slopeChannelInfo
     ? calculateZoneColors(displayPrices, slopeChannelInfo, slopeChannelZones)
     : []
@@ -1127,6 +1158,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               <div>Touches: {slopeChannelInfo.touchCount} ({((slopeChannelInfo.touchCount / slopeChannelInfo.recentDataCount) * 100).toFixed(1)}%)</div>
               <div>Outside: {slopeChannelInfo.percentOutside}% (target: ≤5%)</div>
               <div>R²: {(slopeChannelInfo.rSquared * 100).toFixed(1)}%</div>
+              {slopeChannelVolumeWeighted && (
+                <div style={{ color: 'rgb(139, 92, 246)', fontWeight: '600' }}>Volume Weighted (bottom 20% ignored)</div>
+              )}
             </div>
           </div>
         </div>
@@ -1187,7 +1221,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 stroke="#3b82f6"
                 strokeWidth={1.5}
                 dot={false}
-                name={`Trend (${slopeChannelInfo.recentDataCount}pts, ${slopeChannelInfo.touchCount} touches, R²=${(slopeChannelInfo.rSquared * 100).toFixed(1)}%)`}
+                name={`Trend${slopeChannelVolumeWeighted ? ' (Vol-Weighted)' : ''} (${slopeChannelInfo.recentDataCount}pts, ${slopeChannelInfo.touchCount} touches, R²=${(slopeChannelInfo.rSquared * 100).toFixed(1)}%)`}
                 strokeDasharray="3 3"
               />
               <Line

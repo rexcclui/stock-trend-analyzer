@@ -93,6 +93,7 @@ function StockAnalyzer() {
         smaPeriods: [],
         smaVisibility: {},
         slopeChannelEnabled: false,
+        slopeChannelVolumeWeighted: false,
         slopeChannelZones: 8,
         slopeChannelDataPercent: 30,
         slopeChannelWidthMultiplier: 2.5,
@@ -211,6 +212,20 @@ function StockAnalyzer() {
           return {
             ...chart,
             slopeChannelEnabled: !chart.slopeChannelEnabled
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const toggleSlopeChannelVolumeWeighted = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            slopeChannelVolumeWeighted: !chart.slopeChannelVolumeWeighted
           }
         }
         return chart
@@ -554,6 +569,7 @@ function StockAnalyzer() {
                   onToggleSma={(period) => toggleSmaVisibility(chart.id, period)}
                   onDeleteSma={(period) => deleteSma(chart.id, period)}
                   slopeChannelEnabled={chart.slopeChannelEnabled}
+                  slopeChannelVolumeWeighted={chart.slopeChannelVolumeWeighted}
                   slopeChannelZones={chart.slopeChannelZones}
                   slopeChannelDataPercent={chart.slopeChannelDataPercent}
                   slopeChannelWidthMultiplier={chart.slopeChannelWidthMultiplier}
@@ -705,6 +721,20 @@ function StockAnalyzer() {
                     />
                     <label htmlFor="showBestLastChannel" className="text-slate-100 cursor-pointer flex-1">
                       Show Best Last Channel
+                    </label>
+                  </div>
+
+                  {/* Show Best Last Channel with Volume Weight Checkbox */}
+                  <div className="flex items-center gap-3 p-3 bg-slate-700 rounded-lg">
+                    <input
+                      type="checkbox"
+                      id="volumeWeighted"
+                      checked={chart.slopeChannelVolumeWeighted}
+                      onChange={() => toggleSlopeChannelVolumeWeighted(editingSlopeChannelChartId)}
+                      className="w-5 h-5 text-purple-600 bg-slate-600 border-slate-500 rounded focus:ring-2 focus:ring-purple-500 cursor-pointer"
+                    />
+                    <label htmlFor="volumeWeighted" className="text-slate-100 cursor-pointer flex-1">
+                      Volume Weighted (ignore bottom 20% volume)
                     </label>
                   </div>
 
