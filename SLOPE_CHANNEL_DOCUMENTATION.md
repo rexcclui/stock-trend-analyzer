@@ -144,12 +144,17 @@ Width = 3.0σ → Channel contains ~99.7% of price data
 **Purpose**: Runs full optimization algorithm to find ideal parameters
 
 **What It Does**:
-1. Starts with minimum 100-point lookback period
+1. Starts with current Lookback Period value if manually adjusted, otherwise minimum 100-point lookback
 2. Finds optimal stdev multiplier ensuring ≤5% points outside channel
 3. Tries to extend lookback by adding older historical data
 4. Stops extending if >50% of new data falls outside the channel (trend break)
 5. Returns the longest valid channel that meets the ≤5% outside criteria
 6. Updates both sliders to the optimized values
+
+**Smart Starting Point**:
+- If you manually adjust the Lookback Period slider (e.g., to 150), clicking "Find Best Fit" will start optimization from 150 instead of 100
+- This allows you to constrain the search to a specific lookback range
+- Example: Set slider to 200, click "Find Best Fit" → optimization starts at 200 and extends from there
 
 **When to Use**:
 - After enabling the channel for the first time
