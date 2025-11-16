@@ -733,33 +733,76 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             </button>
           </div>
 
-          {/* Current Parameters */}
+          {/* Manual Parameter Controls */}
           <div style={{ marginBottom: '12px' }}>
-            <div style={{ fontSize: '11px', color: 'rgb(148, 163, 184)', marginBottom: '8px', fontStyle: 'italic' }}>
-              Current channel parameters:
+            {/* Lookback Slider */}
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label style={{ fontSize: '11px', color: 'rgb(203, 213, 225)', fontWeight: '500' }}>
+                  Lookback Period
+                </label>
+                <span style={{ fontSize: '11px', color: 'rgb(139, 92, 246)', fontFamily: 'monospace', fontWeight: '600' }}>
+                  {slopeChannelInfo.recentDataCount} pts
+                </span>
+              </div>
+              <input
+                type="range"
+                min="20"
+                max={dataLength}
+                step="1"
+                value={slopeChannelInfo.recentDataCount}
+                onChange={(e) => {
+                  const newCount = parseInt(e.target.value)
+                  setOptimizedLookbackCount(newCount)
+                }}
+                style={{
+                  width: '100%',
+                  height: '4px',
+                  borderRadius: '2px',
+                  outline: 'none',
+                  background: `linear-gradient(to right, rgb(139, 92, 246) 0%, rgb(139, 92, 246) ${((slopeChannelInfo.recentDataCount - 20) / (dataLength - 20)) * 100}%, rgb(71, 85, 105) ${((slopeChannelInfo.recentDataCount - 20) / (dataLength - 20)) * 100}%, rgb(71, 85, 105) 100%)`,
+                  cursor: 'pointer'
+                }}
+              />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(71, 85, 105, 0.3)', borderRadius: '4px', marginBottom: '6px' }}>
-              <span style={{ fontSize: '11px', color: 'rgb(203, 213, 225)' }}>Lookback:</span>
-              <span style={{ fontSize: '11px', color: 'rgb(139, 92, 246)', fontFamily: 'monospace', fontWeight: '600' }}>
-                {slopeChannelInfo.recentDataCount} points
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(71, 85, 105, 0.3)', borderRadius: '4px', marginBottom: '12px' }}>
-              <span style={{ fontSize: '11px', color: 'rgb(203, 213, 225)' }}>Width:</span>
-              <span style={{ fontSize: '11px', color: 'rgb(139, 92, 246)', fontFamily: 'monospace', fontWeight: '600' }}>
-                {slopeChannelInfo.optimalStdevMult.toFixed(2)}σ
-              </span>
+            {/* StdDev Width Slider */}
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                <label style={{ fontSize: '11px', color: 'rgb(203, 213, 225)', fontWeight: '500' }}>
+                  Channel Width
+                </label>
+                <span style={{ fontSize: '11px', color: 'rgb(139, 92, 246)', fontFamily: 'monospace', fontWeight: '600' }}>
+                  {slopeChannelInfo.optimalStdevMult.toFixed(2)}σ
+                </span>
+              </div>
+              <input
+                type="range"
+                min="1.0"
+                max="4.0"
+                step="0.1"
+                value={slopeChannelInfo.optimalStdevMult}
+                onChange={(e) => {
+                  const newMult = parseFloat(e.target.value)
+                  setOptimizedStdevMult(newMult)
+                }}
+                style={{
+                  width: '100%',
+                  height: '4px',
+                  borderRadius: '2px',
+                  outline: 'none',
+                  background: `linear-gradient(to right, rgb(139, 92, 246) 0%, rgb(139, 92, 246) ${((slopeChannelInfo.optimalStdevMult - 1) / 3) * 100}%, rgb(71, 85, 105) ${((slopeChannelInfo.optimalStdevMult - 1) / 3) * 100}%, rgb(71, 85, 105) 100%)`,
+                  cursor: 'pointer'
+                }}
+              />
             </div>
 
             {/* Find Best Fit Button */}
             <button
               onClick={() => {
-                // Trigger re-optimization by setting stored params to null
+                // Trigger re-optimization by clearing stored params
                 setOptimizedLookbackCount(null)
                 setOptimizedStdevMult(null)
-                // Component will re-render and calculateSlopeChannel will run optimization
               }}
               style={{
                 width: '100%',
@@ -787,9 +830,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           {/* Channel Statistics */}
           <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgb(71, 85, 105)' }}>
             <div style={{ fontSize: '10px', color: 'rgb(148, 163, 184)', lineHeight: '1.4' }}>
-              <div>Points: {slopeChannelInfo.recentDataCount}</div>
               <div>Touches: {slopeChannelInfo.touchCount} ({((slopeChannelInfo.touchCount / slopeChannelInfo.recentDataCount) * 100).toFixed(1)}%)</div>
-              <div>StdDev: {slopeChannelInfo.optimalStdevMult.toFixed(2)}σ</div>
               <div>R²: {(slopeChannelInfo.rSquared * 100).toFixed(1)}%</div>
             </div>
           </div>
