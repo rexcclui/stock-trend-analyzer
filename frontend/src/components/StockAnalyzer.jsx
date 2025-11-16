@@ -95,7 +95,8 @@ function StockAnalyzer() {
         slopeChannelEnabled: false,
         slopeChannelZones: 8,
         slopeChannelDataPercent: 30,
-        slopeChannelWidthMultiplier: 2.5
+        slopeChannelWidthMultiplier: 2.5,
+        findAllChannelEnabled: false
       }
       setCharts(prevCharts => [...prevCharts, newChart])
 
@@ -238,6 +239,20 @@ function StockAnalyzer() {
           return {
             ...chart,
             ...params
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const toggleFindAllChannel = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            findAllChannelEnabled: !chart.findAllChannelEnabled
           }
         }
         return chart
@@ -488,6 +503,17 @@ function StockAnalyzer() {
                       Slope Channel
                     </button>
                     <button
+                      onClick={() => toggleFindAllChannel(chart.id)}
+                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
+                        chart.findAllChannelEnabled
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                      title="Find All Channels"
+                    >
+                      Find All Channel
+                    </button>
+                    <button
                       onClick={() => openSmaDialog(chart.id)}
                       className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
                       title="Configure SMA"
@@ -532,6 +558,7 @@ function StockAnalyzer() {
                   slopeChannelDataPercent={chart.slopeChannelDataPercent}
                   slopeChannelWidthMultiplier={chart.slopeChannelWidthMultiplier}
                   onSlopeChannelParamsChange={(params) => updateSlopeChannelParams(chart.id, params)}
+                  findAllChannelEnabled={chart.findAllChannelEnabled}
                   chartHeight={chartHeight}
                   days={days}
                   zoomRange={globalZoomRange}

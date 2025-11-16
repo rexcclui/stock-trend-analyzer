@@ -1,14 +1,17 @@
+import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
 import { X } from 'lucide-react'
-import { useState, useRef, useEffect } from 'react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, slopeChannelEnabled = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, slopeChannelEnabled = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
   // Store ABSOLUTE optimized parameters (not percentages) so they persist across period changes
   const [optimizedLookbackCount, setOptimizedLookbackCount] = useState(null)
   const [optimizedStdevMult, setOptimizedStdevMult] = useState(null)
+
+  // Store all found channels
+  const [allChannels, setAllChannels] = useState([])
 
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
   // No need to reset here to avoid infinite loop
@@ -247,6 +250,222 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     }
   }
 
+  // Find all channels in the data
+  const findAllChannels = (data) => {
+    if (!data || data.length < 20) return []
+
+    const channels = []
+    const maxChannels = 5
+    let currentStartIndex = 0
+    const minLookback = 20
+
+    while (channels.length < maxChannels && currentStartIndex < data.length - minLookback) {
+      // Find optimal channel starting from currentStartIndex
+      const remainingData = data.slice(currentStartIndex)
+
+      if (remainingData.length < minLookback) break
+
+      // Start with minimum lookback and try to extend
+      let lookbackCount = minLookback
+      let optimalStdevMult = 2.5
+      let channelBroken = false
+      let breakIndex = currentStartIndex + lookbackCount
+
+      // First, find the optimal stddev for the initial lookback period
+      const findOptimalStdev = (dataSegment) => {
+        const stdevMultipliers = []
+        for (let mult = 1.0; mult <= 4.0; mult += 0.25) {
+          stdevMultipliers.push(mult)
+        }
+
+        // Calculate regression
+        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
+        const n = dataSegment.length
+
+        dataSegment.forEach((point, index) => {
+          sumX += index
+          sumY += point.close
+          sumXY += index * point.close
+          sumX2 += index * index
+        })
+
+        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+        const intercept = (sumY - slope * sumX) / n
+
+        // Calculate standard deviation
+        const distances = dataSegment.map((point, index) => {
+          const predictedY = slope * index + intercept
+          return point.close - predictedY
+        })
+
+        const meanDistance = distances.reduce((a, b) => a + b, 0) / distances.length
+        const variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
+        const stdDev = Math.sqrt(variance)
+
+        // Find best stdev multiplier based on boundary touches
+        let bestTouchCount = 0
+        let bestStdevMult = 2.5
+
+        for (const stdevMult of stdevMultipliers) {
+          const channelWidth = stdDev * stdevMult
+          let touchCount = 0
+          const touchTolerance = 0.05
+          let hasUpperTouch = false
+          let hasLowerTouch = false
+
+          dataSegment.forEach((point, index) => {
+            const predictedY = slope * index + intercept
+            const upperBound = predictedY + channelWidth
+            const lowerBound = predictedY - channelWidth
+
+            const distanceToUpper = Math.abs(point.close - upperBound)
+            const distanceToLower = Math.abs(point.close - lowerBound)
+            const boundRange = channelWidth * 2
+
+            if (distanceToUpper <= boundRange * touchTolerance) {
+              touchCount++
+              hasUpperTouch = true
+            }
+            if (distanceToLower <= boundRange * touchTolerance) {
+              touchCount++
+              hasLowerTouch = true
+            }
+          })
+
+          // Must have at least one touch on upper or lower bound
+          if ((hasUpperTouch || hasLowerTouch) && touchCount > bestTouchCount) {
+            bestTouchCount = touchCount
+            bestStdevMult = stdevMult
+          }
+        }
+
+        return { slope, intercept, stdDev, optimalStdevMult: bestStdevMult }
+      }
+
+      // Optimize initial channel
+      let initialSegment = remainingData.slice(0, lookbackCount)
+      let channelParams = findOptimalStdev(initialSegment)
+      let { slope, intercept, stdDev, optimalStdevMult: currentStdevMult } = channelParams
+
+      optimalStdevMult = currentStdevMult
+
+      // Try to extend the lookback period
+      while (lookbackCount < remainingData.length) {
+        const previousLookback = lookbackCount
+        const previous90Percent = Math.floor(previousLookback * 0.9)
+        const first10Percent = previousLookback - previous90Percent
+
+        // Try to extend by adding more data
+        lookbackCount++
+        const extendedSegment = remainingData.slice(0, lookbackCount)
+
+        // Check if the newly added first 10% of data (going backward) stays within the channel
+        // defined by the previous 90%
+        const newPoints = extendedSegment.slice(previous90Percent, lookbackCount)
+
+        // Use previous channel parameters to check
+        const channelWidth = stdDev * optimalStdevMult
+        let pointsOutside = 0
+
+        newPoints.forEach((point, index) => {
+          const globalIndex = previous90Percent + index
+          const predictedY = slope * globalIndex + intercept
+          const upperBound = predictedY + channelWidth
+          const lowerBound = predictedY - channelWidth
+
+          if (point.close > upperBound || point.close < lowerBound) {
+            pointsOutside++
+          }
+        })
+
+        // If most of the new points are outside, break the trend
+        if (newPoints.length > 0 && pointsOutside / newPoints.length > 0.5) {
+          channelBroken = true
+          breakIndex = currentStartIndex + previousLookback
+          lookbackCount = previousLookback
+          break
+        }
+
+        // Update channel parameters with extended data
+        channelParams = findOptimalStdev(extendedSegment)
+        slope = channelParams.slope
+        intercept = channelParams.intercept
+        stdDev = channelParams.stdDev
+        optimalStdevMult = channelParams.optimalStdevMult
+      }
+
+      // Store this channel
+      const channelSegment = remainingData.slice(0, lookbackCount)
+      const channelWidth = stdDev * optimalStdevMult
+
+      // Calculate R²
+      const meanY = channelSegment.reduce((sum, p) => sum + p.close, 0) / channelSegment.length
+      let ssTotal = 0
+      let ssResidual = 0
+
+      channelSegment.forEach((point, index) => {
+        const predictedY = slope * index + intercept
+        ssTotal += Math.pow(point.close - meanY, 2)
+        ssResidual += Math.pow(point.close - predictedY, 2)
+      })
+
+      const rSquared = 1 - (ssResidual / ssTotal)
+
+      // Count touches
+      let touchCount = 0
+      const touchTolerance = 0.05
+
+      channelSegment.forEach((point, index) => {
+        const predictedY = slope * index + intercept
+        const upperBound = predictedY + channelWidth
+        const lowerBound = predictedY - channelWidth
+        const distanceToUpper = Math.abs(point.close - upperBound)
+        const distanceToLower = Math.abs(point.close - lowerBound)
+        const boundRange = channelWidth * 2
+
+        if (distanceToUpper <= boundRange * touchTolerance ||
+            distanceToLower <= boundRange * touchTolerance) {
+          touchCount++
+        }
+      })
+
+      channels.push({
+        startIndex: currentStartIndex,
+        endIndex: currentStartIndex + lookbackCount,
+        slope,
+        intercept,
+        channelWidth,
+        stdDev,
+        optimalStdevMult,
+        lookbackCount,
+        rSquared,
+        touchCount
+      })
+
+      // Move to next segment: start from (break point - lookback) or if no break, we're done
+      if (channelBroken) {
+        currentStartIndex = Math.max(currentStartIndex + 1, breakIndex - lookbackCount)
+      } else {
+        // Channel extended to the end of data, stop
+        break
+      }
+    }
+
+    return channels
+  }
+
+  // Effect to calculate all channels when findAllChannelEnabled changes
+  useEffect(() => {
+    if (findAllChannelEnabled && prices.length > 0) {
+      const dataLength = Math.min(prices.length, indicators.length)
+      const displayPrices = prices.slice(0, dataLength)
+      const foundChannels = findAllChannels(displayPrices)
+      setAllChannels(foundChannels)
+    } else {
+      setAllChannels([])
+    }
+  }, [findAllChannelEnabled, prices, indicators])
+
   // Calculate volume-weighted zone colors
   const calculateZoneColors = (data, channelInfo, numZones) => {
     if (!channelInfo || !data) return []
@@ -348,6 +567,20 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       dataPoint.channelUpper = channel.upper
       dataPoint.channelMid = channel.mid
       dataPoint.channelLower = channel.lower
+    }
+
+    // Add all channels data if enabled
+    if (findAllChannelEnabled && allChannels.length > 0) {
+      allChannels.forEach((channel, channelIndex) => {
+        // Check if this index is within this channel's range
+        if (index >= channel.startIndex && index < channel.endIndex) {
+          const localIndex = index - channel.startIndex
+          const midValue = channel.slope * localIndex + channel.intercept
+          dataPoint[`allChannel${channelIndex}Upper`] = midValue + channel.channelWidth
+          dataPoint[`allChannel${channelIndex}Mid`] = midValue
+          dataPoint[`allChannel${channelIndex}Lower`] = midValue - channel.channelWidth
+        }
+      })
     }
 
     return dataPoint
@@ -906,6 +1139,54 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               />
             </>
           )}
+
+          {/* All Channels Lines */}
+          {findAllChannelEnabled && allChannels.length > 0 && allChannels.map((channel, index) => {
+            // Define distinct colors for each channel
+            const channelColors = [
+              { upper: '#10b981', mid: '#3b82f6', lower: '#ef4444' },  // Green, Blue, Red
+              { upper: '#f59e0b', mid: '#8b5cf6', lower: '#ec4899' },  // Amber, Purple, Pink
+              { upper: '#14b8a6', mid: '#6366f1', lower: '#f97316' },  // Teal, Indigo, Orange
+              { upper: '#84cc16', mid: '#06b6d4', lower: '#f43f5e' },  // Lime, Cyan, Rose
+              { upper: '#a3e635', mid: '#0ea5e9', lower: '#e11d48' },  // Lime-light, Sky, Rose-dark
+            ]
+            const colors = channelColors[index % channelColors.length]
+
+            return (
+              <React.Fragment key={`channel-${index}`}>
+                <Line
+                  type="monotone"
+                  dataKey={`allChannel${index}Upper`}
+                  stroke={colors.upper}
+                  strokeWidth={1.5}
+                  dot={false}
+                  name={`Ch${index + 1} Upper`}
+                  strokeDasharray="5 5"
+                  opacity={0.8}
+                />
+                <Line
+                  type="monotone"
+                  dataKey={`allChannel${index}Mid`}
+                  stroke={colors.mid}
+                  strokeWidth={2}
+                  dot={false}
+                  name={`Ch${index + 1} (${channel.lookbackCount}pts, R²=${(channel.rSquared * 100).toFixed(1)}%)`}
+                  strokeDasharray="5 5"
+                  opacity={0.8}
+                />
+                <Line
+                  type="monotone"
+                  dataKey={`allChannel${index}Lower`}
+                  stroke={colors.lower}
+                  strokeWidth={1.5}
+                  dot={false}
+                  name={`Ch${index + 1} Lower`}
+                  strokeDasharray="5 5"
+                  opacity={0.8}
+                />
+              </React.Fragment>
+            )
+          })}
 
           <Line
             type="monotone"
