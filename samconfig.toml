@@ -5,7 +5,7 @@ version = 0.1
 [default.deploy.parameters]
 stack_name = "stock-trend-analyzer"
 s3_prefix = "stock-trend-analyzer"
-region = "us-east-1"
+region = "eu-west-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 parameter_overrides = "FMPApiKey=\"YOUR_API_KEY_HERE\""
@@ -16,3 +16,6 @@ resolve_s3 = true
 [default.build.parameters]
 cached = true
 parallel = true
+
+[default.global.parameters]
+region = "eu-west-1"
