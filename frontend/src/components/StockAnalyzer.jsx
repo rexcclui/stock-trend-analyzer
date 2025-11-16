@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { Plus, Loader2, TrendingUp, TrendingDown, AlertCircle, X } from 'lucide-react'
 import PriceChart from './PriceChart'
@@ -6,6 +6,7 @@ import IndicatorsChart from './IndicatorsChart'
 import SignalsList from './SignalsList'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const STOCK_HISTORY_KEY = 'stockSearchHistory'
 
 function StockAnalyzer() {
   const [symbol, setSymbol] = useState('')
@@ -14,9 +15,30 @@ function StockAnalyzer() {
   const [error, setError] = useState(null)
   const [charts, setCharts] = useState([])
   const [syncedMouseDate, setSyncedMouseDate] = useState(null)
+  const [stockHistory, setStockHistory] = useState([])
 
-  const analyzeStock = async () => {
-    if (!symbol.trim()) {
+  // Load stock history from localStorage on mount
+  useEffect(() => {
+    const savedHistory = localStorage.getItem(STOCK_HISTORY_KEY)
+    if (savedHistory) {
+      try {
+        setStockHistory(JSON.parse(savedHistory))
+      } catch (e) {
+        console.error('Failed to load stock history:', e)
+      }
+    }
+  }, [])
+
+  const saveToHistory = (stockSymbol) => {
+    const updatedHistory = [stockSymbol, ...stockHistory.filter(s => s !== stockSymbol)].slice(0, 10)
+    setStockHistory(updatedHistory)
+    localStorage.setItem(STOCK_HISTORY_KEY, JSON.stringify(updatedHistory))
+  }
+
+  const analyzeStock = async (symbolToAnalyze = null) => {
+    const targetSymbol = symbolToAnalyze || symbol
+
+    if (!targetSymbol.trim()) {
       setError('Please enter a stock symbol')
       return
     }
@@ -27,25 +49,38 @@ function StockAnalyzer() {
     try {
       const response = await axios.get(`${API_URL}/analyze`, {
         params: {
-          symbol: symbol.toUpperCase(),
+          symbol: targetSymbol.toUpperCase(),
           days: days
         }
       })
 
+      // Save to history
+      saveToHistory(targetSymbol.toUpperCase())
+
       // Add new chart to the array
       const newChart = {
         id: Date.now(),
-        symbol: symbol.toUpperCase(),
+        symbol: targetSymbol.toUpperCase(),
         data: response.data,
         showRSI: false,
         showMACD: false
       }
       setCharts(prevCharts => [...prevCharts, newChart])
+
+      // Clear input if not clicked from history
+      if (!symbolToAnalyze) {
+        setSymbol('')
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to analyze stock. Please check the symbol and try again.')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleHistoryClick = (stockSymbol) => {
+    setSymbol(stockSymbol)
+    analyzeStock(stockSymbol)
   }
 
   const removeChart = (chartId) => {
@@ -126,9 +161,29 @@ function StockAnalyzer() {
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Stock Symbol
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-slate-300">
+                Stock Symbol
+              </label>
+              {stockHistory.length > 0 && (
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className="text-xs text-slate-400">Recent:</span>
+                  {stockHistory.map((stock, index) => (
+                    <span key={stock}>
+                      <button
+                        onClick={() => handleHistoryClick(stock)}
+                        className="text-xs text-purple-400 hover:text-purple-300 hover:underline transition-colors"
+                      >
+                        {stock}
+                      </button>
+                      {index < stockHistory.length - 1 && (
+                        <span className="text-slate-500">, </span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
             <input
               type="text"
               value={symbol}
