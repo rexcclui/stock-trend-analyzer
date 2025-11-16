@@ -70,7 +70,8 @@ function StockAnalyzer() {
         showRSI: false,
         showMACD: false,
         smaPeriods: [],
-        smaVisibility: {}
+        smaVisibility: {},
+        zoomRange: { start: 0, end: null }
       }
       setCharts(prevCharts => [...prevCharts, newChart])
 
@@ -99,6 +100,16 @@ function StockAnalyzer() {
       prevCharts.map(chart =>
         chart.id === chartId
           ? { ...chart, [indicator]: value }
+          : chart
+      )
+    )
+  }
+
+  const updateChartZoom = (chartId, zoomRange) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart =>
+        chart.id === chartId
+          ? { ...chart, zoomRange }
           : chart
       )
     )
@@ -221,6 +232,16 @@ function StockAnalyzer() {
     { label: '5Y', days: '1825' },
     { label: 'Max', days: '3650' }
   ]
+
+  const extendTimePeriod = () => {
+    const currentIndex = timeRanges.findIndex(range => range.days === days)
+    if (currentIndex < timeRanges.length - 1) {
+      const nextRange = timeRanges[currentIndex + 1]
+      changeTimeRange(nextRange.days)
+      return true
+    }
+    return false
+  }
 
   return (
     <div className="space-y-6">
@@ -414,6 +435,9 @@ function StockAnalyzer() {
                   onDeleteSma={(period) => deleteSma(chart.id, period)}
                   chartHeight={chartHeight}
                   days={days}
+                  zoomRange={chart.zoomRange}
+                  onZoomChange={(newZoom) => updateChartZoom(chart.id, newZoom)}
+                  onExtendPeriod={extendTimePeriod}
                 />
               </div>
 
@@ -427,6 +451,9 @@ function StockAnalyzer() {
                     showMACD={chart.showMACD}
                     syncedMouseDate={syncedMouseDate}
                     setSyncedMouseDate={setSyncedMouseDate}
+                    zoomRange={chart.zoomRange}
+                    onZoomChange={(newZoom) => updateChartZoom(chart.id, newZoom)}
+                    onExtendPeriod={extendTimePeriod}
                   />
                 </div>
               )}

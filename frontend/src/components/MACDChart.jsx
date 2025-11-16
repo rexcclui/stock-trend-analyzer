@@ -1,7 +1,7 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { useRef, useEffect, useCallback } from 'react'
 
-function MACDChart({ indicators, syncedMouseDate, setSyncedMouseDate, zoomRange, onZoomChange }) {
+function MACDChart({ indicators, syncedMouseDate, setSyncedMouseDate, zoomRange, onZoomChange, onExtendPeriod }) {
   const chartRef = useRef(null)
 
   const chartData = [...indicators].reverse().map(ind => ({
@@ -18,6 +18,8 @@ function MACDChart({ indicators, syncedMouseDate, setSyncedMouseDate, zoomRange,
   // Handle mouse wheel for zoom
   const handleWheel = useCallback((e) => {
     e.preventDefault()
+    if (!onZoomChange) return
+
     const delta = e.deltaY
     const zoomFactor = 0.1 // 10% zoom per scroll
     const currentRange = endIndex - zoomRange.start
@@ -32,19 +34,29 @@ function MACDChart({ indicators, syncedMouseDate, setSyncedMouseDate, zoomRange,
       onZoomChange({ start: newStart, end: newEnd })
     } else {
       // Scroll down - Zoom out (show more data)
-      const newRange = Math.min(chartData.length, currentRange + zoomAmount)
-      const expansion = newRange - currentRange
-      const newStart = Math.max(0, zoomRange.start - Math.floor(expansion / 2))
-      const newEnd = Math.min(chartData.length, newStart + newRange)
+      // Check if already at full zoom
+      const isFullyZoomedOut = zoomRange.start === 0 && (zoomRange.end === null || zoomRange.end === chartData.length)
 
-      // If we've reached full view, set end to null
-      if (newStart === 0 && newEnd === chartData.length) {
-        onZoomChange({ start: 0, end: null })
+      if (isFullyZoomedOut) {
+        // Try to extend to next time period
+        if (onExtendPeriod) {
+          onExtendPeriod()
+        }
       } else {
-        onZoomChange({ start: newStart, end: newEnd })
+        const newRange = Math.min(chartData.length, currentRange + zoomAmount)
+        const expansion = newRange - currentRange
+        const newStart = Math.max(0, zoomRange.start - Math.floor(expansion / 2))
+        const newEnd = Math.min(chartData.length, newStart + newRange)
+
+        // If we've reached full view, set end to null
+        if (newStart === 0 && newEnd === chartData.length) {
+          onZoomChange({ start: 0, end: null })
+        } else {
+          onZoomChange({ start: newStart, end: newEnd })
+        }
       }
     }
-  }, [zoomRange, chartData.length, onZoomChange])
+  }, [zoomRange, chartData.length, onZoomChange, onExtendPeriod])
 
   // Add wheel event listener
   useEffect(() => {

@@ -1,18 +1,14 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useEffect } from 'react'
 import RSIChart from './RSIChart'
 import MACDChart from './MACDChart'
 
-function IndicatorsChart({ indicators, showRSI = true, showMACD = true, syncedMouseDate, setSyncedMouseDate }) {
-  const [zoomRange, setZoomRange] = useState({ start: 0, end: null })
-
+function IndicatorsChart({ indicators, showRSI = true, showMACD = true, syncedMouseDate, setSyncedMouseDate, zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   // Reset zoom when indicators change
   useEffect(() => {
-    setZoomRange({ start: 0, end: null })
-  }, [indicators.length])
-
-  const handleZoomChange = useCallback((newZoomRange) => {
-    setZoomRange(newZoomRange)
-  }, [])
+    if (onZoomChange) {
+      onZoomChange({ start: 0, end: null })
+    }
+  }, [indicators.length, onZoomChange])
 
   return (
     <div className="space-y-6">
@@ -22,7 +18,8 @@ function IndicatorsChart({ indicators, showRSI = true, showMACD = true, syncedMo
           syncedMouseDate={syncedMouseDate}
           setSyncedMouseDate={setSyncedMouseDate}
           zoomRange={zoomRange}
-          onZoomChange={handleZoomChange}
+          onZoomChange={onZoomChange}
+          onExtendPeriod={onExtendPeriod}
         />
       )}
 
@@ -32,7 +29,8 @@ function IndicatorsChart({ indicators, showRSI = true, showMACD = true, syncedMo
           syncedMouseDate={syncedMouseDate}
           setSyncedMouseDate={setSyncedMouseDate}
           zoomRange={zoomRange}
-          onZoomChange={handleZoomChange}
+          onZoomChange={onZoomChange}
+          onExtendPeriod={onExtendPeriod}
         />
       )}
     </div>

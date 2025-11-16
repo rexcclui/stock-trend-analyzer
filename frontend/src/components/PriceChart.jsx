@@ -2,14 +2,15 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 import { X } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, chartHeight = 400, days = '365' }) {
-  const [zoomRange, setZoomRange] = useState({ start: 0, end: null })
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
 
   // Reset zoom when prices change
   useEffect(() => {
-    setZoomRange({ start: 0, end: null })
-  }, [prices.length])
+    if (onZoomChange) {
+      onZoomChange({ start: 0, end: null })
+    }
+  }, [prices.length, onZoomChange])
 
   // Calculate SMA for a given period
   const calculateSMA = (data, period) => {
@@ -59,6 +60,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // Handle mouse wheel for zoom
   const handleWheel = (e) => {
     e.preventDefault()
+    if (!onZoomChange) return
+
     const delta = e.deltaY
     const zoomFactor = 0.1 // 10% zoom per scroll
     const currentRange = endIndex - zoomRange.start
@@ -70,19 +73,29 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const reduction = currentRange - newRange
       const newStart = Math.min(chartData.length - newRange, zoomRange.start + Math.floor(reduction / 2))
       const newEnd = Math.min(chartData.length, newStart + newRange)
-      setZoomRange({ start: newStart, end: newEnd })
+      onZoomChange({ start: newStart, end: newEnd })
     } else {
       // Scroll down - Zoom out (show more data)
-      const newRange = Math.min(chartData.length, currentRange + zoomAmount)
-      const expansion = newRange - currentRange
-      const newStart = Math.max(0, zoomRange.start - Math.floor(expansion / 2))
-      const newEnd = Math.min(chartData.length, newStart + newRange)
+      // Check if already at full zoom
+      const isFullyZoomedOut = zoomRange.start === 0 && (zoomRange.end === null || zoomRange.end === chartData.length)
 
-      // If we've reached full view, set end to null
-      if (newStart === 0 && newEnd === chartData.length) {
-        setZoomRange({ start: 0, end: null })
+      if (isFullyZoomedOut) {
+        // Try to extend to next time period
+        if (onExtendPeriod) {
+          onExtendPeriod()
+        }
       } else {
-        setZoomRange({ start: newStart, end: newEnd })
+        const newRange = Math.min(chartData.length, currentRange + zoomAmount)
+        const expansion = newRange - currentRange
+        const newStart = Math.max(0, zoomRange.start - Math.floor(expansion / 2))
+        const newEnd = Math.min(chartData.length, newStart + newRange)
+
+        // If we've reached full view, set end to null
+        if (newStart === 0 && newEnd === chartData.length) {
+          onZoomChange({ start: 0, end: null })
+        } else {
+          onZoomChange({ start: newStart, end: newEnd })
+        }
       }
     }
   }
