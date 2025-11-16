@@ -77,8 +77,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // touchCount will be calculated after regression
     } else {
       // Run optimization to find best parameters with trend-breaking logic
-      const findBestChannel = () => {
-      const minPoints = Math.min(100, data.length) // Start from 100 points (or less if data is shorter)
+      const findBestChannel = (startingLookback = null) => {
+      // If user manually set a lookback, use it as starting point; otherwise use 100
+      const defaultMinPoints = Math.min(100, data.length)
+      const minPoints = startingLookback ? Math.min(startingLookback, data.length) : defaultMinPoints
       const maxPoints = data.length // Always test up to 100% of available data
 
       // Test stdev multipliers from 1 to 4 with 0.1 increments for finer control
@@ -255,7 +257,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       }
 
       // Find best channel parameters (lookback count and stdev multiplier)
-      const bestChannelParams = findBestChannel()
+      // Use current lookback as starting point if user manually adjusted it
+      const bestChannelParams = findBestChannel(optimizedLookbackCount)
       recentDataCount = bestChannelParams.count
       optimalStdevMult = bestChannelParams.stdevMultiplier
       touchCount = bestChannelParams.touches
