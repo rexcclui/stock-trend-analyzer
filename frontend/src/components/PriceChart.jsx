@@ -77,7 +77,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               }}
               className={`flex items-center gap-2 px-2 py-1 rounded transition-all ${
                 isSma ? 'cursor-pointer hover:bg-slate-700' : 'cursor-default'
-              } ${!isVisible ? 'opacity-40' : 'opacity-100'}`}
+              }`}
               disabled={!isSma}
             >
               <div
@@ -85,10 +85,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   width: 12,
                   height: 12,
                   backgroundColor: entry.color,
-                  borderRadius: '50%'
+                  borderRadius: '50%',
+                  opacity: isVisible ? 1 : 0.3
                 }}
               />
-              <span className="text-sm text-slate-300">{entry.value}</span>
+              <span className={`text-sm text-slate-300 ${!isVisible ? 'line-through opacity-50' : ''}`}>
+                {entry.value}
+              </span>
             </button>
           )
         })}
