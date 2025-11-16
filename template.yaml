@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Stock Trend Analyzer Serverless Application
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Runtime: java17
+    Environment:
+      Variables:
+        FMP_API_KEY: !Ref FMPApiKey
+
+Parameters:
+  FMPApiKey:
+    Type: String
+    Description: Financial Modeling Prep API Key
+    NoEcho: true
+
+Resources:
+  StockAnalyzerApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: prod
+      Cors:
+        AllowMethods: "'GET, POST, OPTIONS'"
+        AllowHeaders: "'Content-Type'"
+        AllowOrigin: "'*'"
+
+  AnalyzeStockFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend
+      Handler: com.stockanalyzer.handler.AnalyzeStockHandler::handleRequest
+      Events:
+        AnalyzeStock:
+          Type: Api
+          Properties:
+            RestApiId: !Ref StockAnalyzerApi
+            Path: /analyze
+            Method: get
+
+  BacktestFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend
+      Handler: com.stockanalyzer.handler.BacktestHandler::handleRequest
+      Events:
+        Backtest:
+          Type: Api
+          Properties:
+            RestApiId: !Ref StockAnalyzerApi
+            Path: /backtest
+            Method: get
+
+Outputs:
+  StockAnalyzerApiUrl:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${StockAnalyzerApi}.execute-api.${AWS::Region}.amazonaws.com/prod/"
+
+  AnalyzeEndpoint:
+    Description: "Analyze Stock Endpoint"
+    Value: !Sub "https://${StockAnalyzerApi}.execute-api.${AWS::Region}.amazonaws.com/prod/analyze"
+
+  BacktestEndpoint:
+    Description: "Backtest Endpoint"
+    Value: !Sub "https://${StockAnalyzerApi}.execute-api.${AWS::Region}.amazonaws.com/prod/backtest"
