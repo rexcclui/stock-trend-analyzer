@@ -413,6 +413,7 @@ function StockAnalyzer() {
                   onToggleSma={(period) => toggleSmaVisibility(chart.id, period)}
                   onDeleteSma={(period) => deleteSma(chart.id, period)}
                   chartHeight={chartHeight}
+                  days={days}
                 />
               </div>
 

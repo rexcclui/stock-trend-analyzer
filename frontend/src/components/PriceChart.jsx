@@ -1,7 +1,7 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { X } from 'lucide-react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, chartHeight = 400 }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, chartHeight = 400, days = '365' }) {
   // Calculate SMA for a given period
   const calculateSMA = (data, period) => {
     const smaData = []
@@ -84,6 +84,53 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     setSyncedMouseDate(null)
   }
 
+  const CustomXAxisTick = ({ x, y, payload, index }) => {
+    const currentDate = payload.value
+    const isLongPeriod = parseInt(days) >= 1095 // 3Y or more
+    const isShortPeriod = parseInt(days) < 365 // Less than 1Y
+
+    let color = '#94a3b8' // Default color
+
+    if (index > 0 && currentDate) {
+      // Find the current data point index
+      const currentDataIndex = chartData.findIndex(d => d.date === currentDate)
+
+      if (currentDataIndex > 0) {
+        const prevDate = chartData[currentDataIndex - 1]?.date
+
+        if (prevDate) {
+          const current = new Date(currentDate)
+          const previous = new Date(prevDate)
+
+          if (isLongPeriod) {
+            // For >= 3Y, change color when year changes
+            if (current.getFullYear() !== previous.getFullYear()) {
+              color = '#3b82f6' // Blue for year change
+            }
+          } else if (isShortPeriod) {
+            // For < 1Y, change color when month changes
+            if (current.getMonth() !== previous.getMonth()) {
+              color = '#10b981' // Green for month change
+            }
+          }
+        }
+      }
+    }
+
+    return (
+      <text
+        x={x}
+        y={y}
+        dy={16}
+        textAnchor="middle"
+        fill={color}
+        fontSize={12}
+      >
+        {currentDate}
+      </text>
+    )
+  }
+
   const CustomLegend = ({ payload }) => {
     return (
       <div className="flex justify-center gap-4 mt-2 flex-wrap">
@@ -152,7 +199,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
           <XAxis
             dataKey="date"
-            tick={{ fontSize: 12, fill: '#94a3b8' }}
+            tick={<CustomXAxisTick />}
             interval={Math.floor(chartData.length / 10)}
             stroke="#475569"
           />
