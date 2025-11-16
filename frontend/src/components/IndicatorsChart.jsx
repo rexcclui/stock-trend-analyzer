@@ -1,14 +1,9 @@
-import { useEffect } from 'react'
 import RSIChart from './RSIChart'
 import MACDChart from './MACDChart'
 
 function IndicatorsChart({ indicators, showRSI = true, showMACD = true, syncedMouseDate, setSyncedMouseDate, zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
-  // Reset zoom when indicators change
-  useEffect(() => {
-    if (onZoomChange) {
-      onZoomChange({ start: 0, end: null })
-    }
-  }, [indicators.length, onZoomChange])
+  // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
+  // No need to reset here to avoid infinite loop
 
   return (
     <div className="space-y-6">

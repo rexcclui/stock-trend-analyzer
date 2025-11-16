@@ -5,12 +5,8 @@ import { useState, useRef, useEffect } from 'react'
 function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
 
-  // Reset zoom when prices change
-  useEffect(() => {
-    if (onZoomChange) {
-      onZoomChange({ start: 0, end: null })
-    }
-  }, [prices.length, onZoomChange])
+  // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
+  // No need to reset here to avoid infinite loop
 
   // Calculate SMA for a given period
   const calculateSMA = (data, period) => {

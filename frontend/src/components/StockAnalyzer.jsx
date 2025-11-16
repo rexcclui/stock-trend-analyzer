@@ -328,7 +328,6 @@ function StockAnalyzer() {
                   >
                     <Minus className="w-4 h-4" />
                   </button>
-                  <span className="text-sm text-slate-300 min-w-[3rem] text-center">{chartHeight}px</span>
                   <button
                     onClick={() => setChartHeight(prev => Math.min(1000, prev + 50))}
                     className="p-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg hover:bg-slate-600 transition-colors"
