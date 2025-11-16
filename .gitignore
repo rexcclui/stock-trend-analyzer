@@ -12,6 +12,9 @@ node_modules/
 dist/
 build/
 
+# AWS SAM
+.aws-sam/
+
 # OS
 .DS_Store
 
