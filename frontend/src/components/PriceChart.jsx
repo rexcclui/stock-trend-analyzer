@@ -108,7 +108,25 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const stdDev = Math.sqrt(variance)
 
     // Channel bounds using configurable width multiplier
-    const channelWidth = stdDev * slopeChannelWidthMultiplier
+    let channelWidth = stdDev * slopeChannelWidthMultiplier
+
+    // Extend channel to ensure at least one data point touches upper or lower bound
+    const extendChannelToData = () => {
+      const tolerance = 0.01 // 1% tolerance for "touching"
+
+      // Find max deviation above and below the trend line
+      const maxAbove = Math.max(...distances)
+      const maxBelow = Math.abs(Math.min(...distances))
+      const maxDeviation = Math.max(maxAbove, maxBelow)
+
+      // If no data point is close to the boundary, extend the channel
+      if (maxDeviation > channelWidth * (1 + tolerance)) {
+        // Extend channel width to reach the furthest point
+        channelWidth = maxDeviation * 1.02 // Add 2% margin
+      }
+    }
+
+    extendChannelToData()
 
     // Calculate channel lines for all data points
     const channelData = data.map((point, globalIndex) => {
@@ -133,6 +151,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       else if (point.close < predictedY) finalCountBelow++
     })
 
+    // Calculate effective multiplier after extension
+    const effectiveMultiplier = channelWidth / stdDev
+
     return {
       channelData,
       slope,
@@ -141,7 +162,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       stdDev,
       recentDataCount,
       percentAbove: (finalCountAbove / n * 100).toFixed(1),
-      percentBelow: (finalCountBelow / n * 100).toFixed(1)
+      percentBelow: (finalCountBelow / n * 100).toFixed(1),
+      effectiveMultiplier
     }
   }
 
@@ -579,7 +601,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 stroke="#10b981"
                 strokeWidth={1.5}
                 dot={false}
-                name={`Upper (+${slopeChannelWidthMultiplier.toFixed(1)}σ=$${slopeChannelInfo.stdDev.toFixed(2)})`}
+                name={`Upper (+${slopeChannelInfo.effectiveMultiplier.toFixed(2)}σ=$${slopeChannelInfo.stdDev.toFixed(2)})`}
                 strokeDasharray="3 3"
               />
               <Line
@@ -597,7 +619,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 stroke="#ef4444"
                 strokeWidth={1.5}
                 dot={false}
-                name={`Lower (-${slopeChannelWidthMultiplier.toFixed(1)}σ=$${slopeChannelInfo.stdDev.toFixed(2)})`}
+                name={`Lower (-${slopeChannelInfo.effectiveMultiplier.toFixed(2)}σ=$${slopeChannelInfo.stdDev.toFixed(2)})`}
                 strokeDasharray="3 3"
               />
             </>
