@@ -223,10 +223,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // Use the optimal stdev multiplier found by the best-fit algorithm
     let channelWidth = stdDev * optimalStdevMult
 
-    // Calculate channel lines for all data points
+    // Calculate channel lines ONLY for the recent data period (lookback window)
+    // Don't show channel for older historical data
+    const startOfRecentData = data.length - recentDataCount
     const channelData = data.map((point, globalIndex) => {
-      // Adjust index relative to the start of recent data (counting backwards from last point)
-      const startOfRecentData = data.length - recentDataCount
+      // Only calculate channel for the lookback period
+      if (globalIndex < startOfRecentData) {
+        return null // No channel for historical data before lookback period
+      }
+
+      // Adjust index relative to the start of recent data (0 = first point in lookback)
       const adjustedIndex = globalIndex - startOfRecentData
 
       const midValue = slope * adjustedIndex + intercept
