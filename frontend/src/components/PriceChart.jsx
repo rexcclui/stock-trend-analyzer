@@ -52,7 +52,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const findBestChannel = () => {
       const minPoints = Math.min(20, data.length) // Start from 20 points (or less if data is shorter)
       const maxPoints = Math.floor(data.length * (slopeChannelDataPercent / 100))
-      const stepSize = Math.max(5, Math.floor((maxPoints - minPoints) / 20)) // Test ~20 different windows
 
       // Test stdev multipliers from 1 to 4 with 0.25 increments
       const stdevMultipliers = []
@@ -64,8 +63,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       let bestCount = minPoints
       let bestStdevMult = 2.5
 
-      // Try different lookback periods
-      for (let count = minPoints; count <= maxPoints; count += stepSize) {
+      // Try different lookback periods: -20, -21, -22, -23... incrementing by 1
+      for (let count = minPoints; count <= maxPoints; count++) {
         const testData = data.slice(-count)
 
         // Calculate regression for this window
@@ -121,61 +120,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           if (touchCount > bestTouchCount) {
             bestTouchCount = touchCount
             bestCount = count
-            bestStdevMult = stdevMult
-          }
-        }
-      }
-
-      // Also test the maximum lookback to ensure we don't miss it
-      if (maxPoints > minPoints && (maxPoints - bestCount) > stepSize) {
-        const testData = data.slice(-maxPoints)
-
-        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
-        const n = testData.length
-
-        testData.forEach((point, index) => {
-          sumX += index
-          sumY += point.close
-          sumXY += index * point.close
-          sumX2 += index * index
-        })
-
-        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
-        const intercept = (sumY - slope * sumX) / n
-
-        const distances = testData.map((point, index) => {
-          const predictedY = slope * index + intercept
-          return point.close - predictedY
-        })
-
-        const meanDistance = distances.reduce((a, b) => a + b, 0) / distances.length
-        const variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
-        const stdDev = Math.sqrt(variance)
-
-        for (const stdevMult of stdevMultipliers) {
-          const channelWidth = stdDev * stdevMult
-
-          let touchCount = 0
-          const touchTolerance = 0.05
-
-          testData.forEach((point, index) => {
-            const predictedY = slope * index + intercept
-            const upperBound = predictedY + channelWidth
-            const lowerBound = predictedY - channelWidth
-
-            const distanceToUpper = Math.abs(point.close - upperBound)
-            const distanceToLower = Math.abs(point.close - lowerBound)
-            const boundRange = channelWidth * 2
-
-            if (distanceToUpper <= boundRange * touchTolerance ||
-                distanceToLower <= boundRange * touchTolerance) {
-              touchCount++
-            }
-          })
-
-          if (touchCount > bestTouchCount) {
-            bestTouchCount = touchCount
-            bestCount = maxPoints
             bestStdevMult = stdevMult
           }
         }
