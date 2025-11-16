@@ -2,6 +2,7 @@ import { useState } from 'react'
 import axios from 'axios'
 import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts'
+import { apiCache } from '../utils/apiCache'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -23,13 +24,32 @@ function BacktestResults() {
     setData(null)
 
     try {
-      const response = await axios.get(`${API_URL}/backtest`, {
-        params: {
-          symbol: symbol.toUpperCase(),
-          days: days
-        }
-      })
-      setData(response.data)
+      const upperSymbol = symbol.toUpperCase()
+
+      // Try to get from cache first (use "backtest:" prefix to differentiate)
+      const cacheKey = `backtest:${upperSymbol}`
+      let data = apiCache.get(cacheKey, days)
+
+      if (data) {
+        console.log(`[Cache] ✅ Cache HIT for ${cacheKey}:${days}`)
+      } else {
+        console.log(`[Cache] ❌ Cache MISS for ${cacheKey}:${days}, fetching from server...`)
+        const response = await axios.get(`${API_URL}/backtest`, {
+          params: {
+            symbol: upperSymbol,
+            days: days
+          }
+        })
+        data = response.data
+
+        // Store in cache
+        apiCache.set(cacheKey, days, data)
+      }
+
+      // Log cache statistics
+      apiCache.logStats()
+
+      setData(data)
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to run backtest. Please check the symbol and try again.')
     } finally {
