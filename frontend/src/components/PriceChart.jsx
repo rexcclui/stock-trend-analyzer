@@ -1,6 +1,29 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
 
 function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma }) {
+  // Calculate SMA for a given period
+  const calculateSMA = (data, period) => {
+    const smaData = []
+    for (let i = 0; i < data.length; i++) {
+      if (i < period - 1) {
+        smaData.push(null)
+      } else {
+        let sum = 0
+        for (let j = 0; j < period; j++) {
+          sum += data[i - j].close
+        }
+        smaData.push(sum / period)
+      }
+    }
+    return smaData
+  }
+
+  // Pre-calculate all SMAs
+  const smaCache = {}
+  smaPeriods.forEach(period => {
+    smaCache[period] = calculateSMA(prices, period)
+  })
+
   // Combine data
   const chartData = prices.map((price, index) => {
     const indicator = indicators[index] || {}
@@ -12,7 +35,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // Add SMA data for each period
     smaPeriods.forEach(period => {
       const smaKey = `sma${period}`
-      dataPoint[smaKey] = indicator[smaKey] || null
+      // Try backend data first, fall back to frontend calculation
+      dataPoint[smaKey] = indicator[smaKey] || smaCache[period][index]
     })
 
     return dataPoint
