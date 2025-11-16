@@ -1,24 +1,52 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma }) {
   // Combine data
   const chartData = prices.map((price, index) => {
-    return {
+    const indicator = indicators[index] || {}
+    const dataPoint = {
       date: price.date,
       close: price.close,
     }
+
+    // Add SMA data for each period
+    smaPeriods.forEach(period => {
+      const smaKey = `sma${period}`
+      dataPoint[smaKey] = indicator[smaKey] || null
+    })
+
+    return dataPoint
   }).reverse() // Show oldest to newest
 
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
+      const data = payload[0].payload
       return (
         <div className="bg-slate-800 p-3 border border-slate-600 rounded shadow-lg">
-          <p className="font-semibold text-slate-100">{payload[0].payload.date}</p>
-          <p className="text-sm text-slate-300">Close: ${payload[0].payload.close?.toFixed(2)}</p>
+          <p className="font-semibold text-slate-100">{data.date}</p>
+          <p className="text-sm text-slate-300">Close: ${data.close?.toFixed(2)}</p>
+          {smaPeriods.map(period => {
+            const smaKey = `sma${period}`
+            const smaValue = data[smaKey]
+            if (smaValue && smaVisibility[period]) {
+              return (
+                <p key={period} className="text-sm" style={{ color: getSmaColor(period) }}>
+                  SMA{period}: ${smaValue.toFixed(2)}
+                </p>
+              )
+            }
+            return null
+          })}
         </div>
       )
     }
     return null
+  }
+
+  const getSmaColor = (period) => {
+    const colors = ['#3b82f6', '#f97316', '#10b981', '#f59e0b', '#ec4899']
+    const index = smaPeriods.indexOf(period) % colors.length
+    return colors[index]
   }
 
   const handleMouseMove = (e) => {
@@ -29,6 +57,43 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   const handleMouseLeave = () => {
     setSyncedMouseDate(null)
+  }
+
+  const CustomLegend = ({ payload }) => {
+    return (
+      <div className="flex justify-center gap-4 mt-2 flex-wrap">
+        {payload.map((entry, index) => {
+          const isSma = entry.dataKey.startsWith('sma')
+          const period = isSma ? parseInt(entry.dataKey.replace('sma', '')) : null
+          const isVisible = isSma ? smaVisibility[period] : true
+
+          return (
+            <button
+              key={`item-${index}`}
+              onClick={() => {
+                if (isSma && onToggleSma) {
+                  onToggleSma(period)
+                }
+              }}
+              className={`flex items-center gap-2 px-2 py-1 rounded transition-all ${
+                isSma ? 'cursor-pointer hover:bg-slate-700' : 'cursor-default'
+              } ${!isVisible ? 'opacity-40' : 'opacity-100'}`}
+              disabled={!isSma}
+            >
+              <div
+                style={{
+                  width: 12,
+                  height: 12,
+                  backgroundColor: entry.color,
+                  borderRadius: '50%'
+                }}
+              />
+              <span className="text-sm text-slate-300">{entry.value}</span>
+            </button>
+          )
+        })}
+      </div>
+    )
   }
 
   return (
@@ -49,7 +114,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           />
           <YAxis domain={['auto', 'auto']} tick={{ fill: '#94a3b8' }} stroke="#475569" />
           <Tooltip content={<CustomTooltip />} />
-          <Legend wrapperStyle={{ color: '#94a3b8' }} />
+          <Legend content={<CustomLegend />} />
           {syncedMouseDate && (
             <ReferenceLine
               x={syncedMouseDate}
@@ -66,6 +131,23 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             dot={false}
             name="Close Price"
           />
+          {smaPeriods.map((period, index) => {
+            const smaKey = `sma${period}`
+            if (!smaVisibility[period]) return null
+
+            return (
+              <Line
+                key={smaKey}
+                type="monotone"
+                dataKey={smaKey}
+                stroke={getSmaColor(period)}
+                strokeWidth={1.5}
+                dot={false}
+                name={`SMA ${period}`}
+                strokeDasharray="5 5"
+              />
+            )
+          })}
         </LineChart>
       </ResponsiveContainer>
     </div>

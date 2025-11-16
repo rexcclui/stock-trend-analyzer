@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
-import { Plus, Loader2, TrendingUp, TrendingDown, AlertCircle, X } from 'lucide-react'
+import { Plus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings } from 'lucide-react'
 import PriceChart from './PriceChart'
 import IndicatorsChart from './IndicatorsChart'
 import SignalsList from './SignalsList'
@@ -17,6 +17,8 @@ function StockAnalyzer() {
   const [syncedMouseDate, setSyncedMouseDate] = useState(null)
   const [stockHistory, setStockHistory] = useState([])
   const [displayColumns, setDisplayColumns] = useState(1)
+  const [smaDialogOpen, setSmaDialogOpen] = useState(false)
+  const [editingSmaChartId, setEditingSmaChartId] = useState(null)
 
   // Load stock history from localStorage on mount
   useEffect(() => {
@@ -65,7 +67,9 @@ function StockAnalyzer() {
         symbol: targetSymbol.toUpperCase(),
         data: response.data,
         showRSI: false,
-        showMACD: false
+        showMACD: false,
+        smaPeriods: [10, 20, 50],
+        smaVisibility: { 10: true, 20: true, 50: true }
       }
       setCharts(prevCharts => [...prevCharts, newChart])
 
@@ -96,6 +100,48 @@ function StockAnalyzer() {
           ? { ...chart, [indicator]: value }
           : chart
       )
+    )
+  }
+
+  const openSmaDialog = (chartId) => {
+    setEditingSmaChartId(chartId)
+    setSmaDialogOpen(true)
+  }
+
+  const closeSmaDialog = () => {
+    setSmaDialogOpen(false)
+    setEditingSmaChartId(null)
+  }
+
+  const updateSmaPeriods = (chartId, newPeriods) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          const newVisibility = {}
+          newPeriods.forEach(period => {
+            newVisibility[period] = chart.smaVisibility?.[period] ?? true
+          })
+          return { ...chart, smaPeriods: newPeriods, smaVisibility: newVisibility }
+        }
+        return chart
+      })
+    )
+  }
+
+  const toggleSmaVisibility = (chartId, period) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            smaVisibility: {
+              ...chart.smaVisibility,
+              [period]: !chart.smaVisibility[period]
+            }
+          }
+        }
+        return chart
+      })
     )
   }
 
@@ -244,7 +290,7 @@ function StockAnalyzer() {
         <div
           className="grid gap-6"
           style={{
-            gridTemplateColumns: `repeat(${displayColumns}, minmax(0, 1fr))`
+            gridTemplateColumns: `repeat(${Math.min(displayColumns, charts.length)}, minmax(0, 1fr))`
           }}
         >
           {charts.map((chart) => (
@@ -260,13 +306,26 @@ function StockAnalyzer() {
                   <X className="w-5 h-5" />
                 </button>
 
-                <h3 className="text-lg font-semibold mb-4 text-slate-100 pr-12">{chart.symbol}</h3>
+                <div className="flex items-center justify-between mb-4 pr-12">
+                  <h3 className="text-lg font-semibold text-slate-100">{chart.symbol}</h3>
+                  <button
+                    onClick={() => openSmaDialog(chart.id)}
+                    className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
+                    title="Configure SMA"
+                  >
+                    <Settings className="w-4 h-4" />
+                    SMA
+                  </button>
+                </div>
                 <PriceChart
                   prices={chart.data.prices}
                   indicators={chart.data.indicators}
                   signals={chart.data.signals}
                   syncedMouseDate={syncedMouseDate}
                   setSyncedMouseDate={setSyncedMouseDate}
+                  smaPeriods={chart.smaPeriods}
+                  smaVisibility={chart.smaVisibility}
+                  onToggleSma={(period) => toggleSmaVisibility(chart.id, period)}
                 />
 
                 {/* Controls: Time Range + Indicators */}
@@ -329,6 +388,84 @@ function StockAnalyzer() {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* SMA Configuration Dialog */}
+      {smaDialogOpen && editingSmaChartId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={closeSmaDialog}>
+          <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-100">Configure SMA Lines</h3>
+              <button
+                onClick={closeSmaDialog}
+                className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {(() => {
+              const chart = charts.find(c => c.id === editingSmaChartId)
+              if (!chart) return null
+
+              const tempPeriods = [...chart.smaPeriods]
+
+              return (
+                <div className="space-y-3">
+                  {tempPeriods.map((period, index) => (
+                    <div key={index} className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        max="200"
+                        value={period}
+                        onChange={(e) => {
+                          const newPeriods = [...tempPeriods]
+                          newPeriods[index] = parseInt(e.target.value) || 1
+                          updateSmaPeriods(editingSmaChartId, newPeriods)
+                        }}
+                        className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                      <button
+                        onClick={() => {
+                          const newPeriods = tempPeriods.filter((_, i) => i !== index)
+                          updateSmaPeriods(editingSmaChartId, newPeriods)
+                        }}
+                        disabled={tempPeriods.length === 1}
+                        className="p-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                        title="Remove SMA"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {tempPeriods.length < 5 && (
+                    <button
+                      onClick={() => {
+                        const newPeriods = [...tempPeriods, 30]
+                        updateSmaPeriods(editingSmaChartId, newPeriods)
+                      }}
+                      className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add SMA Line
+                    </button>
+                  )}
+
+                  <div className="pt-3 border-t border-slate-700">
+                    <button
+                      onClick={closeSmaDialog}
+                      className="w-full px-4 py-2 bg-slate-700 text-slate-100 rounded-lg hover:bg-slate-600 transition-colors"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
         </div>
       )}
     </div>
