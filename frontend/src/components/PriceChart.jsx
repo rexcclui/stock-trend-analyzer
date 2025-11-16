@@ -50,7 +50,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // Find the best channel by starting from the last point and extending backwards
     // Tests different lookback periods and stdev multipliers, scoring by boundary touches
     const findBestChannel = () => {
-      const minPoints = Math.min(100, data.length) // Start from 100 points (or less if data is shorter)
+      const minPoints = Math.min(20, data.length) // Start from 20 points (or less if data is shorter)
       const maxPoints = Math.floor(data.length * (slopeChannelDataPercent / 100))
       const stepSize = Math.max(5, Math.floor((maxPoints - minPoints) / 20)) // Test ~20 different windows
 
