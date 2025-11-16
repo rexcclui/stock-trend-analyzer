@@ -2,8 +2,19 @@ import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 import { X } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, slopeChannelEnabled = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, slopeChannelEnabled = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
+  const [localDataPercent, setLocalDataPercent] = useState(slopeChannelDataPercent)
+  const [localWidthMultiplier, setLocalWidthMultiplier] = useState(slopeChannelWidthMultiplier)
+
+  // Sync local state with props
+  useEffect(() => {
+    setLocalDataPercent(slopeChannelDataPercent)
+  }, [slopeChannelDataPercent])
+
+  useEffect(() => {
+    setLocalWidthMultiplier(slopeChannelWidthMultiplier)
+  }, [slopeChannelWidthMultiplier])
 
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
   // No need to reset here to avoid infinite loop
@@ -658,7 +669,102 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
   return (
-    <div ref={chartContainerRef} style={{ width: '100%', height: chartHeight }}>
+    <div ref={chartContainerRef} style={{ width: '100%', height: chartHeight, position: 'relative' }}>
+      {/* Slope Channel Controls Overlay */}
+      {slopeChannelEnabled && slopeChannelInfo && onSlopeChannelParamsChange && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            background: 'rgba(30, 41, 59, 0.95)',
+            border: '1px solid rgb(71, 85, 105)',
+            borderRadius: '8px',
+            padding: '12px',
+            zIndex: 10,
+            minWidth: '280px',
+            backdropFilter: 'blur(4px)'
+          }}
+        >
+          <div style={{ fontSize: '12px', fontWeight: '600', color: 'rgb(226, 232, 240)', marginBottom: '10px' }}>
+            Channel Controls
+          </div>
+
+          {/* Lookback Period */}
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <label style={{ fontSize: '11px', color: 'rgb(203, 213, 225)', fontWeight: '500' }}>
+                Lookback
+              </label>
+              <span style={{ fontSize: '11px', color: 'rgb(203, 213, 225)', fontFamily: 'monospace', fontWeight: '600' }}>
+                {localDataPercent}%
+              </span>
+            </div>
+            <input
+              type="range"
+              min="10"
+              max="100"
+              step="5"
+              value={localDataPercent}
+              onChange={(e) => {
+                const newValue = parseInt(e.target.value)
+                setLocalDataPercent(newValue)
+                onSlopeChannelParamsChange({ slopeChannelDataPercent: newValue })
+              }}
+              style={{
+                width: '100%',
+                height: '4px',
+                borderRadius: '2px',
+                outline: 'none',
+                background: 'linear-gradient(to right, rgb(139, 92, 246) 0%, rgb(139, 92, 246) ' + localDataPercent + '%, rgb(71, 85, 105) ' + localDataPercent + '%, rgb(71, 85, 105) 100%)',
+                cursor: 'pointer'
+              }}
+            />
+          </div>
+
+          {/* Channel Width */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+              <label style={{ fontSize: '11px', color: 'rgb(203, 213, 225)', fontWeight: '500' }}>
+                Width
+              </label>
+              <span style={{ fontSize: '11px', color: 'rgb(203, 213, 225)', fontFamily: 'monospace', fontWeight: '600' }}>
+                {localWidthMultiplier.toFixed(1)}σ
+              </span>
+            </div>
+            <input
+              type="range"
+              min="1"
+              max="4"
+              step="0.1"
+              value={localWidthMultiplier}
+              onChange={(e) => {
+                const newValue = parseFloat(e.target.value)
+                setLocalWidthMultiplier(newValue)
+                onSlopeChannelParamsChange({ slopeChannelWidthMultiplier: newValue })
+              }}
+              style={{
+                width: '100%',
+                height: '4px',
+                borderRadius: '2px',
+                outline: 'none',
+                background: 'linear-gradient(to right, rgb(139, 92, 246) 0%, rgb(139, 92, 246) ' + ((localWidthMultiplier - 1) / 3 * 100) + '%, rgb(71, 85, 105) ' + ((localWidthMultiplier - 1) / 3 * 100) + '%, rgb(71, 85, 105) 100%)',
+                cursor: 'pointer'
+              }}
+            />
+          </div>
+
+          {/* Channel Info */}
+          <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgb(71, 85, 105)' }}>
+            <div style={{ fontSize: '10px', color: 'rgb(148, 163, 184)', lineHeight: '1.4' }}>
+              <div>Points: {slopeChannelInfo.recentDataCount}</div>
+              <div>R²: {(slopeChannelInfo.rSquared * 100).toFixed(1)}%</div>
+              <div>StdDev: ${slopeChannelInfo.stdDev.toFixed(2)}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ResponsiveContainer>
         <ComposedChart
           data={chartDataWithZones}
