@@ -695,8 +695,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         <div
           style={{
             position: 'absolute',
-            top: '10px',
-            right: '10px',
+            bottom: '60px',
+            left: '50%',
+            transform: 'translateX(-50%)',
             background: 'rgba(30, 41, 59, 0.95)',
             border: '1px solid rgb(71, 85, 105)',
             borderRadius: '8px',
