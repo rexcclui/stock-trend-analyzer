@@ -35,9 +35,86 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const calculateSlopeChannel = (data) => {
     if (!data || data.length < 10) return null
 
-    // Use configurable percentage of recent data for the channel
-    const dataPercentDecimal = slopeChannelDataPercent / 100
-    const recentDataCount = Math.max(20, Math.floor(data.length * dataPercentDecimal))
+    // Find the best channel by starting from the last point and extending backwards
+    const findBestChannel = () => {
+      const minPoints = 20
+      const maxPoints = Math.floor(data.length * (slopeChannelDataPercent / 100))
+      const stepSize = Math.max(5, Math.floor((maxPoints - minPoints) / 20)) // Test ~20 different windows
+
+      let bestScore = -Infinity
+      let bestCount = minPoints
+
+      // Try different lookback periods
+      for (let count = minPoints; count <= maxPoints; count += stepSize) {
+        const testData = data.slice(-count)
+
+        // Calculate regression for this window
+        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
+        const n = testData.length
+
+        testData.forEach((point, index) => {
+          sumX += index
+          sumY += point.close
+          sumXY += index * point.close
+          sumX2 += index * index
+        })
+
+        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+        const intercept = (sumY - slope * sumX) / n
+
+        // Calculate distribution
+        let countAbove = 0
+        let countBelow = 0
+        const distances = []
+
+        testData.forEach((point, index) => {
+          const predictedY = slope * index + intercept
+          const distance = point.close - predictedY
+          distances.push(distance)
+
+          if (point.close > predictedY) countAbove++
+          else if (point.close < predictedY) countBelow++
+        })
+
+        const percentAbove = countAbove / n
+        const percentBelow = countBelow / n
+
+        // Calculate R² (coefficient of determination) - measures fit quality
+        const meanY = sumY / n
+        let ssTotal = 0
+        let ssResidual = 0
+
+        testData.forEach((point, index) => {
+          const predictedY = slope * index + intercept
+          ssTotal += Math.pow(point.close - meanY, 2)
+          ssResidual += Math.pow(point.close - predictedY, 2)
+        })
+
+        const rSquared = 1 - (ssResidual / ssTotal)
+
+        // Score this channel based on multiple criteria
+        const balanceScore = 1 - Math.abs(percentAbove - 0.5) * 2 // Prefer 50/50 distribution, max score 1
+        const fitScore = rSquared // Higher R² means better linear fit
+        const minDistributionMet = (percentAbove >= 0.4 && percentBelow >= 0.4) ? 1 : 0 // Must meet minimum
+
+        // Combined score: balance (40%), fit quality (40%), meets minimum (20%)
+        const score = (balanceScore * 0.4 + fitScore * 0.4 + minDistributionMet * 0.2)
+
+        if (score > bestScore && minDistributionMet === 1) {
+          bestScore = score
+          bestCount = count
+        }
+      }
+
+      // Also test the maximum to ensure we don't miss it
+      if (maxPoints > minPoints && (maxPoints - bestCount) > stepSize) {
+        bestCount = maxPoints
+      }
+
+      return bestCount
+    }
+
+    const recentDataCount = findBestChannel()
     const recentData = data.slice(-recentDataCount)
 
     // Calculate linear regression (best fit line)
@@ -151,6 +228,19 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       else if (point.close < predictedY) finalCountBelow++
     })
 
+    // Calculate R² for the final channel
+    const meanY = recentData.reduce((sum, p) => sum + p.close, 0) / n
+    let ssTotal = 0
+    let ssResidual = 0
+
+    recentData.forEach((point, index) => {
+      const predictedY = slope * index + intercept
+      ssTotal += Math.pow(point.close - meanY, 2)
+      ssResidual += Math.pow(point.close - predictedY, 2)
+    })
+
+    const rSquared = 1 - (ssResidual / ssTotal)
+
     // Calculate effective multiplier after extension
     const effectiveMultiplier = channelWidth / stdDev
 
@@ -163,7 +253,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       recentDataCount,
       percentAbove: (finalCountAbove / n * 100).toFixed(1),
       percentBelow: (finalCountBelow / n * 100).toFixed(1),
-      effectiveMultiplier
+      effectiveMultiplier,
+      rSquared
     }
   }
 
@@ -610,7 +701,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 stroke="#3b82f6"
                 strokeWidth={1.5}
                 dot={false}
-                name={`Trend (${slopeChannelInfo.recentDataCount}pts: ${slopeChannelInfo.percentAbove}%↑ ${slopeChannelInfo.percentBelow}%↓)`}
+                name={`Trend (${slopeChannelInfo.recentDataCount}pts: ${slopeChannelInfo.percentAbove}%↑ ${slopeChannelInfo.percentBelow}%↓ R²=${(slopeChannelInfo.rSquared * 100).toFixed(1)}%)`}
                 strokeDasharray="3 3"
               />
               <Line

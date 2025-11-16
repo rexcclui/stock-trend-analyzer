@@ -709,7 +709,7 @@ function StockAnalyzer() {
                       {/* Recent Data Percentage */}
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-slate-300">
-                          Lookback Period (10-100%)
+                          Max Lookback Range (10-100%)
                         </label>
                         <div className="flex items-center gap-2">
                           <input
@@ -728,7 +728,7 @@ function StockAnalyzer() {
                           <span className="text-slate-300 font-mono text-sm w-12">{chart.slopeChannelDataPercent}%</span>
                         </div>
                         <p className="text-xs text-slate-400">
-                          Uses the most recent {chart.slopeChannelDataPercent}% of chart data (rightmost points) for trend calculation. Lower % = more responsive to recent price action.
+                          Algorithm starts from the last data point and extends backward up to {chart.slopeChannelDataPercent}% of data, automatically finding the best-fit channel based on balance and R² score.
                         </p>
                       </div>
 
