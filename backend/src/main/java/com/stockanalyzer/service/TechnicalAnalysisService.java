@@ -35,17 +35,18 @@ public class TechnicalAnalysisService {
             double macd = ema12 - ema26;
             indicator.setMacd(macd);
 
-            // Calculate MACD Signal (9-day EMA of MACD)
+            // Calculate RSI
+            indicator.setRsi(calculateRSI(chronologicalPrices, i, 14));
+
+            // Add indicator to list first
+            indicators.add(indicator);
+
+            // Calculate MACD Signal (9-day EMA of MACD) - needs to be after adding to list
             if (i >= 34) { // Need at least 26 + 9 periods
                 double macdSignal = calculateMACDSignal(indicators, i, 9);
                 indicator.setMacdSignal(macdSignal);
                 indicator.setMacdHistogram(macd - macdSignal);
             }
-
-            // Calculate RSI
-            indicator.setRsi(calculateRSI(chronologicalPrices, i, 14));
-
-            indicators.add(indicator);
         }
 
         // Reverse back to match input order (newest first)
