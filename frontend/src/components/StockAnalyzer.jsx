@@ -4,6 +4,7 @@ import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Setting
 import PriceChart from './PriceChart'
 import IndicatorsChart from './IndicatorsChart'
 import SignalsList from './SignalsList'
+import { apiCache } from '../utils/apiCache'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
@@ -52,21 +53,38 @@ function StockAnalyzer() {
     setError(null)
 
     try {
-      const response = await axios.get(`${API_URL}/analyze`, {
-        params: {
-          symbol: targetSymbol.toUpperCase(),
-          days: days
-        }
-      })
+      const upperSymbol = targetSymbol.toUpperCase()
+
+      // Try to get from cache first
+      let data = apiCache.get(upperSymbol, days)
+
+      if (data) {
+        console.log(`[Cache] ✅ Cache HIT for ${upperSymbol}:${days}`)
+      } else {
+        console.log(`[Cache] ❌ Cache MISS for ${upperSymbol}:${days}, fetching from server...`)
+        const response = await axios.get(`${API_URL}/analyze`, {
+          params: {
+            symbol: upperSymbol,
+            days: days
+          }
+        })
+        data = response.data
+
+        // Store in cache
+        apiCache.set(upperSymbol, days, data)
+      }
+
+      // Log cache statistics
+      apiCache.logStats()
 
       // Save to history
-      saveToHistory(targetSymbol.toUpperCase())
+      saveToHistory(upperSymbol)
 
       // Add new chart to the array
       const newChart = {
         id: Date.now(),
-        symbol: targetSymbol.toUpperCase(),
-        data: response.data,
+        symbol: upperSymbol,
+        data: data,
         showRSI: false,
         showMACD: false,
         smaPeriods: [],
@@ -177,16 +195,32 @@ function StockAnalyzer() {
     // Update all charts with the new time range
     try {
       const updatePromises = charts.map(async (chart) => {
-        const response = await axios.get(`${API_URL}/analyze`, {
-          params: {
-            symbol: chart.symbol,
-            days: newDays
-          }
-        })
-        return { id: chart.id, data: response.data }
+        // Try to get from cache first
+        let data = apiCache.get(chart.symbol, newDays)
+
+        if (data) {
+          console.log(`[Cache] ✅ Cache HIT for ${chart.symbol}:${newDays}`)
+        } else {
+          console.log(`[Cache] ❌ Cache MISS for ${chart.symbol}:${newDays}, fetching from server...`)
+          const response = await axios.get(`${API_URL}/analyze`, {
+            params: {
+              symbol: chart.symbol,
+              days: newDays
+            }
+          })
+          data = response.data
+
+          // Store in cache
+          apiCache.set(chart.symbol, newDays, data)
+        }
+
+        return { id: chart.id, data }
       })
 
       const results = await Promise.all(updatePromises)
+
+      // Log cache statistics
+      apiCache.logStats()
 
       setCharts(prevCharts =>
         prevCharts.map(chart => {

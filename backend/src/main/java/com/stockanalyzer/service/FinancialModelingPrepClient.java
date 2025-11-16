@@ -18,10 +18,12 @@ public class FinancialModelingPrepClient {
     private static final String BASE_URL = "https://financialmodelingprep.com/api/v3";
     private final String apiKey;
     private final Gson gson;
+    private final StockDataCache cache;
 
     public FinancialModelingPrepClient(String apiKey) {
         this.apiKey = apiKey;
         this.gson = new Gson();
+        this.cache = new StockDataCache();
     }
 
     public List<StockPrice> getHistoricalData(String symbol, String from, String to) throws IOException {
@@ -48,6 +50,17 @@ public class FinancialModelingPrepClient {
     }
 
     public List<StockPrice> getHistoricalDataByDays(String symbol, int days) throws IOException {
+        // Try to get from cache first
+        List<StockPrice> cachedData = cache.get(symbol, days);
+
+        if (cachedData != null) {
+            System.out.println(String.format("[Cache] ✅ Cache HIT for %s:%d", symbol, days));
+            cache.logStats();
+            return cachedData;
+        }
+
+        System.out.println(String.format("[Cache] ❌ Cache MISS for %s:%d, fetching from external API...", symbol, days));
+
         String url = String.format("%s/historical-price-full/%s?timeseries=%d&apikey=%s",
                 BASE_URL, symbol, days, apiKey);
 
@@ -61,9 +74,15 @@ public class FinancialModelingPrepClient {
 
                 List<Map<String, Object>> historical = (List<Map<String, Object>>) data.get("historical");
 
-                return historical.stream()
+                List<StockPrice> prices = historical.stream()
                     .map(this::mapToStockPrice)
                     .toList();
+
+                // Store in cache
+                cache.put(symbol, days, prices);
+                cache.logStats();
+
+                return prices;
             }
         }
     }
