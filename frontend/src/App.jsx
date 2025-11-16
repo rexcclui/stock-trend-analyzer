@@ -24,14 +24,14 @@ function App() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="bg-white rounded-lg shadow-lg mb-6">
-          <div className="flex border-b">
+        <div className="bg-slate-800 rounded-lg shadow-lg mb-6 border border-slate-700">
+          <div className="flex border-b border-slate-700">
             <button
               onClick={() => setActiveTab('analyze')}
               className={`flex-1 px-6 py-4 font-semibold transition-colors flex items-center justify-center gap-2 ${
                 activeTab === 'analyze'
-                  ? 'text-purple-600 border-b-2 border-purple-600 bg-purple-50'
-                  : 'text-gray-600 hover:text-purple-600 hover:bg-gray-50'
+                  ? 'text-purple-400 border-b-2 border-purple-400 bg-slate-900'
+                  : 'text-slate-300 hover:text-purple-400 hover:bg-slate-700'
               }`}
             >
               <Activity className="w-5 h-5" />
@@ -41,8 +41,8 @@ function App() {
               onClick={() => setActiveTab('backtest')}
               className={`flex-1 px-6 py-4 font-semibold transition-colors flex items-center justify-center gap-2 ${
                 activeTab === 'backtest'
-                  ? 'text-purple-600 border-b-2 border-purple-600 bg-purple-50'
-                  : 'text-gray-600 hover:text-purple-600 hover:bg-gray-50'
+                  ? 'text-purple-400 border-b-2 border-purple-400 bg-slate-900'
+                  : 'text-slate-300 hover:text-purple-400 hover:bg-slate-700'
               }`}
             >
               <BarChart3 className="w-5 h-5" />
@@ -58,7 +58,7 @@ function App() {
         </div>
 
         {/* Footer */}
-        <div className="text-center text-white/60 text-sm">
+        <div className="text-center text-slate-400 text-sm">
           <p>Data provided by Financial Modeling Prep | For educational purposes only</p>
         </div>
       </div>

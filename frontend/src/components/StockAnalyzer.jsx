@@ -63,7 +63,7 @@ function StockAnalyzer() {
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
               Stock Symbol
             </label>
             <input
@@ -72,17 +72,17 @@ function StockAnalyzer() {
               onChange={(e) => setSymbol(e.target.value.toUpperCase())}
               onKeyPress={handleKeyPress}
               placeholder="e.g., AAPL, TSLA, MSFT"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-slate-400"
             />
           </div>
           <div className="w-full md:w-48">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
               Time Period
             </label>
             <select
               value={days}
               onChange={(e) => setDays(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             >
               <option value="90">3 Months</option>
               <option value="180">6 Months</option>
@@ -94,7 +94,7 @@ function StockAnalyzer() {
             <button
               onClick={analyzeStock}
               disabled={loading}
-              className="w-full md:w-auto px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+              className="w-full md:w-auto px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
             >
               {loading ? (
                 <>
@@ -112,7 +112,7 @@ function StockAnalyzer() {
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          <div className="bg-red-900/50 border border-red-700 text-red-300 px-4 py-3 rounded-lg">
             {error}
           </div>
         )}
@@ -123,10 +123,10 @@ function StockAnalyzer() {
         <div className="space-y-6">
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-lg border border-purple-200">
+            <div className="bg-gradient-to-br from-purple-900/50 to-purple-800/50 p-6 rounded-lg border border-purple-700">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-purple-600">Market Trend</p>
+                  <p className="text-sm font-medium text-purple-300">Market Trend</p>
                   <p className={`text-2xl font-bold mt-2 ${getTrendColor(data.trend)}`}>
                     {data.trend?.replace(/_/g, ' ')}
                   </p>
@@ -137,10 +137,10 @@ function StockAnalyzer() {
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-lg border border-blue-200">
+            <div className="bg-gradient-to-br from-blue-900/50 to-blue-800/50 p-6 rounded-lg border border-blue-700">
               <div>
-                <p className="text-sm font-medium text-blue-600">Recommendation</p>
-                <p className="text-xl font-bold mt-2 text-blue-900">
+                <p className="text-sm font-medium text-blue-300">Recommendation</p>
+                <p className="text-xl font-bold mt-2 text-blue-100">
                   {data.recommendation}
                 </p>
               </div>
@@ -148,8 +148,8 @@ function StockAnalyzer() {
           </div>
 
           {/* Price Chart */}
-          <div className="bg-white p-6 rounded-lg border border-gray-200">
-            <h3 className="text-lg font-semibold mb-4">Price Chart with Signals</h3>
+          <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
+            <h3 className="text-lg font-semibold mb-4 text-slate-100">Price Chart with Signals</h3>
             <PriceChart
               prices={data.prices}
               indicators={data.indicators}
@@ -158,14 +158,14 @@ function StockAnalyzer() {
           </div>
 
           {/* Technical Indicators */}
-          <div className="bg-white p-6 rounded-lg border border-gray-200">
-            <h3 className="text-lg font-semibold mb-4">Technical Indicators</h3>
+          <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
+            <h3 className="text-lg font-semibold mb-4 text-slate-100">Technical Indicators</h3>
             <IndicatorsChart indicators={data.indicators} />
           </div>
 
           {/* Signals List */}
-          <div className="bg-white p-6 rounded-lg border border-gray-200">
-            <h3 className="text-lg font-semibold mb-4">Trading Signals</h3>
+          <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
+            <h3 className="text-lg font-semibold mb-4 text-slate-100">Trading Signals</h3>
             <SignalsList signals={data.signals} />
           </div>
         </div>

@@ -13,20 +13,21 @@ function IndicatorsChart({ indicators }) {
     <div className="space-y-6">
       {/* RSI Chart */}
       <div>
-        <h4 className="text-md font-semibold mb-2">RSI (Relative Strength Index)</h4>
+        <h4 className="text-md font-semibold mb-2 text-slate-200">RSI (Relative Strength Index)</h4>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 12 }}
+              tick={{ fontSize: 12, fill: '#94a3b8' }}
               interval={Math.floor(chartData.length / 10)}
+              stroke="#475569"
             />
-            <YAxis domain={[0, 100]} />
-            <Tooltip />
-            <Legend />
-            <ReferenceLine y={70} stroke="red" strokeDasharray="3 3" label="Overbought" />
-            <ReferenceLine y={30} stroke="green" strokeDasharray="3 3" label="Oversold" />
+            <YAxis domain={[0, 100]} tick={{ fill: '#94a3b8' }} stroke="#475569" />
+            <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', color: '#e2e8f0' }} />
+            <Legend wrapperStyle={{ color: '#94a3b8' }} />
+            <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="3 3" label={{ value: "Overbought", fill: '#94a3b8' }} />
+            <ReferenceLine y={30} stroke="#10b981" strokeDasharray="3 3" label={{ value: "Oversold", fill: '#94a3b8' }} />
             <Line
               type="monotone"
               dataKey="rsi"
@@ -41,19 +42,20 @@ function IndicatorsChart({ indicators }) {
 
       {/* MACD Chart */}
       <div>
-        <h4 className="text-md font-semibold mb-2">MACD (Moving Average Convergence Divergence)</h4>
+        <h4 className="text-md font-semibold mb-2 text-slate-200">MACD (Moving Average Convergence Divergence)</h4>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 12 }}
+              tick={{ fontSize: 12, fill: '#94a3b8' }}
               interval={Math.floor(chartData.length / 10)}
+              stroke="#475569"
             />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            <ReferenceLine y={0} stroke="gray" />
+            <YAxis tick={{ fill: '#94a3b8' }} stroke="#475569" />
+            <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', color: '#e2e8f0' }} />
+            <Legend wrapperStyle={{ color: '#94a3b8' }} />
+            <ReferenceLine y={0} stroke="#64748b" />
             <Line
               type="monotone"
               dataKey="macd"

@@ -61,7 +61,7 @@ function BacktestResults() {
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
               Stock Symbol
             </label>
             <input
@@ -70,17 +70,17 @@ function BacktestResults() {
               onChange={(e) => setSymbol(e.target.value.toUpperCase())}
               onKeyPress={handleKeyPress}
               placeholder="e.g., AAPL, TSLA, MSFT"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-slate-400"
             />
           </div>
           <div className="w-full md:w-48">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
               Backtest Period
             </label>
             <select
               value={days}
               onChange={(e) => setDays(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             >
               <option value="90">3 Months</option>
               <option value="180">6 Months</option>
@@ -92,7 +92,7 @@ function BacktestResults() {
             <button
               onClick={runBacktest}
               disabled={loading}
-              className="w-full md:w-auto px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+              className="w-full md:w-auto px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
             >
               {loading ? (
                 <>
@@ -110,7 +110,7 @@ function BacktestResults() {
         </div>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          <div className="bg-red-900/50 border border-red-700 text-red-300 px-4 py-3 rounded-lg">
             {error}
           </div>
         )}
@@ -121,102 +121,102 @@ function BacktestResults() {
         <div className="space-y-6">
           {/* Performance Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-lg border border-green-200">
+            <div className="bg-gradient-to-br from-green-900/50 to-green-800/50 p-6 rounded-lg border border-green-700">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-green-600">Total Return</p>
-                  <p className={`text-2xl font-bold mt-2 ${data.backtestResult.totalReturn >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                  <p className="text-sm font-medium text-green-300">Total Return</p>
+                  <p className={`text-2xl font-bold mt-2 ${data.backtestResult.totalReturn >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                     {formatCurrency(data.backtestResult.totalReturn)}
                   </p>
-                  <p className={`text-sm mt-1 ${data.backtestResult.totalReturnPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  <p className={`text-sm mt-1 ${data.backtestResult.totalReturnPercentage >= 0 ? 'text-green-300' : 'text-red-300'}`}>
                     {formatPercent(data.backtestResult.totalReturnPercentage)}
                   </p>
                 </div>
-                <DollarSign className="w-8 h-8 text-green-600" />
+                <DollarSign className="w-8 h-8 text-green-400" />
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-lg border border-blue-200">
+            <div className="bg-gradient-to-br from-blue-900/50 to-blue-800/50 p-6 rounded-lg border border-blue-700">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-blue-600">Win Rate</p>
-                  <p className="text-2xl font-bold mt-2 text-blue-900">
+                  <p className="text-sm font-medium text-blue-300">Win Rate</p>
+                  <p className="text-2xl font-bold mt-2 text-blue-100">
                     {data.backtestResult.winRate.toFixed(1)}%
                   </p>
-                  <p className="text-sm mt-1 text-blue-600">
+                  <p className="text-sm mt-1 text-blue-300">
                     {data.backtestResult.winningTrades}W / {data.backtestResult.losingTrades}L
                   </p>
                 </div>
-                <Target className="w-8 h-8 text-blue-600" />
+                <Target className="w-8 h-8 text-blue-400" />
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-lg border border-purple-200">
+            <div className="bg-gradient-to-br from-purple-900/50 to-purple-800/50 p-6 rounded-lg border border-purple-700">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-purple-600">Total Trades</p>
-                  <p className="text-2xl font-bold mt-2 text-purple-900">
+                  <p className="text-sm font-medium text-purple-300">Total Trades</p>
+                  <p className="text-2xl font-bold mt-2 text-purple-100">
                     {data.backtestResult.totalTrades}
                   </p>
-                  <p className="text-sm mt-1 text-purple-600">
+                  <p className="text-sm mt-1 text-purple-300">
                     Signals: {data.totalSignals}
                   </p>
                 </div>
-                <TrendingUp className="w-8 h-8 text-purple-600" />
+                <TrendingUp className="w-8 h-8 text-purple-400" />
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-6 rounded-lg border border-orange-200">
+            <div className="bg-gradient-to-br from-orange-900/50 to-orange-800/50 p-6 rounded-lg border border-orange-700">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-orange-600">Profit Factor</p>
-                  <p className="text-2xl font-bold mt-2 text-orange-900">
+                  <p className="text-sm font-medium text-orange-300">Profit Factor</p>
+                  <p className="text-2xl font-bold mt-2 text-orange-100">
                     {data.backtestResult.profitFactor.toFixed(2)}
                   </p>
-                  <p className="text-sm mt-1 text-orange-600">
+                  <p className="text-sm mt-1 text-orange-300">
                     Sharpe: {data.backtestResult.sharpeRatio.toFixed(2)}
                   </p>
                 </div>
-                <Percent className="w-8 h-8 text-orange-600" />
+                <Percent className="w-8 h-8 text-orange-400" />
               </div>
             </div>
           </div>
 
           {/* Additional Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white p-4 rounded-lg border border-gray-200">
-              <p className="text-sm text-gray-600">Initial Capital</p>
-              <p className="text-xl font-bold text-gray-900">
+            <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
+              <p className="text-sm text-slate-400">Initial Capital</p>
+              <p className="text-xl font-bold text-slate-100">
                 {formatCurrency(data.backtestResult.initialCapital)}
               </p>
             </div>
-            <div className="bg-white p-4 rounded-lg border border-gray-200">
-              <p className="text-sm text-gray-600">Final Capital</p>
-              <p className="text-xl font-bold text-gray-900">
+            <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
+              <p className="text-sm text-slate-400">Final Capital</p>
+              <p className="text-xl font-bold text-slate-100">
                 {formatCurrency(data.backtestResult.finalCapital)}
               </p>
             </div>
-            <div className="bg-white p-4 rounded-lg border border-gray-200">
-              <p className="text-sm text-gray-600">Max Drawdown</p>
-              <p className="text-xl font-bold text-red-600">
+            <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
+              <p className="text-sm text-slate-400">Max Drawdown</p>
+              <p className="text-xl font-bold text-red-400">
                 {data.backtestResult.maxDrawdown.toFixed(2)}%
               </p>
             </div>
           </div>
 
           {/* Trade Statistics */}
-          <div className="bg-white p-6 rounded-lg border border-gray-200">
-            <h3 className="text-lg font-semibold mb-4">Trade Statistics</h3>
+          <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
+            <h3 className="text-lg font-semibold mb-4 text-slate-100">Trade Statistics</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <p className="text-sm text-gray-600 mb-2">Average Win</p>
-                <p className="text-2xl font-bold text-green-600">
+                <p className="text-sm text-slate-400 mb-2">Average Win</p>
+                <p className="text-2xl font-bold text-green-400">
                   {formatCurrency(data.backtestResult.averageWin)}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 mb-2">Average Loss</p>
-                <p className="text-2xl font-bold text-red-600">
+                <p className="text-sm text-slate-400 mb-2">Average Loss</p>
+                <p className="text-2xl font-bold text-red-400">
                   {formatCurrency(data.backtestResult.averageLoss)}
                 </p>
               </div>
@@ -225,33 +225,33 @@ function BacktestResults() {
 
           {/* Trades List */}
           {data.backtestResult.trades && data.backtestResult.trades.length > 0 && (
-            <div className="bg-white p-6 rounded-lg border border-gray-200">
-              <h3 className="text-lg font-semibold mb-4">Trade History</h3>
+            <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
+              <h3 className="text-lg font-semibold mb-4 text-slate-100">Trade History</h3>
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-slate-700">
+                  <thead className="bg-slate-900">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entry Date</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Exit Date</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Entry Price</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Exit Price</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Shares</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Profit/Loss</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Return %</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Entry Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Exit Date</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Entry Price</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Exit Price</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Shares</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Profit/Loss</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Return %</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-slate-800 divide-y divide-slate-700">
                     {data.backtestResult.trades.map((trade, index) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm text-gray-900">{trade.entryDate}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{trade.exitDate}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900 text-right">${trade.entryPrice.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900 text-right">${trade.exitPrice.toFixed(2)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900 text-right">{trade.shares}</td>
-                        <td className={`px-4 py-3 text-sm font-semibold text-right ${trade.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      <tr key={index} className="hover:bg-slate-700">
+                        <td className="px-4 py-3 text-sm text-slate-300">{trade.entryDate}</td>
+                        <td className="px-4 py-3 text-sm text-slate-300">{trade.exitDate}</td>
+                        <td className="px-4 py-3 text-sm text-slate-300 text-right">${trade.entryPrice.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-sm text-slate-300 text-right">${trade.exitPrice.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-sm text-slate-300 text-right">{trade.shares}</td>
+                        <td className={`px-4 py-3 text-sm font-semibold text-right ${trade.profit >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                           {formatCurrency(trade.profit)}
                         </td>
-                        <td className={`px-4 py-3 text-sm font-semibold text-right ${trade.profitPercentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                        <td className={`px-4 py-3 text-sm font-semibold text-right ${trade.profitPercentage >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                           {formatPercent(trade.profitPercentage)}
                         </td>
                       </tr>

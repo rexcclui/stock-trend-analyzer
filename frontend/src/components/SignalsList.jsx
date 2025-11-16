@@ -3,7 +3,7 @@ import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
 function SignalsList({ signals }) {
   if (!signals || signals.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
+      <div className="text-center py-8 text-slate-400">
         No trading signals detected for this period.
       </div>
     )
@@ -12,29 +12,29 @@ function SignalsList({ signals }) {
   const getSignalIcon = (type) => {
     switch (type) {
       case 'BUY':
-        return <TrendingUp className="w-5 h-5 text-green-600" />
+        return <TrendingUp className="w-5 h-5 text-green-400" />
       case 'SELL':
-        return <TrendingDown className="w-5 h-5 text-red-600" />
+        return <TrendingDown className="w-5 h-5 text-red-400" />
       default:
-        return <Minus className="w-5 h-5 text-gray-600" />
+        return <Minus className="w-5 h-5 text-slate-400" />
     }
   }
 
   const getSignalColor = (type) => {
     switch (type) {
       case 'BUY':
-        return 'bg-green-50 border-green-200 text-green-800'
+        return 'bg-green-900/30 border-green-700 text-green-200'
       case 'SELL':
-        return 'bg-red-50 border-red-200 text-red-800'
+        return 'bg-red-900/30 border-red-700 text-red-200'
       default:
-        return 'bg-gray-50 border-gray-200 text-gray-800'
+        return 'bg-slate-700/30 border-slate-600 text-slate-300'
     }
   }
 
   const getConfidenceColor = (confidence) => {
-    if (confidence >= 0.8) return 'text-green-600'
-    if (confidence >= 0.6) return 'text-yellow-600'
-    return 'text-orange-600'
+    if (confidence >= 0.8) return 'text-green-400'
+    if (confidence >= 0.6) return 'text-yellow-400'
+    return 'text-orange-400'
   }
 
   return (
