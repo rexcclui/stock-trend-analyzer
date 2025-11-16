@@ -31,8 +31,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     smaCache[period] = calculateSMA(prices, period)
   })
 
-  // Combine data
-  const chartData = prices.map((price, index) => {
+  // Combine data - ensure we use the minimum length to stay in sync with indicators
+  const dataLength = Math.min(prices.length, indicators.length)
+  const chartData = prices.slice(0, dataLength).map((price, index) => {
     const indicator = indicators[index] || {}
     const dataPoint = {
       date: price.date,

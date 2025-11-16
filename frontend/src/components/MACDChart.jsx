@@ -4,7 +4,8 @@ import { useRef, useEffect, useCallback } from 'react'
 function MACDChart({ indicators, syncedMouseDate, setSyncedMouseDate, zoomRange, onZoomChange, onExtendPeriod }) {
   const chartRef = useRef(null)
 
-  const chartData = [...indicators].reverse().map(ind => ({
+  // Ensure data is properly reversed and matches expected format
+  const chartData = indicators.slice().reverse().map(ind => ({
     date: ind.date,
     macd: ind.macd,
     macdSignal: ind.macdSignal,

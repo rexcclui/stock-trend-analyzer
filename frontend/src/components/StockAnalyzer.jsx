@@ -302,7 +302,7 @@ function StockAnalyzer() {
             <div className="flex gap-4 flex-wrap items-end">
               <div className="flex flex-col">
                 <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Display Columns
+                  Display Cols
                 </label>
                 <select
                   value={displayColumns}
