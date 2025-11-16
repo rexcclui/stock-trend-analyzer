@@ -250,12 +250,12 @@ function StockAnalyzer() {
                 {/* Controls: Time Range + Indicators */}
                 <div className="flex justify-between items-center mt-6 flex-wrap gap-4">
                   {/* Time Range Selector */}
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex gap-1 flex-wrap">
                     {timeRanges.map((range) => (
                       <button
                         key={range.label}
                         onClick={() => changeTimeRange(range.days)}
-                        className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                        className={`px-2 py-1 text-sm rounded font-medium transition-colors ${
                           days === range.days
                             ? 'bg-purple-600 text-white'
                             : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
