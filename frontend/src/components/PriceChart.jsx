@@ -51,7 +51,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // Tests different lookback periods and stdev multipliers, scoring by boundary touches
     const findBestChannel = () => {
       const minPoints = Math.min(20, data.length) // Start from 20 points (or less if data is shorter)
-      const maxPoints = Math.floor(data.length * (slopeChannelDataPercent / 100))
+      const maxPoints = data.length // Always test up to 100% of available data
 
       // Test stdev multipliers from 1 to 4 with 0.25 increments
       const stdevMultipliers = []
