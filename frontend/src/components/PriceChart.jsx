@@ -292,15 +292,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return zoneColors
   }
 
-  // Calculate slope channel if enabled
-  const slopeChannelInfo = slopeChannelEnabled ? calculateSlopeChannel(prices) : null
-  const zoneColors = slopeChannelEnabled && slopeChannelInfo
-    ? calculateZoneColors(prices, slopeChannelInfo, slopeChannelZones)
-    : []
-
   // Combine data - ensure we use the minimum length to stay in sync with indicators
   const dataLength = Math.min(prices.length, indicators.length)
-  const chartData = prices.slice(0, dataLength).map((price, index) => {
+
+  // Calculate slope channel ONLY on the data that will be displayed
+  // This prevents mismatch when period changes and indicators haven't updated yet
+  const displayPrices = prices.slice(0, dataLength)
+  const slopeChannelInfo = slopeChannelEnabled ? calculateSlopeChannel(displayPrices) : null
+  const zoneColors = slopeChannelEnabled && slopeChannelInfo
+    ? calculateZoneColors(displayPrices, slopeChannelInfo, slopeChannelZones)
+    : []
+
+  const chartData = displayPrices.map((price, index) => {
     const indicator = indicators[index] || {}
     const dataPoint = {
       date: price.date,
