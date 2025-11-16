@@ -152,42 +152,40 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     setSyncedMouseDate(null)
   }
 
-  const CustomXAxisTick = ({ x, y, payload, index }) => {
-    const currentDate = payload.value
+  // Pre-calculate which dates represent month/year transitions
+  const getTransitionDates = () => {
     const isLongPeriod = parseInt(days) >= 1095 // 3Y or more
-    const isMediumPeriod = parseInt(days) >= 365 && parseInt(days) < 1095 // 1Y to 3Y
+    const transitions = new Set()
 
-    let color = '#94a3b8' // Default color
+    for (let i = 1; i < visibleChartData.length; i++) {
+      const current = new Date(visibleChartData[i].date)
+      const previous = new Date(visibleChartData[i - 1].date)
 
-    if (index > 0 && currentDate) {
-      // Find the current data point index
-      const currentDataIndex = visibleChartData.findIndex(d => d.date === currentDate)
-
-      if (currentDataIndex > 0) {
-        const prevDate = visibleChartData[currentDataIndex - 1]?.date
-
-        if (prevDate) {
-          const current = new Date(currentDate)
-          const previous = new Date(prevDate)
-
-          if (isLongPeriod) {
-            // For >= 3Y, change color when year changes
-            if (current.getFullYear() !== previous.getFullYear()) {
-              color = '#3b82f6' // Blue for year change
-            }
-          } else if (isMediumPeriod) {
-            // For 1Y to 3Y, change color when month changes
-            if (current.getMonth() !== previous.getMonth()) {
-              color = '#10b981' // Green for month change
-            }
-          } else {
-            // For < 1Y, change color when month changes
-            if (current.getMonth() !== previous.getMonth()) {
-              color = '#10b981' // Green for month change
-            }
-          }
+      if (isLongPeriod) {
+        // Mark year transitions
+        if (current.getFullYear() !== previous.getFullYear()) {
+          transitions.add(visibleChartData[i].date)
+        }
+      } else {
+        // Mark month transitions
+        if (current.getMonth() !== previous.getMonth() || current.getFullYear() !== previous.getFullYear()) {
+          transitions.add(visibleChartData[i].date)
         }
       }
+    }
+
+    return transitions
+  }
+
+  const transitionDates = getTransitionDates()
+  const isLongPeriod = parseInt(days) >= 1095
+
+  const CustomXAxisTick = ({ x, y, payload }) => {
+    const currentDate = payload.value
+    let color = '#94a3b8' // Default color
+
+    if (transitionDates.has(currentDate)) {
+      color = isLongPeriod ? '#3b82f6' : '#10b981' // Blue for year, green for month
     }
 
     return (
