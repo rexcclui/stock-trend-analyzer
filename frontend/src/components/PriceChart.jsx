@@ -1,6 +1,7 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { X } from 'lucide-react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma }) {
   // Calculate SMA for a given period
   const calculateSMA = (data, period) => {
     const smaData = []
@@ -92,31 +93,47 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const isVisible = isSma ? smaVisibility[period] : true
 
           return (
-            <button
+            <div
               key={`item-${index}`}
-              onClick={() => {
-                if (isSma && onToggleSma) {
-                  onToggleSma(period)
-                }
-              }}
-              className={`flex items-center gap-2 px-2 py-1 rounded transition-all ${
-                isSma ? 'cursor-pointer hover:bg-slate-700' : 'cursor-default'
-              }`}
-              disabled={!isSma}
+              className="flex items-center gap-2 px-2 py-1 rounded transition-all"
             >
-              <div
-                style={{
-                  width: 12,
-                  height: 12,
-                  backgroundColor: entry.color,
-                  borderRadius: '50%',
-                  opacity: isVisible ? 1 : 0.3
+              <button
+                onClick={() => {
+                  if (isSma && onToggleSma) {
+                    onToggleSma(period)
+                  }
                 }}
-              />
-              <span className={`text-sm text-slate-300 ${!isVisible ? 'line-through opacity-50' : ''}`}>
-                {entry.value}
-              </span>
-            </button>
+                className={`flex items-center gap-2 ${
+                  isSma ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
+                }`}
+                disabled={!isSma}
+              >
+                <div
+                  style={{
+                    width: 12,
+                    height: 12,
+                    backgroundColor: entry.color,
+                    borderRadius: '50%',
+                    opacity: isVisible ? 1 : 0.3
+                  }}
+                />
+                <span className={`text-sm text-slate-300 ${!isVisible ? 'line-through opacity-50' : ''}`}>
+                  {entry.value}
+                </span>
+              </button>
+              {isSma && onDeleteSma && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDeleteSma(period)
+                  }}
+                  className="ml-1 p-0.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded transition-colors"
+                  title="Delete SMA line"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
           )
         })}
       </div>
@@ -160,7 +177,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           />
           {smaPeriods.map((period, index) => {
             const smaKey = `sma${period}`
-            if (!smaVisibility[period]) return null
+            const isVisible = smaVisibility[period]
 
             return (
               <Line
@@ -172,6 +189,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 dot={false}
                 name={`SMA ${period}`}
                 strokeDasharray="5 5"
+                hide={!isVisible}
               />
             )
           })}

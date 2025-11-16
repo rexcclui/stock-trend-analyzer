@@ -145,6 +145,24 @@ function StockAnalyzer() {
     )
   }
 
+  const deleteSma = (chartId, period) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          const newPeriods = chart.smaPeriods.filter(p => p !== period)
+          const newVisibility = { ...chart.smaVisibility }
+          delete newVisibility[period]
+          return {
+            ...chart,
+            smaPeriods: newPeriods,
+            smaVisibility: newVisibility
+          }
+        }
+        return chart
+      })
+    )
+  }
+
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') {
       analyzeStock()
@@ -326,6 +344,7 @@ function StockAnalyzer() {
                   smaPeriods={chart.smaPeriods}
                   smaVisibility={chart.smaVisibility}
                   onToggleSma={(period) => toggleSmaVisibility(chart.id, period)}
+                  onDeleteSma={(period) => deleteSma(chart.id, period)}
                 />
 
                 {/* Controls: Time Range + Indicators */}
@@ -450,7 +469,8 @@ function StockAnalyzer() {
                   {tempPeriods.length < 5 && (
                     <button
                       onClick={() => {
-                        const defaultPeriod = tempPeriods.length === 0 ? 20 : 30
+                        const defaultPeriods = [20, 30, 50, 100, 200]
+                        const defaultPeriod = defaultPeriods[tempPeriods.length] || 30
                         const newPeriods = [...tempPeriods, defaultPeriod]
                         updateSmaPeriods(editingSmaChartId, newPeriods)
                       }}
