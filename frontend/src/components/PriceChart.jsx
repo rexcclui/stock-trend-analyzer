@@ -3,13 +3,9 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsi
 function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate }) {
   // Combine data
   const chartData = prices.map((price, index) => {
-    const indicator = indicators[index] || {}
     return {
       date: price.date,
       close: price.close,
-      sma20: indicator.sma20 || null,
-      sma50: indicator.sma50 || null,
-      sma200: indicator.sma200 || null,
     }
   }).reverse() // Show oldest to newest
 
@@ -44,15 +40,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         <div className="bg-slate-800 p-3 border border-slate-600 rounded shadow-lg">
           <p className="font-semibold text-slate-100">{payload[0].payload.date}</p>
           <p className="text-sm text-slate-300">Close: ${payload[0].payload.close?.toFixed(2)}</p>
-          {payload[0].payload.sma20 && (
-            <p className="text-sm text-blue-400">SMA20: ${payload[0].payload.sma20.toFixed(2)}</p>
-          )}
-          {payload[0].payload.sma50 && (
-            <p className="text-sm text-orange-400">SMA50: ${payload[0].payload.sma50.toFixed(2)}</p>
-          )}
-          {payload[0].payload.sma200 && (
-            <p className="text-sm text-purple-400">SMA200: ${payload[0].payload.sma200.toFixed(2)}</p>
-          )}
         </div>
       )
     }
@@ -103,33 +90,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             strokeWidth={2}
             dot={false}
             name="Close Price"
-          />
-          <Line
-            type="monotone"
-            dataKey="sma20"
-            stroke="#3b82f6"
-            strokeWidth={1.5}
-            dot={false}
-            name="SMA 20"
-            strokeDasharray="5 5"
-          />
-          <Line
-            type="monotone"
-            dataKey="sma50"
-            stroke="#f97316"
-            strokeWidth={1.5}
-            dot={false}
-            name="SMA 50"
-            strokeDasharray="5 5"
-          />
-          <Line
-            type="monotone"
-            dataKey="sma200"
-            stroke="#a855f7"
-            strokeWidth={1.5}
-            dot={false}
-            name="SMA 200"
-            strokeDasharray="5 5"
           />
         </LineChart>
       </ResponsiveContainer>
