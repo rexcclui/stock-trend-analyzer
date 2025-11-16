@@ -533,6 +533,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const isSma = entry.dataKey.startsWith('sma')
           const period = isSma ? parseInt(entry.dataKey.replace('sma', '')) : null
           const isVisible = isSma ? smaVisibility[period] : true
+          const isTrendLine = entry.dataKey === 'channelMid'
 
           return (
             <div
@@ -573,6 +574,20 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   title="Delete SMA line"
                 >
                   <X className="w-3 h-3" />
+                </button>
+              )}
+              {/* Show controls button next to Trend legend */}
+              {isTrendLine && slopeChannelEnabled && onSlopeChannelParamsChange && (
+                <button
+                  onClick={() => setControlsVisible(!controlsVisible)}
+                  className="ml-2 px-2 py-1 text-xs bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
+                  title={controlsVisible ? "Hide controls" : "Show controls"}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"/>
+                  </svg>
+                  {controlsVisible ? 'Hide' : 'Controls'}
                 </button>
               )}
             </div>
@@ -675,46 +690,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   return (
     <div ref={chartContainerRef} style={{ width: '100%', height: chartHeight, position: 'relative' }}>
-      {/* Slope Channel Controls Toggle Button */}
-      {slopeChannelEnabled && slopeChannelInfo && onSlopeChannelParamsChange && !controlsVisible && (
-        <button
-          onClick={() => setControlsVisible(true)}
-          style={{
-            position: 'absolute',
-            top: '10px',
-            right: '10px',
-            background: 'rgba(30, 41, 59, 0.9)',
-            border: '1px solid rgb(71, 85, 105)',
-            borderRadius: '6px',
-            padding: '8px 12px',
-            zIndex: 10,
-            cursor: 'pointer',
-            color: 'rgb(226, 232, 240)',
-            fontSize: '11px',
-            fontWeight: '500',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            backdropFilter: 'blur(4px)',
-            transition: 'all 0.2s'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(30, 41, 59, 1)'
-            e.currentTarget.style.borderColor = 'rgb(139, 92, 246)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(30, 41, 59, 0.9)'
-            e.currentTarget.style.borderColor = 'rgb(71, 85, 105)'
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"/>
-          </svg>
-          Controls
-        </button>
-      )}
-
       {/* Slope Channel Controls Panel */}
       {slopeChannelEnabled && slopeChannelInfo && onSlopeChannelParamsChange && controlsVisible && (
         <div
