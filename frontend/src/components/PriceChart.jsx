@@ -12,6 +12,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Store all found channels
   const [allChannels, setAllChannels] = useState([])
+  const [allChannelsVisibility, setAllChannelsVisibility] = useState({})
 
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
   // No need to reset here to avoid infinite loop
@@ -442,9 +443,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         touchCount
       })
 
-      // Move to next segment: start from (break point - lookback) or if no break, we're done
+      // Move to next segment: start from the break point
       if (channelBroken) {
-        currentStartIndex = Math.max(currentStartIndex + 1, breakIndex - lookbackCount)
+        // Next channel starts where this one broke
+        currentStartIndex = breakIndex
       } else {
         // Channel extended to the end of data, stop
         break
@@ -461,8 +463,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const displayPrices = prices.slice(0, dataLength)
       const foundChannels = findAllChannels(displayPrices)
       setAllChannels(foundChannels)
+
+      // Initialize visibility for all channels (all visible by default)
+      const visibility = {}
+      foundChannels.forEach((_, index) => {
+        visibility[index] = true
+      })
+      setAllChannelsVisibility(visibility)
     } else {
       setAllChannels([])
+      setAllChannelsVisibility({})
     }
   }, [findAllChannelEnabled, prices, indicators])
 
@@ -741,8 +751,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         {payload.map((entry, index) => {
           const isSma = entry.dataKey.startsWith('sma')
           const period = isSma ? parseInt(entry.dataKey.replace('sma', '')) : null
-          const isVisible = isSma ? smaVisibility[period] : true
+
+          // Check if this is an all channel line
+          const isAllChannel = entry.dataKey.startsWith('allChannel') && entry.dataKey.endsWith('Mid')
+          const channelIndex = isAllChannel ? parseInt(entry.dataKey.replace('allChannel', '').replace('Mid', '')) : null
+
+          const isVisible = isSma ? smaVisibility[period] : (isAllChannel ? allChannelsVisibility[channelIndex] : true)
           const isTrendLine = entry.dataKey === 'channelMid'
+          const isClickable = isSma || isAllChannel
 
           return (
             <div
@@ -753,12 +769,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 onClick={() => {
                   if (isSma && onToggleSma) {
                     onToggleSma(period)
+                  } else if (isAllChannel) {
+                    setAllChannelsVisibility(prev => ({
+                      ...prev,
+                      [channelIndex]: !prev[channelIndex]
+                    }))
                   }
                 }}
                 className={`flex items-center gap-2 ${
-                  isSma ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
+                  isClickable ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
                 }`}
-                disabled={!isSma}
+                disabled={!isClickable}
               >
                 <div
                   style={{
@@ -1151,6 +1172,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               { upper: '#a3e635', mid: '#0ea5e9', lower: '#e11d48' },  // Lime-light, Sky, Rose-dark
             ]
             const colors = channelColors[index % channelColors.length]
+            const isVisible = allChannelsVisibility[index] !== false
 
             return (
               <React.Fragment key={`channel-${index}`}>
@@ -1160,9 +1182,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   stroke={colors.upper}
                   strokeWidth={1.5}
                   dot={false}
-                  name={`Ch${index + 1} Upper`}
+                  legendType="none"
                   strokeDasharray="5 5"
                   opacity={0.8}
+                  hide={!isVisible}
                 />
                 <Line
                   type="monotone"
@@ -1173,6 +1196,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   name={`Ch${index + 1} (${channel.lookbackCount}pts, R²=${(channel.rSquared * 100).toFixed(1)}%)`}
                   strokeDasharray="5 5"
                   opacity={0.8}
+                  hide={!isVisible}
                 />
                 <Line
                   type="monotone"
@@ -1180,9 +1204,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   stroke={colors.lower}
                   strokeWidth={1.5}
                   dot={false}
-                  name={`Ch${index + 1} Lower`}
+                  legendType="none"
                   strokeDasharray="5 5"
                   opacity={0.8}
+                  hide={!isVisible}
                 />
               </React.Fragment>
             )
