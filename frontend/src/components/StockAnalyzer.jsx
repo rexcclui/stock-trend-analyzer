@@ -15,6 +15,7 @@ function StockAnalyzer() {
   const [data, setData] = useState(null)
   const [showRSI, setShowRSI] = useState(false)
   const [showMACD, setShowMACD] = useState(false)
+  const [syncedMouseDate, setSyncedMouseDate] = useState(null)
 
   const analyzeStock = async () => {
     if (!symbol.trim()) {
@@ -148,6 +149,8 @@ function StockAnalyzer() {
               prices={data.prices}
               indicators={data.indicators}
               signals={data.signals}
+              syncedMouseDate={syncedMouseDate}
+              setSyncedMouseDate={setSyncedMouseDate}
             />
 
             {/* Controls: Time Range + Indicators */}
@@ -200,7 +203,13 @@ function StockAnalyzer() {
           {(showRSI || showMACD) && (
             <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
               <h3 className="text-lg font-semibold mb-4 text-slate-100">Technical Indicators</h3>
-              <IndicatorsChart indicators={data.indicators} showRSI={showRSI} showMACD={showMACD} />
+              <IndicatorsChart
+                indicators={data.indicators}
+                showRSI={showRSI}
+                showMACD={showMACD}
+                syncedMouseDate={syncedMouseDate}
+                setSyncedMouseDate={setSyncedMouseDate}
+              />
             </div>
           )}
         </div>

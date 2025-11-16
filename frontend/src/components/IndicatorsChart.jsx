@@ -1,6 +1,6 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
 
-function IndicatorsChart({ indicators, showRSI = true, showMACD = true }) {
+function IndicatorsChart({ indicators, showRSI = true, showMACD = true, syncedMouseDate, setSyncedMouseDate }) {
   const chartData = [...indicators].reverse().map(ind => ({
     date: ind.date,
     rsi: ind.rsi,
@@ -9,13 +9,28 @@ function IndicatorsChart({ indicators, showRSI = true, showMACD = true }) {
     macdHistogram: ind.macdHistogram,
   }))
 
+  const handleMouseMove = (e) => {
+    if (e && e.activeLabel) {
+      setSyncedMouseDate(e.activeLabel)
+    }
+  }
+
+  const handleMouseLeave = () => {
+    setSyncedMouseDate(null)
+  }
+
   return (
     <div className="space-y-6">
       {/* RSI Chart */}
       {showRSI && <div>
         <h4 className="text-md font-semibold mb-2 text-slate-200">RSI (Relative Strength Index)</h4>
         <ResponsiveContainer width="100%" height={200}>
-          <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+          <LineChart
+            data={chartData}
+            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
             <XAxis
               dataKey="date"
@@ -28,6 +43,14 @@ function IndicatorsChart({ indicators, showRSI = true, showMACD = true }) {
             <Legend wrapperStyle={{ color: '#94a3b8' }} />
             <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="3 3" label={{ value: "Overbought", fill: '#94a3b8' }} />
             <ReferenceLine y={30} stroke="#10b981" strokeDasharray="3 3" label={{ value: "Oversold", fill: '#94a3b8' }} />
+            {syncedMouseDate && (
+              <ReferenceLine
+                x={syncedMouseDate}
+                stroke="#94a3b8"
+                strokeWidth={1}
+                strokeDasharray="3 3"
+              />
+            )}
             <Line
               type="monotone"
               dataKey="rsi"
@@ -44,7 +67,12 @@ function IndicatorsChart({ indicators, showRSI = true, showMACD = true }) {
       {showMACD && <div>
         <h4 className="text-md font-semibold mb-2 text-slate-200">MACD (Moving Average Convergence Divergence)</h4>
         <ResponsiveContainer width="100%" height={200}>
-          <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+          <LineChart
+            data={chartData}
+            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
             <XAxis
               dataKey="date"
@@ -56,6 +84,14 @@ function IndicatorsChart({ indicators, showRSI = true, showMACD = true }) {
             <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', color: '#e2e8f0' }} />
             <Legend wrapperStyle={{ color: '#94a3b8' }} />
             <ReferenceLine y={0} stroke="#64748b" />
+            {syncedMouseDate && (
+              <ReferenceLine
+                x={syncedMouseDate}
+                stroke="#94a3b8"
+                strokeWidth={1}
+                strokeDasharray="3 3"
+              />
+            )}
             <Line
               type="monotone"
               dataKey="macd"

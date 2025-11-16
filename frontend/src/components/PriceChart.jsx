@@ -1,6 +1,6 @@
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Scatter, ScatterChart, ZAxis } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
 
-function PriceChart({ prices, indicators, signals }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate }) {
   // Combine data
   const chartData = prices.map((price, index) => {
     const indicator = indicators[index] || {}
@@ -59,10 +59,25 @@ function PriceChart({ prices, indicators, signals }) {
     return null
   }
 
+  const handleMouseMove = (e) => {
+    if (e && e.activeLabel) {
+      setSyncedMouseDate(e.activeLabel)
+    }
+  }
+
+  const handleMouseLeave = () => {
+    setSyncedMouseDate(null)
+  }
+
   return (
     <div style={{ width: '100%', height: 400 }}>
       <ResponsiveContainer>
-        <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+        <LineChart
+          data={chartData}
+          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
           <XAxis
             dataKey="date"
@@ -73,6 +88,14 @@ function PriceChart({ prices, indicators, signals }) {
           <YAxis domain={['auto', 'auto']} tick={{ fill: '#94a3b8' }} stroke="#475569" />
           <Tooltip content={<CustomTooltip />} />
           <Legend wrapperStyle={{ color: '#94a3b8' }} />
+          {syncedMouseDate && (
+            <ReferenceLine
+              x={syncedMouseDate}
+              stroke="#94a3b8"
+              strokeWidth={1}
+              strokeDasharray="3 3"
+            />
+          )}
           <Line
             type="monotone"
             dataKey="close"
