@@ -76,7 +76,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       optimalStdevMult = optimizedStdevMult
       // touchCount will be calculated after regression
     } else {
-      // Run optimization to find best parameters
+      // Run optimization to find best parameters with trend-breaking logic
       const findBestChannel = () => {
       const minPoints = Math.min(20, data.length) // Start from 20 points (or less if data is shorter)
       const maxPoints = data.length // Always test up to 100% of available data
@@ -87,71 +87,33 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         stdevMultipliers.push(mult)
       }
 
-      let bestCount = minPoints
-      let bestStdevMult = 2.5
-      let bestTouchCount = 0
       const maxOutsidePercent = 0.05 // 5% maximum outside threshold
+      const trendBreakThreshold = 0.5 // Break if >50% of new data is outside
 
-      // Try different lookback periods: 20, 21, 22, 23... incrementing by 1
-      // Data comes in NEWEST-FIRST, so slice(0, count) gets the most recent N points
-      for (let count = minPoints; count <= maxPoints; count++) {
-        const testData = data.slice(0, count)
+      // Start with minimum lookback and try to extend
+      let currentCount = minPoints
+      let currentStdevMult = 2.5
+      let currentTouchCount = 0
+      let channelBroken = false
 
-        // Filter data based on volume if volume weighting is enabled
-        // Create array of included points with their original indices
-        const includedPoints = testData
-          .map((point, index) => ({ point, originalIndex: index }))
-          .filter(({ point }) => shouldIncludePoint(point))
-
-        // Need minimum points for regression
-        if (includedPoints.length < 10) continue
-
-        // Calculate regression for this window using only included points
-        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
-        const n = includedPoints.length
-
-        includedPoints.forEach(({ point, originalIndex }) => {
-          sumX += originalIndex
-          sumY += point.close
-          sumXY += originalIndex * point.close
-          sumX2 += originalIndex * originalIndex
-        })
-
-        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
-        const intercept = (sumY - slope * sumX) / n
-
-        // Calculate distances from regression line for included points only
-        const distances = includedPoints.map(({ point, originalIndex }) => {
-          const predictedY = slope * originalIndex + intercept
-          return point.close - predictedY
-        })
-
-        // Calculate standard deviation
-        const meanDistance = distances.reduce((a, b) => a + b, 0) / distances.length
-        const variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
-        const stdDev = Math.sqrt(variance)
-
-        // Find the minimum stdev multiplier where no more than 5% of points are outside
-        let foundValidChannel = false
+      // Helper function to find optimal stdev for a given dataset
+      const findOptimalStdev = (includedPoints, slope, intercept, stdDev) => {
         for (const stdevMult of stdevMultipliers) {
           const channelWidth = stdDev * stdevMult
-
-          // Count how many points are OUTSIDE the channel bounds (only check included points)
           let outsideCount = 0
           let touchCount = 0
-          const touchTolerance = 0.05 // 5% tolerance for touch counting
+          const touchTolerance = 0.05
+          const n = includedPoints.length
 
           includedPoints.forEach(({ point, originalIndex }) => {
             const predictedY = slope * originalIndex + intercept
             const upperBound = predictedY + channelWidth
             const lowerBound = predictedY - channelWidth
 
-            // Check if point is outside the channel
             if (point.close > upperBound || point.close < lowerBound) {
               outsideCount++
             }
 
-            // Also count touches for selection criteria
             const distanceToUpper = Math.abs(point.close - upperBound)
             const distanceToLower = Math.abs(point.close - lowerBound)
             const boundRange = channelWidth * 2
@@ -164,36 +126,132 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           const outsidePercent = outsideCount / n
 
-          // If this channel meets the criteria (≤5% outside)
+          // If this meets criteria, return it (first valid one = minimum stdev)
           if (outsidePercent <= maxOutsidePercent) {
-            foundValidChannel = true
-
-            // Prefer this channel if:
-            // 1. We haven't found a valid channel yet, OR
-            // 2. This lookback period is longer (more data), OR
-            // 3. Same lookback but more touches (better fit)
-            const isBetterLookback = count > bestCount
-            const isSameLookbackBetterFit = count === bestCount && touchCount > bestTouchCount
-
-            if (bestCount === minPoints || isBetterLookback || isSameLookbackBetterFit) {
-              bestCount = count
-              bestStdevMult = stdevMult
-              bestTouchCount = touchCount
-            }
-
-            // Since we're iterating from smallest to largest stdev,
-            // take the first one that meets criteria for this lookback period
-            break
+            return { stdevMult, touchCount, valid: true }
           }
         }
 
-        // If no valid channel found for this lookback period, continue to next
-        if (!foundValidChannel) {
-          continue
-        }
+        return { stdevMult: 2.5, touchCount: 0, valid: false }
       }
 
-        return { count: bestCount, stdevMultiplier: bestStdevMult, touches: bestTouchCount }
+      // Start with minimum lookback period
+      let testData = data.slice(0, currentCount)
+      let includedPoints = testData
+        .map((point, index) => ({ point, originalIndex: index }))
+        .filter(({ point }) => shouldIncludePoint(point))
+
+      if (includedPoints.length < 10) {
+        return { count: minPoints, stdevMultiplier: 2.5, touches: 0 }
+      }
+
+      // Calculate initial channel parameters
+      let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
+      let n = includedPoints.length
+
+      includedPoints.forEach(({ point, originalIndex }) => {
+        sumX += originalIndex
+        sumY += point.close
+        sumXY += originalIndex * point.close
+        sumX2 += originalIndex * originalIndex
+      })
+
+      let slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+      let intercept = (sumY - slope * sumX) / n
+
+      let distances = includedPoints.map(({ point, originalIndex }) => {
+        const predictedY = slope * originalIndex + intercept
+        return point.close - predictedY
+      })
+
+      let meanDistance = distances.reduce((a, b) => a + b, 0) / distances.length
+      let variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
+      let stdDev = Math.sqrt(variance)
+
+      // Find optimal stdev for initial period
+      const initialResult = findOptimalStdev(includedPoints, slope, intercept, stdDev)
+      if (!initialResult.valid) {
+        return { count: minPoints, stdevMultiplier: 2.5, touches: 0 }
+      }
+
+      currentStdevMult = initialResult.stdevMult
+      currentTouchCount = initialResult.touchCount
+
+      // Try to extend the lookback period
+      for (let count = currentCount + 1; count <= maxPoints; count++) {
+        const previousCount = count - 1
+        const previous90Percent = Math.floor(previousCount * 0.9)
+
+        // Get extended data
+        testData = data.slice(0, count)
+        includedPoints = testData
+          .map((point, index) => ({ point, originalIndex: index }))
+          .filter(({ point }) => shouldIncludePoint(point))
+
+        if (includedPoints.length < 10) continue
+
+        // Check if new 10% of data (older historical data) fits within current channel
+        const newDataPoints = includedPoints.filter(({ originalIndex }) => originalIndex >= previous90Percent)
+        const channelWidth = stdDev * currentStdevMult
+
+        let pointsOutside = 0
+        newDataPoints.forEach(({ point, originalIndex }) => {
+          const predictedY = slope * originalIndex + intercept
+          const upperBound = predictedY + channelWidth
+          const lowerBound = predictedY - channelWidth
+
+          if (point.close > upperBound || point.close < lowerBound) {
+            pointsOutside++
+          }
+        })
+
+        // If most of the new data is outside, break the trend
+        if (newDataPoints.length > 0 && pointsOutside / newDataPoints.length > trendBreakThreshold) {
+          channelBroken = true
+          break
+        }
+
+        // Recalculate channel with extended data
+        sumX = 0
+        sumY = 0
+        sumXY = 0
+        sumX2 = 0
+        n = includedPoints.length
+
+        includedPoints.forEach(({ point, originalIndex }) => {
+          sumX += originalIndex
+          sumY += point.close
+          sumXY += originalIndex * point.close
+          sumX2 += originalIndex * originalIndex
+        })
+
+        slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+        intercept = (sumY - slope * sumX) / n
+
+        distances = includedPoints.map(({ point, originalIndex }) => {
+          const predictedY = slope * originalIndex + intercept
+          return point.close - predictedY
+        })
+
+        meanDistance = distances.reduce((a, b) => a + b, 0) / distances.length
+        variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
+        stdDev = Math.sqrt(variance)
+
+        // Find optimal stdev for extended period
+        const extendedResult = findOptimalStdev(includedPoints, slope, intercept, stdDev)
+        if (!extendedResult.valid) {
+          // Can't find valid channel with extended data, stop here
+          channelBroken = true
+          break
+        }
+
+        // Update current best parameters
+        currentCount = count
+        currentStdevMult = extendedResult.stdevMult
+        currentTouchCount = extendedResult.touchCount
+      }
+
+      return { count: currentCount, stdevMultiplier: currentStdevMult, touches: currentTouchCount }
       }
 
       // Find best channel parameters (lookback count and stdev multiplier)
