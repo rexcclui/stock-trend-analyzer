@@ -34,14 +34,14 @@ function MACDChart({ indicators, syncedMouseDate, setSyncedMouseDate, zoomRange,
       onZoomChange({ start: newStart, end: newEnd })
     } else {
       // Scroll down - Zoom out (show more data)
-      // Check if already at full zoom
-      const isFullyZoomedOut = zoomRange.start === 0 && (zoomRange.end === null || zoomRange.end === chartData.length)
+      // Check if already at full zoom with a small tolerance
+      const isAtStart = zoomRange.start === 0
+      const isAtEnd = zoomRange.end === null || Math.abs(zoomRange.end - chartData.length) <= 1
+      const isFullyZoomedOut = isAtStart && isAtEnd && currentRange >= chartData.length - 2
 
-      if (isFullyZoomedOut) {
-        // Try to extend to next time period
-        if (onExtendPeriod) {
-          onExtendPeriod()
-        }
+      if (isFullyZoomedOut && onExtendPeriod) {
+        // Only extend if we're truly showing all available data
+        onExtendPeriod()
       } else {
         const newRange = Math.min(chartData.length, currentRange + zoomAmount)
         const expansion = newRange - currentRange

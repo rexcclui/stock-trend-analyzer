@@ -202,7 +202,7 @@ function StockAnalyzer() {
       setCharts(prevCharts =>
         prevCharts.map(chart => {
           const updatedData = results.find(r => r.id === chart.id)
-          return updatedData ? { ...chart, data: updatedData.data } : chart
+          return updatedData ? { ...chart, data: updatedData.data, zoomRange: { start: 0, end: null } } : chart
         })
       )
     } catch (err) {
