@@ -36,7 +36,8 @@ function StockAnalyzer() {
   }
 
   const analyzeStock = async (symbolToAnalyze = null) => {
-    const targetSymbol = symbolToAnalyze || symbol
+    // Check if symbolToAnalyze is a string (not an event object)
+    const targetSymbol = (typeof symbolToAnalyze === 'string') ? symbolToAnalyze : symbol
 
     if (!targetSymbol.trim()) {
       setError('Please enter a stock symbol')
