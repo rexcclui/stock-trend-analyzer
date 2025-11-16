@@ -20,6 +20,7 @@ function StockAnalyzer() {
   const [chartHeight, setChartHeight] = useState(400)
   const [smaDialogOpen, setSmaDialogOpen] = useState(false)
   const [editingSmaChartId, setEditingSmaChartId] = useState(null)
+  const [globalZoomRange, setGlobalZoomRange] = useState({ start: 0, end: null })
 
   // Load stock history from localStorage on mount
   useEffect(() => {
@@ -70,8 +71,7 @@ function StockAnalyzer() {
         showRSI: false,
         showMACD: false,
         smaPeriods: [],
-        smaVisibility: {},
-        zoomRange: { start: 0, end: null }
+        smaVisibility: {}
       }
       setCharts(prevCharts => [...prevCharts, newChart])
 
@@ -105,14 +105,8 @@ function StockAnalyzer() {
     )
   }
 
-  const updateChartZoom = (chartId, zoomRange) => {
-    setCharts(prevCharts =>
-      prevCharts.map(chart =>
-        chart.id === chartId
-          ? { ...chart, zoomRange }
-          : chart
-      )
-    )
+  const updateGlobalZoom = (zoomRange) => {
+    setGlobalZoomRange(zoomRange)
   }
 
   const openSmaDialog = (chartId) => {
@@ -184,6 +178,7 @@ function StockAnalyzer() {
   const changeTimeRange = async (newDays) => {
     setDays(newDays)
     setError(null)
+    setGlobalZoomRange({ start: 0, end: null }) // Reset global zoom when changing periods
 
     // Update all charts with the new time range
     try {
@@ -202,7 +197,7 @@ function StockAnalyzer() {
       setCharts(prevCharts =>
         prevCharts.map(chart => {
           const updatedData = results.find(r => r.id === chart.id)
-          return updatedData ? { ...chart, data: updatedData.data, zoomRange: { start: 0, end: null } } : chart
+          return updatedData ? { ...chart, data: updatedData.data } : chart
         })
       )
     } catch (err) {
@@ -434,8 +429,8 @@ function StockAnalyzer() {
                   onDeleteSma={(period) => deleteSma(chart.id, period)}
                   chartHeight={chartHeight}
                   days={days}
-                  zoomRange={chart.zoomRange}
-                  onZoomChange={(newZoom) => updateChartZoom(chart.id, newZoom)}
+                  zoomRange={globalZoomRange}
+                  onZoomChange={updateGlobalZoom}
                   onExtendPeriod={extendTimePeriod}
                 />
               </div>
@@ -450,8 +445,8 @@ function StockAnalyzer() {
                     showMACD={chart.showMACD}
                     syncedMouseDate={syncedMouseDate}
                     setSyncedMouseDate={setSyncedMouseDate}
-                    zoomRange={chart.zoomRange}
-                    onZoomChange={(newZoom) => updateChartZoom(chart.id, newZoom)}
+                    zoomRange={globalZoomRange}
+                    onZoomChange={updateGlobalZoom}
                     onExtendPeriod={extendTimePeriod}
                   />
                 </div>
