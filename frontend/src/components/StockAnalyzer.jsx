@@ -93,7 +93,7 @@ function StockAnalyzer() {
         smaPeriods: [],
         smaVisibility: {},
         slopeChannelEnabled: false,
-        slopeChannelZones: 5,
+        slopeChannelZones: 8,
         slopeChannelDataPercent: 30,
         slopeChannelWidthMultiplier: 2.5
       }

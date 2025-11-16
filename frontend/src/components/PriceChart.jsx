@@ -2,7 +2,7 @@ import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 import { X } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, slopeChannelEnabled = false, slopeChannelZones = 5, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, slopeChannelEnabled = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
 
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
@@ -585,59 +585,72 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return { ...point, ...zoneData }
   })
 
-  // Custom component to render zone bands
-  const CustomZoneBands = (props) => {
+  // Custom component to render zone lines with labels
+  const CustomZoneLines = (props) => {
     if (!slopeChannelEnabled || zoneColors.length === 0) return null
 
-    const { xAxisMap, yAxisMap, chartWidth, chartHeight } = props
+    const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
     const xAxis = xAxisMap?.[0]
     const yAxis = yAxisMap?.[0]
 
     if (!xAxis || !yAxis) return null
 
+    // Generate distinct colors for each zone
+    const getZoneColor = (index, total) => {
+      const hue = (index / total) * 300 // 0 to 300 degrees (red to blue, avoiding green)
+      const saturation = 70
+      const lightness = 50 + (index % 2) * 10 // Alternate lightness for better distinction
+      return `hsl(${hue}, ${saturation}%, ${lightness}%)`
+    }
+
     return (
       <g>
         {zoneColors.map((zone, zoneIndex) => {
-          const points = chartDataWithZones.map((point, index) => {
-            const lower = point[`zone${zoneIndex}Lower`]
+          const points = chartDataWithZones.map((point) => {
             const upper = point[`zone${zoneIndex}Upper`]
-
-            if (lower === undefined || upper === undefined) return null
+            if (upper === undefined) return null
 
             const x = xAxis.scale(point.date)
-            const yLower = yAxis.scale(lower)
-            const yUpper = yAxis.scale(upper)
-
-            return { x, yLower, yUpper, index }
+            const y = yAxis.scale(upper)
+            return { x, y }
           }).filter(p => p !== null)
 
           if (points.length < 2) return null
 
-          // Create path for the zone band
-          let pathData = `M ${points[0].x} ${points[0].yUpper}`
-
-          // Draw top boundary (upper line)
+          // Create path for the zone boundary line
+          let pathData = `M ${points[0].x} ${points[0].y}`
           for (let i = 1; i < points.length; i++) {
-            pathData += ` L ${points[i].x} ${points[i].yUpper}`
+            pathData += ` L ${points[i].x} ${points[i].y}`
           }
 
-          // Draw right side and bottom boundary (lower line, reversed)
-          pathData += ` L ${points[points.length - 1].x} ${points[points.length - 1].yLower}`
-          for (let i = points.length - 2; i >= 0; i--) {
-            pathData += ` L ${points[i].x} ${points[i].yLower}`
-          }
-
-          // Close path
-          pathData += ' Z'
+          const color = getZoneColor(zoneIndex, zoneColors.length)
+          const lastPoint = points[points.length - 1]
 
           return (
-            <path
-              key={`zone-band-${zoneIndex}`}
-              d={pathData}
-              fill={zone.color}
-              fillOpacity={0.3}
-              stroke="none"
-            />
+            <g key={`zone-line-${zoneIndex}`}>
+              {/* Zone boundary line */}
+              <path
+                d={pathData}
+                fill="none"
+                stroke={color}
+                strokeWidth={1.5}
+                strokeDasharray="2 2"
+                opacity={0.7}
+              />
+
+              {/* Volume percentage label at the end of the line */}
+              <text
+                x={lastPoint.x + 5}
+                y={lastPoint.y}
+                fill={color}
+                fontSize="11"
+                fontWeight="600"
+                textAnchor="start"
+                dominantBaseline="middle"
+              >
+                {(zone.volumeWeight * 100).toFixed(1)}%
+              </text>
+            </g>
           )
         })}
       </g>
@@ -680,8 +693,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             />
           )}
 
-          {/* Slope Channel Zones as Custom Bands */}
-          <Customized component={CustomZoneBands} />
+          {/* Slope Channel Zones as Parallel Lines */}
+          <Customized component={CustomZoneLines} />
 
           {/* Slope Channel Lines */}
           {slopeChannelEnabled && slopeChannelInfo && (
