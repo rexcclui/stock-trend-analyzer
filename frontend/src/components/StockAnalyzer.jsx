@@ -68,8 +68,8 @@ function StockAnalyzer() {
         data: response.data,
         showRSI: false,
         showMACD: false,
-        smaPeriods: [10, 20, 50],
-        smaVisibility: { 10: true, 20: true, 50: true }
+        smaPeriods: [],
+        smaVisibility: {}
       }
       setCharts(prevCharts => [...prevCharts, newChart])
 
@@ -413,38 +413,42 @@ function StockAnalyzer() {
 
               return (
                 <div className="space-y-3">
-                  {tempPeriods.map((period, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min="1"
-                        max="200"
-                        value={period}
-                        onChange={(e) => {
-                          const newPeriods = [...tempPeriods]
-                          newPeriods[index] = parseInt(e.target.value) || 1
-                          updateSmaPeriods(editingSmaChartId, newPeriods)
-                        }}
-                        className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      />
-                      <button
-                        onClick={() => {
-                          const newPeriods = tempPeriods.filter((_, i) => i !== index)
-                          updateSmaPeriods(editingSmaChartId, newPeriods)
-                        }}
-                        disabled={tempPeriods.length === 1}
-                        className="p-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-                        title="Remove SMA"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
+                  {tempPeriods.length === 0 ? (
+                    <p className="text-sm text-slate-400 text-center py-2">No SMA lines configured. Click below to add one.</p>
+                  ) : (
+                    tempPeriods.map((period, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          max="200"
+                          value={period}
+                          onChange={(e) => {
+                            const newPeriods = [...tempPeriods]
+                            newPeriods[index] = parseInt(e.target.value) || 1
+                            updateSmaPeriods(editingSmaChartId, newPeriods)
+                          }}
+                          className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                        <button
+                          onClick={() => {
+                            const newPeriods = tempPeriods.filter((_, i) => i !== index)
+                            updateSmaPeriods(editingSmaChartId, newPeriods)
+                          }}
+                          className="p-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                          title="Remove SMA"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))
+                  )}
 
                   {tempPeriods.length < 5 && (
                     <button
                       onClick={() => {
-                        const newPeriods = [...tempPeriods, 30]
+                        const defaultPeriod = tempPeriods.length === 0 ? 20 : 30
+                        const newPeriods = [...tempPeriods, defaultPeriod]
                         updateSmaPeriods(editingSmaChartId, newPeriods)
                       }}
                       className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
