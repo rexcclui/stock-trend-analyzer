@@ -1,6 +1,6 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
 
-function IndicatorsChart({ indicators }) {
+function IndicatorsChart({ indicators, showRSI = true, showMACD = true }) {
   const chartData = [...indicators].reverse().map(ind => ({
     date: ind.date,
     rsi: ind.rsi,
@@ -12,7 +12,7 @@ function IndicatorsChart({ indicators }) {
   return (
     <div className="space-y-6">
       {/* RSI Chart */}
-      <div>
+      {showRSI && <div>
         <h4 className="text-md font-semibold mb-2 text-slate-200">RSI (Relative Strength Index)</h4>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
@@ -38,10 +38,10 @@ function IndicatorsChart({ indicators }) {
             />
           </LineChart>
         </ResponsiveContainer>
-      </div>
+      </div>}
 
       {/* MACD Chart */}
-      <div>
+      {showMACD && <div>
         <h4 className="text-md font-semibold mb-2 text-slate-200">MACD (Moving Average Convergence Divergence)</h4>
         <ResponsiveContainer width="100%" height={200}>
           <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
@@ -82,7 +82,7 @@ function IndicatorsChart({ indicators }) {
             />
           </LineChart>
         </ResponsiveContainer>
-      </div>
+      </div>}
     </div>
   )
 }
