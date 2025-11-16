@@ -10,6 +10,7 @@ confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 parameter_overrides = "FMPApiKey=\"YOUR_API_KEY_HERE\""
 image_repositories = []
+resolve_s3 = true
 
 [default.build]
 [default.build.parameters]
