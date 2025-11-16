@@ -4,18 +4,11 @@ import { useState, useRef, useEffect } from 'react'
 
 function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, slopeChannelEnabled = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
-  const [localDataPercent, setLocalDataPercent] = useState(slopeChannelDataPercent)
-  const [localWidthMultiplier, setLocalWidthMultiplier] = useState(slopeChannelWidthMultiplier)
   const [controlsVisible, setControlsVisible] = useState(false)
 
-  // Sync local state with props
-  useEffect(() => {
-    setLocalDataPercent(slopeChannelDataPercent)
-  }, [slopeChannelDataPercent])
-
-  useEffect(() => {
-    setLocalWidthMultiplier(slopeChannelWidthMultiplier)
-  }, [slopeChannelWidthMultiplier])
+  // Store ABSOLUTE optimized parameters (not percentages) so they persist across period changes
+  const [optimizedLookbackCount, setOptimizedLookbackCount] = useState(null)
+  const [optimizedStdevMult, setOptimizedStdevMult] = useState(null)
 
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
   // No need to reset here to avoid infinite loop
@@ -44,12 +37,21 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   })
 
   // Calculate Slope Channel using linear regression
-  const calculateSlopeChannel = (data) => {
+  // If useStoredParams is true and we have stored params, use them; otherwise optimize
+  const calculateSlopeChannel = (data, useStoredParams = true) => {
     if (!data || data.length < 10) return null
 
-    // Find the best channel by starting from the last point and extending backwards
-    // Tests different lookback periods and stdev multipliers, scoring by boundary touches
-    const findBestChannel = () => {
+    let recentDataCount, optimalStdevMult, touchCount
+
+    // Use stored parameters if available and requested, otherwise optimize
+    if (useStoredParams && optimizedLookbackCount !== null && optimizedStdevMult !== null) {
+      // Use stored absolute values (keeps channel same across period changes)
+      recentDataCount = Math.min(optimizedLookbackCount, data.length)
+      optimalStdevMult = optimizedStdevMult
+      // touchCount will be calculated after regression
+    } else {
+      // Run optimization to find best parameters
+      const findBestChannel = () => {
       const minPoints = Math.min(20, data.length) // Start from 20 points (or less if data is shorter)
       const maxPoints = data.length // Always test up to 100% of available data
 
@@ -126,14 +128,19 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         }
       }
 
-      return { count: bestCount, stdevMultiplier: bestStdevMult, touches: bestTouchCount }
-    }
+        return { count: bestCount, stdevMultiplier: bestStdevMult, touches: bestTouchCount }
+      }
 
-    // Find best channel parameters (lookback count and stdev multiplier)
-    const bestChannelParams = findBestChannel()
-    const recentDataCount = bestChannelParams.count
-    const optimalStdevMult = bestChannelParams.stdevMultiplier
-    const touchCount = bestChannelParams.touches
+      // Find best channel parameters (lookback count and stdev multiplier)
+      const bestChannelParams = findBestChannel()
+      recentDataCount = bestChannelParams.count
+      optimalStdevMult = bestChannelParams.stdevMultiplier
+      touchCount = bestChannelParams.touches
+
+      // Store the optimized parameters for future use (persist across period changes)
+      setOptimizedLookbackCount(recentDataCount)
+      setOptimizedStdevMult(optimalStdevMult)
+    }
 
     // Use first N data points (data is NEWEST-FIRST, so first N = most recent N)
     const recentData = data.slice(0, recentDataCount)
@@ -206,6 +213,24 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     })
 
     const rSquared = 1 - (ssResidual / ssTotal)
+
+    // Calculate touch count if not already set (happens when using stored params)
+    if (touchCount === undefined) {
+      touchCount = 0
+      const touchTolerance = 0.05
+      recentData.forEach((point, index) => {
+        const predictedY = slope * index + intercept
+        const upperBound = predictedY + channelWidth
+        const lowerBound = predictedY - channelWidth
+        const distanceToUpper = Math.abs(point.close - upperBound)
+        const distanceToLower = Math.abs(point.close - lowerBound)
+        const boundRange = channelWidth * 2
+        if (distanceToUpper <= boundRange * touchTolerance ||
+            distanceToLower <= boundRange * touchTolerance) {
+          touchCount++
+        }
+      })
+    }
 
     return {
       channelData,
@@ -708,79 +733,33 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             </button>
           </div>
 
-          {/* Lookback Period */}
+          {/* Current Parameters */}
           <div style={{ marginBottom: '12px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-              <label style={{ fontSize: '11px', color: 'rgb(203, 213, 225)', fontWeight: '500' }}>
-                Lookback
-              </label>
-              <span style={{ fontSize: '11px', color: 'rgb(203, 213, 225)', fontFamily: 'monospace', fontWeight: '600' }}>
-                {localDataPercent}%
+            <div style={{ fontSize: '11px', color: 'rgb(148, 163, 184)', marginBottom: '8px', fontStyle: 'italic' }}>
+              Current channel parameters:
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(71, 85, 105, 0.3)', borderRadius: '4px', marginBottom: '6px' }}>
+              <span style={{ fontSize: '11px', color: 'rgb(203, 213, 225)' }}>Lookback:</span>
+              <span style={{ fontSize: '11px', color: 'rgb(139, 92, 246)', fontFamily: 'monospace', fontWeight: '600' }}>
+                {slopeChannelInfo.recentDataCount} points
               </span>
             </div>
-            <input
-              type="range"
-              min="10"
-              max="100"
-              step="5"
-              value={localDataPercent}
-              onChange={(e) => {
-                const newValue = parseInt(e.target.value)
-                setLocalDataPercent(newValue)
-                onSlopeChannelParamsChange({ slopeChannelDataPercent: newValue })
-              }}
-              style={{
-                width: '100%',
-                height: '4px',
-                borderRadius: '2px',
-                outline: 'none',
-                background: 'linear-gradient(to right, rgb(139, 92, 246) 0%, rgb(139, 92, 246) ' + localDataPercent + '%, rgb(71, 85, 105) ' + localDataPercent + '%, rgb(71, 85, 105) 100%)',
-                cursor: 'pointer'
-              }}
-            />
-          </div>
 
-          {/* Channel Width */}
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-              <label style={{ fontSize: '11px', color: 'rgb(203, 213, 225)', fontWeight: '500' }}>
-                Width
-              </label>
-              <span style={{ fontSize: '11px', color: 'rgb(203, 213, 225)', fontFamily: 'monospace', fontWeight: '600' }}>
-                {localWidthMultiplier.toFixed(1)}σ
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px', background: 'rgba(71, 85, 105, 0.3)', borderRadius: '4px', marginBottom: '12px' }}>
+              <span style={{ fontSize: '11px', color: 'rgb(203, 213, 225)' }}>Width:</span>
+              <span style={{ fontSize: '11px', color: 'rgb(139, 92, 246)', fontFamily: 'monospace', fontWeight: '600' }}>
+                {slopeChannelInfo.optimalStdevMult.toFixed(2)}σ
               </span>
             </div>
-            <input
-              type="range"
-              min="1"
-              max="4"
-              step="0.1"
-              value={localWidthMultiplier}
-              onChange={(e) => {
-                const newValue = parseFloat(e.target.value)
-                setLocalWidthMultiplier(newValue)
-                onSlopeChannelParamsChange({ slopeChannelWidthMultiplier: newValue })
-              }}
-              style={{
-                width: '100%',
-                height: '4px',
-                borderRadius: '2px',
-                outline: 'none',
-                background: 'linear-gradient(to right, rgb(139, 92, 246) 0%, rgb(139, 92, 246) ' + ((localWidthMultiplier - 1) / 3 * 100) + '%, rgb(71, 85, 105) ' + ((localWidthMultiplier - 1) / 3 * 100) + '%, rgb(71, 85, 105) 100%)',
-                cursor: 'pointer'
-              }}
-            />
-          </div>
 
-          {/* Recalculate Button */}
-          <div style={{ marginTop: '12px' }}>
+            {/* Find Best Fit Button */}
             <button
               onClick={() => {
-                // Force recalculation by updating the lookback percentage
-                onSlopeChannelParamsChange({
-                  slopeChannelDataPercent: localDataPercent,
-                  slopeChannelWidthMultiplier: localWidthMultiplier
-                })
+                // Trigger re-optimization by setting stored params to null
+                setOptimizedLookbackCount(null)
+                setOptimizedStdevMult(null)
+                // Component will re-render and calculateSlopeChannel will run optimization
               }}
               style={{
                 width: '100%',
@@ -801,11 +780,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 e.currentTarget.style.background = 'rgb(139, 92, 246)'
               }}
             >
-              Recalculate Channel
+              Find Best Fit
             </button>
           </div>
 
-          {/* Channel Info */}
+          {/* Channel Statistics */}
           <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgb(71, 85, 105)' }}>
             <div style={{ fontSize: '10px', color: 'rgb(148, 163, 184)', lineHeight: '1.4' }}>
               <div>Points: {slopeChannelInfo.recentDataCount}</div>
