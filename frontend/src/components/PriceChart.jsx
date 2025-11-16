@@ -59,15 +59,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const minPoints = Math.min(20, data.length) // Start from 20 points (or less if data is shorter)
       const maxPoints = data.length // Always test up to 100% of available data
 
-      // Test stdev multipliers from 1 to 4 with 0.25 increments
+      // Test stdev multipliers from 1 to 4 with 0.1 increments for finer control
       const stdevMultipliers = []
-      for (let mult = 1.0; mult <= 4.0; mult += 0.25) {
+      for (let mult = 1.0; mult <= 4.0; mult += 0.1) {
         stdevMultipliers.push(mult)
       }
 
-      let bestTouchCount = 0
       let bestCount = minPoints
       let bestStdevMult = 2.5
+      let bestTouchCount = 0
+      const maxOutsidePercent = 0.05 // 5% maximum outside threshold
 
       // Try different lookback periods: 20, 21, 22, 23... incrementing by 1
       // Data comes in NEWEST-FIRST, so slice(0, count) gets the most recent N points
@@ -99,36 +100,65 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
         const stdDev = Math.sqrt(variance)
 
-        // Try different stdev multipliers for this lookback period
+        // Find the minimum stdev multiplier where no more than 5% of points are outside
+        let foundValidChannel = false
         for (const stdevMult of stdevMultipliers) {
           const channelWidth = stdDev * stdevMult
 
-          // Count how many points touch or almost touch (within 5%) the upper or lower bounds
+          // Count how many points are OUTSIDE the channel bounds
+          let outsideCount = 0
           let touchCount = 0
-          const touchTolerance = 0.05 // 5% tolerance
+          const touchTolerance = 0.05 // 5% tolerance for touch counting
 
           testData.forEach((point, index) => {
             const predictedY = slope * index + intercept
             const upperBound = predictedY + channelWidth
             const lowerBound = predictedY - channelWidth
 
+            // Check if point is outside the channel
+            if (point.close > upperBound || point.close < lowerBound) {
+              outsideCount++
+            }
+
+            // Also count touches for selection criteria
             const distanceToUpper = Math.abs(point.close - upperBound)
             const distanceToLower = Math.abs(point.close - lowerBound)
             const boundRange = channelWidth * 2
 
-            // Check if price is within 5% of either boundary
             if (distanceToUpper <= boundRange * touchTolerance ||
                 distanceToLower <= boundRange * touchTolerance) {
               touchCount++
             }
           })
 
-          // Update best if this combination has more touches
-          if (touchCount > bestTouchCount) {
-            bestTouchCount = touchCount
-            bestCount = count
-            bestStdevMult = stdevMult
+          const outsidePercent = outsideCount / n
+
+          // If this channel meets the criteria (≤5% outside)
+          if (outsidePercent <= maxOutsidePercent) {
+            foundValidChannel = true
+
+            // Prefer this channel if:
+            // 1. We haven't found a valid channel yet, OR
+            // 2. This lookback period is longer (more data), OR
+            // 3. Same lookback but more touches (better fit)
+            const isBetterLookback = count > bestCount
+            const isSameLookbackBetterFit = count === bestCount && touchCount > bestTouchCount
+
+            if (bestCount === minPoints || isBetterLookback || isSameLookbackBetterFit) {
+              bestCount = count
+              bestStdevMult = stdevMult
+              bestTouchCount = touchCount
+            }
+
+            // Since we're iterating from smallest to largest stdev,
+            // take the first one that meets criteria for this lookback period
+            break
           }
+        }
+
+        // If no valid channel found for this lookback period, continue to next
+        if (!foundValidChannel) {
+          continue
         }
       }
 
@@ -199,10 +229,19 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // Calculate final distribution for display
     let finalCountAbove = 0
     let finalCountBelow = 0
+    let finalCountOutside = 0
     recentData.forEach((point, index) => {
       const predictedY = slope * index + intercept
+      const upperBound = predictedY + channelWidth
+      const lowerBound = predictedY - channelWidth
+
       if (point.close > predictedY) finalCountAbove++
       else if (point.close < predictedY) finalCountBelow++
+
+      // Count points outside the channel
+      if (point.close > upperBound || point.close < lowerBound) {
+        finalCountOutside++
+      }
     })
 
     // Calculate R² for the final channel
@@ -245,6 +284,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       recentDataCount,
       percentAbove: (finalCountAbove / n * 100).toFixed(1),
       percentBelow: (finalCountBelow / n * 100).toFixed(1),
+      percentOutside: (finalCountOutside / n * 100).toFixed(1),
       optimalStdevMult,
       touchCount,
       rSquared
@@ -1085,6 +1125,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgb(71, 85, 105)' }}>
             <div style={{ fontSize: '10px', color: 'rgb(148, 163, 184)', lineHeight: '1.4' }}>
               <div>Touches: {slopeChannelInfo.touchCount} ({((slopeChannelInfo.touchCount / slopeChannelInfo.recentDataCount) * 100).toFixed(1)}%)</div>
+              <div>Outside: {slopeChannelInfo.percentOutside}% (target: ≤5%)</div>
               <div>R²: {(slopeChannelInfo.rSquared * 100).toFixed(1)}%</div>
             </div>
           </div>
