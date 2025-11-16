@@ -419,15 +419,18 @@ function StockAnalyzer() {
                     tempPeriods.map((period, index) => (
                       <div key={index} className="flex items-center gap-2">
                         <input
-                          type="number"
-                          min="1"
-                          max="200"
+                          type="text"
                           value={period}
                           onChange={(e) => {
-                            const newPeriods = [...tempPeriods]
-                            newPeriods[index] = parseInt(e.target.value) || 1
-                            updateSmaPeriods(editingSmaChartId, newPeriods)
+                            const value = e.target.value
+                            const parsed = parseInt(value)
+                            if (value === '' || (!isNaN(parsed) && parsed >= 1 && parsed <= 200)) {
+                              const newPeriods = [...tempPeriods]
+                              newPeriods[index] = value === '' ? '' : parsed
+                              updateSmaPeriods(editingSmaChartId, newPeriods)
+                            }
                           }}
+                          placeholder="Period (1-200)"
                           className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                         />
                         <button
