@@ -805,6 +805,39 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             />
           </div>
 
+          {/* Recalculate Button */}
+          <div style={{ marginTop: '12px' }}>
+            <button
+              onClick={() => {
+                // Force recalculation by updating the lookback percentage
+                onSlopeChannelParamsChange({
+                  slopeChannelDataPercent: localDataPercent,
+                  slopeChannelWidthMultiplier: localWidthMultiplier
+                })
+              }}
+              style={{
+                width: '100%',
+                padding: '8px',
+                background: 'rgb(139, 92, 246)',
+                border: 'none',
+                borderRadius: '6px',
+                color: 'rgb(226, 232, 240)',
+                fontSize: '11px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgb(124, 58, 237)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgb(139, 92, 246)'
+              }}
+            >
+              Recalculate Channel
+            </button>
+          </div>
+
           {/* Channel Info */}
           <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgb(71, 85, 105)' }}>
             <div style={{ fontSize: '10px', color: 'rgb(148, 163, 184)', lineHeight: '1.4' }}>
