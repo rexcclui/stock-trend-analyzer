@@ -36,7 +36,6 @@ function StockAnalyzer() {
       const newChart = {
         id: Date.now(),
         symbol: symbol.toUpperCase(),
-        days: days,
         data: response.data,
         showRSI: false,
         showMACD: false
@@ -69,24 +68,32 @@ function StockAnalyzer() {
     }
   }
 
-  const changeTimeRange = async (chartId, chartSymbol, newDays) => {
+  const changeTimeRange = async (newDays) => {
+    setDays(newDays)
+    setError(null)
+
+    // Update all charts with the new time range
     try {
-      const response = await axios.get(`${API_URL}/analyze`, {
-        params: {
-          symbol: chartSymbol,
-          days: newDays
-        }
+      const updatePromises = charts.map(async (chart) => {
+        const response = await axios.get(`${API_URL}/analyze`, {
+          params: {
+            symbol: chart.symbol,
+            days: newDays
+          }
+        })
+        return { id: chart.id, data: response.data }
       })
 
+      const results = await Promise.all(updatePromises)
+
       setCharts(prevCharts =>
-        prevCharts.map(chart =>
-          chart.id === chartId
-            ? { ...chart, days: newDays, data: response.data }
-            : chart
-        )
+        prevCharts.map(chart => {
+          const updatedData = results.find(r => r.id === chart.id)
+          return updatedData ? { ...chart, data: updatedData.data } : chart
+        })
       )
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to update chart.')
+      setError(err.response?.data?.error || 'Failed to update charts.')
     }
   }
 
@@ -191,9 +198,9 @@ function StockAnalyzer() {
                     {timeRanges.map((range) => (
                       <button
                         key={range.label}
-                        onClick={() => changeTimeRange(chart.id, chart.symbol, range.days)}
+                        onClick={() => changeTimeRange(range.days)}
                         className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                          chart.days === range.days
+                          days === range.days
                             ? 'bg-purple-600 text-white'
                             : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                         }`}
