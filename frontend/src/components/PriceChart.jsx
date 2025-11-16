@@ -78,7 +78,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     } else {
       // Run optimization to find best parameters with trend-breaking logic
       const findBestChannel = () => {
-      const minPoints = Math.min(20, data.length) // Start from 20 points (or less if data is shorter)
+      const minPoints = Math.min(100, data.length) // Start from 100 points (or less if data is shorter)
       const maxPoints = data.length // Always test up to 100% of available data
 
       // Test stdev multipliers from 1 to 4 with 0.1 increments for finer control
@@ -1130,7 +1130,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               </div>
               <input
                 type="range"
-                min="20"
+                min="100"
                 max={dataLength}
                 step="1"
                 value={slopeChannelInfo.recentDataCount}
@@ -1143,7 +1143,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   height: '4px',
                   borderRadius: '2px',
                   outline: 'none',
-                  background: `linear-gradient(to right, rgb(139, 92, 246) 0%, rgb(139, 92, 246) ${((slopeChannelInfo.recentDataCount - 20) / (dataLength - 20)) * 100}%, rgb(71, 85, 105) ${((slopeChannelInfo.recentDataCount - 20) / (dataLength - 20)) * 100}%, rgb(71, 85, 105) 100%)`,
+                  background: `linear-gradient(to right, rgb(139, 92, 246) 0%, rgb(139, 92, 246) ${((slopeChannelInfo.recentDataCount - 100) / (dataLength - 100)) * 100}%, rgb(71, 85, 105) ${((slopeChannelInfo.recentDataCount - 100) / (dataLength - 100)) * 100}%, rgb(71, 85, 105) 100%)`,
                   cursor: 'pointer'
                 }}
               />

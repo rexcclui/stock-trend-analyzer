@@ -102,20 +102,21 @@ Example: `Trend (150pts, 45 touches, R²=87.3%)`
 
 **Purpose**: Determines how many recent data points are used for channel calculation
 
-**Range**: 20 to maximum available data points
-- 1Y period: 20 to ~365 points
-- 5Y period: 20 to ~1825 points
+**Range**: 100 to maximum available data points
+- 1Y period: 100 to ~365 points
+- 5Y period: 100 to ~1825 points
 
 **Step Size**: 1 point
 
 **Behavior**:
-- Lower values (20-100): Focus on very recent trends, more responsive
+- Minimum value (100): Focus on recent trends, more responsive
 - Medium values (100-250): Balanced view of recent price action
 - Higher values (250+): Longer-term trend analysis
 
 **Example**:
 ```
-Lookback = 100 → Uses last 100 trading days
+Lookback = 100 → Uses last 100 trading days (minimum)
+Lookback = 250 → Uses last 250 trading days
 Lookback = 365 → Uses entire year of data
 ```
 
@@ -143,7 +144,7 @@ Width = 3.0σ → Channel contains ~99.7% of price data
 **Purpose**: Runs full optimization algorithm to find ideal parameters
 
 **What It Does**:
-1. Starts with minimum 20-point lookback period
+1. Starts with minimum 100-point lookback period
 2. Finds optimal stdev multiplier ensuring ≤5% points outside channel
 3. Tries to extend lookback by adding older historical data
 4. Stops extending if >50% of new data falls outside the channel (trend break)
@@ -303,7 +304,7 @@ lowerBound = trendLine - channelWidth
 ```python
 def findBestChannel():
     # Start with minimum lookback
-    lookback = 20
+    lookback = 100
     stdevMult = findOptimalStdev(lookback)  # First stdev where ≤5% outside
 
     # Try to extend lookback period
@@ -339,13 +340,13 @@ def findOptimalStdev(lookback):
 5. **Volume Filtering**: When enabled, only high-volume points are considered
 
 **Complexity**:
-- Worst case: ~(dataLength - 20) iterations
+- Worst case: ~(dataLength - 100) iterations
 - Average case: Much fewer due to trend-breaking
 - StdDev tested per iteration: Up to 31 (1.0 to 4.0, step 0.1)
 
 **Example** (365 days):
-- Without breaking: Tests up to 345 lookback values
-- With breaking: Typically breaks at 80-150 lookback (depending on trend)
+- Without breaking: Tests up to 265 lookback values (from 100 to 365)
+- With breaking: Typically breaks at 150-250 lookback (depending on trend)
 - **Result: 10x-20x faster than old algorithm**
 
 ### Touch Detection
@@ -472,8 +473,8 @@ For zone i (0-indexed):
 ### Manual Adjustment Tips
 
 **Lookback Period**:
-- **Short-term traders** (day/swing): 20-100 points
-- **Medium-term traders**: 100-250 points
+- **Short-term traders** (swing): 100-150 points
+- **Medium-term traders**: 150-250 points
 - **Long-term investors**: 250+ points
 - **Trend confirmation**: Match lookback to your trading timeframe
 
@@ -553,10 +554,10 @@ Direction: Check volume zones for bias (upper vs lower concentration)
 
 ### Data Requirements
 
-**Minimum**: 10 data points (error otherwise)
+**Minimum**: 100 data points for channel optimization (falls back to minimum if less available)
 
 **Optimal**:
-- At least 100 points for meaningful regression
+- At least 250 points for meaningful trend analysis
 - At least 365 points for long-term trends
 
 **Maximum**: No hard limit, tested up to 10,000 points
