@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
-import { Plus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings } from 'lucide-react'
+import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings } from 'lucide-react'
 import PriceChart from './PriceChart'
 import IndicatorsChart from './IndicatorsChart'
 import SignalsList from './SignalsList'
@@ -17,6 +17,7 @@ function StockAnalyzer() {
   const [syncedMouseDate, setSyncedMouseDate] = useState(null)
   const [stockHistory, setStockHistory] = useState([])
   const [displayColumns, setDisplayColumns] = useState(1)
+  const [chartHeight, setChartHeight] = useState(400)
   const [smaDialogOpen, setSmaDialogOpen] = useState(false)
   const [editingSmaChartId, setEditingSmaChartId] = useState(null)
 
@@ -277,21 +278,65 @@ function StockAnalyzer() {
                 </>
               )}
             </button>
-            <div className="flex flex-col">
-              <label className="block text-xs font-medium text-slate-300 mb-1">
-                Display Columns
-              </label>
-              <select
-                value={displayColumns}
-                onChange={(e) => setDisplayColumns(Number(e.target.value))}
-                className="px-3 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              >
-                {[1, 2, 3, 4, 5, 6].map((num) => (
-                  <option key={num} value={num}>
-                    {num}
-                  </option>
-                ))}
-              </select>
+            <div className="flex gap-4 flex-wrap items-end">
+              <div className="flex flex-col">
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Display Columns
+                </label>
+                <select
+                  value={displayColumns}
+                  onChange={(e) => setDisplayColumns(Number(e.target.value))}
+                  className="px-3 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  {[1, 2, 3, 4, 5, 6].map((num) => (
+                    <option key={num} value={num}>
+                      {num}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex flex-col">
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Chart Height
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setChartHeight(prev => Math.max(200, prev - 50))}
+                    className="p-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg hover:bg-slate-600 transition-colors"
+                    title="Decrease height"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <span className="text-sm text-slate-300 min-w-[3rem] text-center">{chartHeight}px</span>
+                  <button
+                    onClick={() => setChartHeight(prev => Math.min(1000, prev + 50))}
+                    className="p-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg hover:bg-slate-600 transition-colors"
+                    title="Increase height"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-col">
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Time Period
+                </label>
+                <div className="flex gap-1 flex-wrap">
+                  {timeRanges.map((range) => (
+                    <button
+                      key={range.label}
+                      onClick={() => changeTimeRange(range.days)}
+                      className={`px-2 py-1 text-sm rounded font-medium transition-colors ${
+                        days === range.days
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      {range.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -326,14 +371,36 @@ function StockAnalyzer() {
 
                 <div className="flex items-center justify-between mb-4 pr-12">
                   <h3 className="text-lg font-semibold text-slate-100">{chart.symbol}</h3>
-                  <button
-                    onClick={() => openSmaDialog(chart.id)}
-                    className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
-                    title="Configure SMA"
-                  >
-                    <Settings className="w-4 h-4" />
-                    SMA
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => openSmaDialog(chart.id)}
+                      className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
+                      title="Configure SMA"
+                    >
+                      <Settings className="w-4 h-4" />
+                      SMA
+                    </button>
+                    <button
+                      onClick={() => updateChartIndicator(chart.id, 'showRSI', !chart.showRSI)}
+                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
+                        chart.showRSI
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      RSI
+                    </button>
+                    <button
+                      onClick={() => updateChartIndicator(chart.id, 'showMACD', !chart.showMACD)}
+                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
+                        chart.showMACD
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                    >
+                      MACD
+                    </button>
+                  </div>
                 </div>
                 <PriceChart
                   prices={chart.data.prices}
@@ -345,51 +412,8 @@ function StockAnalyzer() {
                   smaVisibility={chart.smaVisibility}
                   onToggleSma={(period) => toggleSmaVisibility(chart.id, period)}
                   onDeleteSma={(period) => deleteSma(chart.id, period)}
+                  chartHeight={chartHeight}
                 />
-
-                {/* Controls: Time Range + Indicators */}
-                <div className="flex justify-between items-center mt-6 flex-wrap gap-4">
-                  {/* Time Range Selector */}
-                  <div className="flex gap-1 flex-wrap">
-                    {timeRanges.map((range) => (
-                      <button
-                        key={range.label}
-                        onClick={() => changeTimeRange(range.days)}
-                        className={`px-2 py-1 text-sm rounded font-medium transition-colors ${
-                          days === range.days
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                      >
-                        {range.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Indicator Toggle Buttons */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => updateChartIndicator(chart.id, 'showRSI', !chart.showRSI)}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        chart.showRSI
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                    >
-                      RSI
-                    </button>
-                    <button
-                      onClick={() => updateChartIndicator(chart.id, 'showMACD', !chart.showMACD)}
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                        chart.showMACD
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                    >
-                      MACD
-                    </button>
-                  </div>
-                </div>
               </div>
 
               {/* Technical Indicators */}
