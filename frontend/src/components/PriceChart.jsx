@@ -574,11 +574,22 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     if (!xAxis || !yAxis) return null
 
-    // Generate distinct colors for each zone
-    const getZoneColor = (index, total) => {
+    // Generate distinct colors for each zone with depth based on volume weight
+    const getZoneColor = (index, total, volumeWeight) => {
       const hue = (index / total) * 300 // 0 to 300 degrees (red to blue, avoiding green)
-      const saturation = 70
-      const lightness = 50 + (index % 2) * 10 // Alternate lightness for better distinction
+
+      // Saturation and lightness vary with volume weight
+      // Higher volume = higher saturation (deeper color)
+      // Lower volume = lower saturation (lighter color)
+      const minSaturation = 30
+      const maxSaturation = 90
+      const saturation = minSaturation + (volumeWeight * (maxSaturation - minSaturation))
+
+      // Lightness: higher volume = darker, lower volume = lighter
+      const minLightness = 35
+      const maxLightness = 65
+      const lightness = maxLightness - (volumeWeight * (maxLightness - minLightness))
+
       return `hsl(${hue}, ${saturation}%, ${lightness}%)`
     }
 
@@ -602,8 +613,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             pathData += ` L ${points[i].x} ${points[i].y}`
           }
 
-          const color = getZoneColor(zoneIndex, zoneColors.length)
+          const color = getZoneColor(zoneIndex, zoneColors.length, zone.volumeWeight)
           const lastPoint = points[points.length - 1]
+
+          // Opacity varies with volume weight: higher volume = more opaque
+          const minOpacity = 0.4
+          const maxOpacity = 0.95
+          const opacity = minOpacity + (zone.volumeWeight * (maxOpacity - minOpacity))
 
           return (
             <g key={`zone-line-${zoneIndex}`}>
@@ -614,7 +630,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 stroke={color}
                 strokeWidth={1.5}
                 strokeDasharray="2 2"
-                opacity={0.7}
+                opacity={opacity}
               />
 
               {/* Volume percentage label at the end of the line */}
