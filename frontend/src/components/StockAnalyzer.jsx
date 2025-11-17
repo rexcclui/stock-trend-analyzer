@@ -96,7 +96,7 @@ function StockAnalyzer() {
         volumeColorMode: 'absolute', // 'absolute' or 'relative-spy'
         volumeProfileEnabled: false,
         volumeProfileMode: 'auto', // 'auto' or 'manual'
-        volumeProfileManualRange: null, // { startDate, endDate }
+        volumeProfileManualRanges: [], // Array of { startDate, endDate }
         spyData: null,
         performanceComparisonEnabled: false,
         performanceComparisonBenchmark: 'SPY',
@@ -339,8 +339,8 @@ function StockAnalyzer() {
           return {
             ...chart,
             volumeProfileMode: nextMode,
-            // Clear manual range when switching back to auto
-            volumeProfileManualRange: nextMode === 'auto' ? null : chart.volumeProfileManualRange
+            // Clear manual ranges when switching back to auto
+            volumeProfileManualRanges: nextMode === 'auto' ? [] : chart.volumeProfileManualRanges
           }
         }
         return chart
@@ -354,7 +354,8 @@ function StockAnalyzer() {
         if (chart.id === chartId) {
           return {
             ...chart,
-            volumeProfileManualRange: range
+            // Add new range to the array (don't replace)
+            volumeProfileManualRanges: [...chart.volumeProfileManualRanges, range]
           }
         }
         return chart
@@ -975,7 +976,7 @@ function StockAnalyzer() {
                   volumeColorMode={chart.volumeColorMode}
                   volumeProfileEnabled={chart.volumeProfileEnabled}
                   volumeProfileMode={chart.volumeProfileMode}
-                  volumeProfileManualRange={chart.volumeProfileManualRange}
+                  volumeProfileManualRanges={chart.volumeProfileManualRanges}
                   onVolumeProfileManualRangeChange={(range) => updateVolumeProfileManualRange(chart.id, range)}
                   spyData={chart.spyData}
                   performanceComparisonEnabled={chart.performanceComparisonEnabled}

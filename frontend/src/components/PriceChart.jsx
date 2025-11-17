@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
 import { X, ArrowLeftRight } from 'lucide-react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRange = null, onVolumeProfileManualRangeChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -883,22 +883,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   const { thresholds80: rollingThresholds80, thresholds20: rollingThresholds20 } = calculateRollingThresholds()
 
-  // Calculate volume profile - create even-height zones with volume weight
-  const calculateVolumeProfile = () => {
-    if (!volumeProfileEnabled || displayPrices.length === 0) return null
-
-    // Filter data based on manual range if in manual mode
-    let dataToAnalyze = displayPrices
-    if (volumeProfileMode === 'manual' && volumeProfileManualRange) {
-      const { startDate, endDate } = volumeProfileManualRange
-      dataToAnalyze = displayPrices.filter(price => {
-        const priceDate = price.date
-        return priceDate >= startDate && priceDate <= endDate
-      })
-
-      // If no data in selected range, return null
-      if (dataToAnalyze.length === 0) return null
-    }
+  // Helper function to calculate volume profile for a specific dataset and date range
+  const calculateSingleVolumeProfile = (dataToAnalyze, dateRange = null) => {
+    if (dataToAnalyze.length === 0) return null
 
     // Calculate total volume
     const totalVolume = dataToAnalyze.reduce((sum, price) => sum + (price.volume || 0), 0)
@@ -948,10 +935,38 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       if (zone.volume > maxZoneVolume) maxZoneVolume = zone.volume
     })
 
-    return { zones: volumeZones, maxVolume: maxZoneVolume, totalVolume }
+    return { zones: volumeZones, maxVolume: maxZoneVolume, totalVolume, dateRange }
   }
 
-  const volumeProfile = calculateVolumeProfile()
+  // Calculate volume profiles - returns array of profiles
+  const calculateVolumeProfiles = () => {
+    if (!volumeProfileEnabled || displayPrices.length === 0) return []
+
+    if (volumeProfileMode === 'auto') {
+      // Auto mode: single profile for all data
+      const profile = calculateSingleVolumeProfile(displayPrices, null)
+      return profile ? [profile] : []
+    } else {
+      // Manual mode: one profile for each selected range
+      if (volumeProfileManualRanges.length === 0) return []
+
+      const profiles = []
+      volumeProfileManualRanges.forEach(range => {
+        const { startDate, endDate } = range
+        const dataToAnalyze = displayPrices.filter(price => {
+          const priceDate = price.date
+          return priceDate >= startDate && priceDate <= endDate
+        })
+
+        const profile = calculateSingleVolumeProfile(dataToAnalyze, range)
+        if (profile) profiles.push(profile)
+      })
+
+      return profiles
+    }
+  }
+
+  const volumeProfiles = calculateVolumeProfiles()
 
   // Calculate performance variance for each point (configurable rolling period)
   const performanceVariances = (() => {
@@ -2207,9 +2222,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     )
   }
 
-  // Custom component to render volume profile horizontal bars
+  // Custom component to render volume profile horizontal bars (supports multiple profiles)
   const CustomVolumeProfile = (props) => {
-    if (!volumeProfileEnabled || !volumeProfile) return null
+    if (!volumeProfileEnabled || volumeProfiles.length === 0) return null
 
     const { xAxisMap, yAxisMap, offset } = props
     const xAxis = xAxisMap?.[0]
@@ -2217,73 +2232,79 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     if (!xAxis || !yAxis) return null
 
-    // Determine bar x position and width based on mode
-    let barX = offset.left
-    let barWidth = offset.width
-
-    // In manual mode, only span the selected date range
-    if (volumeProfileMode === 'manual' && volumeProfileManualRange) {
-      const { startDate, endDate } = volumeProfileManualRange
-      const startX = xAxis.scale(startDate)
-      const endX = xAxis.scale(endDate)
-
-      if (startX !== undefined && endX !== undefined) {
-        barX = Math.min(startX, endX)
-        barWidth = Math.abs(endX - startX)
-      }
-    }
-
     return (
       <g>
-        {volumeProfile.zones.map((zone, i) => {
-          // Calculate y positions based on price range (even heights)
-          const yTop = yAxis.scale(zone.maxPrice)
-          const yBottom = yAxis.scale(zone.minPrice)
-          const height = Math.abs(yBottom - yTop)
+        {volumeProfiles.map((volumeProfile, profileIndex) => {
+          // Determine bar x position and width based on mode
+          let barX = offset.left
+          let barWidth = offset.width
 
-          // Calculate color depth based on volume weight
-          // Higher volume = deeper/darker color
-          const volumeWeight = zone.volume / volumeProfile.maxVolume // 0 to 1
+          // In manual mode, only span the selected date range
+          if (volumeProfileMode === 'manual' && volumeProfile.dateRange) {
+            const { startDate, endDate } = volumeProfile.dateRange
+            const startX = xAxis.scale(startDate)
+            const endX = xAxis.scale(endDate)
 
-          // Use blue/cyan hue with varying lightness
-          const hue = 200 // Blue/cyan
-          const saturation = 75
-          // Map volume weight to lightness: high volume = darker (30%), low volume = lighter (75%)
-          const lightness = 75 - (volumeWeight * 45) // Range from 75% (light) to 30% (dark)
-
-          // Opacity based on volume weight too
-          const opacity = 0.3 + (volumeWeight * 0.5) // Range from 0.3 to 0.8
+            if (startX !== undefined && endX !== undefined) {
+              barX = Math.min(startX, endX)
+              barWidth = Math.abs(endX - startX)
+            }
+          }
 
           return (
-            <g key={`volume-profile-${i}`}>
-              {/* Horizontal bar spanning selected range or full chart */}
-              <rect
-                x={barX}
-                y={yTop}
-                width={barWidth}
-                height={height}
-                fill={`hsl(${hue}, ${saturation}%, ${lightness}%)`}
-                stroke="rgba(59, 130, 246, 0.4)"
-                strokeWidth={0.5}
-                opacity={opacity}
-              />
+            <g key={`volume-profile-${profileIndex}`}>
+              {volumeProfile.zones.map((zone, i) => {
+                // Calculate y positions based on price range (even heights)
+                const yTop = yAxis.scale(zone.maxPrice)
+                const yBottom = yAxis.scale(zone.minPrice)
+                const height = Math.abs(yBottom - yTop)
 
-              {/* Volume percentage label in the center */}
-              <text
-                x={barX + barWidth / 2}
-                y={yTop + height / 2}
-                fill="#ffffff"
-                fontSize="11"
-                fontWeight="700"
-                textAnchor="middle"
-                dominantBaseline="middle"
-                opacity={0.95}
-                style={{
-                  textShadow: '0 0 3px rgba(0,0,0,0.8), 0 0 5px rgba(0,0,0,0.5)'
-                }}
-              >
-                {zone.volumePercent.toFixed(1)}%
-              </text>
+                // Calculate color depth based on volume weight
+                // Higher volume = deeper/darker color
+                const volumeWeight = zone.volume / volumeProfile.maxVolume // 0 to 1
+
+                // Use blue/cyan hue with varying lightness
+                const hue = 200 // Blue/cyan
+                const saturation = 75
+                // Map volume weight to lightness: high volume = darker (30%), low volume = lighter (75%)
+                const lightness = 75 - (volumeWeight * 45) // Range from 75% (light) to 30% (dark)
+
+                // Opacity based on volume weight too
+                const opacity = 0.3 + (volumeWeight * 0.5) // Range from 0.3 to 0.8
+
+                return (
+                  <g key={`volume-profile-${profileIndex}-zone-${i}`}>
+                    {/* Horizontal bar spanning selected range or full chart */}
+                    <rect
+                      x={barX}
+                      y={yTop}
+                      width={barWidth}
+                      height={height}
+                      fill={`hsl(${hue}, ${saturation}%, ${lightness}%)`}
+                      stroke="rgba(59, 130, 246, 0.4)"
+                      strokeWidth={0.5}
+                      opacity={opacity}
+                    />
+
+                    {/* Volume percentage label in the center */}
+                    <text
+                      x={barX + barWidth / 2}
+                      y={yTop + height / 2}
+                      fill="#ffffff"
+                      fontSize="11"
+                      fontWeight="700"
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      opacity={0.95}
+                      style={{
+                        textShadow: '0 0 3px rgba(0,0,0,0.8), 0 0 5px rgba(0,0,0,0.5)'
+                      }}
+                    >
+                      {zone.volumePercent.toFixed(1)}%
+                    </text>
+                  </g>
+                )
+              })}
             </g>
           )
         })}
