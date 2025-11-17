@@ -93,7 +93,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       }
 
       const maxOutsidePercent = 0.05 // 5% maximum outside threshold
-      const trendBreakThreshold = 1.0 // Break if >100% of new data is outside
+      const trendBreakThreshold = 0.5 // Break if >50% of new data is outside
 
       // Start with minimum lookback and try to extend
       let currentCount = minPoints
