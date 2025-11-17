@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
-import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings } from 'lucide-react'
+import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp } from 'lucide-react'
 import PriceChart from './PriceChart'
 import IndicatorsChart from './IndicatorsChart'
 import SignalsList from './SignalsList'
@@ -97,7 +97,8 @@ function StockAnalyzer() {
         slopeChannelZones: 8,
         slopeChannelDataPercent: 30,
         slopeChannelWidthMultiplier: 2.5,
-        findAllChannelEnabled: false
+        findAllChannelEnabled: false,
+        collapsed: false
       }
       setCharts(prevCharts => [...prevCharts, newChart])
 
@@ -268,6 +269,20 @@ function StockAnalyzer() {
           return {
             ...chart,
             findAllChannelEnabled: !chart.findAllChannelEnabled
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const toggleChartCollapse = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            collapsed: !chart.collapsed
           }
         }
         return chart
@@ -501,18 +516,29 @@ function StockAnalyzer() {
             <div key={chart.id} className="space-y-6">
               {/* Price Chart */}
               <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 relative">
-                {/* Close button */}
-                <button
-                  onClick={() => removeChart(chart.id)}
-                  className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
-                  title="Remove chart"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                {/* Collapse and Close buttons */}
+                <div className="absolute top-4 right-4 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleChartCollapse(chart.id)}
+                    className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                    title={chart.collapsed ? "Expand chart" : "Collapse chart"}
+                  >
+                    {chart.collapsed ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeChart(chart.id)}
+                    className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+                    title="Remove chart"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
 
-                <div className="flex items-center justify-between mb-4 pr-12">
+                <div className="flex items-center justify-between mb-4 pr-24">
                   <h3 className="text-lg font-semibold text-slate-100">{chart.symbol}</h3>
-                  <div className="flex gap-2">
+                  {!chart.collapsed && <div className="flex gap-2">
                     <button
                       type="button"
                       onClick={() => openSlopeChannelDialog(chart.id)}
@@ -565,9 +591,9 @@ function StockAnalyzer() {
                     >
                       MACD
                     </button>
-                  </div>
+                  </div>}
                 </div>
-                <PriceChart
+                {!chart.collapsed && <PriceChart
                   prices={chart.data.prices}
                   indicators={chart.data.indicators}
                   signals={chart.data.signals}
@@ -589,11 +615,11 @@ function StockAnalyzer() {
                   zoomRange={globalZoomRange}
                   onZoomChange={updateGlobalZoom}
                   onExtendPeriod={extendTimePeriod}
-                />
+                />}
               </div>
 
               {/* Technical Indicators */}
-              {(chart.showRSI || chart.showMACD) && (
+              {!chart.collapsed && (chart.showRSI || chart.showMACD) && (
                 <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
                   <h3 className="text-lg font-semibold mb-4 text-slate-100">Technical Indicators</h3>
                   <IndicatorsChart
