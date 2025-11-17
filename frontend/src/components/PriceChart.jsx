@@ -1475,6 +1475,26 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             </div>
           )
         })}
+
+        {/* Manual Channel Control Icons */}
+        {manualChannelEnabled && manualChannels.length > 0 && (
+          <div className="flex items-center gap-2 ml-4">
+            <button
+              onClick={extendManualChannel}
+              className="p-1 text-slate-300 hover:text-green-400 hover:bg-slate-700 rounded transition-colors"
+              title="Extend last manual channel"
+            >
+              <ArrowLeftRight className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setManualChannels([])}
+              className="p-1 text-slate-300 hover:text-red-400 hover:bg-slate-700 rounded transition-colors"
+              title="Clear all manual channels"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
       </div>
     )
   }
@@ -2201,36 +2221,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           })}
         </ComposedChart>
       </ResponsiveContainer>
-
-      {/* Manual Channel Control Buttons */}
-      {manualChannelEnabled && manualChannels.length > 0 && (
-        <div style={{
-          position: 'absolute',
-          bottom: '10px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 20,
-          display: 'flex',
-          gap: '8px'
-        }}>
-          <button
-            onClick={extendManualChannel}
-            className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-lg transition-colors flex items-center gap-2"
-            title="Extend last manual channel forward and backward until trend breaks"
-          >
-            <ArrowLeftRight className="w-4 h-4" />
-            Extend Last
-          </button>
-          <button
-            onClick={() => setManualChannels([])}
-            className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-lg transition-colors flex items-center gap-2"
-            title="Clear all manual channels"
-          >
-            <X className="w-4 h-4" />
-            Clear All
-          </button>
-        </div>
-      )}
     </div>
   )
 }
