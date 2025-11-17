@@ -814,6 +814,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return null
   })()
 
+  // Calculate volume threshold for bottom 20% (20th percentile)
+  const volumeThreshold20 = (() => {
+    if (!volumeColorEnabled) return null
+    const volumes = displayPrices.map(d => d.volume || 0).filter(v => v > 0).sort((a, b) => a - b)
+    if (volumes.length > 0) {
+      const percentileIndex = Math.floor(volumes.length * 0.2)
+      return volumes[percentileIndex]
+    }
+    return null
+  })()
+
   const slopeChannelInfo = slopeChannelEnabled ? calculateSlopeChannel(displayPrices, true, slopeChannelVolumeWeighted) : null
   const zoneColors = slopeChannelEnabled && slopeChannelInfo
     ? calculateZoneColors(displayPrices, slopeChannelInfo, slopeChannelZones)
@@ -832,10 +843,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const chartData = displayPrices.map((price, index) => {
     const indicator = indicators[index] || {}
     const isHighVolume = volumeColorEnabled && volumeThreshold80 && (price.volume || 0) >= volumeThreshold80
+    const isLowVolume = volumeColorEnabled && volumeThreshold20 && (price.volume || 0) <= volumeThreshold20
     const dataPoint = {
       date: price.date,
       close: price.close,
       highVolumeClose: isHighVolume ? price.close : null, // Only set close value for high volume points
+      lowVolumeClose: isLowVolume ? price.close : null, // Only set close value for low volume points
     }
 
     // Add SMA data for each period
@@ -2357,15 +2370,26 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             name="Close Price"
           />
           {volumeColorEnabled && (
-            <Line
-              type="monotone"
-              dataKey="highVolumeClose"
-              stroke="#ea580c"
-              strokeWidth={3}
-              dot={false}
-              name="High Volume (Top 20%)"
-              connectNulls={false}
-            />
+            <>
+              <Line
+                type="monotone"
+                dataKey="highVolumeClose"
+                stroke="#ea580c"
+                strokeWidth={3}
+                dot={false}
+                name="High Volume (Top 20%)"
+                connectNulls={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="lowVolumeClose"
+                stroke="#06b6d4"
+                strokeWidth={3}
+                dot={false}
+                name="Low Volume (Bottom 20%)"
+                connectNulls={false}
+              />
+            </>
           )}
           {smaPeriods.map((period, index) => {
             const smaKey = `sma${period}`

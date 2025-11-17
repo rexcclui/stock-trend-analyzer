@@ -577,7 +577,7 @@ function StockAnalyzer() {
                           ? 'bg-orange-600 text-white'
                           : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                       }`}
-                      title="Highlight high volume (top 20%)"
+                      title="Highlight high volume (top 20%) and low volume (bottom 20%)"
                     >
                       Volume Color
                     </button>
