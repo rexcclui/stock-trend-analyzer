@@ -1991,8 +1991,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     )
   }
 
-  // Custom component to render volume-colored price line
-  const VolumeColoredLine = (props) => {
+  // Custom component to highlight high-volume points
+  const HighVolumeMarkers = (props) => {
     if (!volumeColorEnabled) return null
 
     const { xAxisMap, yAxisMap } = props
@@ -2007,26 +2007,21 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return { x, y, isHighVolume: point.isHighVolume }
     }).filter(p => !isNaN(p.x) && !isNaN(p.y))
 
-    if (points.length < 2) return null
-
     return (
       <g>
         {points.map((point, index) => {
-          if (index === points.length - 1) return null
-
-          const nextPoint = points[index + 1]
-          const color = point.isHighVolume ? '#ef4444' : '#8b5cf6' // Red for high volume, purple for normal
+          if (!point.isHighVolume) return null
 
           return (
-            <line
+            <circle
               key={index}
-              x1={point.x}
-              y1={point.y}
-              x2={nextPoint.x}
-              y2={nextPoint.y}
-              stroke={color}
-              strokeWidth={2}
-              opacity={1}
+              cx={point.x}
+              cy={point.y}
+              r={3.5}
+              fill="#ef4444"
+              stroke="#dc2626"
+              strokeWidth={1}
+              opacity={0.9}
             />
           )
         })}
@@ -2240,8 +2235,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           {/* Manual Channel Zones as Parallel Lines */}
           <Customized component={CustomManualChannelZoneLines} />
 
-          {/* Volume Colored Price Line */}
-          <Customized component={VolumeColoredLine} />
+          {/* High Volume Point Markers */}
+          <Customized component={HighVolumeMarkers} />
 
           {/* Manual Channel Selection Rectangle */}
           {manualChannelEnabled && isSelecting && selectionStart && selectionEnd && (
@@ -2428,7 +2423,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             strokeWidth={2}
             dot={false}
             name="Close Price"
-            hide={volumeColorEnabled}
           />
           {smaPeriods.map((period, index) => {
             const smaKey = `sma${period}`
