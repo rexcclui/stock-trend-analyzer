@@ -884,7 +884,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const { thresholds80: rollingThresholds80, thresholds20: rollingThresholds20 } = calculateRollingThresholds()
 
   // Helper function to calculate volume profile for a specific dataset and date range
-  const calculateSingleVolumeProfile = (dataToAnalyze, dateRange = null) => {
+  const calculateSingleVolumeProfile = (dataToAnalyze, yAxisMax, dateRange = null) => {
     if (dataToAnalyze.length === 0) return null
 
     // Calculate total volume
@@ -899,8 +899,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     if (priceRange === 0) return null
 
-    // Create 15 equal-height zones based on price range
-    const numZones = 15
+    // Calculate number of zones based on ratio of price range to y-axis max
+    // Each 0.05 ratio = 1 zone
+    // ratio = priceRange / yAxisMax
+    // numZones = ratio / 0.05 = ratio * 20
+    const ratio = priceRange / yAxisMax
+    const numZones = Math.max(1, Math.round(ratio * 20)) // Minimum 1 zone
     const zoneHeight = priceRange / numZones
     const volumeZones = []
 
@@ -935,16 +939,20 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       if (zone.volume > maxZoneVolume) maxZoneVolume = zone.volume
     })
 
-    return { zones: volumeZones, maxVolume: maxZoneVolume, totalVolume, dateRange }
+    return { zones: volumeZones, maxVolume: maxZoneVolume, totalVolume, dateRange, numZones }
   }
 
   // Calculate volume profiles - returns array of profiles
   const calculateVolumeProfiles = () => {
     if (!volumeProfileEnabled || displayPrices.length === 0) return []
 
+    // Calculate y-axis maximum from all displayed data
+    const allPrices = displayPrices.map(p => p.close)
+    const yAxisMax = Math.max(...allPrices)
+
     if (volumeProfileMode === 'auto') {
       // Auto mode: single profile for all data
-      const profile = calculateSingleVolumeProfile(displayPrices, null)
+      const profile = calculateSingleVolumeProfile(displayPrices, yAxisMax, null)
       return profile ? [profile] : []
     } else {
       // Manual mode: one profile for each selected range
@@ -958,7 +966,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           return priceDate >= startDate && priceDate <= endDate
         })
 
-        const profile = calculateSingleVolumeProfile(dataToAnalyze, range)
+        const profile = calculateSingleVolumeProfile(dataToAnalyze, yAxisMax, range)
         if (profile) profiles.push(profile)
       })
 
