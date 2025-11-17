@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
 import { X } from 'lucide-react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -16,6 +16,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Track main trend channel visibility
   const [trendChannelVisible, setTrendChannelVisible] = useState(true)
+
+  // Manual channel selection state
+  const [isSelecting, setIsSelecting] = useState(false)
+  const [selectionStart, setSelectionStart] = useState(null)
+  const [selectionEnd, setSelectionEnd] = useState(null)
+  const [manualChannel, setManualChannel] = useState(null)
+  const chartRef = useRef(null)
 
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
   // No need to reset here to avoid infinite loop
@@ -804,6 +811,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       })
     }
 
+    // Add manual channel data if available
+    if (manualChannel && index >= manualChannel.startIndex && index <= manualChannel.endIndex) {
+      const localIndex = index - manualChannel.startIndex
+      const midValue = manualChannel.slope * localIndex + manualChannel.intercept
+      const upperBound = midValue + manualChannel.channelWidth
+      const lowerBound = midValue - manualChannel.channelWidth
+
+      dataPoint.manualChannelUpper = upperBound
+      dataPoint.manualChannelMid = midValue
+      dataPoint.manualChannelLower = lowerBound
+    }
+
     return dataPoint
   }).reverse() // Show oldest to newest
 
@@ -900,10 +919,154 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     if (e && e.activeLabel) {
       setSyncedMouseDate(e.activeLabel)
     }
+
+    // Handle manual channel selection
+    if (manualChannelEnabled && isSelecting && e && e.activeLabel) {
+      setSelectionEnd(e.activeLabel)
+    }
   }
 
   const handleMouseLeave = () => {
     setSyncedMouseDate(null)
+  }
+
+  const handleMouseDown = (e) => {
+    if (manualChannelEnabled && e && e.activeLabel) {
+      setIsSelecting(true)
+      setSelectionStart(e.activeLabel)
+      setSelectionEnd(e.activeLabel)
+      setManualChannel(null) // Clear previous manual channel
+    }
+  }
+
+  const handleMouseUp = (e) => {
+    if (manualChannelEnabled && isSelecting && selectionStart && selectionEnd) {
+      // Calculate manual channel for selected range
+      fitManualChannel(selectionStart, selectionEnd)
+      setIsSelecting(false)
+    }
+  }
+
+  // Fit a channel to the manually selected data range
+  const fitManualChannel = (startDate, endDate) => {
+    if (!startDate || !endDate) return
+
+    // Find the indices of the selected date range
+    const startIndex = displayPrices.findIndex(p => p.date === startDate)
+    const endIndex = displayPrices.findIndex(p => p.date === endDate)
+
+    if (startIndex === -1 || endIndex === -1) return
+
+    // Ensure we have the correct order (start should be earlier)
+    const minIndex = Math.min(startIndex, endIndex)
+    const maxIndex = Math.max(startIndex, endIndex)
+
+    // Get the data segment for the selected range
+    const dataSegment = displayPrices.slice(minIndex, maxIndex + 1)
+
+    if (dataSegment.length < 5) {
+      console.log('Selected range too small (minimum 5 points required)')
+      return
+    }
+
+    // Calculate linear regression for the selected segment
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
+    const n = dataSegment.length
+
+    dataSegment.forEach((point, index) => {
+      sumX += index
+      sumY += point.close
+      sumXY += index * point.close
+      sumX2 += index * index
+    })
+
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+    const intercept = (sumY - slope * sumX) / n
+
+    // Calculate standard deviation
+    const distances = dataSegment.forEach((point, index) => {
+      const predictedY = slope * index + intercept
+      return point.close - predictedY
+    })
+
+    const distancesArray = dataSegment.map((point, index) => {
+      const predictedY = slope * index + intercept
+      return point.close - predictedY
+    })
+
+    const meanDistance = distancesArray.reduce((a, b) => a + b, 0) / distancesArray.length
+    const variance = distancesArray.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distancesArray.length
+    const stdDev = Math.sqrt(variance)
+
+    // Find optimal stddev multiplier (similar to findAllChannels logic)
+    const stdevMultipliers = []
+    for (let mult = 1.0; mult <= 4.0; mult += 0.25) {
+      stdevMultipliers.push(mult)
+    }
+
+    let bestTouchCount = 0
+    let bestStdevMult = 2.5
+
+    for (const stdevMult of stdevMultipliers) {
+      const channelWidth = stdDev * stdevMult
+      let touchCount = 0
+      const touchTolerance = 0.05
+      let hasUpperTouch = false
+      let hasLowerTouch = false
+
+      dataSegment.forEach((point, index) => {
+        const predictedY = slope * index + intercept
+        const upperBound = predictedY + channelWidth
+        const lowerBound = predictedY - channelWidth
+
+        const distanceToUpper = Math.abs(point.close - upperBound)
+        const distanceToLower = Math.abs(point.close - lowerBound)
+        const boundRange = channelWidth * 2
+
+        if (distanceToUpper <= boundRange * touchTolerance) {
+          touchCount++
+          hasUpperTouch = true
+        }
+        if (distanceToLower <= boundRange * touchTolerance) {
+          touchCount++
+          hasLowerTouch = true
+        }
+      })
+
+      // Must have at least one touch on both upper AND lower bounds
+      if ((hasUpperTouch || hasLowerTouch) && touchCount > bestTouchCount) {
+        bestTouchCount = touchCount
+        bestStdevMult = stdevMult
+      }
+    }
+
+    const channelWidth = stdDev * bestStdevMult
+
+    // Calculate R-squared
+    const meanY = sumY / n
+    let totalSS = 0
+    let residualSS = 0
+
+    dataSegment.forEach((point, index) => {
+      const predictedY = slope * index + intercept
+      totalSS += Math.pow(point.close - meanY, 2)
+      residualSS += Math.pow(point.close - predictedY, 2)
+    })
+
+    const rSquared = totalSS > 0 ? 1 - (residualSS / totalSS) : 0
+
+    // Store the manual channel
+    setManualChannel({
+      startIndex: minIndex,
+      endIndex: maxIndex,
+      slope,
+      intercept,
+      channelWidth,
+      stdDev,
+      optimalStdevMult: bestStdevMult,
+      touchCount: bestTouchCount,
+      rSquared
+    })
   }
 
   // Pre-calculate which dates represent month/year transitions
@@ -1460,6 +1623,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
+          onMouseDown={handleMouseDown}
+          onMouseUp={handleMouseUp}
         >
           <defs>
             {slopeChannelEnabled && zoneColors.map((zone, index) => (
@@ -1493,6 +1658,42 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           {/* All Channels Zones as Parallel Lines */}
           <Customized component={CustomAllChannelZoneLines} />
+
+          {/* Manual Channel Selection Rectangle */}
+          {manualChannelEnabled && isSelecting && selectionStart && selectionEnd && (
+            <Customized component={(props) => {
+              const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
+              if (!xAxisMap || !yAxisMap) return null
+
+              const xAxis = xAxisMap[0]
+              const yAxis = yAxisMap[0]
+
+              if (!xAxis || !yAxis) return null
+
+              const startX = xAxis.scale(selectionStart)
+              const endX = xAxis.scale(selectionEnd)
+
+              if (startX === undefined || endX === undefined) return null
+
+              const x = Math.min(startX, endX)
+              const width = Math.abs(endX - startX)
+              const y = offset.top
+              const height = offset.height
+
+              return (
+                <rect
+                  x={x}
+                  y={y}
+                  width={width}
+                  height={height}
+                  fill="rgba(34, 197, 94, 0.2)"
+                  stroke="#22c55e"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                />
+              )
+            }} />
+          )}
 
           {/* Slope Channel Lines */}
           {slopeChannelEnabled && slopeChannelInfo && (
@@ -1586,6 +1787,41 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               </React.Fragment>
             )
           })}
+
+          {/* Manual Channel Lines */}
+          {manualChannelEnabled && manualChannel && (
+            <>
+              <Line
+                type="monotone"
+                dataKey="manualChannelUpper"
+                stroke="#22c55e"
+                strokeWidth={2}
+                dot={false}
+                name={`Manual Upper (+${manualChannel.optimalStdevMult.toFixed(2)}σ)`}
+                strokeDasharray="5 5"
+                opacity={0.8}
+              />
+              <Line
+                type="monotone"
+                dataKey="manualChannelMid"
+                stroke="#22c55e"
+                strokeWidth={2.5}
+                dot={false}
+                name={`Manual Channel (${manualChannel.endIndex - manualChannel.startIndex + 1}pts, ${manualChannel.touchCount} touches, R²=${(manualChannel.rSquared * 100).toFixed(1)}%)`}
+                strokeDasharray="5 5"
+              />
+              <Line
+                type="monotone"
+                dataKey="manualChannelLower"
+                stroke="#22c55e"
+                strokeWidth={2}
+                dot={false}
+                name={`Manual Lower (-${manualChannel.optimalStdevMult.toFixed(2)}σ)`}
+                strokeDasharray="5 5"
+                opacity={0.8}
+              />
+            </>
+          )}
 
           <Line
             type="monotone"

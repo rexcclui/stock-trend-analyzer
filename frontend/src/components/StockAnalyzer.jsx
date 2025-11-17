@@ -98,6 +98,7 @@ function StockAnalyzer() {
         slopeChannelDataPercent: 30,
         slopeChannelWidthMultiplier: 2.5,
         findAllChannelEnabled: false,
+        manualChannelEnabled: false,
         collapsed: false
       }
       setCharts(prevCharts => [...prevCharts, newChart])
@@ -269,6 +270,20 @@ function StockAnalyzer() {
           return {
             ...chart,
             findAllChannelEnabled: !chart.findAllChannelEnabled
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const toggleManualChannel = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            manualChannelEnabled: !chart.manualChannelEnabled
           }
         }
         return chart
@@ -562,6 +577,18 @@ function StockAnalyzer() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => toggleManualChannel(chart.id)}
+                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
+                        chart.manualChannelEnabled
+                          ? 'bg-green-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                      title="Manual Channel - Draw rectangle to select data range"
+                    >
+                      Manual Channel
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => openSmaDialog(chart.id)}
                       className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
                       title="Configure SMA"
@@ -610,6 +637,7 @@ function StockAnalyzer() {
                   slopeChannelWidthMultiplier={chart.slopeChannelWidthMultiplier}
                   onSlopeChannelParamsChange={(params) => updateSlopeChannelParams(chart.id, params)}
                   findAllChannelEnabled={chart.findAllChannelEnabled}
+                  manualChannelEnabled={chart.manualChannelEnabled}
                   chartHeight={chartHeight}
                   days={days}
                   zoomRange={globalZoomRange}
