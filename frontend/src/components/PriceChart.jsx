@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
-import { X } from 'lucide-react'
+import { X, ArrowLeftRight } from 'lucide-react'
 
 function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
@@ -1069,6 +1069,144 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     })
   }
 
+  // Extend the manual channel forward and backward using breaking rules
+  const extendManualChannel = () => {
+    if (!manualChannel) return
+
+    const { slope, intercept, channelWidth, stdDev, optimalStdevMult } = manualChannel
+    let { startIndex, endIndex } = manualChannel
+
+    const trendBreakThreshold = 0.5 // Break if >50% of new data is outside
+
+    // Step 1: Extend forward (from endIndex to end of data)
+    let forwardExtended = false
+    while (endIndex < displayPrices.length - 1) {
+      const previousEndIndex = endIndex
+      const extendCount = Math.max(1, Math.floor((endIndex - startIndex) * 0.2)) // Extend by 20% at a time
+      const newEndIndex = Math.min(displayPrices.length - 1, endIndex + extendCount)
+
+      if (newEndIndex === endIndex) break
+
+      // Check if the new points fit within the channel
+      const newPoints = displayPrices.slice(endIndex + 1, newEndIndex + 1)
+      let outsideCount = 0
+
+      for (let i = 0; i < newPoints.length; i++) {
+        const globalIndex = endIndex + 1 + i
+        const localIndex = globalIndex - startIndex
+        const predictedY = slope * localIndex + intercept
+        const upperBound = predictedY + channelWidth
+        const lowerBound = predictedY - channelWidth
+        const actualY = newPoints[i].close
+
+        if (actualY > upperBound || actualY < lowerBound) {
+          outsideCount++
+        }
+      }
+
+      const outsidePercent = outsideCount / newPoints.length
+
+      if (outsidePercent > trendBreakThreshold) {
+        // Channel broke, stop extending forward
+        break
+      }
+
+      // Extension successful, update endIndex
+      endIndex = newEndIndex
+      forwardExtended = true
+    }
+
+    // Step 2: Extend backward (from startIndex to beginning)
+    let backwardExtended = false
+    while (startIndex > 0) {
+      const previousStartIndex = startIndex
+      const extendCount = Math.max(1, Math.floor((endIndex - startIndex) * 0.2)) // Extend by 20% at a time
+      const newStartIndex = Math.max(0, startIndex - extendCount)
+
+      if (newStartIndex === startIndex) break
+
+      // Check if the new points fit within the channel
+      const newPoints = displayPrices.slice(newStartIndex, startIndex)
+      let outsideCount = 0
+
+      for (let i = 0; i < newPoints.length; i++) {
+        const globalIndex = newStartIndex + i
+        const localIndex = globalIndex - newStartIndex // Recalculate from new start
+        const adjustedLocalIndex = globalIndex - startIndex // Position relative to original start
+
+        // We need to recalculate intercept for the extended range
+        // The slope stays the same, but intercept changes when we extend backward
+        const newIntercept = intercept - slope * (startIndex - newStartIndex)
+        const predictedY = slope * localIndex + newIntercept
+        const upperBound = predictedY + channelWidth
+        const lowerBound = predictedY - channelWidth
+        const actualY = newPoints[i].close
+
+        if (actualY > upperBound || actualY < lowerBound) {
+          outsideCount++
+        }
+      }
+
+      const outsidePercent = outsideCount / newPoints.length
+
+      if (outsidePercent > trendBreakThreshold) {
+        // Channel broke, stop extending backward
+        break
+      }
+
+      // Extension successful, update startIndex and intercept
+      const indexDiff = startIndex - newStartIndex
+      intercept = intercept - slope * indexDiff
+      startIndex = newStartIndex
+      backwardExtended = true
+    }
+
+    // Recalculate statistics for the extended channel
+    const extendedSegment = displayPrices.slice(startIndex, endIndex + 1)
+    let touchCount = 0
+    let totalSS = 0
+    let residualSS = 0
+    const meanY = extendedSegment.reduce((sum, p) => sum + p.close, 0) / extendedSegment.length
+
+    extendedSegment.forEach((point, index) => {
+      const predictedY = slope * index + intercept
+      const upperBound = predictedY + channelWidth
+      const lowerBound = predictedY - channelWidth
+
+      const distanceToUpper = Math.abs(point.close - upperBound)
+      const distanceToLower = Math.abs(point.close - lowerBound)
+      const boundRange = channelWidth * 2
+      const touchTolerance = 0.05
+
+      if (distanceToUpper <= boundRange * touchTolerance) {
+        touchCount++
+      }
+      if (distanceToLower <= boundRange * touchTolerance) {
+        touchCount++
+      }
+
+      totalSS += Math.pow(point.close - meanY, 2)
+      residualSS += Math.pow(point.close - predictedY, 2)
+    })
+
+    const rSquared = totalSS > 0 ? 1 - (residualSS / totalSS) : 0
+
+    // Update the manual channel with extended range
+    if (forwardExtended || backwardExtended) {
+      setManualChannel({
+        startIndex,
+        endIndex,
+        slope,
+        intercept,
+        channelWidth,
+        stdDev,
+        optimalStdevMult,
+        touchCount,
+        rSquared
+      })
+    }
+  }
+
   // Pre-calculate which dates represent month/year transitions
   const getTransitionDates = () => {
     const isLongPeriod = parseInt(days) >= 1095 // 3Y or more
@@ -1851,6 +1989,26 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           })}
         </ComposedChart>
       </ResponsiveContainer>
+
+      {/* Manual Channel Extend Button */}
+      {manualChannelEnabled && manualChannel && (
+        <div style={{
+          position: 'absolute',
+          bottom: '10px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 20
+        }}>
+          <button
+            onClick={extendManualChannel}
+            className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-lg transition-colors flex items-center gap-2"
+            title="Extend manual channel forward and backward until trend breaks"
+          >
+            <ArrowLeftRight className="w-4 h-4" />
+            Extend Channel
+          </button>
+        </div>
+      )}
     </div>
   )
 }
