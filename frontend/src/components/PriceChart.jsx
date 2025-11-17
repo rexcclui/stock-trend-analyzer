@@ -681,6 +681,63 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return zoneColors
   }
 
+  // Calculate volume-weighted zones for all channels (3 zones per channel)
+  const calculateAllChannelZones = (data, allChannels) => {
+    if (!allChannels || allChannels.length === 0 || !data) return {}
+
+    const allZones = {}
+
+    allChannels.forEach((channel, channelIndex) => {
+      const zoneColors = []
+      const numZones = 3 // Fixed at 3 zones for all channels
+
+      // Create zones from lower to upper
+      for (let i = 0; i < numZones; i++) {
+        const zoneStart = i / numZones
+        const zoneEnd = (i + 1) / numZones
+
+        let volumeInZone = 0
+        let totalVolume = 0
+
+        // Only process data within this channel's range
+        data.forEach((point, globalIndex) => {
+          if (globalIndex < channel.startIndex || globalIndex >= channel.endIndex) return
+
+          const localIndex = globalIndex - channel.startIndex
+          const midValue = channel.slope * localIndex + channel.intercept
+          const upperBound = midValue + channel.channelWidth
+          const lowerBound = midValue - channel.channelWidth
+
+          const channelRange = upperBound - lowerBound
+          const zoneLower = lowerBound + channelRange * zoneStart
+          const zoneUpper = lowerBound + channelRange * zoneEnd
+
+          const volume = point.volume || 1
+
+          totalVolume += volume
+
+          // Check if price falls in this zone
+          if (point.close >= zoneLower && point.close < zoneUpper) {
+            volumeInZone += volume
+          }
+        })
+
+        const volumeWeight = totalVolume > 0 ? volumeInZone / totalVolume : 0
+
+        zoneColors.push({
+          zoneIndex: i,
+          volumeWeight,
+          zoneStart,
+          zoneEnd
+        })
+      }
+
+      allZones[channelIndex] = zoneColors
+    })
+
+    return allZones
+  }
+
   // Combine data - ensure we use the minimum length to stay in sync with indicators
   const dataLength = Math.min(prices.length, indicators.length)
 
@@ -691,6 +748,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const zoneColors = slopeChannelEnabled && slopeChannelInfo
     ? calculateZoneColors(displayPrices, slopeChannelInfo, slopeChannelZones)
     : []
+
+  // Calculate zones for all channels
+  const allChannelZones = findAllChannelEnabled && allChannels.length > 0
+    ? calculateAllChannelZones(displayPrices, allChannels)
+    : {}
 
   const chartData = displayPrices.map((price, index) => {
     const indicator = indicators[index] || {}
@@ -721,9 +783,23 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         if (index >= channel.startIndex && index < channel.endIndex) {
           const localIndex = index - channel.startIndex
           const midValue = channel.slope * localIndex + channel.intercept
-          dataPoint[`allChannel${channelIndex}Upper`] = midValue + channel.channelWidth
+          const upperBound = midValue + channel.channelWidth
+          const lowerBound = midValue - channel.channelWidth
+
+          dataPoint[`allChannel${channelIndex}Upper`] = upperBound
           dataPoint[`allChannel${channelIndex}Mid`] = midValue
-          dataPoint[`allChannel${channelIndex}Lower`] = midValue - channel.channelWidth
+          dataPoint[`allChannel${channelIndex}Lower`] = lowerBound
+
+          // Add zone boundaries for this channel
+          if (allChannelZones[channelIndex]) {
+            const channelRange = upperBound - lowerBound
+            allChannelZones[channelIndex].forEach((zone, zoneIndex) => {
+              const zoneLower = lowerBound + channelRange * zone.zoneStart
+              const zoneUpper = lowerBound + channelRange * zone.zoneEnd
+              dataPoint[`allChannel${channelIndex}Zone${zoneIndex}Lower`] = zoneLower
+              dataPoint[`allChannel${channelIndex}Zone${zoneIndex}Upper`] = zoneUpper
+            })
+          }
         }
       })
     }
@@ -1129,6 +1205,94 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     )
   }
 
+  // Custom component to render zone lines for all channels
+  const CustomAllChannelZoneLines = (props) => {
+    if (!findAllChannelEnabled || allChannels.length === 0 || Object.keys(allChannelZones).length === 0) return null
+
+    const { xAxisMap, yAxisMap } = props
+    const xAxis = xAxisMap?.[0]
+    const yAxis = yAxisMap?.[0]
+
+    if (!xAxis || !yAxis) return null
+
+    // Define color palette for channels (same as channel lines)
+    const channelColors = [
+      '#3b82f6',  // Blue
+      '#8b5cf6',  // Purple
+      '#f59e0b',  // Amber
+      '#10b981',  // Green
+      '#06b6d4',  // Cyan
+      '#f97316',  // Orange
+      '#ec4899',  // Pink
+      '#84cc16',  // Lime
+    ]
+
+    return (
+      <g>
+        {allChannels.map((channel, channelIndex) => {
+          const isVisible = allChannelsVisibility[channelIndex] !== false
+          if (!isVisible) return null
+
+          const channelColor = channelColors[channelIndex % channelColors.length]
+          const zones = allChannelZones[channelIndex]
+          if (!zones) return null
+
+          return zones.map((zone, zoneIndex) => {
+            const points = chartDataWithZones.map((point) => {
+              const upper = point[`allChannel${channelIndex}Zone${zoneIndex}Upper`]
+              if (upper === undefined) return null
+
+              const x = xAxis.scale(point.date)
+              const y = yAxis.scale(upper)
+              return { x, y }
+            }).filter(p => p !== null)
+
+            if (points.length < 2) return null
+
+            // Create path for the zone boundary line
+            let pathData = `M ${points[0].x} ${points[0].y}`
+            for (let i = 1; i < points.length; i++) {
+              pathData += ` L ${points[i].x} ${points[i].y}`
+            }
+
+            const lastPoint = points[points.length - 1]
+
+            // Use channel color with varying opacity based on zone
+            const opacity = 0.4 + (zoneIndex * 0.2) // Zones 0, 1, 2 have increasing opacity
+
+            return (
+              <g key={`channel-${channelIndex}-zone-${zoneIndex}`}>
+                {/* Zone boundary line */}
+                <path
+                  d={pathData}
+                  fill="none"
+                  stroke={channelColor}
+                  strokeWidth={1}
+                  strokeDasharray="2 2"
+                  opacity={opacity}
+                />
+
+                {/* Volume percentage label at the end of the line */}
+                <text
+                  x={lastPoint.x + 5}
+                  y={lastPoint.y}
+                  fill={channelColor}
+                  fontSize="10"
+                  fontWeight="500"
+                  textAnchor="start"
+                  dominantBaseline="middle"
+                  opacity={0.9}
+                >
+                  {(zone.volumeWeight * 100).toFixed(1)}%
+                </text>
+              </g>
+            )
+          })
+        })}
+      </g>
+    )
+  }
+
   return (
     <div ref={chartContainerRef} style={{ width: '100%', height: chartHeight, position: 'relative' }}>
       {/* Slope Channel Controls Panel */}
@@ -1326,6 +1490,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           {/* Slope Channel Zones as Parallel Lines */}
           <Customized component={CustomZoneLines} />
+
+          {/* All Channels Zones as Parallel Lines */}
+          <Customized component={CustomAllChannelZoneLines} />
 
           {/* Slope Channel Lines */}
           {slopeChannelEnabled && slopeChannelInfo && (
