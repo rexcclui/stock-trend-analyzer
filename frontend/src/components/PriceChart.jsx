@@ -2321,27 +2321,33 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               {/* X button to remove this volume profile (only in manual mode) */}
               {volumeProfileMode === 'manual' && onVolumeProfileRangeRemove && (
                 <g
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => onVolumeProfileRangeRemove(profileIndex)}
+                  style={{ cursor: 'pointer', pointerEvents: 'all' }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation()
+                    onVolumeProfileRangeRemove(profileIndex)
+                  }}
                 >
-                  {/* Background circle */}
+                  {/* Transparent clickable area */}
                   <circle
                     cx={barX + barWidth - 10}
                     cy={topZoneY + 10}
-                    r="8"
-                    fill="rgba(239, 68, 68, 0.9)"
-                    stroke="#ffffff"
-                    strokeWidth="1"
+                    r="10"
+                    fill="transparent"
+                    stroke="none"
                   />
-                  {/* X icon */}
+                  {/* X icon with shadow for visibility */}
                   <text
                     x={barX + barWidth - 10}
                     y={topZoneY + 10}
-                    fill="#ffffff"
-                    fontSize="12"
+                    fill="#ef4444"
+                    fontSize="16"
                     fontWeight="900"
                     textAnchor="middle"
                     dominantBaseline="central"
+                    style={{
+                      filter: 'drop-shadow(0px 0px 2px rgba(0,0,0,0.8))',
+                      pointerEvents: 'none'
+                    }}
                   >
                     ×
                   </text>
