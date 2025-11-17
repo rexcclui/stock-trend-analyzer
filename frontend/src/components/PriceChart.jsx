@@ -900,11 +900,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     if (priceRange === 0) return null
 
     // Calculate number of zones based on ratio of price range to y-axis max
-    // Each 0.05 ratio = 1 zone
+    // Each 0.025 ratio = 1 zone (doubled from 0.05)
     // ratio = priceRange / yAxisMax
-    // numZones = ratio / 0.05 = ratio * 20
+    // numZones = ratio / 0.025 = ratio * 40
     const ratio = priceRange / yAxisMax
-    const numZones = Math.max(1, Math.round(ratio * 20)) // Minimum 1 zone
+    const numZones = Math.max(1, Math.round(ratio * 40)) // Minimum 1 zone
     const zoneHeight = priceRange / numZones
     const volumeZones = []
 
@@ -2269,12 +2269,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 // Calculate y positions based on price range (even heights)
                 const yTop = yAxis.scale(zone.maxPrice)
                 const yBottom = yAxis.scale(zone.minPrice)
-                const baseHeight = Math.abs(yBottom - yTop)
-
-                // Halve the height of each bar
-                const height = baseHeight * 0.5
-                // Adjust y position to center the halved bar on the zone
-                const adjustedY = yTop + baseHeight / 4
+                const height = Math.abs(yBottom - yTop)
 
                 // Calculate color depth based on volume weight
                 // Higher volume = deeper/darker color
@@ -2294,7 +2289,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                     {/* Horizontal bar spanning selected range or full chart */}
                     <rect
                       x={barX}
-                      y={adjustedY}
+                      y={yTop}
                       width={barWidth}
                       height={height}
                       fill={`hsl(${hue}, ${saturation}%, ${lightness}%)`}
@@ -2306,7 +2301,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                     {/* Volume percentage label in the center */}
                     <text
                       x={barX + barWidth / 2}
-                      y={yTop + baseHeight / 2}
+                      y={yTop + height / 2}
                       fill="#ffffff"
                       fontSize="11"
                       fontWeight="700"
