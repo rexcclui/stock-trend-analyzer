@@ -518,6 +518,7 @@ function StockAnalyzer() {
                       Slope Channel
                     </button>
                     <button
+                      type="button"
                       onClick={() => toggleFindAllChannel(chart.id)}
                       className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
                         chart.findAllChannelEnabled
