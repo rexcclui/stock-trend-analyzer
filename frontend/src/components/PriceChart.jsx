@@ -2269,7 +2269,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 // Calculate y positions based on price range (even heights)
                 const yTop = yAxis.scale(zone.maxPrice)
                 const yBottom = yAxis.scale(zone.minPrice)
-                const height = Math.abs(yBottom - yTop)
+                const baseHeight = Math.abs(yBottom - yTop)
+
+                // Double the height of each bar
+                const height = baseHeight * 2
+                // Adjust y position to center the doubled bar on the zone
+                const adjustedY = yTop - baseHeight / 2
 
                 // Calculate color depth based on volume weight
                 // Higher volume = deeper/darker color
@@ -2289,7 +2294,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                     {/* Horizontal bar spanning selected range or full chart */}
                     <rect
                       x={barX}
-                      y={yTop}
+                      y={adjustedY}
                       width={barWidth}
                       height={height}
                       fill={`hsl(${hue}, ${saturation}%, ${lightness}%)`}
@@ -2301,7 +2306,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                     {/* Volume percentage label in the center */}
                     <text
                       x={barX + barWidth / 2}
-                      y={yTop + height / 2}
+                      y={yTop + baseHeight / 2}
                       fill="#ffffff"
                       fontSize="11"
                       fontWeight="700"
