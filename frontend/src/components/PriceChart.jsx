@@ -21,7 +21,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const [isSelecting, setIsSelecting] = useState(false)
   const [selectionStart, setSelectionStart] = useState(null)
   const [selectionEnd, setSelectionEnd] = useState(null)
-  const [manualChannel, setManualChannel] = useState(null)
+  const [manualChannels, setManualChannels] = useState([]) // Array to store multiple channels
   const chartRef = useRef(null)
 
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
@@ -812,9 +812,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     ? calculateAllChannelZones(displayPrices, allChannels)
     : {}
 
-  // Calculate zones for manual channel
-  const manualChannelZones = manualChannelEnabled && manualChannel
-    ? calculateManualChannelZones(displayPrices, manualChannel)
+  // Calculate zones for all manual channels
+  const allManualChannelZones = manualChannelEnabled && manualChannels.length > 0
+    ? manualChannels.map(channel => calculateManualChannelZones(displayPrices, channel))
     : []
 
   const chartData = displayPrices.map((price, index) => {
@@ -867,27 +867,31 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       })
     }
 
-    // Add manual channel data if available
-    if (manualChannel && index >= manualChannel.startIndex && index <= manualChannel.endIndex) {
-      const localIndex = index - manualChannel.startIndex
-      const midValue = manualChannel.slope * localIndex + manualChannel.intercept
-      const upperBound = midValue + manualChannel.channelWidth
-      const lowerBound = midValue - manualChannel.channelWidth
+    // Add all manual channels data
+    if (manualChannelEnabled && manualChannels.length > 0) {
+      manualChannels.forEach((channel, channelIndex) => {
+        if (index >= channel.startIndex && index <= channel.endIndex) {
+          const localIndex = index - channel.startIndex
+          const midValue = channel.slope * localIndex + channel.intercept
+          const upperBound = midValue + channel.channelWidth
+          const lowerBound = midValue - channel.channelWidth
 
-      dataPoint.manualChannelUpper = upperBound
-      dataPoint.manualChannelMid = midValue
-      dataPoint.manualChannelLower = lowerBound
+          dataPoint[`manualChannel${channelIndex}Upper`] = upperBound
+          dataPoint[`manualChannel${channelIndex}Mid`] = midValue
+          dataPoint[`manualChannel${channelIndex}Lower`] = lowerBound
 
-      // Add zone boundaries for manual channel
-      if (manualChannelZones.length > 0) {
-        const channelRange = upperBound - lowerBound
-        manualChannelZones.forEach((zone, zoneIndex) => {
-          const zoneLower = lowerBound + channelRange * zone.zoneStart
-          const zoneUpper = lowerBound + channelRange * zone.zoneEnd
-          dataPoint[`manualChannelZone${zoneIndex}Lower`] = zoneLower
-          dataPoint[`manualChannelZone${zoneIndex}Upper`] = zoneUpper
-        })
-      }
+          // Add zone boundaries for this manual channel
+          if (allManualChannelZones[channelIndex] && allManualChannelZones[channelIndex].length > 0) {
+            const channelRange = upperBound - lowerBound
+            allManualChannelZones[channelIndex].forEach((zone, zoneIndex) => {
+              const zoneLower = lowerBound + channelRange * zone.zoneStart
+              const zoneUpper = lowerBound + channelRange * zone.zoneEnd
+              dataPoint[`manualChannel${channelIndex}Zone${zoneIndex}Lower`] = zoneLower
+              dataPoint[`manualChannel${channelIndex}Zone${zoneIndex}Upper`] = zoneUpper
+            })
+          }
+        }
+      })
     }
 
     return dataPoint
@@ -1002,7 +1006,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       setIsSelecting(true)
       setSelectionStart(e.activeLabel)
       setSelectionEnd(e.activeLabel)
-      setManualChannel(null) // Clear previous manual channel
+      // Don't clear previous channels - they accumulate
     }
   }
 
@@ -1122,8 +1126,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     const rSquared = totalSS > 0 ? 1 - (residualSS / totalSS) : 0
 
-    // Store the manual channel
-    setManualChannel({
+    // Add the new manual channel to the array
+    const newChannel = {
       startIndex: minIndex,
       endIndex: maxIndex,
       slope,
@@ -1133,12 +1137,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       optimalStdevMult: bestStdevMult,
       touchCount: bestTouchCount,
       rSquared
-    })
+    }
+    setManualChannels(prevChannels => [...prevChannels, newChannel])
   }
 
-  // Extend the manual channel forward and backward using breaking rules
+  // Extend the most recent manual channel forward and backward using breaking rules
   const extendManualChannel = () => {
-    if (!manualChannel) return
+    if (manualChannels.length === 0) return
+
+    const lastChannelIndex = manualChannels.length - 1
+    const manualChannel = manualChannels[lastChannelIndex]
 
     const { slope, intercept, channelWidth, stdDev, optimalStdevMult } = manualChannel
     let { startIndex, endIndex } = manualChannel
@@ -1260,7 +1268,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     // Update the manual channel with extended range
     if (forwardExtended || backwardExtended) {
-      setManualChannel({
+      const updatedChannel = {
         startIndex,
         endIndex,
         slope,
@@ -1270,6 +1278,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         optimalStdevMult,
         touchCount,
         rSquared
+      }
+      setManualChannels(prevChannels => {
+        const newChannels = [...prevChannels]
+        newChannels[lastChannelIndex] = updatedChannel
+        return newChannels
       })
     }
   }
@@ -1681,9 +1694,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     )
   }
 
-  // Custom component to render zone lines for manual channel
+  // Custom component to render zone lines for all manual channels
   const CustomManualChannelZoneLines = (props) => {
-    if (!manualChannelEnabled || !manualChannel || manualChannelZones.length === 0) return null
+    if (!manualChannelEnabled || manualChannels.length === 0 || allManualChannelZones.length === 0) return null
 
     const { xAxisMap, yAxisMap } = props
     const xAxis = xAxisMap?.[0]
@@ -1691,72 +1704,86 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     if (!xAxis || !yAxis) return null
 
-    const channelColor = '#22c55e' // Green for manual channel
+    // Color palette for manual channels (various green shades)
+    const channelColors = [
+      142, // Green
+      160, // Teal-green
+      175, // Sea green
+      125, // Lime green
+      150, // Jade
+    ]
 
     return (
       <g>
-        {manualChannelZones.map((zone, zoneIndex) => {
-          const points = chartDataWithZones.map((point) => {
-            const upper = point[`manualChannelZone${zoneIndex}Upper`]
-            if (upper === undefined) return null
+        {manualChannels.map((channel, channelIndex) => {
+          const zones = allManualChannelZones[channelIndex]
+          if (!zones) return null
 
-            const x = xAxis.scale(point.date)
-            const y = yAxis.scale(upper)
+          const hue = channelColors[channelIndex % channelColors.length]
 
-            if (x === undefined || y === undefined) return null
+          return zones.map((zone, zoneIndex) => {
+            const points = chartDataWithZones.map((point) => {
+              const upper = point[`manualChannel${channelIndex}Zone${zoneIndex}Upper`]
+              if (upper === undefined) return null
 
-            return { x, y }
-          }).filter(p => p !== null)
+              const x = xAxis.scale(point.date)
+              const y = yAxis.scale(upper)
 
-          if (points.length < 2) return null
+              if (x === undefined || y === undefined) return null
 
-          // Create path for the zone boundary line
-          let pathData = `M ${points[0].x} ${points[0].y}`
-          for (let i = 1; i < points.length; i++) {
-            pathData += ` L ${points[i].x} ${points[i].y}`
-          }
+              return { x, y }
+            }).filter(p => p !== null)
 
-          const lastPoint = points[points.length - 1]
+            if (points.length < 2) return null
 
-          // Opacity and color intensity varies with volume weight: higher volume = more intense
-          const minOpacity = 0.3
-          const maxOpacity = 0.9
-          const opacity = minOpacity + (zone.volumeWeight * (maxOpacity - minOpacity))
+            // Create path for the zone boundary line
+            let pathData = `M ${points[0].x} ${points[0].y}`
+            for (let i = 1; i < points.length; i++) {
+              pathData += ` L ${points[i].x} ${points[i].y}`
+            }
 
-          // Create color with varying intensity based on volume weight
-          // Higher volume = deeper/darker color
-          const minLightness = 35 // Darker
-          const maxLightness = 65 // Lighter
-          const lightness = maxLightness - (zone.volumeWeight * (maxLightness - minLightness))
-          const color = `hsl(142, 70%, ${lightness}%)`
+            const lastPoint = points[points.length - 1]
 
-          return (
-            <g key={`manual-zone-line-${zoneIndex}`}>
-              {/* Zone boundary line */}
-              <path
-                d={pathData}
-                fill="none"
-                stroke={color}
-                strokeWidth={1.5}
-                strokeDasharray="2 2"
-                opacity={opacity}
-              />
+            // Opacity and color intensity varies with volume weight: higher volume = more intense
+            const minOpacity = 0.3
+            const maxOpacity = 0.9
+            const opacity = minOpacity + (zone.volumeWeight * (maxOpacity - minOpacity))
 
-              {/* Volume percentage label at the end of the line */}
-              <text
-                x={lastPoint.x + 5}
-                y={lastPoint.y}
-                fill={color}
-                fontSize="11"
-                fontWeight="600"
-                textAnchor="start"
-                dominantBaseline="middle"
-                opacity={0.95}
-              >
-                {(zone.volumeWeight * 100).toFixed(1)}%
-              </text>
-            </g>
-          )
+            // Create color with varying intensity based on volume weight
+            // Higher volume = deeper/darker color
+            const minLightness = 35 // Darker
+            const maxLightness = 65 // Lighter
+            const lightness = maxLightness - (zone.volumeWeight * (maxLightness - minLightness))
+            const color = `hsl(${hue}, 70%, ${lightness}%)`
+
+            return (
+              <g key={`manual-channel-${channelIndex}-zone-${zoneIndex}`}>
+                {/* Zone boundary line */}
+                <path
+                  d={pathData}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={1.5}
+                  strokeDasharray="2 2"
+                  opacity={opacity}
+                />
+
+                {/* Volume percentage label at the end of the line */}
+                <text
+                  x={lastPoint.x + 5}
+                  y={lastPoint.y}
+                  fill={color}
+                  fontSize="11"
+                  fontWeight="600"
+                  textAnchor="start"
+                  dominantBaseline="middle"
+                  opacity={0.95}
+                >
+                  {(zone.volumeWeight * 100).toFixed(1)}%
+                </text>
+              </g>
+            )
+          })
         })}
       </g>
     )
@@ -2098,39 +2125,53 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           })}
 
           {/* Manual Channel Lines */}
-          {manualChannelEnabled && manualChannel && (
-            <>
-              <Line
-                type="monotone"
-                dataKey="manualChannelUpper"
-                stroke="#22c55e"
-                strokeWidth={2}
-                dot={false}
-                name={`Manual Upper (+${manualChannel.optimalStdevMult.toFixed(2)}σ)`}
-                strokeDasharray="5 5"
-                opacity={0.8}
-              />
-              <Line
-                type="monotone"
-                dataKey="manualChannelMid"
-                stroke="#22c55e"
-                strokeWidth={2.5}
-                dot={false}
-                name={`Manual Channel (${manualChannel.endIndex - manualChannel.startIndex + 1}pts, ${manualChannel.touchCount} touches, R²=${(manualChannel.rSquared * 100).toFixed(1)}%)`}
-                strokeDasharray="5 5"
-              />
-              <Line
-                type="monotone"
-                dataKey="manualChannelLower"
-                stroke="#22c55e"
-                strokeWidth={2}
-                dot={false}
-                name={`Manual Lower (-${manualChannel.optimalStdevMult.toFixed(2)}σ)`}
-                strokeDasharray="5 5"
-                opacity={0.8}
-              />
-            </>
-          )}
+          {manualChannelEnabled && manualChannels.length > 0 && manualChannels.map((channel, index) => {
+            // Color palette for manual channels (various green shades)
+            const channelColors = [
+              '#22c55e',  // Green
+              '#10b981',  // Emerald
+              '#14b8a6',  // Teal
+              '#84cc16',  // Lime
+              '#059669',  // Deep green
+            ]
+            const channelColor = channelColors[index % channelColors.length]
+
+            return (
+              <React.Fragment key={`manual-channel-${index}`}>
+                <Line
+                  type="monotone"
+                  dataKey={`manualChannel${index}Upper`}
+                  stroke={channelColor}
+                  strokeWidth={2}
+                  dot={false}
+                  name={`Manual ${index + 1} Upper (+${channel.optimalStdevMult.toFixed(2)}σ)`}
+                  strokeDasharray="5 5"
+                  opacity={0.7}
+                  legendType="none"
+                />
+                <Line
+                  type="monotone"
+                  dataKey={`manualChannel${index}Mid`}
+                  stroke={channelColor}
+                  strokeWidth={2.5}
+                  dot={false}
+                  name={`Manual Channel ${index + 1} (${channel.endIndex - channel.startIndex + 1}pts, ${channel.touchCount} touches, R²=${(channel.rSquared * 100).toFixed(1)}%)`}
+                  strokeDasharray="5 5"
+                />
+                <Line
+                  type="monotone"
+                  dataKey={`manualChannel${index}Lower`}
+                  stroke={channelColor}
+                  strokeWidth={2}
+                  dot={false}
+                  name={`Manual ${index + 1} Lower (-${channel.optimalStdevMult.toFixed(2)}σ)`}
+                  strokeDasharray="5 5"
+                  opacity={0.7}
+                  legendType="none"
+                />
+              </React.Fragment>
+            )
+          })}
 
           <Line
             type="monotone"
@@ -2161,22 +2202,32 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         </ComposedChart>
       </ResponsiveContainer>
 
-      {/* Manual Channel Extend Button */}
-      {manualChannelEnabled && manualChannel && (
+      {/* Manual Channel Control Buttons */}
+      {manualChannelEnabled && manualChannels.length > 0 && (
         <div style={{
           position: 'absolute',
           bottom: '10px',
           left: '50%',
           transform: 'translateX(-50%)',
-          zIndex: 20
+          zIndex: 20,
+          display: 'flex',
+          gap: '8px'
         }}>
           <button
             onClick={extendManualChannel}
             className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg shadow-lg transition-colors flex items-center gap-2"
-            title="Extend manual channel forward and backward until trend breaks"
+            title="Extend last manual channel forward and backward until trend breaks"
           >
             <ArrowLeftRight className="w-4 h-4" />
-            Extend Channel
+            Extend Last
+          </button>
+          <button
+            onClick={() => setManualChannels([])}
+            className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-lg transition-colors flex items-center gap-2"
+            title="Clear all manual channels"
+          >
+            <X className="w-4 h-4" />
+            Clear All
           </button>
         </div>
       )}
