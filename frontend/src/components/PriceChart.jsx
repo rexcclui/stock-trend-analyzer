@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
-import { X, ArrowLeftRight } from 'lucide-react'
+import { X, ArrowLeftRight, Hand } from 'lucide-react'
 
 function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
@@ -22,6 +22,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const [selectionStart, setSelectionStart] = useState(null)
   const [selectionEnd, setSelectionEnd] = useState(null)
   const [manualChannels, setManualChannels] = useState([]) // Array to store multiple channels
+  const [manualChannelDragMode, setManualChannelDragMode] = useState(false) // Toggle for drag mode
   const chartRef = useRef(null)
 
   // Volume profile manual selection state
@@ -1252,8 +1253,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       setSyncedMouseDate(e.activeLabel)
     }
 
-    // Handle manual channel selection
-    if (manualChannelEnabled && isSelecting && e && e.activeLabel) {
+    // Handle manual channel selection - only when drag mode is enabled
+    if (manualChannelEnabled && manualChannelDragMode && isSelecting && e && e.activeLabel) {
       setSelectionEnd(e.activeLabel)
     }
 
@@ -1268,7 +1269,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
   const handleMouseDown = (e) => {
-    if (manualChannelEnabled && e && e.activeLabel) {
+    // Only allow selection when drag mode is enabled
+    if (manualChannelEnabled && manualChannelDragMode && e && e.activeLabel) {
       setIsSelecting(true)
       setSelectionStart(e.activeLabel)
       setSelectionEnd(e.activeLabel)
@@ -1282,7 +1284,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
   const handleMouseUp = (e) => {
-    if (manualChannelEnabled && isSelecting && selectionStart && selectionEnd) {
+    // Only process selection when drag mode is enabled
+    if (manualChannelEnabled && manualChannelDragMode && isSelecting && selectionStart && selectionEnd) {
       // Calculate manual channel for selected range
       fitManualChannel(selectionStart, selectionEnd)
       setIsSelecting(false)
@@ -1349,14 +1352,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const variance = distancesArray.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distancesArray.length
     const stdDev = Math.sqrt(variance)
 
-    // Find optimal stddev multiplier (similar to findAllChannels logic)
+    // Find turning points in the selected range
+    const turningPoints = findTurningPoints(displayPrices, minIndex, maxIndex)
+
+    // Find optimal stddev multiplier - extend to cover more data but ensure at least one bound touches a turning point
     const stdevMultipliers = []
-    for (let mult = 1.0; mult <= 4.0; mult += 0.25) {
+    for (let mult = 1.0; mult <= 4.0; mult += 0.1) {
       stdevMultipliers.push(mult)
     }
 
     let bestTouchCount = 0
     let bestStdevMult = 2.5
+    let bestTurningPointTouch = false
 
     for (const stdevMult of stdevMultipliers) {
       const channelWidth = stdDev * stdevMult
@@ -1364,8 +1371,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const touchTolerance = 0.05
       let hasUpperTouch = false
       let hasLowerTouch = false
+      let hasTurningPointTouch = false
 
       dataSegment.forEach((point, index) => {
+        const globalIndex = minIndex + index
         const predictedY = slope * index + intercept
         const upperBound = predictedY + channelWidth
         const lowerBound = predictedY - channelWidth
@@ -1374,21 +1383,48 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const distanceToLower = Math.abs(point.close - lowerBound)
         const boundRange = channelWidth * 2
 
+        // Check if this is a turning point
+        const isTurningPoint = turningPoints.some(tp => tp.index === globalIndex)
+
         if (distanceToUpper <= boundRange * touchTolerance) {
           touchCount++
           hasUpperTouch = true
+          if (isTurningPoint) hasTurningPointTouch = true
         }
         if (distanceToLower <= boundRange * touchTolerance) {
           touchCount++
           hasLowerTouch = true
+          if (isTurningPoint) hasTurningPointTouch = true
         }
       })
 
-      // Must have at least one touch on both upper AND lower bounds
-      if ((hasUpperTouch || hasLowerTouch) && touchCount > bestTouchCount) {
+      // Prioritize: (1) has turning point touch, (2) has upper OR lower touch, (3) more total touches
+      const currentScore = (hasTurningPointTouch ? 10000 : 0) + touchCount
+      const bestScore = (bestTurningPointTouch ? 10000 : 0) + bestTouchCount
+
+      if ((hasUpperTouch || hasLowerTouch) && currentScore > bestScore) {
         bestTouchCount = touchCount
         bestStdevMult = stdevMult
+        bestTurningPointTouch = hasTurningPointTouch
       }
+    }
+
+    // If no turning point touch found, extend the stdev to ensure at least one bound touches a turning point
+    if (!bestTurningPointTouch && turningPoints.length > 0) {
+      // Find the minimum stdev multiplier needed to touch at least one turning point
+      let minMultForTurningPoint = bestStdevMult
+      for (const tp of turningPoints) {
+        const localIndex = tp.index - minIndex
+        const predictedY = slope * localIndex + intercept
+        const residual = Math.abs(tp.value - predictedY)
+        const requiredMult = residual / stdDev
+        // Use the smallest multiplier that touches any turning point
+        if (requiredMult >= bestStdevMult) {
+          minMultForTurningPoint = Math.max(minMultForTurningPoint, requiredMult)
+        }
+      }
+      // Don't go beyond 4.0
+      bestStdevMult = Math.min(minMultForTurningPoint, 4.0)
     }
 
     const channelWidth = stdDev * bestStdevMult
@@ -2230,6 +2266,77 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     )
   }
 
+  // Custom component to render stdev labels beneath middle of lower bound slope for manual channels
+  const CustomManualChannelLabels = (props) => {
+    if (!manualChannelEnabled || manualChannels.length === 0) return null
+
+    const { xAxisMap, yAxisMap } = props
+    const xAxis = xAxisMap?.[0]
+    const yAxis = yAxisMap?.[0]
+
+    if (!xAxis || !yAxis) return null
+
+    const channelColors = [
+      '#22c55e', // Green
+      '#14b8a6', // Teal
+      '#06b6d4', // Cyan
+      '#84cc16', // Lime
+      '#10b981', // Emerald
+    ]
+
+    return (
+      <g>
+        {manualChannels.map((channel, channelIndex) => {
+          // Find the middle point of the lower bound line
+          const midIndex = Math.floor((channel.startIndex + channel.endIndex) / 2)
+
+          // Get the data point at the middle
+          const midPoint = chartDataWithZones[midIndex]
+          if (!midPoint) return null
+
+          const lowerValue = midPoint[`manualChannel${channelIndex}Lower`]
+          if (lowerValue === undefined) return null
+
+          const x = xAxis.scale(midPoint.date)
+          const y = yAxis.scale(lowerValue)
+
+          if (x === undefined || y === undefined) return null
+
+          const color = channelColors[channelIndex % channelColors.length]
+          const stdevText = `${channel.optimalStdevMult.toFixed(2)}σ`
+
+          return (
+            <g key={`manual-channel-label-${channelIndex}`}>
+              {/* Background rectangle for better readability */}
+              <rect
+                x={x - 20}
+                y={y + 5}
+                width={40}
+                height={16}
+                fill="rgba(15, 23, 42, 0.9)"
+                stroke={color}
+                strokeWidth={1}
+                rx={3}
+              />
+              {/* Stdev label */}
+              <text
+                x={x}
+                y={y + 15}
+                fill={color}
+                fontSize="11"
+                fontWeight="700"
+                textAnchor="middle"
+                dominantBaseline="middle"
+              >
+                {stdevText}
+              </text>
+            </g>
+          )
+        })}
+      </g>
+    )
+  }
+
   // Custom component to render volume profile horizontal bars (supports multiple profiles)
   const CustomVolumeProfile = (props) => {
     if (!volumeProfileEnabled || volumeProfiles.length === 0) return null
@@ -2535,6 +2642,35 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         </div>
       )}
 
+      {/* Manual Channel Drag Mode Toggle Button */}
+      {manualChannelEnabled && (
+        <button
+          onClick={() => setManualChannelDragMode(!manualChannelDragMode)}
+          style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            zIndex: 10,
+            padding: '6px',
+            backgroundColor: manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(71, 85, 105)',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'background-color 0.2s',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+          }}
+          title={manualChannelDragMode ? "Drag mode enabled - Draw rectangle to plot channel" : "Click to enable drag mode"}
+        >
+          <Hand
+            className="w-4 h-4"
+            style={{ color: manualChannelDragMode ? 'white' : 'rgb(203, 213, 225)' }}
+          />
+        </button>
+      )}
+
       <ResponsiveContainer>
         <ComposedChart
           data={chartDataWithZones}
@@ -2580,11 +2716,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           {/* Manual Channel Zones as Parallel Lines */}
           <Customized component={CustomManualChannelZoneLines} />
 
+          {/* Manual Channel Stdev Labels */}
+          <Customized component={CustomManualChannelLabels} />
+
           {/* Volume Profile Horizontal Bars */}
           <Customized component={CustomVolumeProfile} />
 
           {/* Manual Channel Selection Rectangle */}
-          {manualChannelEnabled && isSelecting && selectionStart && selectionEnd && (
+          {manualChannelEnabled && manualChannelDragMode && isSelecting && selectionStart && selectionEnd && (
             <Customized component={(props) => {
               const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
               if (!xAxisMap || !yAxisMap) return null
