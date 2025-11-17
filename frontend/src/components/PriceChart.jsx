@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
+import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, ReferenceDot, Customized } from 'recharts'
 import { X, ArrowLeftRight } from 'lucide-react'
 
 function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
@@ -2460,6 +2460,23 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             ]
             const channelColor = channelColors[index % channelColors.length]
 
+            // Calculate middle point for stdev label display
+            const middleIndex = Math.floor((channel.startIndex + channel.endIndex) / 2)
+            const middleDataPoint = visibleChartData.find((point, idx) => {
+              const originalIndex = zoomRange.start + idx
+              return originalIndex === middleIndex
+            })
+
+            // Calculate lower bound value at middle point
+            let lowerBoundValue = null
+            let middleDate = null
+            if (middleDataPoint) {
+              const localIndex = middleIndex - channel.startIndex
+              const midValue = channel.slope * localIndex + channel.intercept
+              lowerBoundValue = midValue - channel.channelWidth
+              middleDate = middleDataPoint.date
+            }
+
             return (
               <React.Fragment key={`manual-channel-${index}`}>
                 <Line
@@ -2493,6 +2510,21 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   opacity={0.7}
                   legendType="none"
                 />
+                {/* Display stdev value beneath middle of lower bound */}
+                {middleDate && lowerBoundValue && (
+                  <ReferenceDot
+                    x={middleDate}
+                    y={lowerBoundValue}
+                    r={0}
+                    label={{
+                      value: `σ=${channel.stdDev.toFixed(4)}`,
+                      position: 'bottom',
+                      fill: channelColor,
+                      fontSize: 12,
+                      fontWeight: 'bold'
+                    }}
+                  />
+                )}
               </React.Fragment>
             )
           })}
