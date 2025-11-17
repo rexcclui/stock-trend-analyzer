@@ -2259,9 +2259,23 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             }
           }
 
-          // Get the top zone for X button positioning
+          // Determine if price is upward slope (for X button positioning)
+          let isUpwardSlope = false
+          if (volumeProfileMode === 'manual' && volumeProfile.dateRange) {
+            const { startDate, endDate } = volumeProfile.dateRange
+            const startPrice = displayPrices.find(p => p.date === startDate)
+            const endPrice = displayPrices.find(p => p.date === endDate)
+            if (startPrice && endPrice) {
+              isUpwardSlope = endPrice.close > startPrice.close
+            }
+          }
+
+          // Position X button at bottom-right for upward slope, top-right for downward
           const topZone = volumeProfile.zones[volumeProfile.zones.length - 1]
-          const topZoneY = topZone ? yAxis.scale(topZone.maxPrice) : offset.top
+          const bottomZone = volumeProfile.zones[0]
+          const xButtonY = isUpwardSlope
+            ? (bottomZone ? yAxis.scale(bottomZone.minPrice) - 10 : offset.top + offset.height - 10)
+            : (topZone ? yAxis.scale(topZone.maxPrice) + 10 : offset.top + 10)
 
           return (
             <g key={`volume-profile-${profileIndex}`}>
@@ -2330,7 +2344,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   {/* Transparent clickable area */}
                   <circle
                     cx={barX + barWidth - 10}
-                    cy={topZoneY + 10}
+                    cy={xButtonY}
                     r="10"
                     fill="transparent"
                     stroke="none"
@@ -2338,7 +2352,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   {/* X icon with shadow for visibility */}
                   <text
                     x={barX + barWidth - 10}
-                    y={topZoneY + 10}
+                    y={xButtonY}
                     fill="#ef4444"
                     fontSize="16"
                     fontWeight="900"
