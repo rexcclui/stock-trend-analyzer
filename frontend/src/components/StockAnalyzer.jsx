@@ -139,8 +139,11 @@ function StockAnalyzer() {
           }
 
           if (targetDataPoints < totalDataPoints) {
-            setGlobalZoomRange({ start: 0, end: targetDataPoints })
+            // Show most recent data by setting start to show last N data points
+            const startIndex = totalDataPoints - targetDataPoints
+            setGlobalZoomRange({ start: startIndex, end: null })
           } else {
+            // Show all data if selected period >= total available data
             setGlobalZoomRange({ start: 0, end: null })
           }
         }
@@ -661,8 +664,9 @@ function StockAnalyzer() {
 
           // Set zoom to show only the target period (most recent data)
           if (targetDataPoints < totalDataPoints) {
-            // Zoom to show only recent data, leaving older data for panning
-            setGlobalZoomRange({ start: 0, end: targetDataPoints })
+            // Show most recent data by setting start to show last N data points
+            const startIndex = totalDataPoints - targetDataPoints
+            setGlobalZoomRange({ start: startIndex, end: null })
           } else {
             // Show all data if selected period >= total available data
             setGlobalZoomRange({ start: 0, end: null })
