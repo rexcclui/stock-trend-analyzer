@@ -147,7 +147,7 @@ Width = 3.0σ → Channel contains ~99.7% of price data
 1. Starts with current Lookback Period value if manually adjusted, otherwise minimum 100-point lookback
 2. Finds optimal stdev multiplier ensuring ≤5% points outside channel
 3. Tries to extend lookback by adding older historical data
-4. Stops extending if >50% of new data falls outside the channel (trend break)
+4. Stops extending if 100% of new data falls outside the channel (trend break)
 5. Returns the longest valid channel that meets the ≤5% outside criteria
 6. Updates both sliders to the optimized values
 
@@ -319,7 +319,7 @@ def findBestChannel():
 
         # Check if new 10% of data fits in current channel
         outsidePercent = calculateOutsidePercent(newData, currentChannel)
-        if outsidePercent > 0.5:  # >50% of new data outside
+        if outsidePercent > 1.0:  # >100% of new data outside
             break  # Trend broken, stop extending
 
         # Recalculate channel with extended data
@@ -674,7 +674,7 @@ frontend/src/components/StockAnalyzer.jsx
 - Optimization: Iterative extension with trend-breaking
 - Constraint: ≤5% of points outside channel bounds
 - StdDev selection: Minimum that meets constraint (1.0 to 4.0σ, step 0.1)
-- Trend break threshold: >50% of new 10% data outside
+- Trend break threshold: 100% of new 10% data outside
 - Volume filtering: Optional 20th percentile threshold
 - Performance: 10x-20x faster than exhaustive search
 
