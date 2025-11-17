@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, ReferenceDot, Customized } from 'recharts'
-import { X, ArrowLeftRight } from 'lucide-react'
+import { X, ArrowLeftRight, Hand } from 'lucide-react'
 
 function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
@@ -18,6 +18,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const [trendChannelVisible, setTrendChannelVisible] = useState(true)
 
   // Manual channel selection state
+  const [isDrawingMode, setIsDrawingMode] = useState(false) // Toggle for enabling channel drawing
   const [isSelecting, setIsSelecting] = useState(false)
   const [selectionStart, setSelectionStart] = useState(null)
   const [selectionEnd, setSelectionEnd] = useState(null)
@@ -1159,8 +1160,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       setSyncedMouseDate(e.activeLabel)
     }
 
-    // Handle manual channel selection
-    if (manualChannelEnabled && isSelecting && e && e.activeLabel) {
+    // Handle manual channel selection (only when drawing mode is active)
+    if (manualChannelEnabled && isDrawingMode && isSelecting && e && e.activeLabel) {
       setSelectionEnd(e.activeLabel)
     }
   }
@@ -1176,7 +1177,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
   const handleMouseDown = (e) => {
-    if (manualChannelEnabled && e && e.activeLabel) {
+    // Only enable channel selection when drawing mode is active
+    if (manualChannelEnabled && isDrawingMode && e && e.activeLabel) {
       setIsSelecting(true)
       setSelectionStart(e.activeLabel)
       setSelectionEnd(e.activeLabel)
@@ -1185,10 +1187,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
   const handleMouseUp = (e) => {
-    if (manualChannelEnabled && isSelecting && selectionStart && selectionEnd) {
+    // Complete channel selection if drawing mode is active
+    if (manualChannelEnabled && isDrawingMode && isSelecting && selectionStart && selectionEnd) {
       // Calculate manual channel for selected range
       fitManualChannel(selectionStart, selectionEnd)
       setIsSelecting(false)
+      // Auto-disable drawing mode after drawing one channel
+      setIsDrawingMode(false)
     }
 
     // Stop dragging
@@ -1201,8 +1206,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Handle panning with mouse drag (on the container div, not the chart)
   const handleContainerMouseDown = (e) => {
-    // Only enable panning when NOT in manual channel mode
-    if (!manualChannelEnabled && onZoomChange) {
+    // Enable panning when NOT in drawing mode
+    if (!isDrawingMode && onZoomChange) {
       setIsDragging(true)
       setDragStartX(e.clientX)
       setDragStartRange({ ...zoomRange })
@@ -2208,13 +2213,53 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         width: '100%',
         height: chartHeight,
         position: 'relative',
-        cursor: !manualChannelEnabled ? (isDragging ? 'grabbing' : 'grab') : 'crosshair'
+        cursor: isDrawingMode ? 'crosshair' : (isDragging ? 'grabbing' : 'grab')
       }}
       onMouseDown={handleContainerMouseDown}
       onMouseMove={handleContainerMouseMove}
       onMouseUp={handleContainerMouseUp}
       onMouseLeave={handleContainerMouseUp}
     >
+      {/* Manual Channel Drawing Mode Toggle Button */}
+      {manualChannelEnabled && (
+        <button
+          onClick={() => setIsDrawingMode(!isDrawingMode)}
+          style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            zIndex: 20,
+            background: isDrawingMode ? 'rgba(34, 197, 94, 0.95)' : 'rgba(30, 41, 59, 0.95)',
+            border: isDrawingMode ? '2px solid rgb(34, 197, 94)' : '1px solid rgb(71, 85, 105)',
+            borderRadius: '6px',
+            padding: '6px',
+            cursor: 'pointer',
+            color: isDrawingMode ? 'rgb(255, 255, 255)' : 'rgb(203, 213, 225)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backdropFilter: 'blur(4px)',
+            transition: 'all 0.2s',
+            boxShadow: isDrawingMode ? '0 0 8px rgba(34, 197, 94, 0.5)' : '0 2px 4px rgba(0, 0, 0, 0.3)'
+          }}
+          onMouseEnter={(e) => {
+            if (!isDrawingMode) {
+              e.currentTarget.style.background = 'rgba(51, 65, 85, 0.95)'
+              e.currentTarget.style.borderColor = 'rgb(100, 116, 139)'
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!isDrawingMode) {
+              e.currentTarget.style.background = 'rgba(30, 41, 59, 0.95)'
+              e.currentTarget.style.borderColor = 'rgb(71, 85, 105)'
+            }
+          }}
+          title={isDrawingMode ? "Drawing mode active - Click to exit" : "Click to draw manual channel"}
+        >
+          <Hand className="w-4 h-4" />
+        </button>
+      )}
+
       {/* Slope Channel Controls Panel */}
       {slopeChannelEnabled && slopeChannelInfo && onSlopeChannelParamsChange && controlsVisible && (
         <div
@@ -2420,7 +2465,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           <Customized component={CustomManualChannelZoneLines} />
 
           {/* Manual Channel Selection Rectangle */}
-          {manualChannelEnabled && isSelecting && selectionStart && selectionEnd && (
+          {manualChannelEnabled && isDrawingMode && isSelecting && selectionStart && selectionEnd && (
             <Customized component={(props) => {
               const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
               if (!xAxisMap || !yAxisMap) return null
