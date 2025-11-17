@@ -95,6 +95,8 @@ function StockAnalyzer() {
         volumeColorEnabled: false,
         volumeColorMode: 'absolute', // 'absolute' or 'relative-spy'
         volumeProfileEnabled: false,
+        volumeProfileMode: 'auto', // 'auto' or 'manual'
+        volumeProfileManualRange: null, // { startDate, endDate }
         spyData: null,
         performanceComparisonEnabled: false,
         performanceComparisonBenchmark: 'SPY',
@@ -319,6 +321,40 @@ function StockAnalyzer() {
           return {
             ...chart,
             volumeProfileEnabled: !chart.volumeProfileEnabled
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const cycleVolumeProfileMode = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          const modes = ['auto', 'manual']
+          const currentIndex = modes.indexOf(chart.volumeProfileMode)
+          const nextMode = modes[(currentIndex + 1) % modes.length]
+
+          return {
+            ...chart,
+            volumeProfileMode: nextMode,
+            // Clear manual range when switching back to auto
+            volumeProfileManualRange: nextMode === 'auto' ? null : chart.volumeProfileManualRange
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const updateVolumeProfileManualRange = (chartId, range) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            volumeProfileManualRange: range
           }
         }
         return chart
@@ -769,18 +805,32 @@ function StockAnalyzer() {
                         </button>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => toggleVolumeProfile(chart.id)}
-                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
-                        chart.volumeProfileEnabled
-                          ? 'bg-yellow-600 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                      title="Show horizontal volume profile - each zone contains 10% of total volume"
-                    >
-                      Volume Profile
-                    </button>
+                    <div className="flex gap-1 items-center">
+                      <button
+                        type="button"
+                        onClick={() => toggleVolumeProfile(chart.id)}
+                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
+                          chart.volumeProfileEnabled
+                            ? (chart.volumeProfileMode === 'manual' ? 'bg-purple-600 text-white' : 'bg-yellow-600 text-white')
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                        title={chart.volumeProfileMode === 'manual'
+                          ? "Manual volume profile - draw a rectangle to select date range"
+                          : "Show horizontal volume profile across all data"}
+                      >
+                        {chart.volumeProfileMode === 'manual' ? 'Manual Vol' : 'Volume Profile'}
+                      </button>
+                      {chart.volumeProfileEnabled && (
+                        <button
+                          type="button"
+                          onClick={() => cycleVolumeProfileMode(chart.id)}
+                          className="px-2 py-1 text-xs rounded font-medium bg-slate-600 text-slate-200 hover:bg-slate-500 transition-colors"
+                          title="Click to cycle: Auto → Manual"
+                        >
+                          {chart.volumeProfileMode === 'auto' ? 'AUTO' : 'MAN'}
+                        </button>
+                      )}
+                    </div>
                     <div className="flex gap-1 items-center">
                       <button
                         type="button"
@@ -924,6 +974,9 @@ function StockAnalyzer() {
                   volumeColorEnabled={chart.volumeColorEnabled}
                   volumeColorMode={chart.volumeColorMode}
                   volumeProfileEnabled={chart.volumeProfileEnabled}
+                  volumeProfileMode={chart.volumeProfileMode}
+                  volumeProfileManualRange={chart.volumeProfileManualRange}
+                  onVolumeProfileManualRangeChange={(range) => updateVolumeProfileManualRange(chart.id, range)}
                   spyData={chart.spyData}
                   performanceComparisonEnabled={chart.performanceComparisonEnabled}
                   performanceComparisonBenchmark={chart.performanceComparisonBenchmark}

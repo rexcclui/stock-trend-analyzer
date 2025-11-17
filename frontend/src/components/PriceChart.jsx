@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
 import { X, ArrowLeftRight } from 'lucide-react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRange = null, onVolumeProfileManualRangeChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -23,6 +23,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const [selectionEnd, setSelectionEnd] = useState(null)
   const [manualChannels, setManualChannels] = useState([]) // Array to store multiple channels
   const chartRef = useRef(null)
+
+  // Volume profile manual selection state
+  const [isSelectingVolumeProfile, setIsSelectingVolumeProfile] = useState(false)
+  const [volumeProfileSelectionStart, setVolumeProfileSelectionStart] = useState(null)
+  const [volumeProfileSelectionEnd, setVolumeProfileSelectionEnd] = useState(null)
 
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
   // No need to reset here to avoid infinite loop
@@ -882,12 +887,25 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const calculateVolumeProfile = () => {
     if (!volumeProfileEnabled || displayPrices.length === 0) return null
 
+    // Filter data based on manual range if in manual mode
+    let dataToAnalyze = displayPrices
+    if (volumeProfileMode === 'manual' && volumeProfileManualRange) {
+      const { startDate, endDate } = volumeProfileManualRange
+      dataToAnalyze = displayPrices.filter(price => {
+        const priceDate = price.date
+        return priceDate >= startDate && priceDate <= endDate
+      })
+
+      // If no data in selected range, return null
+      if (dataToAnalyze.length === 0) return null
+    }
+
     // Calculate total volume
-    const totalVolume = displayPrices.reduce((sum, price) => sum + (price.volume || 0), 0)
+    const totalVolume = dataToAnalyze.reduce((sum, price) => sum + (price.volume || 0), 0)
     if (totalVolume === 0) return null
 
-    // Find min and max price
-    const prices = displayPrices.map(p => p.close)
+    // Find min and max price from the filtered data
+    const prices = dataToAnalyze.map(p => p.close)
     const minPrice = Math.min(...prices)
     const maxPrice = Math.max(...prices)
     const priceRange = maxPrice - minPrice
@@ -910,7 +928,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     }
 
     // Accumulate volume for each zone
-    displayPrices.forEach(price => {
+    dataToAnalyze.forEach(price => {
       const priceValue = price.close
       const volume = price.volume || 0
 
@@ -1215,6 +1233,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     if (manualChannelEnabled && isSelecting && e && e.activeLabel) {
       setSelectionEnd(e.activeLabel)
     }
+
+    // Handle volume profile manual selection
+    if (volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && e && e.activeLabel) {
+      setVolumeProfileSelectionEnd(e.activeLabel)
+    }
   }
 
   const handleMouseLeave = () => {
@@ -1228,6 +1251,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       setSelectionEnd(e.activeLabel)
       // Don't clear previous channels - they accumulate
     }
+    if (volumeProfileEnabled && volumeProfileMode === 'manual' && e && e.activeLabel) {
+      setIsSelectingVolumeProfile(true)
+      setVolumeProfileSelectionStart(e.activeLabel)
+      setVolumeProfileSelectionEnd(e.activeLabel)
+    }
   }
 
   const handleMouseUp = (e) => {
@@ -1235,6 +1263,15 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // Calculate manual channel for selected range
       fitManualChannel(selectionStart, selectionEnd)
       setIsSelecting(false)
+    }
+    if (volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && volumeProfileSelectionStart && volumeProfileSelectionEnd) {
+      // Set the manual range for volume profile
+      const startDate = volumeProfileSelectionStart
+      const endDate = volumeProfileSelectionEnd
+      // Ensure correct order
+      const dates = [startDate, endDate].sort()
+      onVolumeProfileManualRangeChange({ startDate: dates[0], endDate: dates[1] })
+      setIsSelectingVolumeProfile(false)
     }
   }
 
@@ -2480,6 +2517,42 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   height={height}
                   fill="rgba(34, 197, 94, 0.2)"
                   stroke="#22c55e"
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                />
+              )
+            }} />
+          )}
+
+          {/* Volume Profile Manual Selection Rectangle */}
+          {volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && volumeProfileSelectionStart && volumeProfileSelectionEnd && (
+            <Customized component={(props) => {
+              const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
+              if (!xAxisMap || !yAxisMap) return null
+
+              const xAxis = xAxisMap[0]
+              const yAxis = yAxisMap[0]
+
+              if (!xAxis || !yAxis) return null
+
+              const startX = xAxis.scale(volumeProfileSelectionStart)
+              const endX = xAxis.scale(volumeProfileSelectionEnd)
+
+              if (startX === undefined || endX === undefined) return null
+
+              const x = Math.min(startX, endX)
+              const width = Math.abs(endX - startX)
+              const y = offset.top
+              const height = offset.height
+
+              return (
+                <rect
+                  x={x}
+                  y={y}
+                  width={width}
+                  height={height}
+                  fill="rgba(147, 51, 234, 0.2)"
+                  stroke="#9333ea"
                   strokeWidth={2}
                   strokeDasharray="5 5"
                 />
