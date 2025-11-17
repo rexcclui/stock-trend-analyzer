@@ -2217,9 +2217,21 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     if (!xAxis || !yAxis) return null
 
-    // Get chart dimensions
-    const chartX = offset.left
-    const chartWidth = offset.width
+    // Determine bar x position and width based on mode
+    let barX = offset.left
+    let barWidth = offset.width
+
+    // In manual mode, only span the selected date range
+    if (volumeProfileMode === 'manual' && volumeProfileManualRange) {
+      const { startDate, endDate } = volumeProfileManualRange
+      const startX = xAxis.scale(startDate)
+      const endX = xAxis.scale(endDate)
+
+      if (startX !== undefined && endX !== undefined) {
+        barX = Math.min(startX, endX)
+        barWidth = Math.abs(endX - startX)
+      }
+    }
 
     return (
       <g>
@@ -2244,11 +2256,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           return (
             <g key={`volume-profile-${i}`}>
-              {/* Full-width horizontal bar */}
+              {/* Horizontal bar spanning selected range or full chart */}
               <rect
-                x={chartX}
+                x={barX}
                 y={yTop}
-                width={chartWidth}
+                width={barWidth}
                 height={height}
                 fill={`hsl(${hue}, ${saturation}%, ${lightness}%)`}
                 stroke="rgba(59, 130, 246, 0.4)"
@@ -2258,7 +2270,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
               {/* Volume percentage label in the center */}
               <text
-                x={chartX + chartWidth / 2}
+                x={barX + barWidth / 2}
                 y={yTop + height / 2}
                 fill="#ffffff"
                 fontSize="11"
