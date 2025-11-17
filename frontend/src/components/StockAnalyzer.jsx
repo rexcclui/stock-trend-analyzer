@@ -95,6 +95,9 @@ function StockAnalyzer() {
         volumeColorEnabled: false,
         volumeColorMode: 'absolute', // 'absolute' or 'relative-spy'
         spyData: null,
+        performanceComparisonEnabled: false,
+        performanceComparisonBenchmark: 'SPY',
+        performanceComparisonDays: 30,
         slopeChannelEnabled: false,
         slopeChannelVolumeWeighted: false,
         slopeChannelZones: 8,
@@ -367,6 +370,74 @@ function StockAnalyzer() {
     }
   }
 
+  const togglePerformanceComparison = async (chartId) => {
+    const chart = charts.find(c => c.id === chartId)
+    if (!chart) return
+
+    const newState = !chart.performanceComparisonEnabled
+
+    // Toggle the enabled state
+    setCharts(prevCharts =>
+      prevCharts.map(c => {
+        if (c.id === chartId) {
+          return {
+            ...c,
+            performanceComparisonEnabled: newState
+          }
+        }
+        return c
+      })
+    )
+
+    // If enabling and we don't have benchmark data, fetch it
+    if (newState && !chart.spyData) {
+      // Use fetchBenchmarkData after state update
+      setTimeout(() => fetchBenchmarkData(chartId), 0)
+    }
+  }
+
+  const fetchBenchmarkData = async (chartId) => {
+    const chart = charts.find(c => c.id === chartId)
+    if (!chart || !chart.performanceComparisonEnabled) return
+
+    const benchmarkSymbol = chart.performanceComparisonBenchmark
+    if (!benchmarkSymbol || benchmarkSymbol.trim() === '') return
+
+    try {
+      // Check cache first
+      let benchmarkData = apiCache.get(benchmarkSymbol, days)
+
+      if (!benchmarkData) {
+        console.log(`[Cache] ❌ Cache MISS for ${benchmarkSymbol}:${days}, fetching from server...`)
+        const response = await axios.get(`${API_URL}/analyze`, {
+          params: {
+            symbol: benchmarkSymbol,
+            days: days
+          }
+        })
+        benchmarkData = response.data
+        apiCache.set(benchmarkSymbol, days, benchmarkData)
+      } else {
+        console.log(`[Cache] ✅ Cache HIT for ${benchmarkSymbol}:${days}`)
+      }
+
+      setCharts(prevCharts =>
+        prevCharts.map(c => {
+          if (c.id === chartId) {
+            return {
+              ...c,
+              spyData: benchmarkData
+            }
+          }
+          return c
+        })
+      )
+    } catch (err) {
+      console.error('Failed to fetch benchmark data:', err)
+      setError(`Failed to fetch ${benchmarkSymbol} data for performance comparison`)
+    }
+  }
+
   const toggleChartCollapse = (chartId) => {
     setCharts(prevCharts =>
       prevCharts.map(chart => {
@@ -394,8 +465,8 @@ function StockAnalyzer() {
 
     // Update all charts with the new time range
     try {
-      // Check if any chart needs SPY data
-      const needsSpy = charts.some(chart => chart.volumeColorMode === 'relative-spy')
+      // Check if any chart needs SPY data (for volume comparison or performance comparison)
+      const needsSpy = charts.some(chart => chart.volumeColorMode === 'relative-spy' || chart.performanceComparisonEnabled)
       let spyDataForPeriod = null
 
       if (needsSpy) {
@@ -449,8 +520,8 @@ function StockAnalyzer() {
           const updatedData = results.find(r => r.id === chart.id)
           const updates = { data: updatedData.data }
 
-          // Update SPY data if chart is in relative-spy mode
-          if (chart.volumeColorMode === 'relative-spy' && spyDataForPeriod) {
+          // Update SPY data if chart is in relative-spy mode or performance comparison mode
+          if ((chart.volumeColorMode === 'relative-spy' || chart.performanceComparisonEnabled) && spyDataForPeriod) {
             updates.spyData = spyDataForPeriod
           }
 
@@ -683,6 +754,70 @@ function StockAnalyzer() {
                         </button>
                       )}
                     </div>
+                    <div className="flex gap-1 items-center">
+                      <button
+                        type="button"
+                        onClick={() => togglePerformanceComparison(chart.id)}
+                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
+                          chart.performanceComparisonEnabled
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                        title="Highlight top 20% and bottom 20% performance variance vs benchmark"
+                      >
+                        vs Perf
+                      </button>
+                      {chart.performanceComparisonEnabled && (
+                        <>
+                          <input
+                            type="text"
+                            value={chart.performanceComparisonBenchmark}
+                            onChange={(e) => {
+                              const newBenchmark = e.target.value.toUpperCase()
+                              setCharts(prevCharts =>
+                                prevCharts.map(c =>
+                                  c.id === chart.id
+                                    ? { ...c, performanceComparisonBenchmark: newBenchmark }
+                                    : c
+                                )
+                              )
+                            }}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                fetchBenchmarkData(chart.id)
+                              }
+                            }}
+                            onBlur={() => {
+                              fetchBenchmarkData(chart.id)
+                            }}
+                            placeholder="SPY"
+                            className="w-16 px-2 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-100 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                            title="Benchmark symbol (press Enter or blur to load)"
+                          />
+                          <input
+                            type="number"
+                            value={chart.performanceComparisonDays}
+                            onChange={(e) => {
+                              const value = parseInt(e.target.value)
+                              if (!isNaN(value) && value > 0 && value <= 365) {
+                                setCharts(prevCharts =>
+                                  prevCharts.map(c =>
+                                    c.id === chart.id
+                                      ? { ...c, performanceComparisonDays: value }
+                                      : c
+                                  )
+                                )
+                              }
+                            }}
+                            min="1"
+                            max="365"
+                            placeholder="30"
+                            className="w-14 px-2 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-100 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                            title="Lookback days"
+                          />
+                        </>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={() => openSlopeChannelDialog(chart.id)}
@@ -762,6 +897,9 @@ function StockAnalyzer() {
                   volumeColorEnabled={chart.volumeColorEnabled}
                   volumeColorMode={chart.volumeColorMode}
                   spyData={chart.spyData}
+                  performanceComparisonEnabled={chart.performanceComparisonEnabled}
+                  performanceComparisonBenchmark={chart.performanceComparisonBenchmark}
+                  performanceComparisonDays={chart.performanceComparisonDays}
                   slopeChannelEnabled={chart.slopeChannelEnabled}
                   slopeChannelVolumeWeighted={chart.slopeChannelVolumeWeighted}
                   slopeChannelZones={chart.slopeChannelZones}

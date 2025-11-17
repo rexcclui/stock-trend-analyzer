@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
 import { X, ArrowLeftRight } from 'lucide-react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', spyData = null, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -878,6 +878,61 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   const { thresholds80: rollingThresholds80, thresholds20: rollingThresholds20 } = calculateRollingThresholds()
 
+  // Calculate performance variance for each point (configurable rolling period)
+  const performanceVariances = (() => {
+    if (!performanceComparisonEnabled || !spyData) return []
+
+    const variances = []
+    const lookbackPeriod = performanceComparisonDays // Configurable rolling performance
+
+    // Build a map of benchmark prices by date
+    const benchmarkPriceByDate = {}
+    spyData.prices.forEach(p => {
+      benchmarkPriceByDate[p.date] = p.close
+    })
+
+    for (let i = 0; i < displayPrices.length; i++) {
+      const currentPrice = displayPrices[i]
+      const currentBenchmarkPrice = benchmarkPriceByDate[currentPrice.date]
+
+      // Look back the specified number of days
+      const startIdx = Math.max(0, i - lookbackPeriod)
+      const startPrice = displayPrices[startIdx]
+      const startBenchmarkPrice = benchmarkPriceByDate[startPrice.date]
+
+      if (currentBenchmarkPrice && startBenchmarkPrice && startPrice.close && startBenchmarkPrice !== 0 && startPrice.close !== 0) {
+        // Calculate performance (percentage change)
+        const stockPerformance = ((currentPrice.close - startPrice.close) / startPrice.close) * 100
+        const benchmarkPerformance = ((currentBenchmarkPrice - startBenchmarkPrice) / startBenchmarkPrice) * 100
+
+        // Calculate variance (stock performance - benchmark performance)
+        const variance = stockPerformance - benchmarkPerformance
+        variances[i] = variance
+      } else {
+        variances[i] = null
+      }
+    }
+
+    return variances
+  })()
+
+  // Calculate thresholds for performance variance (top 20% and bottom 20%)
+  const performanceVarianceThresholds = (() => {
+    if (!performanceComparisonEnabled || performanceVariances.length === 0) return { top20: null, bottom20: null }
+
+    const validVariances = performanceVariances.filter(v => v !== null)
+    if (validVariances.length === 0) return { top20: null, bottom20: null }
+
+    const sorted = [...validVariances].sort((a, b) => a - b)
+    const idx80 = Math.floor(sorted.length * 0.8)
+    const idx20 = Math.floor(sorted.length * 0.2)
+
+    return {
+      top20: sorted[idx80],      // Top 20% (highest positive variance)
+      bottom20: sorted[idx20]    // Bottom 20% (most negative variance)
+    }
+  })()
+
   const slopeChannelInfo = slopeChannelEnabled ? calculateSlopeChannel(displayPrices, true, slopeChannelVolumeWeighted) : null
   const zoneColors = slopeChannelEnabled && slopeChannelInfo
     ? calculateZoneColors(displayPrices, slopeChannelInfo, slopeChannelZones)
@@ -913,11 +968,23 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       }
     }
 
+    // Determine performance variance extremes
+    let isTopPerformance = false
+    let isBottomPerformance = false
+
+    if (performanceComparisonEnabled && performanceVariances[index] !== null && performanceVarianceThresholds.top20 !== null) {
+      const variance = performanceVariances[index]
+      isTopPerformance = variance >= performanceVarianceThresholds.top20
+      isBottomPerformance = variance <= performanceVarianceThresholds.bottom20
+    }
+
     const dataPoint = {
       date: price.date,
       close: price.close,
       highVolumeClose: isHighVolume ? price.close : null, // Only set close value for high volume points
       lowVolumeClose: isLowVolume ? price.close : null, // Only set close value for low volume points
+      topPerformanceClose: isTopPerformance ? price.close : null, // Top 20% performance variance
+      bottomPerformanceClose: isBottomPerformance ? price.close : null, // Bottom 20% performance variance
     }
 
     // Add SMA data for each period
@@ -2456,6 +2523,28 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 strokeWidth={3}
                 dot={false}
                 name={volumeColorMode === 'relative-spy' ? "Low Volume vs SPY (Bottom 20%)" : "Low Volume (Bottom 20%)"}
+                connectNulls={false}
+              />
+            </>
+          )}
+          {performanceComparisonEnabled && (
+            <>
+              <Line
+                type="monotone"
+                dataKey="topPerformanceClose"
+                stroke="#22c55e"
+                strokeWidth={3}
+                dot={false}
+                name={`Top Performance vs ${performanceComparisonBenchmark} (Top 20%)`}
+                connectNulls={false}
+              />
+              <Line
+                type="monotone"
+                dataKey="bottomPerformanceClose"
+                stroke="#ef4444"
+                strokeWidth={3}
+                dot={false}
+                name={`Bottom Performance vs ${performanceComparisonBenchmark} (Bottom 20%)`}
                 connectNulls={false}
               />
             </>
