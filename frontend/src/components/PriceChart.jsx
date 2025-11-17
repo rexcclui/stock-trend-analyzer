@@ -1367,15 +1367,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           {/* All Channels Lines */}
           {findAllChannelEnabled && allChannels.length > 0 && allChannels.map((channel, index) => {
-            // Define distinct colors for each channel
+            // Define distinct colors for each channel - using single color per channel for consistency
             const channelColors = [
-              { upper: '#10b981', mid: '#3b82f6', lower: '#ef4444' },  // Green, Blue, Red
-              { upper: '#f59e0b', mid: '#8b5cf6', lower: '#ec4899' },  // Amber, Purple, Pink
-              { upper: '#14b8a6', mid: '#6366f1', lower: '#f97316' },  // Teal, Indigo, Orange
-              { upper: '#84cc16', mid: '#06b6d4', lower: '#f43f5e' },  // Lime, Cyan, Rose
-              { upper: '#a3e635', mid: '#0ea5e9', lower: '#e11d48' },  // Lime-light, Sky, Rose-dark
+              '#3b82f6',  // Blue
+              '#8b5cf6',  // Purple
+              '#f59e0b',  // Amber
+              '#10b981',  // Green
+              '#06b6d4',  // Cyan
+              '#f97316',  // Orange
+              '#ec4899',  // Pink
+              '#84cc16',  // Lime
             ]
-            const colors = channelColors[index % channelColors.length]
+            const channelColor = channelColors[index % channelColors.length]
             const isVisible = allChannelsVisibility[index] !== false
 
             return (
@@ -1383,34 +1386,34 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 <Line
                   type="monotone"
                   dataKey={`allChannel${index}Upper`}
-                  stroke={colors.upper}
+                  stroke={channelColor}
                   strokeWidth={1.5}
                   dot={false}
                   legendType="none"
                   strokeDasharray="5 5"
-                  opacity={0.8}
+                  opacity={0.6}
                   hide={!isVisible}
                 />
                 <Line
                   type="monotone"
                   dataKey={`allChannel${index}Mid`}
-                  stroke={colors.mid}
+                  stroke={channelColor}
                   strokeWidth={2}
                   dot={false}
                   name={`Ch${index + 1} (${channel.lookbackCount}pts, R²=${(channel.rSquared * 100).toFixed(1)}%)`}
                   strokeDasharray="5 5"
-                  opacity={0.8}
+                  opacity={1.0}
                   hide={!isVisible}
                 />
                 <Line
                   type="monotone"
                   dataKey={`allChannel${index}Lower`}
-                  stroke={colors.lower}
+                  stroke={channelColor}
                   strokeWidth={1.5}
                   dot={false}
                   legendType="none"
                   strokeDasharray="5 5"
-                  opacity={0.8}
+                  opacity={0.6}
                   hide={!isVisible}
                 />
               </React.Fragment>
