@@ -1193,32 +1193,37 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // Try extending by one more point
       const testEndIndex = endIndex + 1
 
-      // Check the ENTIRE extended range (from startIndex to testEndIndex)
-      const allPointsToCheck = displayPrices.slice(startIndex, testEndIndex + 1)
+      // Calculate the total extended range
+      const totalExtendedLength = testEndIndex - startIndex + 1
 
-      // Check how many of ALL points fall outside the channel
+      // Get the LAST 10% of the extended range
+      const windowSize = Math.max(1, Math.floor(totalExtendedLength * 0.1))
+      const windowStartIdx = testEndIndex - windowSize + 1
+      const last10PercentPoints = displayPrices.slice(windowStartIdx, testEndIndex + 1)
+
+      // Check how many of the LAST 10% points fall outside the channel
       let outsideCount = 0
-      for (let i = 0; i < allPointsToCheck.length; i++) {
-        const globalIndex = startIndex + i
+      for (let i = 0; i < last10PercentPoints.length; i++) {
+        const globalIndex = windowStartIdx + i
         const localIndex = globalIndex - startIndex
         const predictedY = slope * localIndex + intercept
         const upperBound = predictedY + channelWidth
         const lowerBound = predictedY - channelWidth
-        const actualY = allPointsToCheck[i].close
+        const actualY = last10PercentPoints[i].close
 
         if (actualY > upperBound || actualY < lowerBound) {
           outsideCount++
         }
       }
 
-      const outsidePercent = outsideCount / allPointsToCheck.length
+      const outsidePercent = outsideCount / last10PercentPoints.length
 
       if (outsidePercent > trendBreakThreshold) {
-        // Trend broke, stop extending forward
+        // >10% of the last 10% points are outside, stop extending forward
         break
       }
 
-      // Continue extending
+      // Continue extending - the extended range becomes the new "original range"
       endIndex = testEndIndex
       forwardExtended = true
     }
@@ -1238,32 +1243,37 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // Adjust intercept for the new start position
       const newIntercept = originalIntercept - slope * (originalStartIndex - testStartIndex)
 
-      // Check the ENTIRE extended range (from testStartIndex to endIndex)
-      const allPointsToCheck = displayPrices.slice(testStartIndex, endIndex + 1)
+      // Calculate the total extended range
+      const totalExtendedLength = endIndex - testStartIndex + 1
 
-      // Check how many of ALL points fall outside the channel
+      // Get the FIRST 10% of the extended range
+      const windowSize = Math.max(1, Math.floor(totalExtendedLength * 0.1))
+      const windowEndIdx = testStartIndex + windowSize - 1
+      const first10PercentPoints = displayPrices.slice(testStartIndex, windowEndIdx + 1)
+
+      // Check how many of the FIRST 10% points fall outside the channel
       let outsideCount = 0
-      for (let i = 0; i < allPointsToCheck.length; i++) {
+      for (let i = 0; i < first10PercentPoints.length; i++) {
         const globalIndex = testStartIndex + i
         const localIndex = globalIndex - testStartIndex
         const predictedY = slope * localIndex + newIntercept
         const upperBound = predictedY + channelWidth
         const lowerBound = predictedY - channelWidth
-        const actualY = allPointsToCheck[i].close
+        const actualY = first10PercentPoints[i].close
 
         if (actualY > upperBound || actualY < lowerBound) {
           outsideCount++
         }
       }
 
-      const outsidePercent = outsideCount / allPointsToCheck.length
+      const outsidePercent = outsideCount / first10PercentPoints.length
 
       if (outsidePercent > trendBreakThreshold) {
-        // Trend broke, stop extending backward
+        // >10% of the first 10% points are outside, stop extending backward
         break
       }
 
-      // Continue extending
+      // Continue extending - the extended range becomes the new "original range"
       startIndex = testStartIndex
       intercept = newIntercept
       backwardExtended = true
