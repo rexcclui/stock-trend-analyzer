@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
 import { X, ArrowLeftRight } from 'lucide-react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', spyData = null, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -803,27 +803,80 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // This prevents mismatch when period changes and indicators haven't updated yet
   const displayPrices = prices.slice(0, dataLength)
 
-  // Calculate volume threshold for top 20% (80th percentile)
-  const volumeThreshold80 = (() => {
-    if (!volumeColorEnabled) return null
-    const volumes = displayPrices.map(d => d.volume || 0).filter(v => v > 0).sort((a, b) => a - b)
-    if (volumes.length > 0) {
-      const percentileIndex = Math.floor(volumes.length * 0.8)
-      return volumes[percentileIndex]
-    }
-    return null
+  // Build a map of SPY volumes by date for quick lookup
+  const spyVolumeByDate = (() => {
+    if (!volumeColorEnabled || volumeColorMode !== 'relative-spy' || !spyData) return {}
+    const map = {}
+    spyData.prices.forEach(p => {
+      map[p.date] = p.volume || 0
+    })
+    return map
   })()
 
-  // Calculate volume threshold for bottom 20% (20th percentile)
-  const volumeThreshold20 = (() => {
-    if (!volumeColorEnabled) return null
-    const volumes = displayPrices.map(d => d.volume || 0).filter(v => v > 0).sort((a, b) => a - b)
-    if (volumes.length > 0) {
-      const percentileIndex = Math.floor(volumes.length * 0.2)
-      return volumes[percentileIndex]
-    }
-    return null
+  // Calculate volume ratios (stock/SPY) for each date
+  const volumeRatios = (() => {
+    if (!volumeColorEnabled || volumeColorMode !== 'relative-spy' || !spyData) return []
+    return displayPrices.map(price => {
+      const spyVolume = spyVolumeByDate[price.date]
+      if (!spyVolume || spyVolume === 0) return 0
+      return (price.volume || 0) / spyVolume
+    })
   })()
+
+  // Determine rolling lookback window based on time period
+  const getVolumeLookbackWindow = () => {
+    const daysNum = parseInt(days)
+    if (daysNum >= 1825) return 180      // 5Y: 6 months
+    if (daysNum >= 1095) return 90       // 3Y: 3 months
+    if (daysNum >= 365) return 60        // 1Y: 2 months
+    if (daysNum >= 180) return 28        // 6M: 4 weeks
+    if (daysNum >= 90) return 21         // 3M: 3 weeks
+    if (daysNum >= 30) return 7          // 1M: 1 week
+    return 1                             // 7D: 1 day
+  }
+
+  const volumeLookbackWindow = getVolumeLookbackWindow()
+
+  // Calculate rolling volume thresholds for each data point
+  const calculateRollingThresholds = () => {
+    if (!volumeColorEnabled) return { thresholds80: [], thresholds20: [] }
+
+    const thresholds80 = []
+    const thresholds20 = []
+
+    for (let i = 0; i < displayPrices.length; i++) {
+      // Define the lookback window (from i-lookback to i-1, not including current point)
+      const startIdx = Math.max(0, i - volumeLookbackWindow)
+      const endIdx = i // Include current point for comparison
+
+      let values = []
+
+      if (volumeColorMode === 'relative-spy' && spyData) {
+        // Use volume ratios from the lookback window
+        values = volumeRatios.slice(startIdx, endIdx).filter(r => r > 0)
+      } else {
+        // Use absolute volumes from the lookback window
+        values = displayPrices.slice(startIdx, endIdx)
+          .map(d => d.volume || 0)
+          .filter(v => v > 0)
+      }
+
+      if (values.length > 0) {
+        const sorted = [...values].sort((a, b) => a - b)
+        const idx80 = Math.floor(sorted.length * 0.8)
+        const idx20 = Math.floor(sorted.length * 0.2)
+        thresholds80[i] = sorted[idx80]
+        thresholds20[i] = sorted[idx20]
+      } else {
+        thresholds80[i] = null
+        thresholds20[i] = null
+      }
+    }
+
+    return { thresholds80, thresholds20 }
+  }
+
+  const { thresholds80: rollingThresholds80, thresholds20: rollingThresholds20 } = calculateRollingThresholds()
 
   const slopeChannelInfo = slopeChannelEnabled ? calculateSlopeChannel(displayPrices, true, slopeChannelVolumeWeighted) : null
   const zoneColors = slopeChannelEnabled && slopeChannelInfo
@@ -842,8 +895,24 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   const chartData = displayPrices.map((price, index) => {
     const indicator = indicators[index] || {}
-    const isHighVolume = volumeColorEnabled && volumeThreshold80 && (price.volume || 0) >= volumeThreshold80
-    const isLowVolume = volumeColorEnabled && volumeThreshold20 && (price.volume || 0) <= volumeThreshold20
+
+    // Determine high/low volume based on mode using rolling thresholds
+    let isHighVolume = false
+    let isLowVolume = false
+
+    if (volumeColorEnabled && rollingThresholds80[index] && rollingThresholds20[index]) {
+      if (volumeColorMode === 'relative-spy' && spyData) {
+        // Compare volume ratio to rolling thresholds
+        const ratio = volumeRatios[index]
+        isHighVolume = ratio >= rollingThresholds80[index]
+        isLowVolume = ratio <= rollingThresholds20[index] && ratio > 0
+      } else {
+        // Compare absolute volume to rolling thresholds
+        isHighVolume = (price.volume || 0) >= rollingThresholds80[index]
+        isLowVolume = (price.volume || 0) <= rollingThresholds20[index]
+      }
+    }
+
     const dataPoint = {
       date: price.date,
       close: price.close,
@@ -2377,7 +2446,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 stroke="#ea580c"
                 strokeWidth={3}
                 dot={false}
-                name="High Volume (Top 20%)"
+                name={volumeColorMode === 'relative-spy' ? "High Volume vs SPY (Top 20%)" : "High Volume (Top 20%)"}
                 connectNulls={false}
               />
               <Line
@@ -2386,7 +2455,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 stroke="#06b6d4"
                 strokeWidth={3}
                 dot={false}
-                name="Low Volume (Bottom 20%)"
+                name={volumeColorMode === 'relative-spy' ? "Low Volume vs SPY (Bottom 20%)" : "Low Volume (Bottom 20%)"}
                 connectNulls={false}
               />
             </>

@@ -93,6 +93,8 @@ function StockAnalyzer() {
         smaPeriods: [],
         smaVisibility: {},
         volumeColorEnabled: false,
+        volumeColorMode: 'absolute', // 'absolute' or 'relative-spy'
+        spyData: null,
         slopeChannelEnabled: false,
         slopeChannelVolumeWeighted: false,
         slopeChannelZones: 8,
@@ -306,6 +308,65 @@ function StockAnalyzer() {
     )
   }
 
+  const cycleVolumeColorMode = async (chartId) => {
+    const chart = charts.find(c => c.id === chartId)
+    if (!chart) return
+
+    const modes = ['absolute', 'relative-spy']
+    const currentIndex = modes.indexOf(chart.volumeColorMode)
+    const nextMode = modes[(currentIndex + 1) % modes.length]
+
+    // If switching to relative-spy mode and we don't have SPY data, fetch it
+    if (nextMode === 'relative-spy' && !chart.spyData) {
+      try {
+        // Check cache first
+        let spyData = apiCache.get('SPY', days)
+
+        if (!spyData) {
+          console.log(`[Cache] ❌ Cache MISS for SPY:${days}, fetching from server...`)
+          const response = await axios.get(`${API_URL}/analyze`, {
+            params: {
+              symbol: 'SPY',
+              days: days
+            }
+          })
+          spyData = response.data
+          apiCache.set('SPY', days, spyData)
+        } else {
+          console.log(`[Cache] ✅ Cache HIT for SPY:${days}`)
+        }
+
+        setCharts(prevCharts =>
+          prevCharts.map(c => {
+            if (c.id === chartId) {
+              return {
+                ...c,
+                volumeColorMode: nextMode,
+                spyData: spyData
+              }
+            }
+            return c
+          })
+        )
+      } catch (err) {
+        console.error('Failed to fetch SPY data:', err)
+        setError('Failed to fetch SPY data for volume comparison')
+      }
+    } else {
+      setCharts(prevCharts =>
+        prevCharts.map(c => {
+          if (c.id === chartId) {
+            return {
+              ...c,
+              volumeColorMode: nextMode
+            }
+          }
+          return c
+        })
+      )
+    }
+  }
+
   const toggleChartCollapse = (chartId) => {
     setCharts(prevCharts =>
       prevCharts.map(chart => {
@@ -333,6 +394,28 @@ function StockAnalyzer() {
 
     // Update all charts with the new time range
     try {
+      // Check if any chart needs SPY data
+      const needsSpy = charts.some(chart => chart.volumeColorMode === 'relative-spy')
+      let spyDataForPeriod = null
+
+      if (needsSpy) {
+        // Fetch SPY data once for all charts that need it
+        spyDataForPeriod = apiCache.get('SPY', newDays)
+        if (!spyDataForPeriod) {
+          console.log(`[Cache] ❌ Cache MISS for SPY:${newDays}, fetching from server...`)
+          const response = await axios.get(`${API_URL}/analyze`, {
+            params: {
+              symbol: 'SPY',
+              days: newDays
+            }
+          })
+          spyDataForPeriod = response.data
+          apiCache.set('SPY', newDays, spyDataForPeriod)
+        } else {
+          console.log(`[Cache] ✅ Cache HIT for SPY:${newDays}`)
+        }
+      }
+
       const updatePromises = charts.map(async (chart) => {
         // Try to get from cache first
         let data = apiCache.get(chart.symbol, newDays)
@@ -364,7 +447,14 @@ function StockAnalyzer() {
       setCharts(prevCharts =>
         prevCharts.map(chart => {
           const updatedData = results.find(r => r.id === chart.id)
-          return updatedData ? { ...chart, data: updatedData.data } : chart
+          const updates = { data: updatedData.data }
+
+          // Update SPY data if chart is in relative-spy mode
+          if (chart.volumeColorMode === 'relative-spy' && spyDataForPeriod) {
+            updates.spyData = spyDataForPeriod
+          }
+
+          return updatedData ? { ...chart, ...updates } : chart
         })
       )
     } catch (err) {
@@ -569,18 +659,30 @@ function StockAnalyzer() {
                 <div className="flex items-center justify-between mb-4 pr-24">
                   <h3 className="text-lg font-semibold text-slate-100">{chart.symbol}</h3>
                   {!chart.collapsed && <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => toggleVolumeColor(chart.id)}
-                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
-                        chart.volumeColorEnabled
-                          ? 'bg-orange-600 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                      title="Highlight high volume (top 20%) and low volume (bottom 20%)"
-                    >
-                      Volume Color
-                    </button>
+                    <div className="flex gap-1 items-center">
+                      <button
+                        type="button"
+                        onClick={() => toggleVolumeColor(chart.id)}
+                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
+                          chart.volumeColorEnabled
+                            ? 'bg-orange-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                        title="Highlight high volume (top 20%) and low volume (bottom 20%)"
+                      >
+                        Volume Color
+                      </button>
+                      {chart.volumeColorEnabled && (
+                        <button
+                          type="button"
+                          onClick={() => cycleVolumeColorMode(chart.id)}
+                          className="px-2 py-1 text-xs rounded font-medium bg-slate-600 text-slate-200 hover:bg-slate-500 transition-colors"
+                          title="Click to cycle: Absolute Volume → Volume vs SPY"
+                        >
+                          {chart.volumeColorMode === 'absolute' ? 'ABS' : 'vs SPY'}
+                        </button>
+                      )}
+                    </div>
                     <button
                       type="button"
                       onClick={() => openSlopeChannelDialog(chart.id)}
@@ -658,6 +760,8 @@ function StockAnalyzer() {
                   onToggleSma={(period) => toggleSmaVisibility(chart.id, period)}
                   onDeleteSma={(period) => deleteSma(chart.id, period)}
                   volumeColorEnabled={chart.volumeColorEnabled}
+                  volumeColorMode={chart.volumeColorMode}
+                  spyData={chart.spyData}
                   slopeChannelEnabled={chart.slopeChannelEnabled}
                   slopeChannelVolumeWeighted={chart.slopeChannelVolumeWeighted}
                   slopeChannelZones={chart.slopeChannelZones}
