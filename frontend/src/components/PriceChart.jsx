@@ -1172,98 +1172,176 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return turningPoints
   }
 
-  // Extend the most recent manual channel with larger stdev to cover all points
+  // Extend the most recent manual channel point-by-point while maintaining original slope
   const extendManualChannel = () => {
     if (manualChannels.length === 0) return
 
     const lastChannelIndex = manualChannels.length - 1
     const manualChannel = manualChannels[lastChannelIndex]
 
-    const { slope, stdDev } = manualChannel
+    // Keep original slope and stddev - these define the trend
+    const { slope, stdDev, optimalStdevMult, channelWidth } = manualChannel
     let { startIndex, endIndex, intercept } = manualChannel
 
-    // Step 1: Extend forward to end of data
-    endIndex = displayPrices.length - 1
+    const trendBreakThreshold = 0.1 // If >10% of new points are outside, break
 
-    // Step 2: Extend backward to beginning
-    const originalStartIndex = startIndex
-    startIndex = 0
+    // Step 1: Extend forward (from endIndex to end of data) point by point
+    let forwardExtended = false
+    const maxEndIndex = displayPrices.length - 1
 
-    // Adjust intercept for the new startIndex
-    intercept = intercept - slope * (originalStartIndex - startIndex)
+    while (endIndex < maxEndIndex) {
+      // Try extending by one more point
+      const testEndIndex = endIndex + 1
+      const currentRange = endIndex - startIndex + 1
 
-    // Step 3: Calculate residuals for all points in the extended range
+      // Get the newly added section (approximately last 10% of current range)
+      const checkWindowSize = Math.max(1, Math.floor(currentRange * 0.1))
+      const checkStartIdx = Math.max(startIndex, testEndIndex - checkWindowSize + 1)
+      const newPointsToCheck = displayPrices.slice(checkStartIdx, testEndIndex + 1)
+
+      // Check how many of the recent points fall outside the channel
+      let outsideCount = 0
+      for (let i = 0; i < newPointsToCheck.length; i++) {
+        const globalIndex = checkStartIdx + i
+        const localIndex = globalIndex - startIndex
+        const predictedY = slope * localIndex + intercept
+        const upperBound = predictedY + channelWidth
+        const lowerBound = predictedY - channelWidth
+        const actualY = newPointsToCheck[i].close
+
+        if (actualY > upperBound || actualY < lowerBound) {
+          outsideCount++
+        }
+      }
+
+      const outsidePercent = outsideCount / newPointsToCheck.length
+
+      if (outsidePercent > trendBreakThreshold) {
+        // Trend broke, stop extending forward
+        break
+      }
+
+      // Continue extending
+      endIndex = testEndIndex
+      forwardExtended = true
+    }
+
+    // Step 2: Extend backward (from startIndex to beginning) point by point
+    let backwardExtended = false
+    const minStartIndex = 0
+
+    // Save original intercept before adjusting
+    const originalStartIndex = manualChannel.startIndex
+    const originalIntercept = manualChannel.intercept
+
+    while (startIndex > minStartIndex) {
+      // Try extending by one more point backward
+      const testStartIndex = startIndex - 1
+      const currentRange = endIndex - startIndex + 1
+
+      // Get the newly added section (approximately first 10% of current range)
+      const checkWindowSize = Math.max(1, Math.floor(currentRange * 0.1))
+      const checkEndIdx = Math.min(endIndex, testStartIndex + checkWindowSize - 1)
+      const newPointsToCheck = displayPrices.slice(testStartIndex, checkEndIdx + 1)
+
+      // Adjust intercept for the new start position
+      const newIntercept = originalIntercept - slope * (originalStartIndex - testStartIndex)
+
+      // Check how many of the recent points fall outside the channel
+      let outsideCount = 0
+      for (let i = 0; i < newPointsToCheck.length; i++) {
+        const globalIndex = testStartIndex + i
+        const localIndex = globalIndex - testStartIndex
+        const predictedY = slope * localIndex + newIntercept
+        const upperBound = predictedY + channelWidth
+        const lowerBound = predictedY - channelWidth
+        const actualY = newPointsToCheck[i].close
+
+        if (actualY > upperBound || actualY < lowerBound) {
+          outsideCount++
+        }
+      }
+
+      const outsidePercent = outsideCount / newPointsToCheck.length
+
+      if (outsidePercent > trendBreakThreshold) {
+        // Trend broke, stop extending backward
+        break
+      }
+
+      // Continue extending
+      startIndex = testStartIndex
+      intercept = newIntercept
+      backwardExtended = true
+    }
+
+    // Step 3: Recalculate statistics for the extended channel
     const extendedSegment = displayPrices.slice(startIndex, endIndex + 1)
+
+    // Find turning points and ensure at least one touches
+    const turningPoints = findTurningPoints(displayPrices, startIndex, endIndex)
+
+    // Calculate what stdev multiplier would cover all points
     const residuals = extendedSegment.map((point, index) => {
       const predictedY = slope * index + intercept
       return point.close - predictedY
     })
-
-    // Find the maximum absolute residual (this gives us the minimum stdev multiplier needed)
     const maxAbsResidual = Math.max(...residuals.map(r => Math.abs(r)))
-    const minStdevMult = maxAbsResidual / stdDev
+    const minStdevMultForAll = maxAbsResidual / stdDev
 
-    // Step 4: Find turning points in the extended range
-    const turningPoints = findTurningPoints(displayPrices, startIndex, endIndex)
-
-    // Step 5: Check if any turning point touches the bounds
-    const touchTolerance = 0.02 // 2% tolerance for touching
-    let optimalStdevMult = minStdevMult
+    // Check if any turning point touches with current multiplier
+    let finalStdevMult = optimalStdevMult
     let hasTurningPointTouch = false
 
-    // Check with minimum multiplier
     for (const tp of turningPoints) {
       const localIndex = tp.index - startIndex
       const predictedY = slope * localIndex + intercept
-      const upperBound = predictedY + stdDev * minStdevMult
-      const lowerBound = predictedY - stdDev * minStdevMult
+      const testChannelWidth = stdDev * finalStdevMult
+      const upperBound = predictedY + testChannelWidth
+      const lowerBound = predictedY - testChannelWidth
       const actualY = tp.value
-      const channelRange = upperBound - lowerBound
+      const touchTolerance = 0.02
 
-      const distToUpper = Math.abs(actualY - upperBound)
-      const distToLower = Math.abs(actualY - lowerBound)
+      const distToUpper = Math.abs(actualY - upperBound) / (upperBound - lowerBound)
+      const distToLower = Math.abs(actualY - lowerBound) / (upperBound - lowerBound)
 
-      if (tp.type === 'max' && distToUpper <= channelRange * touchTolerance) {
-        hasTurningPointTouch = true
-        break
-      }
-      if (tp.type === 'min' && distToLower <= channelRange * touchTolerance) {
+      if ((tp.type === 'max' && distToUpper <= touchTolerance) ||
+          (tp.type === 'min' && distToLower <= touchTolerance)) {
         hasTurningPointTouch = true
         break
       }
     }
 
-    // If no turning point touches, slightly increase multiplier
+    // If no turning point touches, adjust to make closest one touch
     if (!hasTurningPointTouch && turningPoints.length > 0) {
-      // Find the turning point closest to a bound and adjust multiplier to make it touch
-      let minDistanceRatio = Infinity
-      let targetMult = minStdevMult
+      let closestTp = null
+      let minAdjustment = Infinity
 
       for (const tp of turningPoints) {
         const localIndex = tp.index - startIndex
         const predictedY = slope * localIndex + intercept
         const actualY = tp.value
-        const residual = actualY - predictedY
+        const residual = Math.abs(actualY - predictedY)
+        const requiredMult = residual / stdDev
+        const adjustment = Math.abs(requiredMult - finalStdevMult)
 
-        // Calculate what multiplier would make this point touch
-        const requiredMult = Math.abs(residual) / stdDev
-        const distanceRatio = Math.abs(requiredMult - minStdevMult) / minStdevMult
-
-        if (distanceRatio < minDistanceRatio) {
-          minDistanceRatio = distanceRatio
-          targetMult = Math.max(requiredMult, minStdevMult)
+        if (adjustment < minAdjustment) {
+          minAdjustment = adjustment
+          closestTp = { ...tp, requiredMult }
         }
       }
 
-      optimalStdevMult = targetMult
+      if (closestTp) {
+        finalStdevMult = Math.max(closestTp.requiredMult, finalStdevMult, minStdevMultForAll)
+      }
     }
 
-    // Ensure minimum multiplier of 1.0
-    optimalStdevMult = Math.max(1.0, optimalStdevMult)
+    // Ensure we cover all points
+    finalStdevMult = Math.max(finalStdevMult, minStdevMultForAll)
 
-    const channelWidth = stdDev * optimalStdevMult
+    const finalChannelWidth = stdDev * finalStdevMult
 
-    // Recalculate statistics for the extended channel
+    // Calculate statistics
     let touchCount = 0
     let totalSS = 0
     let residualSS = 0
@@ -1271,12 +1349,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     extendedSegment.forEach((point, index) => {
       const predictedY = slope * index + intercept
-      const upperBound = predictedY + channelWidth
-      const lowerBound = predictedY - channelWidth
+      const upperBound = predictedY + finalChannelWidth
+      const lowerBound = predictedY - finalChannelWidth
 
       const distanceToUpper = Math.abs(point.close - upperBound)
       const distanceToLower = Math.abs(point.close - lowerBound)
-      const boundRange = channelWidth * 2
+      const boundRange = finalChannelWidth * 2
       const touchToleranceCalc = 0.05
 
       if (distanceToUpper <= boundRange * touchToleranceCalc) {
@@ -1292,23 +1370,25 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     const rSquared = totalSS > 0 ? 1 - (residualSS / totalSS) : 0
 
-    // Update the manual channel with extended range and new stdev multiplier
-    const updatedChannel = {
-      startIndex,
-      endIndex,
-      slope,
-      intercept,
-      channelWidth,
-      stdDev,
-      optimalStdevMult,
-      touchCount,
-      rSquared
+    // Update the manual channel with extended range
+    if (forwardExtended || backwardExtended) {
+      const updatedChannel = {
+        startIndex,
+        endIndex,
+        slope,
+        intercept,
+        channelWidth: finalChannelWidth,
+        stdDev,
+        optimalStdevMult: finalStdevMult,
+        touchCount,
+        rSquared
+      }
+      setManualChannels(prevChannels => {
+        const newChannels = [...prevChannels]
+        newChannels[lastChannelIndex] = updatedChannel
+        return newChannels
+      })
     }
-    setManualChannels(prevChannels => {
-      const newChannels = [...prevChannels]
-      newChannels[lastChannelIndex] = updatedChannel
-      return newChannels
-    })
   }
 
   // Pre-calculate which dates represent month/year transitions
