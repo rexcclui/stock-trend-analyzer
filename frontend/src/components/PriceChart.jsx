@@ -894,8 +894,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     if (priceRange === 0) return null
 
-    // Create 10 equal-height zones based on price range
-    const numZones = 10
+    // Create 15 equal-height zones based on price range
+    const numZones = 15
     const zoneHeight = priceRange / numZones
     const volumeZones = []
 
