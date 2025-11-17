@@ -1851,6 +1851,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return `hsl(${hue}, ${saturation}%, ${lightness}%)`
     }
 
+    // Color the volume percentage text based on depth of value
+    // Low volume (0%) = light blue/cyan, High volume (100%) = dark red/orange
+    const getVolumeTextColor = (volumeWeight) => {
+      // Convert volume weight (0-1) to a color gradient
+      // 0% = cyan (180 hue), 100% = red (0 hue)
+      const hue = 180 - (volumeWeight * 180) // 180 to 0 (cyan to red)
+      const saturation = 70 + (volumeWeight * 30) // 70% to 100%
+      const lightness = 65 - (volumeWeight * 40) // 65% to 25% (lighter to darker)
+
+      return `hsl(${hue}, ${saturation}%, ${lightness}%)`
+    }
+
     return (
       <g>
         {zoneColors.map((zone, zoneIndex) => {
@@ -1895,7 +1907,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               <text
                 x={lastPoint.x + 5}
                 y={lastPoint.y}
-                fill={color}
+                fill={getVolumeTextColor(zone.volumeWeight)}
                 fontSize="11"
                 fontWeight="600"
                 textAnchor="start"
@@ -1919,6 +1931,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const yAxis = yAxisMap?.[0]
 
     if (!xAxis || !yAxis) return null
+
+    // Color the volume percentage text based on depth of value
+    const getVolumeTextColor = (volumeWeight) => {
+      const hue = 180 - (volumeWeight * 180) // 180 to 0 (cyan to red)
+      const saturation = 70 + (volumeWeight * 30) // 70% to 100%
+      const lightness = 65 - (volumeWeight * 40) // 65% to 25%
+      return `hsl(${hue}, ${saturation}%, ${lightness}%)`
+    }
 
     // Define color palette for channels (same as channel lines)
     const channelColors = [
@@ -2001,7 +2021,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 <text
                   x={lastPoint.x + 5}
                   y={lastPoint.y}
-                  fill={color}
+                  fill={getVolumeTextColor(zone.volumeWeight)}
                   fontSize="11"
                   fontWeight="600"
                   textAnchor="start"
@@ -2027,6 +2047,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const yAxis = yAxisMap?.[0]
 
     if (!xAxis || !yAxis) return null
+
+    // Color the volume percentage text based on depth of value
+    const getVolumeTextColor = (volumeWeight) => {
+      const hue = 180 - (volumeWeight * 180) // 180 to 0 (cyan to red)
+      const saturation = 70 + (volumeWeight * 30) // 70% to 100%
+      const lightness = 65 - (volumeWeight * 40) // 65% to 25%
+      return `hsl(${hue}, ${saturation}%, ${lightness}%)`
+    }
 
     // Color palette for manual channels (various green shades)
     const channelColors = [
@@ -2096,7 +2124,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 <text
                   x={lastPoint.x + 5}
                   y={lastPoint.y}
-                  fill={color}
+                  fill={getVolumeTextColor(zone.volumeWeight)}
                   fontSize="11"
                   fontWeight="600"
                   textAnchor="start"
