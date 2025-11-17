@@ -58,23 +58,27 @@ function StockAnalyzer() {
     try {
       const upperSymbol = targetSymbol.toUpperCase()
 
+      // Fetch 2x the requested days to allow panning backwards in time
+      const requestedDays = parseInt(days)
+      const fetchDays = Math.min(requestedDays * 2, 3650) // Fetch 2x but cap at max
+
       // Try to get from cache first
-      let data = apiCache.get(upperSymbol, days)
+      let data = apiCache.get(upperSymbol, fetchDays.toString())
 
       if (data) {
-        console.log(`[Cache] ✅ Cache HIT for ${upperSymbol}:${days}`)
+        console.log(`[Cache] ✅ Cache HIT for ${upperSymbol}:${fetchDays}`)
       } else {
-        console.log(`[Cache] ❌ Cache MISS for ${upperSymbol}:${days}, fetching from server...`)
+        console.log(`[Cache] ❌ Cache MISS for ${upperSymbol}:${fetchDays}, fetching from server...`)
         const response = await axios.get(`${API_URL}/analyze`, {
           params: {
             symbol: upperSymbol,
-            days: days
+            days: fetchDays
           }
         })
         data = response.data
 
         // Store in cache
-        apiCache.set(upperSymbol, days, data)
+        apiCache.set(upperSymbol, fetchDays.toString(), data)
       }
 
       // Log cache statistics
@@ -82,6 +86,11 @@ function StockAnalyzer() {
 
       // Save to history
       saveToHistory(upperSymbol)
+
+      // Calculate initial zoom range to show only the requested period
+      const totalDataPoints = data.prices?.length || 0
+      const displayDataPoints = Math.min(requestedDays, totalDataPoints)
+      const zoomStart = Math.max(0, totalDataPoints - displayDataPoints)
 
       // Add new chart to the array
       const newChart = {
@@ -108,6 +117,9 @@ function StockAnalyzer() {
         collapsed: false
       }
       setCharts(prevCharts => [...prevCharts, newChart])
+
+      // Set initial zoom to show only the requested period (leaving older data for panning)
+      setGlobalZoomRange({ start: zoomStart, end: null })
 
       // Clear input if not clicked from history
       if (!symbolToAnalyze) {
@@ -322,21 +334,25 @@ function StockAnalyzer() {
     // If switching to relative-spy mode and we don't have SPY data, fetch it
     if (nextMode === 'relative-spy' && !chart.spyData) {
       try {
+        // Fetch 2x the requested days to match main chart data
+        const requestedDays = parseInt(days)
+        const fetchDays = Math.min(requestedDays * 2, 3650)
+
         // Check cache first
-        let spyData = apiCache.get('SPY', days)
+        let spyData = apiCache.get('SPY', fetchDays.toString())
 
         if (!spyData) {
-          console.log(`[Cache] ❌ Cache MISS for SPY:${days}, fetching from server...`)
+          console.log(`[Cache] ❌ Cache MISS for SPY:${fetchDays}, fetching from server...`)
           const response = await axios.get(`${API_URL}/analyze`, {
             params: {
               symbol: 'SPY',
-              days: days
+              days: fetchDays
             }
           })
           spyData = response.data
-          apiCache.set('SPY', days, spyData)
+          apiCache.set('SPY', fetchDays.toString(), spyData)
         } else {
-          console.log(`[Cache] ✅ Cache HIT for SPY:${days}`)
+          console.log(`[Cache] ✅ Cache HIT for SPY:${fetchDays}`)
         }
 
         setCharts(prevCharts =>
@@ -404,21 +420,25 @@ function StockAnalyzer() {
     if (!benchmarkSymbol || benchmarkSymbol.trim() === '') return
 
     try {
+      // Fetch 2x the requested days to match main chart data
+      const requestedDays = parseInt(days)
+      const fetchDays = Math.min(requestedDays * 2, 3650)
+
       // Check cache first
-      let benchmarkData = apiCache.get(benchmarkSymbol, days)
+      let benchmarkData = apiCache.get(benchmarkSymbol, fetchDays.toString())
 
       if (!benchmarkData) {
-        console.log(`[Cache] ❌ Cache MISS for ${benchmarkSymbol}:${days}, fetching from server...`)
+        console.log(`[Cache] ❌ Cache MISS for ${benchmarkSymbol}:${fetchDays}, fetching from server...`)
         const response = await axios.get(`${API_URL}/analyze`, {
           params: {
             symbol: benchmarkSymbol,
-            days: days
+            days: fetchDays
           }
         })
         benchmarkData = response.data
-        apiCache.set(benchmarkSymbol, days, benchmarkData)
+        apiCache.set(benchmarkSymbol, fetchDays.toString(), benchmarkData)
       } else {
-        console.log(`[Cache] ✅ Cache HIT for ${benchmarkSymbol}:${days}`)
+        console.log(`[Cache] ✅ Cache HIT for ${benchmarkSymbol}:${fetchDays}`)
       }
 
       setCharts(prevCharts =>
@@ -461,7 +481,10 @@ function StockAnalyzer() {
   const changeTimeRange = async (newDays) => {
     setDays(newDays)
     setError(null)
-    setGlobalZoomRange({ start: 0, end: null }) // Reset global zoom when changing periods
+
+    // Fetch 2x the requested days to allow panning backwards in time
+    const requestedDays = parseInt(newDays)
+    const fetchDays = Math.min(requestedDays * 2, 3650) // Fetch 2x but cap at max
 
     // Update all charts with the new time range
     try {
@@ -471,40 +494,40 @@ function StockAnalyzer() {
 
       if (needsSpy) {
         // Fetch SPY data once for all charts that need it
-        spyDataForPeriod = apiCache.get('SPY', newDays)
+        spyDataForPeriod = apiCache.get('SPY', fetchDays.toString())
         if (!spyDataForPeriod) {
-          console.log(`[Cache] ❌ Cache MISS for SPY:${newDays}, fetching from server...`)
+          console.log(`[Cache] ❌ Cache MISS for SPY:${fetchDays}, fetching from server...`)
           const response = await axios.get(`${API_URL}/analyze`, {
             params: {
               symbol: 'SPY',
-              days: newDays
+              days: fetchDays
             }
           })
           spyDataForPeriod = response.data
-          apiCache.set('SPY', newDays, spyDataForPeriod)
+          apiCache.set('SPY', fetchDays.toString(), spyDataForPeriod)
         } else {
-          console.log(`[Cache] ✅ Cache HIT for SPY:${newDays}`)
+          console.log(`[Cache] ✅ Cache HIT for SPY:${fetchDays}`)
         }
       }
 
       const updatePromises = charts.map(async (chart) => {
         // Try to get from cache first
-        let data = apiCache.get(chart.symbol, newDays)
+        let data = apiCache.get(chart.symbol, fetchDays.toString())
 
         if (data) {
-          console.log(`[Cache] ✅ Cache HIT for ${chart.symbol}:${newDays}`)
+          console.log(`[Cache] ✅ Cache HIT for ${chart.symbol}:${fetchDays}`)
         } else {
-          console.log(`[Cache] ❌ Cache MISS for ${chart.symbol}:${newDays}, fetching from server...`)
+          console.log(`[Cache] ❌ Cache MISS for ${chart.symbol}:${fetchDays}, fetching from server...`)
           const response = await axios.get(`${API_URL}/analyze`, {
             params: {
               symbol: chart.symbol,
-              days: newDays
+              days: fetchDays
             }
           })
           data = response.data
 
           // Store in cache
-          apiCache.set(chart.symbol, newDays, data)
+          apiCache.set(chart.symbol, fetchDays.toString(), data)
         }
 
         return { id: chart.id, data }
@@ -514,6 +537,17 @@ function StockAnalyzer() {
 
       // Log cache statistics
       apiCache.logStats()
+
+      // Calculate initial zoom range to show only the requested period
+      const firstResult = results[0]
+      if (firstResult?.data) {
+        const totalDataPoints = firstResult.data.prices?.length || 0
+        const displayDataPoints = Math.min(requestedDays, totalDataPoints)
+        const zoomStart = Math.max(0, totalDataPoints - displayDataPoints)
+        setGlobalZoomRange({ start: zoomStart, end: null })
+      } else {
+        setGlobalZoomRange({ start: 0, end: null })
+      }
 
       setCharts(prevCharts =>
         prevCharts.map(chart => {
