@@ -2271,10 +2271,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 const yBottom = yAxis.scale(zone.minPrice)
                 const baseHeight = Math.abs(yBottom - yTop)
 
-                // Double the height of each bar
-                const height = baseHeight * 2
-                // Adjust y position to center the doubled bar on the zone
-                const adjustedY = yTop - baseHeight / 2
+                // Halve the height of each bar
+                const height = baseHeight * 0.5
+                // Adjust y position to center the halved bar on the zone
+                const adjustedY = yTop + baseHeight / 4
 
                 // Calculate color depth based on volume weight
                 // Higher volume = deeper/darker color
