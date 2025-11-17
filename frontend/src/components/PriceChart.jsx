@@ -878,7 +878,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   const { thresholds80: rollingThresholds80, thresholds20: rollingThresholds20 } = calculateRollingThresholds()
 
-  // Calculate volume profile - find price ranges where each contains 10% of total volume
+  // Calculate volume profile - create even-height zones with volume weight
   const calculateVolumeProfile = () => {
     if (!volumeProfileEnabled || displayPrices.length === 0) return null
 
@@ -886,54 +886,49 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const totalVolume = displayPrices.reduce((sum, price) => sum + (price.volume || 0), 0)
     if (totalVolume === 0) return null
 
-    // Create array of {price, volume} sorted by price
-    const priceVolumeData = displayPrices
-      .map(p => ({ price: p.close, volume: p.volume || 0 }))
-      .sort((a, b) => a.price - b.price)
+    // Find min and max price
+    const prices = displayPrices.map(p => p.close)
+    const minPrice = Math.min(...prices)
+    const maxPrice = Math.max(...prices)
+    const priceRange = maxPrice - minPrice
 
-    // Find price ranges for each 10% volume bucket
+    if (priceRange === 0) return null
+
+    // Create 10 equal-height zones based on price range
+    const numZones = 10
+    const zoneHeight = priceRange / numZones
     const volumeZones = []
-    const targetVolumePerZone = totalVolume * 0.1 // 10% of total volume
 
-    let currentZoneVolume = 0
-    let currentZoneMinPrice = priceVolumeData[0].price
-    let currentZoneMaxPrice = priceVolumeData[0].price
-
-    for (let i = 0; i < priceVolumeData.length; i++) {
-      const item = priceVolumeData[i]
-      currentZoneVolume += item.volume
-      currentZoneMaxPrice = item.price
-
-      // When we reach 10% of volume, create a zone
-      if (currentZoneVolume >= targetVolumePerZone) {
-        volumeZones.push({
-          minPrice: currentZoneMinPrice,
-          maxPrice: currentZoneMaxPrice,
-          volume: currentZoneVolume,
-          volumePercent: (currentZoneVolume / totalVolume) * 100
-        })
-
-        // Start next zone
-        currentZoneVolume = 0
-        if (i + 1 < priceVolumeData.length) {
-          currentZoneMinPrice = priceVolumeData[i + 1].price
-          currentZoneMaxPrice = priceVolumeData[i + 1].price
-        }
-      }
-    }
-
-    // Add any remaining volume as the last zone
-    if (currentZoneVolume > 0) {
+    // Initialize zones
+    for (let i = 0; i < numZones; i++) {
       volumeZones.push({
-        minPrice: currentZoneMinPrice,
-        maxPrice: currentZoneMaxPrice,
-        volume: currentZoneVolume,
-        volumePercent: (currentZoneVolume / totalVolume) * 100
+        minPrice: minPrice + (i * zoneHeight),
+        maxPrice: minPrice + ((i + 1) * zoneHeight),
+        volume: 0,
+        volumePercent: 0
       })
     }
 
-    // Calculate max volume for normalization (for bar width)
-    const maxZoneVolume = Math.max(...volumeZones.map(z => z.volume))
+    // Accumulate volume for each zone
+    displayPrices.forEach(price => {
+      const priceValue = price.close
+      const volume = price.volume || 0
+
+      // Find which zone this price falls into
+      let zoneIndex = Math.floor((priceValue - minPrice) / zoneHeight)
+      // Handle edge case where price equals maxPrice
+      if (zoneIndex >= numZones) zoneIndex = numZones - 1
+      if (zoneIndex < 0) zoneIndex = 0
+
+      volumeZones[zoneIndex].volume += volume
+    })
+
+    // Calculate percentages and find max volume
+    let maxZoneVolume = 0
+    volumeZones.forEach(zone => {
+      zone.volumePercent = (zone.volume / totalVolume) * 100
+      if (zone.volume > maxZoneVolume) maxZoneVolume = zone.volume
+    })
 
     return { zones: volumeZones, maxVolume: maxZoneVolume, totalVolume }
   }
@@ -2185,51 +2180,58 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     if (!xAxis || !yAxis) return null
 
-    // Get the right edge of the chart for positioning
-    const rightX = offset.left + offset.width
-    const maxBarWidth = 80 // Maximum width in pixels for the bars
+    // Get chart dimensions
+    const chartX = offset.left
+    const chartWidth = offset.width
 
     return (
       <g>
         {volumeProfile.zones.map((zone, i) => {
-          // Calculate y positions based on price range
+          // Calculate y positions based on price range (even heights)
           const yTop = yAxis.scale(zone.maxPrice)
           const yBottom = yAxis.scale(zone.minPrice)
           const height = Math.abs(yBottom - yTop)
 
-          // Calculate bar width based on volume percentage
-          // Each zone should be roughly 10%, so normalize based on that
-          const barWidth = (zone.volumePercent / 10) * maxBarWidth
+          // Calculate color depth based on volume weight
+          // Higher volume = deeper/darker color
+          const volumeWeight = zone.volume / volumeProfile.maxVolume // 0 to 1
 
-          // Alternate colors for better visibility
-          const hue = 60 // Yellow/gold hue
-          const opacity = 0.4
-          const lightness = 50 + (i % 2) * 10 // Alternate between lighter and darker
+          // Use yellow/gold hue with varying lightness
+          const hue = 45 // Yellow/gold
+          const saturation = 80
+          // Map volume weight to lightness: high volume = darker (30%), low volume = lighter (75%)
+          const lightness = 75 - (volumeWeight * 45) // Range from 75% (light) to 30% (dark)
+
+          // Opacity based on volume weight too
+          const opacity = 0.3 + (volumeWeight * 0.5) // Range from 0.3 to 0.8
 
           return (
             <g key={`volume-profile-${i}`}>
-              {/* Horizontal bar */}
+              {/* Full-width horizontal bar */}
               <rect
-                x={rightX - barWidth}
+                x={chartX}
                 y={yTop}
-                width={barWidth}
+                width={chartWidth}
                 height={height}
-                fill={`hsl(${hue}, 70%, ${lightness}%)`}
-                stroke="rgba(202, 138, 4, 0.6)"
+                fill={`hsl(${hue}, ${saturation}%, ${lightness}%)`}
+                stroke="rgba(202, 138, 4, 0.4)"
                 strokeWidth={0.5}
                 opacity={opacity}
               />
 
-              {/* Volume percentage label */}
+              {/* Volume percentage label in the center */}
               <text
-                x={rightX - barWidth - 3}
+                x={chartX + chartWidth / 2}
                 y={yTop + height / 2}
-                fill="#eab308"
-                fontSize="10"
-                fontWeight="600"
-                textAnchor="end"
+                fill="#ffffff"
+                fontSize="11"
+                fontWeight="700"
+                textAnchor="middle"
                 dominantBaseline="middle"
-                opacity={0.9}
+                opacity={0.95}
+                style={{
+                  textShadow: '0 0 3px rgba(0,0,0,0.8), 0 0 5px rgba(0,0,0,0.5)'
+                }}
               >
                 {zone.volumePercent.toFixed(1)}%
               </text>
