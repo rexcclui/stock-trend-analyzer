@@ -1192,29 +1192,26 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     while (endIndex < maxEndIndex) {
       // Try extending by one more point
       const testEndIndex = endIndex + 1
-      const currentRange = endIndex - startIndex + 1
 
-      // Get the newly added section (approximately last 10% of current range)
-      const checkWindowSize = Math.max(1, Math.floor(currentRange * 0.1))
-      const checkStartIdx = Math.max(startIndex, testEndIndex - checkWindowSize + 1)
-      const newPointsToCheck = displayPrices.slice(checkStartIdx, testEndIndex + 1)
+      // Check the ENTIRE extended range (from startIndex to testEndIndex)
+      const allPointsToCheck = displayPrices.slice(startIndex, testEndIndex + 1)
 
-      // Check how many of the recent points fall outside the channel
+      // Check how many of ALL points fall outside the channel
       let outsideCount = 0
-      for (let i = 0; i < newPointsToCheck.length; i++) {
-        const globalIndex = checkStartIdx + i
+      for (let i = 0; i < allPointsToCheck.length; i++) {
+        const globalIndex = startIndex + i
         const localIndex = globalIndex - startIndex
         const predictedY = slope * localIndex + intercept
         const upperBound = predictedY + channelWidth
         const lowerBound = predictedY - channelWidth
-        const actualY = newPointsToCheck[i].close
+        const actualY = allPointsToCheck[i].close
 
         if (actualY > upperBound || actualY < lowerBound) {
           outsideCount++
         }
       }
 
-      const outsidePercent = outsideCount / newPointsToCheck.length
+      const outsidePercent = outsideCount / allPointsToCheck.length
 
       if (outsidePercent > trendBreakThreshold) {
         // Trend broke, stop extending forward
@@ -1237,32 +1234,29 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     while (startIndex > minStartIndex) {
       // Try extending by one more point backward
       const testStartIndex = startIndex - 1
-      const currentRange = endIndex - startIndex + 1
-
-      // Get the newly added section (approximately first 10% of current range)
-      const checkWindowSize = Math.max(1, Math.floor(currentRange * 0.1))
-      const checkEndIdx = Math.min(endIndex, testStartIndex + checkWindowSize - 1)
-      const newPointsToCheck = displayPrices.slice(testStartIndex, checkEndIdx + 1)
 
       // Adjust intercept for the new start position
       const newIntercept = originalIntercept - slope * (originalStartIndex - testStartIndex)
 
-      // Check how many of the recent points fall outside the channel
+      // Check the ENTIRE extended range (from testStartIndex to endIndex)
+      const allPointsToCheck = displayPrices.slice(testStartIndex, endIndex + 1)
+
+      // Check how many of ALL points fall outside the channel
       let outsideCount = 0
-      for (let i = 0; i < newPointsToCheck.length; i++) {
+      for (let i = 0; i < allPointsToCheck.length; i++) {
         const globalIndex = testStartIndex + i
         const localIndex = globalIndex - testStartIndex
         const predictedY = slope * localIndex + newIntercept
         const upperBound = predictedY + channelWidth
         const lowerBound = predictedY - channelWidth
-        const actualY = newPointsToCheck[i].close
+        const actualY = allPointsToCheck[i].close
 
         if (actualY > upperBound || actualY < lowerBound) {
           outsideCount++
         }
       }
 
-      const outsidePercent = outsideCount / newPointsToCheck.length
+      const outsidePercent = outsideCount / allPointsToCheck.length
 
       if (outsidePercent > trendBreakThreshold) {
         // Trend broke, stop extending backward
