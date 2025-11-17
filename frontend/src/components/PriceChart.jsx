@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
 import { X, ArrowLeftRight } from 'lucide-react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -802,6 +802,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // Calculate slope channel ONLY on the data that will be displayed
   // This prevents mismatch when period changes and indicators haven't updated yet
   const displayPrices = prices.slice(0, dataLength)
+
+  // Calculate volume threshold for top 20% (80th percentile)
+  const volumeThreshold80 = (() => {
+    if (!volumeColorEnabled) return null
+    const volumes = displayPrices.map(d => d.volume || 0).filter(v => v > 0).sort((a, b) => a - b)
+    if (volumes.length > 0) {
+      const percentileIndex = Math.floor(volumes.length * 0.8)
+      return volumes[percentileIndex]
+    }
+    return null
+  })()
+
   const slopeChannelInfo = slopeChannelEnabled ? calculateSlopeChannel(displayPrices, true, slopeChannelVolumeWeighted) : null
   const zoneColors = slopeChannelEnabled && slopeChannelInfo
     ? calculateZoneColors(displayPrices, slopeChannelInfo, slopeChannelZones)
@@ -819,9 +831,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   const chartData = displayPrices.map((price, index) => {
     const indicator = indicators[index] || {}
+    const isHighVolume = volumeColorEnabled && volumeThreshold80 && (price.volume || 0) >= volumeThreshold80
     const dataPoint = {
       date: price.date,
       close: price.close,
+      highVolumeClose: isHighVolume ? price.close : null, // Only set close value for high volume points
     }
 
     // Add SMA data for each period
@@ -2342,6 +2356,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             dot={false}
             name="Close Price"
           />
+          {volumeColorEnabled && (
+            <Line
+              type="monotone"
+              dataKey="highVolumeClose"
+              stroke="#ea580c"
+              strokeWidth={3}
+              dot={false}
+              name="High Volume (Top 20%)"
+              connectNulls={false}
+            />
+          )}
           {smaPeriods.map((period, index) => {
             const smaKey = `sma${period}`
             const isVisible = smaVisibility[period]
