@@ -24,6 +24,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const [manualChannels, setManualChannels] = useState([]) // Array to store multiple channels
   const chartRef = useRef(null)
 
+  // Chart panning state
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStartX, setDragStartX] = useState(null)
+  const [dragStartRange, setDragStartRange] = useState(null)
+
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
   // No need to reset here to avoid infinite loop
 
@@ -1162,6 +1167,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   const handleMouseLeave = () => {
     setSyncedMouseDate(null)
+    // Stop dragging when mouse leaves chart
+    if (isDragging) {
+      setIsDragging(false)
+      setDragStartX(null)
+      setDragStartRange(null)
+    }
   }
 
   const handleMouseDown = (e) => {
@@ -1178,6 +1189,55 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // Calculate manual channel for selected range
       fitManualChannel(selectionStart, selectionEnd)
       setIsSelecting(false)
+    }
+
+    // Stop dragging
+    if (isDragging) {
+      setIsDragging(false)
+      setDragStartX(null)
+      setDragStartRange(null)
+    }
+  }
+
+  // Handle panning with mouse drag (on the container div, not the chart)
+  const handleContainerMouseDown = (e) => {
+    // Only enable panning when NOT in manual channel mode
+    if (!manualChannelEnabled && onZoomChange) {
+      setIsDragging(true)
+      setDragStartX(e.clientX)
+      setDragStartRange({ ...zoomRange })
+    }
+  }
+
+  const handleContainerMouseMove = (e) => {
+    if (isDragging && dragStartX !== null && dragStartRange !== null && onZoomChange) {
+      const containerWidth = chartContainerRef.current?.offsetWidth || 1
+      const dragDistance = e.clientX - dragStartX
+
+      // Calculate how many data points to pan based on drag distance
+      // Negative dragDistance (left) = pan left (increase indices)
+      // Positive dragDistance (right) = pan right (decrease indices)
+      const visibleDataPoints = (dragStartRange.end === null ? chartData.length : dragStartRange.end) - dragStartRange.start
+      const panAmount = Math.round(-dragDistance / containerWidth * visibleDataPoints)
+
+      const newStart = Math.max(0, Math.min(chartData.length - visibleDataPoints, dragStartRange.start + panAmount))
+      const newEnd = newStart + visibleDataPoints
+
+      // Don't exceed data bounds
+      if (newEnd <= chartData.length) {
+        onZoomChange({
+          start: newStart,
+          end: newEnd === chartData.length ? null : newEnd
+        })
+      }
+    }
+  }
+
+  const handleContainerMouseUp = () => {
+    if (isDragging) {
+      setIsDragging(false)
+      setDragStartX(null)
+      setDragStartRange(null)
     }
   }
 
@@ -2142,7 +2202,19 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
   return (
-    <div ref={chartContainerRef} style={{ width: '100%', height: chartHeight, position: 'relative' }}>
+    <div
+      ref={chartContainerRef}
+      style={{
+        width: '100%',
+        height: chartHeight,
+        position: 'relative',
+        cursor: !manualChannelEnabled ? (isDragging ? 'grabbing' : 'grab') : 'crosshair'
+      }}
+      onMouseDown={handleContainerMouseDown}
+      onMouseMove={handleContainerMouseMove}
+      onMouseUp={handleContainerMouseUp}
+      onMouseLeave={handleContainerMouseUp}
+    >
       {/* Slope Channel Controls Panel */}
       {slopeChannelEnabled && slopeChannelInfo && onSlopeChannelParamsChange && controlsVisible && (
         <div
