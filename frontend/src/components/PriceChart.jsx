@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
 import { X, ArrowLeftRight } from 'lucide-react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -877,6 +877,68 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
   const { thresholds80: rollingThresholds80, thresholds20: rollingThresholds20 } = calculateRollingThresholds()
+
+  // Calculate volume profile - find price ranges where each contains 10% of total volume
+  const calculateVolumeProfile = () => {
+    if (!volumeProfileEnabled || displayPrices.length === 0) return null
+
+    // Calculate total volume
+    const totalVolume = displayPrices.reduce((sum, price) => sum + (price.volume || 0), 0)
+    if (totalVolume === 0) return null
+
+    // Create array of {price, volume} sorted by price
+    const priceVolumeData = displayPrices
+      .map(p => ({ price: p.close, volume: p.volume || 0 }))
+      .sort((a, b) => a.price - b.price)
+
+    // Find price ranges for each 10% volume bucket
+    const volumeZones = []
+    const targetVolumePerZone = totalVolume * 0.1 // 10% of total volume
+
+    let currentZoneVolume = 0
+    let currentZoneMinPrice = priceVolumeData[0].price
+    let currentZoneMaxPrice = priceVolumeData[0].price
+
+    for (let i = 0; i < priceVolumeData.length; i++) {
+      const item = priceVolumeData[i]
+      currentZoneVolume += item.volume
+      currentZoneMaxPrice = item.price
+
+      // When we reach 10% of volume, create a zone
+      if (currentZoneVolume >= targetVolumePerZone) {
+        volumeZones.push({
+          minPrice: currentZoneMinPrice,
+          maxPrice: currentZoneMaxPrice,
+          volume: currentZoneVolume,
+          volumePercent: (currentZoneVolume / totalVolume) * 100
+        })
+
+        // Start next zone
+        currentZoneVolume = 0
+        if (i + 1 < priceVolumeData.length) {
+          currentZoneMinPrice = priceVolumeData[i + 1].price
+          currentZoneMaxPrice = priceVolumeData[i + 1].price
+        }
+      }
+    }
+
+    // Add any remaining volume as the last zone
+    if (currentZoneVolume > 0) {
+      volumeZones.push({
+        minPrice: currentZoneMinPrice,
+        maxPrice: currentZoneMaxPrice,
+        volume: currentZoneVolume,
+        volumePercent: (currentZoneVolume / totalVolume) * 100
+      })
+    }
+
+    // Calculate max volume for normalization (for bar width)
+    const maxZoneVolume = Math.max(...volumeZones.map(z => z.volume))
+
+    return { zones: volumeZones, maxVolume: maxZoneVolume, totalVolume }
+  }
+
+  const volumeProfile = calculateVolumeProfile()
 
   // Calculate performance variance for each point (configurable rolling period)
   const performanceVariances = (() => {
@@ -2113,6 +2175,71 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     )
   }
 
+  // Custom component to render volume profile horizontal bars
+  const CustomVolumeProfile = (props) => {
+    if (!volumeProfileEnabled || !volumeProfile) return null
+
+    const { xAxisMap, yAxisMap, offset } = props
+    const xAxis = xAxisMap?.[0]
+    const yAxis = yAxisMap?.[0]
+
+    if (!xAxis || !yAxis) return null
+
+    // Get the right edge of the chart for positioning
+    const rightX = offset.left + offset.width
+    const maxBarWidth = 80 // Maximum width in pixels for the bars
+
+    return (
+      <g>
+        {volumeProfile.zones.map((zone, i) => {
+          // Calculate y positions based on price range
+          const yTop = yAxis.scale(zone.maxPrice)
+          const yBottom = yAxis.scale(zone.minPrice)
+          const height = Math.abs(yBottom - yTop)
+
+          // Calculate bar width based on volume percentage
+          // Each zone should be roughly 10%, so normalize based on that
+          const barWidth = (zone.volumePercent / 10) * maxBarWidth
+
+          // Alternate colors for better visibility
+          const hue = 60 // Yellow/gold hue
+          const opacity = 0.4
+          const lightness = 50 + (i % 2) * 10 // Alternate between lighter and darker
+
+          return (
+            <g key={`volume-profile-${i}`}>
+              {/* Horizontal bar */}
+              <rect
+                x={rightX - barWidth}
+                y={yTop}
+                width={barWidth}
+                height={height}
+                fill={`hsl(${hue}, 70%, ${lightness}%)`}
+                stroke="rgba(202, 138, 4, 0.6)"
+                strokeWidth={0.5}
+                opacity={opacity}
+              />
+
+              {/* Volume percentage label */}
+              <text
+                x={rightX - barWidth - 3}
+                y={yTop + height / 2}
+                fill="#eab308"
+                fontSize="10"
+                fontWeight="600"
+                textAnchor="end"
+                dominantBaseline="middle"
+                opacity={0.9}
+              >
+                {zone.volumePercent.toFixed(1)}%
+              </text>
+            </g>
+          )
+        })}
+      </g>
+    )
+  }
+
   return (
     <div ref={chartContainerRef} style={{ width: '100%', height: chartHeight, position: 'relative' }}>
       {/* Slope Channel Controls Panel */}
@@ -2318,6 +2445,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           {/* Manual Channel Zones as Parallel Lines */}
           <Customized component={CustomManualChannelZoneLines} />
+
+          {/* Volume Profile Horizontal Bars */}
+          <Customized component={CustomVolumeProfile} />
 
           {/* Manual Channel Selection Rectangle */}
           {manualChannelEnabled && isSelecting && selectionStart && selectionEnd && (
