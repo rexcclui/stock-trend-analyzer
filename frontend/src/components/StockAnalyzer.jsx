@@ -58,23 +58,26 @@ function StockAnalyzer() {
     try {
       const upperSymbol = targetSymbol.toUpperCase()
 
+      // Always fetch maximum data (3650 days) to have full history available
+      const maxDays = '3650'
+
       // Try to get from cache first
-      let data = apiCache.get(upperSymbol, days)
+      let data = apiCache.get(upperSymbol, maxDays)
 
       if (data) {
-        console.log(`[Cache] ✅ Cache HIT for ${upperSymbol}:${days}`)
+        console.log(`[Cache] ✅ Cache HIT for ${upperSymbol}:${maxDays}`)
       } else {
-        console.log(`[Cache] ❌ Cache MISS for ${upperSymbol}:${days}, fetching from server...`)
+        console.log(`[Cache] ❌ Cache MISS for ${upperSymbol}:${maxDays}, fetching from server...`)
         const response = await axios.get(`${API_URL}/analyze`, {
           params: {
             symbol: upperSymbol,
-            days: days
+            days: maxDays
           }
         })
         data = response.data
 
         // Store in cache
-        apiCache.set(upperSymbol, days, data)
+        apiCache.set(upperSymbol, maxDays, data)
       }
 
       // Log cache statistics
@@ -111,6 +114,37 @@ function StockAnalyzer() {
         collapsed: false
       }
       setCharts(prevCharts => [...prevCharts, newChart])
+
+      // Auto-zoom to selected period after adding chart
+      setTimeout(() => {
+        if (data.prices) {
+          const totalDataPoints = data.prices.length
+          const daysNum = parseInt(days)
+          let targetDataPoints = totalDataPoints
+
+          if (daysNum <= 7) {
+            targetDataPoints = Math.min(7, totalDataPoints)
+          } else if (daysNum <= 30) {
+            targetDataPoints = Math.min(22, totalDataPoints)
+          } else if (daysNum <= 90) {
+            targetDataPoints = Math.min(63, totalDataPoints)
+          } else if (daysNum <= 180) {
+            targetDataPoints = Math.min(126, totalDataPoints)
+          } else if (daysNum <= 365) {
+            targetDataPoints = Math.min(252, totalDataPoints)
+          } else if (daysNum <= 1095) {
+            targetDataPoints = Math.min(756, totalDataPoints)
+          } else if (daysNum <= 1825) {
+            targetDataPoints = Math.min(1260, totalDataPoints)
+          }
+
+          if (targetDataPoints < totalDataPoints) {
+            setGlobalZoomRange({ start: 0, end: targetDataPoints })
+          } else {
+            setGlobalZoomRange({ start: 0, end: null })
+          }
+        }
+      }, 100)
 
       // Clear input if not clicked from history
       if (!symbolToAnalyze) {
@@ -527,50 +561,52 @@ function StockAnalyzer() {
   const changeTimeRange = async (newDays) => {
     setDays(newDays)
     setError(null)
-    setGlobalZoomRange({ start: 0, end: null }) // Reset global zoom when changing periods
 
     // Update all charts with the new time range
     try {
+      // Always fetch maximum data (3650 days) to have full history available
+      const maxDays = '3650'
+
       // Check if any chart needs SPY data (for volume comparison or performance comparison)
       const needsSpy = charts.some(chart => chart.volumeColorMode === 'relative-spy' || chart.performanceComparisonEnabled)
       let spyDataForPeriod = null
 
       if (needsSpy) {
         // Fetch SPY data once for all charts that need it
-        spyDataForPeriod = apiCache.get('SPY', newDays)
+        spyDataForPeriod = apiCache.get('SPY', maxDays)
         if (!spyDataForPeriod) {
-          console.log(`[Cache] ❌ Cache MISS for SPY:${newDays}, fetching from server...`)
+          console.log(`[Cache] ❌ Cache MISS for SPY:${maxDays}, fetching from server...`)
           const response = await axios.get(`${API_URL}/analyze`, {
             params: {
               symbol: 'SPY',
-              days: newDays
+              days: maxDays
             }
           })
           spyDataForPeriod = response.data
-          apiCache.set('SPY', newDays, spyDataForPeriod)
+          apiCache.set('SPY', maxDays, spyDataForPeriod)
         } else {
-          console.log(`[Cache] ✅ Cache HIT for SPY:${newDays}`)
+          console.log(`[Cache] ✅ Cache HIT for SPY:${maxDays}`)
         }
       }
 
       const updatePromises = charts.map(async (chart) => {
-        // Try to get from cache first
-        let data = apiCache.get(chart.symbol, newDays)
+        // Try to get from cache first - always fetch max data
+        let data = apiCache.get(chart.symbol, maxDays)
 
         if (data) {
-          console.log(`[Cache] ✅ Cache HIT for ${chart.symbol}:${newDays}`)
+          console.log(`[Cache] ✅ Cache HIT for ${chart.symbol}:${maxDays}`)
         } else {
-          console.log(`[Cache] ❌ Cache MISS for ${chart.symbol}:${newDays}, fetching from server...`)
+          console.log(`[Cache] ❌ Cache MISS for ${chart.symbol}:${maxDays}, fetching from server...`)
           const response = await axios.get(`${API_URL}/analyze`, {
             params: {
               symbol: chart.symbol,
-              days: newDays
+              days: maxDays
             }
           })
           data = response.data
 
           // Store in cache
-          apiCache.set(chart.symbol, newDays, data)
+          apiCache.set(chart.symbol, maxDays, data)
         }
 
         return { id: chart.id, data }
@@ -594,6 +630,45 @@ function StockAnalyzer() {
           return updatedData ? { ...chart, ...updates } : chart
         })
       )
+
+      // After data is loaded, calculate zoom range based on selected period
+      // Wait for next tick to ensure charts are updated
+      setTimeout(() => {
+        if (results.length > 0 && results[0].data.prices) {
+          const totalDataPoints = results[0].data.prices.length
+
+          // Calculate approximate data points for the selected period
+          // Assuming roughly 252 trading days per year
+          const daysNum = parseInt(newDays)
+          let targetDataPoints = totalDataPoints // Default to all data
+
+          if (daysNum <= 7) {
+            targetDataPoints = Math.min(7, totalDataPoints)
+          } else if (daysNum <= 30) {
+            targetDataPoints = Math.min(22, totalDataPoints) // ~22 trading days in a month
+          } else if (daysNum <= 90) {
+            targetDataPoints = Math.min(63, totalDataPoints) // ~63 trading days in 3 months
+          } else if (daysNum <= 180) {
+            targetDataPoints = Math.min(126, totalDataPoints) // ~126 trading days in 6 months
+          } else if (daysNum <= 365) {
+            targetDataPoints = Math.min(252, totalDataPoints) // ~252 trading days in 1 year
+          } else if (daysNum <= 1095) {
+            targetDataPoints = Math.min(756, totalDataPoints) // ~756 trading days in 3 years
+          } else if (daysNum <= 1825) {
+            targetDataPoints = Math.min(1260, totalDataPoints) // ~1260 trading days in 5 years
+          }
+          // else: Max - show all data
+
+          // Set zoom to show only the target period (most recent data)
+          if (targetDataPoints < totalDataPoints) {
+            // Zoom to show only recent data, leaving older data for panning
+            setGlobalZoomRange({ start: 0, end: targetDataPoints })
+          } else {
+            // Show all data if selected period >= total available data
+            setGlobalZoomRange({ start: 0, end: null })
+          }
+        }
+      }, 100)
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to update charts.')
     }
