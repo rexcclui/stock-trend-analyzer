@@ -1348,6 +1348,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const isAllChannel = entry.dataKey.startsWith('allChannel') && entry.dataKey.endsWith('Mid')
           const channelIndex = isAllChannel ? parseInt(entry.dataKey.replace('allChannel', '').replace('Mid', '')) : null
 
+          // Check if this is a manual channel line
+          const isManualChannel = entry.dataKey.startsWith('manualChannel') && entry.dataKey.endsWith('Mid')
+          const manualChannelIndex = isManualChannel ? parseInt(entry.dataKey.replace('manualChannel', '').replace('Mid', '')) : null
+
           // Check if this is the main trend channel
           const isTrendLine = entry.dataKey === 'channelMid'
           const isTrendChannelPart = entry.dataKey === 'channelMid' || entry.dataKey === 'channelUpper' || entry.dataKey === 'channelLower'
@@ -1359,6 +1363,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           // Skip rendering allChannel upper/lower bounds in legend
           if (entry.dataKey && (entry.dataKey.includes('allChannel') && (entry.dataKey.endsWith('Upper') || entry.dataKey.endsWith('Lower')))) {
+            return null
+          }
+
+          // Skip rendering manual channel upper/lower bounds in legend
+          if (entry.dataKey && (entry.dataKey.includes('manualChannel') && (entry.dataKey.endsWith('Upper') || entry.dataKey.endsWith('Lower')))) {
             return null
           }
 
@@ -1472,29 +1481,53 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   {controlsVisible ? 'Hide' : 'Controls'}
                 </button>
               )}
+              {/* Manual channel controls */}
+              {isManualChannel && (
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      // Extend this specific channel if it's the last one
+                      if (manualChannelIndex === manualChannels.length - 1) {
+                        extendManualChannel()
+                      }
+                    }}
+                    className="ml-1 p-0.5 text-slate-400 hover:text-green-400 hover:bg-slate-700 rounded transition-colors"
+                    title="Extend channel"
+                    disabled={manualChannelIndex !== manualChannels.length - 1}
+                    style={{ opacity: manualChannelIndex === manualChannels.length - 1 ? 1 : 0.3 }}
+                  >
+                    <ArrowLeftRight className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      // Remove this channel from manualChannels array
+                      setManualChannels(prev => prev.filter((_, idx) => idx !== manualChannelIndex))
+                    }}
+                    className="ml-1 p-0.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded transition-colors"
+                    title="Remove channel"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                  {/* Show "Clear All" button only on the last manual channel */}
+                  {manualChannelIndex === manualChannels.length - 1 && manualChannels.length > 1 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setManualChannels([])
+                      }}
+                      className="ml-2 px-2 py-1 text-xs bg-slate-700 text-slate-300 rounded hover:bg-red-600 hover:text-white transition-colors"
+                      title="Clear all manual channels"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           )
         })}
-
-        {/* Manual Channel Control Icons */}
-        {manualChannelEnabled && manualChannels.length > 0 && (
-          <div className="flex items-center gap-2 ml-4">
-            <button
-              onClick={extendManualChannel}
-              className="p-1 text-slate-300 hover:text-green-400 hover:bg-slate-700 rounded transition-colors"
-              title="Extend last manual channel"
-            >
-              <ArrowLeftRight className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setManualChannels([])}
-              className="p-1 text-slate-300 hover:text-red-400 hover:bg-slate-700 rounded transition-colors"
-              title="Clear all manual channels"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        )}
       </div>
     )
   }
