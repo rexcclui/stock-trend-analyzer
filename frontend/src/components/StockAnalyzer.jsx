@@ -92,6 +92,7 @@ function StockAnalyzer() {
         showMACD: false,
         smaPeriods: [],
         smaVisibility: {},
+        volumeColorEnabled: false,
         slopeChannelEnabled: false,
         slopeChannelVolumeWeighted: false,
         slopeChannelZones: 8,
@@ -228,6 +229,20 @@ function StockAnalyzer() {
           return {
             ...chart,
             slopeChannelVolumeWeighted: !chart.slopeChannelVolumeWeighted
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const toggleVolumeColor = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            volumeColorEnabled: !chart.volumeColorEnabled
           }
         }
         return chart
@@ -556,6 +571,18 @@ function StockAnalyzer() {
                   {!chart.collapsed && <div className="flex gap-2">
                     <button
                       type="button"
+                      onClick={() => toggleVolumeColor(chart.id)}
+                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
+                        chart.volumeColorEnabled
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                      title="Highlight high volume points (top 20%)"
+                    >
+                      Volume Color
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => openSlopeChannelDialog(chart.id)}
                       className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
                       title="Configure Slope Channel"
@@ -630,6 +657,7 @@ function StockAnalyzer() {
                   smaVisibility={chart.smaVisibility}
                   onToggleSma={(period) => toggleSmaVisibility(chart.id, period)}
                   onDeleteSma={(period) => deleteSma(chart.id, period)}
+                  volumeColorEnabled={chart.volumeColorEnabled}
                   slopeChannelEnabled={chart.slopeChannelEnabled}
                   slopeChannelVolumeWeighted={chart.slopeChannelVolumeWeighted}
                   slopeChannelZones={chart.slopeChannelZones}

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
 import { X, ArrowLeftRight } from 'lucide-react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -817,11 +817,26 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     ? manualChannels.map(channel => calculateManualChannelZones(displayPrices, channel))
     : []
 
+  // Calculate volume threshold for top 20% (80th percentile)
+  let volumeThreshold = 0
+  if (volumeColorEnabled) {
+    const volumes = displayPrices.map(d => d.volume || 0).filter(v => v > 0).sort((a, b) => a - b)
+    if (volumes.length > 0) {
+      const percentileIndex = Math.floor(volumes.length * 0.8) // Top 20% = 80th percentile
+      volumeThreshold = volumes[percentileIndex]
+    }
+  }
+
   const chartData = displayPrices.map((price, index) => {
     const indicator = indicators[index] || {}
+    const volume = price.volume || 0
+    const isHighVolume = volumeColorEnabled && volume > volumeThreshold
+
     const dataPoint = {
       date: price.date,
       close: price.close,
+      volume: volume,
+      isHighVolume: isHighVolume,
     }
 
     // Add SMA data for each period
@@ -1448,6 +1463,32 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const CustomLegend = ({ payload }) => {
     return (
       <div className="flex justify-center gap-4 mt-2 flex-wrap">
+        {volumeColorEnabled && (
+          <div className="flex items-center gap-2 px-2 py-1 rounded bg-slate-700">
+            <div className="flex items-center gap-2">
+              <div
+                style={{
+                  width: 12,
+                  height: 12,
+                  backgroundColor: '#ef4444',
+                  borderRadius: '50%',
+                }}
+              />
+              <span className="text-sm text-slate-300">High Volume (Top 20%)</span>
+            </div>
+            <div className="flex items-center gap-2 ml-2">
+              <div
+                style={{
+                  width: 12,
+                  height: 12,
+                  backgroundColor: '#8b5cf6',
+                  borderRadius: '50%',
+                }}
+              />
+              <span className="text-sm text-slate-300">Normal Volume</span>
+            </div>
+          </div>
+        )}
         {payload.map((entry, index) => {
           const isSma = entry.dataKey.startsWith('sma')
           const period = isSma ? parseInt(entry.dataKey.replace('sma', '')) : null
@@ -1950,6 +1991,49 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     )
   }
 
+  // Custom component to render volume-colored price line
+  const VolumeColoredLine = (props) => {
+    if (!volumeColorEnabled) return null
+
+    const { xAxisMap, yAxisMap } = props
+    const xAxis = xAxisMap?.[0]
+    const yAxis = yAxisMap?.[0]
+
+    if (!xAxis || !yAxis) return null
+
+    const points = chartDataWithZones.map((point, index) => {
+      const x = xAxis.scale(index)
+      const y = yAxis.scale(point.close)
+      return { x, y, isHighVolume: point.isHighVolume }
+    }).filter(p => !isNaN(p.x) && !isNaN(p.y))
+
+    if (points.length < 2) return null
+
+    return (
+      <g>
+        {points.map((point, index) => {
+          if (index === points.length - 1) return null
+
+          const nextPoint = points[index + 1]
+          const color = point.isHighVolume ? '#ef4444' : '#8b5cf6' // Red for high volume, purple for normal
+
+          return (
+            <line
+              key={index}
+              x1={point.x}
+              y1={point.y}
+              x2={nextPoint.x}
+              y2={nextPoint.y}
+              stroke={color}
+              strokeWidth={2}
+              opacity={1}
+            />
+          )
+        })}
+      </g>
+    )
+  }
+
   return (
     <div ref={chartContainerRef} style={{ width: '100%', height: chartHeight, position: 'relative' }}>
       {/* Slope Channel Controls Panel */}
@@ -2156,6 +2240,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           {/* Manual Channel Zones as Parallel Lines */}
           <Customized component={CustomManualChannelZoneLines} />
 
+          {/* Volume Colored Price Line */}
+          <Customized component={VolumeColoredLine} />
+
           {/* Manual Channel Selection Rectangle */}
           {manualChannelEnabled && isSelecting && selectionStart && selectionEnd && (
             <Customized component={(props) => {
@@ -2341,6 +2428,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             strokeWidth={2}
             dot={false}
             name="Close Price"
+            hide={volumeColorEnabled}
           />
           {smaPeriods.map((period, index) => {
             const smaKey = `sma${period}`
