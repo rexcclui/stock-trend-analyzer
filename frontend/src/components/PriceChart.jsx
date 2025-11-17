@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
 import { X, ArrowLeftRight } from 'lucide-react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -2259,6 +2259,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             }
           }
 
+          // Get the top zone for X button positioning
+          const topZone = volumeProfile.zones[volumeProfile.zones.length - 1]
+          const topZoneY = topZone ? yAxis.scale(topZone.maxPrice) : offset.top
+
           return (
             <g key={`volume-profile-${profileIndex}`}>
               {volumeProfile.zones.map((zone, i) => {
@@ -2313,6 +2317,36 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   </g>
                 )
               })}
+
+              {/* X button to remove this volume profile (only in manual mode) */}
+              {volumeProfileMode === 'manual' && onVolumeProfileRangeRemove && (
+                <g
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => onVolumeProfileRangeRemove(profileIndex)}
+                >
+                  {/* Background circle */}
+                  <circle
+                    cx={barX + barWidth - 10}
+                    cy={topZoneY + 10}
+                    r="8"
+                    fill="rgba(239, 68, 68, 0.9)"
+                    stroke="#ffffff"
+                    strokeWidth="1"
+                  />
+                  {/* X icon */}
+                  <text
+                    x={barX + barWidth - 10}
+                    y={topZoneY + 10}
+                    fill="#ffffff"
+                    fontSize="12"
+                    fontWeight="900"
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                  >
+                    ×
+                  </text>
+                </g>
+              )}
             </g>
           )
         })}

@@ -363,6 +363,20 @@ function StockAnalyzer() {
     )
   }
 
+  const removeVolumeProfileRange = (chartId, rangeIndex) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            volumeProfileManualRanges: chart.volumeProfileManualRanges.filter((_, index) => index !== rangeIndex)
+          }
+        }
+        return chart
+      })
+    )
+  }
+
   const cycleVolumeColorMode = async (chartId) => {
     const chart = charts.find(c => c.id === chartId)
     if (!chart) return
@@ -978,6 +992,7 @@ function StockAnalyzer() {
                   volumeProfileMode={chart.volumeProfileMode}
                   volumeProfileManualRanges={chart.volumeProfileManualRanges}
                   onVolumeProfileManualRangeChange={(range) => updateVolumeProfileManualRange(chart.id, range)}
+                  onVolumeProfileRangeRemove={(rangeIndex) => removeVolumeProfileRange(chart.id, rangeIndex)}
                   spyData={chart.spyData}
                   performanceComparisonEnabled={chart.performanceComparisonEnabled}
                   performanceComparisonBenchmark={chart.performanceComparisonBenchmark}
