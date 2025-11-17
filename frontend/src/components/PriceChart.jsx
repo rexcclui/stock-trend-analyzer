@@ -504,7 +504,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         let pointsOutside = 0
 
         newPoints.forEach((point, index) => {
-          const globalIndex = previous90Percent + index
+          const globalIndex = previous80Percent + index
           const predictedY = slope * globalIndex + intercept
           const upperBound = predictedY + channelWidth
           const lowerBound = predictedY - channelWidth

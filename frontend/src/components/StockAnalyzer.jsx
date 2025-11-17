@@ -400,6 +400,7 @@ function StockAnalyzer() {
           </div>
           <div className="flex items-end gap-4">
             <button
+              type="button"
               onClick={analyzeStock}
               disabled={loading}
               className="w-full md:w-auto px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
@@ -439,6 +440,7 @@ function StockAnalyzer() {
                 </label>
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={() => setChartHeight(prev => Math.max(200, prev - 50))}
                     className="p-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg hover:bg-slate-600 transition-colors"
                     title="Decrease height"
@@ -446,6 +448,7 @@ function StockAnalyzer() {
                     <Minus className="w-4 h-4" />
                   </button>
                   <button
+                    type="button"
                     onClick={() => setChartHeight(prev => Math.min(1000, prev + 50))}
                     className="p-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg hover:bg-slate-600 transition-colors"
                     title="Increase height"
@@ -461,6 +464,7 @@ function StockAnalyzer() {
                 <div className="flex gap-1 flex-wrap">
                   {timeRanges.map((range) => (
                     <button
+                      type="button"
                       key={range.label}
                       onClick={() => changeTimeRange(range.days)}
                       className={`px-2 py-1 text-sm rounded font-medium transition-colors ${
@@ -510,6 +514,7 @@ function StockAnalyzer() {
                   <h3 className="text-lg font-semibold text-slate-100">{chart.symbol}</h3>
                   <div className="flex gap-2">
                     <button
+                      type="button"
                       onClick={() => openSlopeChannelDialog(chart.id)}
                       className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
                       title="Configure Slope Channel"
@@ -530,6 +535,7 @@ function StockAnalyzer() {
                       Find All Channel
                     </button>
                     <button
+                      type="button"
                       onClick={() => openSmaDialog(chart.id)}
                       className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
                       title="Configure SMA"
@@ -538,6 +544,7 @@ function StockAnalyzer() {
                       SMA
                     </button>
                     <button
+                      type="button"
                       onClick={() => updateChartIndicator(chart.id, 'showRSI', !chart.showRSI)}
                       className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
                         chart.showRSI
@@ -548,6 +555,7 @@ function StockAnalyzer() {
                       RSI
                     </button>
                     <button
+                      type="button"
                       onClick={() => updateChartIndicator(chart.id, 'showMACD', !chart.showMACD)}
                       className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
                         chart.showMACD
