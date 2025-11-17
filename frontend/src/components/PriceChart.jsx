@@ -14,6 +14,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const [allChannels, setAllChannels] = useState([])
   const [allChannelsVisibility, setAllChannelsVisibility] = useState({})
 
+  // Track main trend channel visibility
+  const [trendChannelVisible, setTrendChannelVisible] = useState(true)
+
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
   // No need to reset here to avoid infinite loop
 
@@ -485,16 +488,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // Try to extend the lookback period
       while (lookbackCount < remainingData.length) {
         const previousLookback = lookbackCount
-        const previous90Percent = Math.floor(previousLookback * 0.9)
-        const first10Percent = previousLookback - previous90Percent
+        const previous80Percent = Math.floor(previousLookback * 0.8)
+        const first20Percent = previousLookback - previous80Percent
 
         // Try to extend by adding more data
         lookbackCount++
         const extendedSegment = remainingData.slice(0, lookbackCount)
 
-        // Check if the newly added first 10% of data (going backward) stays within the channel
-        // defined by the previous 90%
-        const newPoints = extendedSegment.slice(previous90Percent, lookbackCount)
+        // Check if the newly added first 20% of data (going backward) stays within the channel
+        // defined by the previous 80%
+        const newPoints = extendedSegment.slice(previous80Percent, lookbackCount)
 
         // Use previous channel parameters to check
         const channelWidth = stdDev * optimalStdevMult
@@ -511,7 +514,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           }
         })
 
-        // If most of the new points are outside, break the trend
+        // If most of the new 20% points are outside, break the trend
         if (newPoints.length > 0 && pointsOutside / newPoints.length > 0.5) {
           channelBroken = true
           breakIndex = currentStartIndex + previousLookback
@@ -888,9 +891,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const isAllChannel = entry.dataKey.startsWith('allChannel') && entry.dataKey.endsWith('Mid')
           const channelIndex = isAllChannel ? parseInt(entry.dataKey.replace('allChannel', '').replace('Mid', '')) : null
 
-          const isVisible = isSma ? smaVisibility[period] : (isAllChannel ? allChannelsVisibility[channelIndex] : true)
+          // Check if this is the main trend channel
           const isTrendLine = entry.dataKey === 'channelMid'
-          const isClickable = isSma || isAllChannel
+          const isTrendChannelPart = entry.dataKey === 'channelMid' || entry.dataKey === 'channelUpper' || entry.dataKey === 'channelLower'
+
+          // Skip rendering upper/lower bounds in legend (already hidden via legendType="none", but double check)
+          if (entry.dataKey === 'channelUpper' || entry.dataKey === 'channelLower') {
+            return null
+          }
+
+          const isVisible = isSma ? smaVisibility[period] : (isAllChannel ? allChannelsVisibility[channelIndex] : (isTrendLine ? trendChannelVisible : true))
+          const isClickable = isSma || isAllChannel || isTrendLine
 
           return (
             <div
@@ -906,6 +917,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                       ...prev,
                       [channelIndex]: !prev[channelIndex]
                     }))
+                  } else if (isTrendLine) {
+                    setTrendChannelVisible(!trendChannelVisible)
                   }
                 }}
                 className={`flex items-center gap-2 ${
@@ -934,6 +947,51 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   }}
                   className="ml-1 p-0.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded transition-colors"
                   title="Delete SMA line"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+              {isAllChannel && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    // Remove this channel from allChannels array
+                    setAllChannels(prev => prev.filter((_, idx) => idx !== channelIndex))
+                    // Remove from visibility tracking
+                    setAllChannelsVisibility(prev => {
+                      const newVis = { ...prev }
+                      delete newVis[channelIndex]
+                      // Re-index remaining channels
+                      const reindexed = {}
+                      Object.keys(newVis).forEach(key => {
+                        const idx = parseInt(key)
+                        if (idx > channelIndex) {
+                          reindexed[idx - 1] = newVis[key]
+                        } else {
+                          reindexed[idx] = newVis[key]
+                        }
+                      })
+                      return reindexed
+                    })
+                  }}
+                  className="ml-1 p-0.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded transition-colors"
+                  title="Remove channel"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+              {isTrendLine && slopeChannelEnabled && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    // Disable slope channel by calling parent handler
+                    if (onSlopeChannelParamsChange) {
+                      // Signal to parent to disable slope channel
+                      onSlopeChannelParamsChange({ slopeChannelEnabled: false })
+                    }
+                  }}
+                  className="ml-1 p-0.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded transition-colors"
+                  title="Remove trend channel"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -1275,6 +1333,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 dot={false}
                 name={`Upper (+${slopeChannelInfo.optimalStdevMult.toFixed(2)}σ)`}
                 strokeDasharray="3 3"
+                legendType="none"
+                hide={!trendChannelVisible}
               />
               <Line
                 type="monotone"
@@ -1284,6 +1344,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 dot={false}
                 name={`Trend${slopeChannelVolumeWeighted ? ' (Vol-Weighted)' : ''} (${slopeChannelInfo.recentDataCount}pts, ${slopeChannelInfo.touchCount} touches, R²=${(slopeChannelInfo.rSquared * 100).toFixed(1)}%)`}
                 strokeDasharray="3 3"
+                hide={!trendChannelVisible}
               />
               <Line
                 type="monotone"
@@ -1293,6 +1354,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 dot={false}
                 name={`Lower (-${slopeChannelInfo.optimalStdevMult.toFixed(2)}σ)`}
                 strokeDasharray="3 3"
+                legendType="none"
+                hide={!trendChannelVisible}
               />
             </>
           )}
