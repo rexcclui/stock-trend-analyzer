@@ -2196,9 +2196,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           // Higher volume = deeper/darker color
           const volumeWeight = zone.volume / volumeProfile.maxVolume // 0 to 1
 
-          // Use yellow/gold hue with varying lightness
-          const hue = 45 // Yellow/gold
-          const saturation = 80
+          // Use blue/cyan hue with varying lightness
+          const hue = 200 // Blue/cyan
+          const saturation = 75
           // Map volume weight to lightness: high volume = darker (30%), low volume = lighter (75%)
           const lightness = 75 - (volumeWeight * 45) // Range from 75% (light) to 30% (dark)
 
@@ -2214,7 +2214,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 width={chartWidth}
                 height={height}
                 fill={`hsl(${hue}, ${saturation}%, ${lightness}%)`}
-                stroke="rgba(202, 138, 4, 0.4)"
+                stroke="rgba(59, 130, 246, 0.4)"
                 strokeWidth={0.5}
                 opacity={opacity}
               />
