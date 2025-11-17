@@ -900,6 +900,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             return null
           }
 
+          // Skip rendering allChannel upper/lower bounds in legend
+          if (entry.dataKey && (entry.dataKey.includes('allChannel') && (entry.dataKey.endsWith('Upper') || entry.dataKey.endsWith('Lower')))) {
+            return null
+          }
+
           const isVisible = isSma ? smaVisibility[period] : (isAllChannel ? allChannelsVisibility[channelIndex] : (isTrendLine ? trendChannelVisible : true))
           const isClickable = isSma || isAllChannel || isTrendLine
 
