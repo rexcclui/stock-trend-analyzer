@@ -94,6 +94,7 @@ function StockAnalyzer() {
         smaVisibility: {},
         volumeColorEnabled: false,
         volumeColorMode: 'absolute', // 'absolute' or 'relative-spy'
+        volumeProfileEnabled: false,
         spyData: null,
         performanceComparisonEnabled: false,
         performanceComparisonBenchmark: 'SPY',
@@ -304,6 +305,20 @@ function StockAnalyzer() {
           return {
             ...chart,
             volumeColorEnabled: !chart.volumeColorEnabled
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const toggleVolumeProfile = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            volumeProfileEnabled: !chart.volumeProfileEnabled
           }
         }
         return chart
@@ -754,6 +769,18 @@ function StockAnalyzer() {
                         </button>
                       )}
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleVolumeProfile(chart.id)}
+                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
+                        chart.volumeProfileEnabled
+                          ? 'bg-teal-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                      title="Show volume distribution by price level as horizontal bars"
+                    >
+                      Volume Profile
+                    </button>
                     <div className="flex gap-1 items-center">
                       <button
                         type="button"
@@ -896,6 +923,7 @@ function StockAnalyzer() {
                   onDeleteSma={(period) => deleteSma(chart.id, period)}
                   volumeColorEnabled={chart.volumeColorEnabled}
                   volumeColorMode={chart.volumeColorMode}
+                  volumeProfileEnabled={chart.volumeProfileEnabled}
                   spyData={chart.spyData}
                   performanceComparisonEnabled={chart.performanceComparisonEnabled}
                   performanceComparisonBenchmark={chart.performanceComparisonBenchmark}

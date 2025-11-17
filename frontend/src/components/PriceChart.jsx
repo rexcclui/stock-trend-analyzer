@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
 import { X, ArrowLeftRight } from 'lucide-react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -947,6 +947,52 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const allManualChannelZones = manualChannelEnabled && manualChannels.length > 0
     ? manualChannels.map(channel => calculateManualChannelZones(displayPrices, channel))
     : []
+
+  // Calculate volume profile (volume distribution by price level)
+  const calculateVolumeProfile = (priceData) => {
+    if (!priceData || priceData.length === 0) return []
+
+    // Find price range
+    const prices = priceData.map(p => p.close)
+    const minPrice = Math.min(...prices)
+    const maxPrice = Math.max(...prices)
+    const priceRange = maxPrice - minPrice
+
+    // Create price bins (we'll use ~50 bins for good granularity)
+    const numBins = Math.min(50, Math.ceil(priceData.length / 5))
+    const binSize = priceRange / numBins
+
+    // Initialize bins
+    const bins = Array(numBins).fill(0).map((_, i) => ({
+      priceLevel: minPrice + (i + 0.5) * binSize,
+      volume: 0,
+      minPrice: minPrice + i * binSize,
+      maxPrice: minPrice + (i + 1) * binSize
+    }))
+
+    // Distribute volume into bins
+    priceData.forEach(point => {
+      const binIndex = Math.min(
+        numBins - 1,
+        Math.floor((point.close - minPrice) / binSize)
+      )
+      if (binIndex >= 0 && binIndex < numBins) {
+        bins[binIndex].volume += point.volume || 0
+      }
+    })
+
+    // Find max volume for normalization
+    const maxVolume = Math.max(...bins.map(b => b.volume))
+
+    // Normalize volumes
+    bins.forEach(bin => {
+      bin.normalizedVolume = maxVolume > 0 ? bin.volume / maxVolume : 0
+    })
+
+    return bins
+  }
+
+  const volumeProfile = volumeProfileEnabled ? calculateVolumeProfile(displayPrices) : []
 
   const chartData = displayPrices.map((price, index) => {
     const indicator = indicators[index] || {}
@@ -2113,6 +2159,61 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     )
   }
 
+  // Custom component to render volume profile bars
+  const CustomVolumeProfile = (props) => {
+    if (!volumeProfileEnabled || volumeProfile.length === 0) return null
+
+    const { xAxisMap, yAxisMap, offset } = props
+    const xAxis = xAxisMap?.[0]
+    const yAxis = yAxisMap?.[0]
+
+    if (!xAxis || !yAxis || !offset) return null
+
+    // Calculate the x position where bars start (left edge of chart)
+    const chartLeftX = offset.left
+
+    // Maximum bar width as a percentage of chart width
+    const maxBarWidth = offset.width * 0.25 // 25% of chart width max
+
+    return (
+      <g>
+        {volumeProfile.map((bin, index) => {
+          // Convert price level to y coordinate
+          const yTop = yAxis.scale(bin.maxPrice)
+          const yBottom = yAxis.scale(bin.minPrice)
+
+          if (yTop === undefined || yBottom === undefined) return null
+
+          // Calculate bar dimensions
+          const barHeight = Math.abs(yBottom - yTop)
+          const barWidth = bin.normalizedVolume * maxBarWidth
+          const y = Math.min(yTop, yBottom)
+
+          // Color gradient from blue (low volume) to orange (high volume)
+          const colorIntensity = bin.normalizedVolume
+          const hue = 200 - (colorIntensity * 160) // 200 (blue) to 40 (orange)
+          const saturation = 60 + (colorIntensity * 30) // 60% to 90%
+          const lightness = 55 - (colorIntensity * 15) // 55% to 40%
+          const color = `hsl(${hue}, ${saturation}%, ${lightness}%)`
+
+          return (
+            <rect
+              key={`volume-profile-${index}`}
+              x={chartLeftX}
+              y={y}
+              width={barWidth}
+              height={barHeight}
+              fill={color}
+              opacity={0.6}
+              stroke="rgba(255, 255, 255, 0.2)"
+              strokeWidth={0.5}
+            />
+          )
+        })}
+      </g>
+    )
+  }
+
   return (
     <div ref={chartContainerRef} style={{ width: '100%', height: chartHeight, position: 'relative' }}>
       {/* Slope Channel Controls Panel */}
@@ -2318,6 +2419,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           {/* Manual Channel Zones as Parallel Lines */}
           <Customized component={CustomManualChannelZoneLines} />
+
+          {/* Volume Profile Bars */}
+          <Customized component={CustomVolumeProfile} />
 
           {/* Manual Channel Selection Rectangle */}
           {manualChannelEnabled && isSelecting && selectionStart && selectionEnd && (
