@@ -30,6 +30,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const [volumeProfileSelectionStart, setVolumeProfileSelectionStart] = useState(null)
   const [volumeProfileSelectionEnd, setVolumeProfileSelectionEnd] = useState(null)
 
+  // Chart panning state
+  const [isPanning, setIsPanning] = useState(false)
+  const [panStartX, setPanStartX] = useState(null)
+  const [panStartZoom, setPanStartZoom] = useState(null)
+
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
   // No need to reset here to avoid infinite loop
 
@@ -1253,6 +1258,36 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       setSyncedMouseDate(e.activeLabel)
     }
 
+    // Handle chart panning - only when NOT in manual channel drag mode
+    if (isPanning && !manualChannelDragMode && e && e.chartX !== undefined && panStartX !== null && panStartZoom !== null) {
+      const deltaX = e.chartX - panStartX
+      const chartWidth = chartContainerRef.current?.offsetWidth || 800
+      const totalDataLength = chartData.length
+
+      // Calculate pan delta as a percentage of visible range
+      const panPercent = -(deltaX / chartWidth) // Negative because we pan opposite to drag direction
+      const currentRange = (panStartZoom.end || totalDataLength) - panStartZoom.start
+      const panAmount = Math.floor(panPercent * currentRange)
+
+      // Apply pan with bounds checking
+      let newStart = panStartZoom.start + panAmount
+      let newEnd = (panStartZoom.end || totalDataLength) + panAmount
+
+      // Ensure we don't pan beyond data bounds
+      if (newStart < 0) {
+        newEnd -= newStart
+        newStart = 0
+      }
+      if (newEnd > totalDataLength) {
+        newStart -= (newEnd - totalDataLength)
+        newEnd = totalDataLength
+      }
+      if (newStart < 0) newStart = 0
+
+      onZoomChange({ start: newStart, end: newEnd === totalDataLength ? null : newEnd })
+      return
+    }
+
     // Handle manual channel selection - only when drag mode is enabled
     if (manualChannelEnabled && manualChannelDragMode && isSelecting && e && e.activeLabel) {
       setSelectionEnd(e.activeLabel)
@@ -1266,9 +1301,23 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   const handleMouseLeave = () => {
     setSyncedMouseDate(null)
+    // End panning when mouse leaves chart
+    if (isPanning) {
+      setIsPanning(false)
+      setPanStartX(null)
+      setPanStartZoom(null)
+    }
   }
 
   const handleMouseDown = (e) => {
+    // Start panning when NOT in manual channel drag mode
+    if (!manualChannelDragMode && e && e.chartX !== undefined) {
+      setIsPanning(true)
+      setPanStartX(e.chartX)
+      setPanStartZoom({ ...zoomRange })
+      return
+    }
+
     // Only allow selection when drag mode is enabled
     if (manualChannelEnabled && manualChannelDragMode && e && e.activeLabel) {
       setIsSelecting(true)
@@ -1284,6 +1333,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
   const handleMouseUp = (e) => {
+    // End panning
+    if (isPanning) {
+      setIsPanning(false)
+      setPanStartX(null)
+      setPanStartZoom(null)
+      return
+    }
+
     // Only process selection when drag mode is enabled
     if (manualChannelEnabled && manualChannelDragMode && isSelecting && selectionStart && selectionEnd) {
       // Calculate manual channel for selected range
@@ -2481,8 +2538,15 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     )
   }
 
+  // Determine cursor style based on state
+  const getCursorStyle = () => {
+    if (manualChannelDragMode) return 'crosshair'
+    if (isPanning) return 'grabbing'
+    return 'grab'
+  }
+
   return (
-    <div ref={chartContainerRef} style={{ width: '100%', height: chartHeight, position: 'relative' }}>
+    <div ref={chartContainerRef} style={{ width: '100%', height: chartHeight, position: 'relative', cursor: getCursorStyle() }}>
       {/* Slope Channel Controls Panel */}
       {slopeChannelEnabled && slopeChannelInfo && onSlopeChannelParamsChange && controlsVisible && (
         <div
