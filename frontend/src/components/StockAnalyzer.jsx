@@ -104,6 +104,8 @@ function StockAnalyzer() {
         performanceComparisonEnabled: false,
         performanceComparisonBenchmark: 'SPY',
         performanceComparisonDays: 30,
+        comparisonMode: 'line', // 'color' or 'line'
+        comparisonStocks: [], // Array of { symbol, data }
         slopeChannelEnabled: false,
         slopeChannelVolumeWeighted: false,
         slopeChannelZones: 8,
@@ -556,6 +558,70 @@ function StockAnalyzer() {
     }
   }
 
+  const addComparisonStock = async (chartId, symbol) => {
+    const chart = charts.find(c => c.id === chartId)
+    if (!chart) return
+
+    // Check if symbol already exists
+    if (chart.comparisonStocks.some(s => s.symbol === symbol)) {
+      setError(`${symbol} is already added for comparison`)
+      setTimeout(() => setError(null), 3000)
+      return
+    }
+
+    try {
+      // Always fetch maximum data (3650 days) to have full history available
+      const maxDays = '3650'
+
+      // Check cache first
+      let stockData = apiCache.get(symbol, maxDays)
+
+      if (!stockData) {
+        console.log(`[Cache] ❌ Cache MISS for ${symbol}:${maxDays}, fetching from server...`)
+        const response = await axios.get(`${API_URL}/analyze`, {
+          params: {
+            symbol: symbol,
+            days: maxDays
+          }
+        })
+        stockData = response.data
+        apiCache.set(symbol, maxDays, stockData)
+      } else {
+        console.log(`[Cache] ✅ Cache HIT for ${symbol}:${maxDays}`)
+      }
+
+      setCharts(prevCharts =>
+        prevCharts.map(c => {
+          if (c.id === chartId) {
+            return {
+              ...c,
+              comparisonStocks: [...c.comparisonStocks, { symbol, data: stockData }]
+            }
+          }
+          return c
+        })
+      )
+    } catch (err) {
+      console.error('Failed to fetch comparison stock data:', err)
+      setError(`Failed to fetch ${symbol} data for comparison`)
+      setTimeout(() => setError(null), 3000)
+    }
+  }
+
+  const removeComparisonStock = (chartId, stockIndex) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            comparisonStocks: chart.comparisonStocks.filter((_, index) => index !== stockIndex)
+          }
+        }
+        return chart
+      })
+    )
+  }
+
   const toggleChartCollapse = (chartId) => {
     setCharts(prevCharts =>
       prevCharts.map(chart => {
@@ -954,64 +1020,132 @@ function StockAnalyzer() {
                     <div className="flex gap-1 items-center">
                       <button
                         type="button"
-                        onClick={() => togglePerformanceComparison(chart.id)}
-                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
-                          chart.performanceComparisonEnabled
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        onClick={() => {
+                          setCharts(prevCharts =>
+                            prevCharts.map(c =>
+                              c.id === chart.id
+                                ? { ...c, comparisonMode: c.comparisonMode === 'color' ? 'line' : 'color' }
+                                : c
+                            )
+                          )
+                        }}
+                        className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
+                          chart.comparisonMode === 'color'
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
                         }`}
-                        title="Highlight top 20% and bottom 20% performance variance vs benchmark"
+                        title="Click to toggle: Vs Perf Color ↔ Vs Perf"
                       >
-                        vs Perf
+                        {chart.comparisonMode === 'color' ? 'Color' : 'Line'}
                       </button>
-                      {chart.performanceComparisonEnabled && (
+                      {chart.comparisonMode === 'color' && (
                         <>
+                          <button
+                            type="button"
+                            onClick={() => togglePerformanceComparison(chart.id)}
+                            className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
+                              chart.performanceComparisonEnabled
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            }`}
+                            title="Highlight top 20% and bottom 20% performance variance vs benchmark"
+                          >
+                            Vs Perf Color
+                          </button>
+                          {chart.performanceComparisonEnabled && (
+                            <>
+                              <input
+                                type="text"
+                                value={chart.performanceComparisonBenchmark}
+                                onChange={(e) => {
+                                  const newBenchmark = e.target.value.toUpperCase()
+                                  setCharts(prevCharts =>
+                                    prevCharts.map(c =>
+                                      c.id === chart.id
+                                        ? { ...c, performanceComparisonBenchmark: newBenchmark }
+                                        : c
+                                    )
+                                  )
+                                }}
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter') {
+                                    fetchBenchmarkData(chart.id)
+                                  }
+                                }}
+                                onBlur={() => {
+                                  fetchBenchmarkData(chart.id)
+                                }}
+                                placeholder="SPY"
+                                className="w-16 px-2 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-100 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                                title="Benchmark symbol (press Enter or blur to load)"
+                              />
+                              <input
+                                type="number"
+                                value={chart.performanceComparisonDays}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value)
+                                  if (!isNaN(value) && value > 0 && value <= 365) {
+                                    setCharts(prevCharts =>
+                                      prevCharts.map(c =>
+                                        c.id === chart.id
+                                          ? { ...c, performanceComparisonDays: value }
+                                          : c
+                                      )
+                                    )
+                                  }
+                                }}
+                                min="1"
+                                max="365"
+                                placeholder="30"
+                                className="w-14 px-2 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-100 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                                title="Lookback days"
+                              />
+                            </>
+                          )}
+                        </>
+                      )}
+                      {chart.comparisonMode === 'line' && (
+                        <>
+                          <button
+                            type="button"
+                            className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors"
+                            title="Vs Perf - Compare performance relative to first data point"
+                          >
+                            Vs Perf
+                          </button>
                           <input
                             type="text"
-                            value={chart.performanceComparisonBenchmark}
-                            onChange={(e) => {
-                              const newBenchmark = e.target.value.toUpperCase()
-                              setCharts(prevCharts =>
-                                prevCharts.map(c =>
-                                  c.id === chart.id
-                                    ? { ...c, performanceComparisonBenchmark: newBenchmark }
-                                    : c
-                                )
-                              )
-                            }}
+                            placeholder="Add symbol (e.g., SPY)"
+                            className="w-28 px-2 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-100 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
                             onKeyPress={(e) => {
-                              if (e.key === 'Enter') {
-                                fetchBenchmarkData(chart.id)
+                              if (e.key === 'Enter' && e.target.value.trim()) {
+                                const symbol = e.target.value.toUpperCase().trim()
+                                e.target.value = ''
+                                addComparisonStock(chart.id, symbol)
                               }
                             }}
-                            onBlur={() => {
-                              fetchBenchmarkData(chart.id)
-                            }}
-                            placeholder="SPY"
-                            className="w-16 px-2 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-100 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                            title="Benchmark symbol (press Enter or blur to load)"
+                            title="Enter symbol and press Enter to add"
                           />
-                          <input
-                            type="number"
-                            value={chart.performanceComparisonDays}
-                            onChange={(e) => {
-                              const value = parseInt(e.target.value)
-                              if (!isNaN(value) && value > 0 && value <= 365) {
-                                setCharts(prevCharts =>
-                                  prevCharts.map(c =>
-                                    c.id === chart.id
-                                      ? { ...c, performanceComparisonDays: value }
-                                      : c
-                                  )
-                                )
-                              }
-                            }}
-                            min="1"
-                            max="365"
-                            placeholder="30"
-                            className="w-14 px-2 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-100 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                            title="Lookback days"
-                          />
+                          {chart.comparisonStocks && chart.comparisonStocks.length > 0 && (
+                            <div className="flex gap-1 items-center">
+                              {chart.comparisonStocks.map((stock, index) => (
+                                <span
+                                  key={index}
+                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded"
+                                >
+                                  {stock.symbol}
+                                  <button
+                                    type="button"
+                                    onClick={() => removeComparisonStock(chart.id, index)}
+                                    className="hover:text-red-300"
+                                    title="Remove"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
@@ -1147,6 +1281,8 @@ function StockAnalyzer() {
                     performanceComparisonEnabled={chart.performanceComparisonEnabled}
                     performanceComparisonBenchmark={chart.performanceComparisonBenchmark}
                     performanceComparisonDays={chart.performanceComparisonDays}
+                    comparisonMode={chart.comparisonMode}
+                    comparisonStocks={chart.comparisonStocks}
                     slopeChannelEnabled={chart.slopeChannelEnabled}
                     slopeChannelVolumeWeighted={chart.slopeChannelVolumeWeighted}
                     slopeChannelZones={chart.slopeChannelZones}

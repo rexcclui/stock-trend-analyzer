@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
 import { X, ArrowLeftRight, Hand } from 'lucide-react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -995,7 +995,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Calculate performance variance for each point (configurable rolling period)
   const performanceVariances = (() => {
-    if (!performanceComparisonEnabled || !spyData) return []
+    if (!performanceComparisonEnabled || !spyData || comparisonMode !== 'color') return []
 
     const variances = []
     const lookbackPeriod = performanceComparisonDays // Configurable rolling performance
@@ -1033,7 +1033,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Calculate thresholds for performance variance (top 20% and bottom 20%)
   const performanceVarianceThresholds = (() => {
-    if (!performanceComparisonEnabled || performanceVariances.length === 0) return { top20: null, bottom20: null }
+    if (!performanceComparisonEnabled || performanceVariances.length === 0 || comparisonMode !== 'color') return { top20: null, bottom20: null }
 
     const validVariances = performanceVariances.filter(v => v !== null)
     if (validVariances.length === 0) return { top20: null, bottom20: null }
@@ -1046,6 +1046,68 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       top20: sorted[idx80],      // Top 20% (highest positive variance)
       bottom20: sorted[idx20]    // Bottom 20% (most negative variance)
     }
+  })()
+
+  // Calculate comparison lines for 'line' mode
+  // Each line value = (Perf Difference % + 1) × current data point of selected stock
+  // Perf Difference % = (historical % chg of compare stock - historical % chg of selected stock)
+  const comparisonLines = (() => {
+    if (comparisonMode !== 'line' || !comparisonStocks || comparisonStocks.length === 0) {
+      return {}
+    }
+
+    const result = {}
+
+    // Get first price of selected stock (for calculating historical % change)
+    const selectedFirstPrice = displayPrices.length > 0 ? displayPrices[0].close : null
+    if (!selectedFirstPrice) return result
+
+    comparisonStocks.forEach((compStock) => {
+      const lineData = []
+
+      // Build a map of comparison stock prices by date
+      const compPriceByDate = {}
+      if (compStock.data && compStock.data.prices) {
+        compStock.data.prices.forEach(p => {
+          compPriceByDate[p.date] = p.close
+        })
+      }
+
+      // Get first price of comparison stock
+      const compFirstPrice = compStock.data?.prices?.[0]?.close
+      if (!compFirstPrice) {
+        result[compStock.symbol] = []
+        return
+      }
+
+      // Calculate line values for each data point
+      for (let i = 0; i < displayPrices.length; i++) {
+        const currentPrice = displayPrices[i]
+        const compCurrentPrice = compPriceByDate[currentPrice.date]
+
+        if (compCurrentPrice && currentPrice.close && selectedFirstPrice !== 0 && compFirstPrice !== 0) {
+          // Historical % change of selected stock
+          const selectedHistPctChg = (currentPrice.close - selectedFirstPrice) / selectedFirstPrice
+
+          // Historical % change of comparison stock
+          const compHistPctChg = (compCurrentPrice - compFirstPrice) / compFirstPrice
+
+          // Perf Difference %
+          const perfDiffPct = compHistPctChg - selectedHistPctChg
+
+          // Plot value = (Perf Difference % + 1) × current data point of selected stock
+          const plotValue = (perfDiffPct + 1) * currentPrice.close
+
+          lineData[i] = plotValue
+        } else {
+          lineData[i] = null
+        }
+      }
+
+      result[compStock.symbol] = lineData
+    })
+
+    return result
   })()
 
   const slopeChannelInfo = slopeChannelEnabled ? calculateSlopeChannel(displayPrices, true, slopeChannelVolumeWeighted) : null
@@ -1108,6 +1170,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // Try backend data first, fall back to frontend calculation
       dataPoint[smaKey] = indicator[smaKey] || smaCache[period][index]
     })
+
+    // Add comparison line data for 'line' mode
+    if (comparisonMode === 'line' && Object.keys(comparisonLines).length > 0) {
+      Object.keys(comparisonLines).forEach(symbol => {
+        const compLineKey = `comp_${symbol}`
+        dataPoint[compLineKey] = comparisonLines[symbol][index]
+      })
+    }
 
     // Add slope channel data if enabled
     if (slopeChannelInfo && slopeChannelInfo.channelData[index]) {
@@ -3176,7 +3246,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               />
             </>
           )}
-          {performanceComparisonEnabled && (
+          {performanceComparisonEnabled && comparisonMode === 'color' && (
             <>
               <Line
                 type="monotone"
@@ -3198,6 +3268,24 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               />
             </>
           )}
+          {comparisonMode === 'line' && comparisonStocks && comparisonStocks.map((compStock, index) => {
+            const compLineKey = `comp_${compStock.symbol}`
+            const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6']
+            const color = colors[index % colors.length]
+
+            return (
+              <Line
+                key={compLineKey}
+                type="monotone"
+                dataKey={compLineKey}
+                stroke={color}
+                strokeWidth={2}
+                dot={false}
+                name={`Vs ${compStock.symbol}`}
+                connectNulls={true}
+              />
+            )
+          })}
           {smaPeriods.map((period, index) => {
             const smaKey = `sma${period}`
             const isVisible = smaVisibility[period]
