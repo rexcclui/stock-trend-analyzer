@@ -1049,65 +1049,66 @@ function StockAnalyzer() {
                     </button>
                   </div>}
                 </div>
-                {!chart.collapsed && <div className="pr-0 md:pr-12 relative">
-                  {/* Hand Icon - Toggle Drag Mode */}
-                  {chart.manualChannelEnabled && (
+                {/* Hand Icon - Toggle Drag Mode (positioned relative to parent chart container) */}
+                {!chart.collapsed && chart.manualChannelEnabled && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '80px',
+                      left: '30px',
+                      zIndex: 10000,
+                      display: 'flex',
+                      flexDirection: 'row',
+                      gap: '8px',
+                      alignItems: 'center',
+                      pointerEvents: 'auto',
+                      backgroundColor: 'rgba(234, 179, 8, 0.95)',
+                      padding: '16px 20px',
+                      borderRadius: '12px',
+                      border: '4px solid rgb(202, 138, 4)',
+                      boxShadow: '0 0 30px rgba(234, 179, 8, 1), 0 4px 12px rgba(0, 0, 0, 0.8)'
+                    }}
+                  >
+                    <button
+                      onClick={() => toggleManualChannelDragMode(chart.id)}
+                      style={{
+                        padding: '14px',
+                        backgroundColor: chart.manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(234, 179, 8)',
+                        border: '4px solid',
+                        borderColor: chart.manualChannelDragMode ? 'rgb(22, 163, 74)' : 'rgb(202, 138, 4)',
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s'
+                      }}
+                      title={chart.manualChannelDragMode ? "Drag mode ON - Draw rectangle to plot channel" : "Click to enable drag mode"}
+                    >
+                      <Hand
+                        style={{
+                          width: '36px',
+                          height: '36px',
+                          color: 'black',
+                          strokeWidth: 3
+                        }}
+                      />
+                    </button>
                     <div
                       style={{
-                        position: 'absolute',
-                        top: '20px',
-                        left: '20px',
-                        zIndex: 1000,
-                        display: 'flex',
-                        flexDirection: 'row',
-                        gap: '8px',
-                        alignItems: 'center',
-                        pointerEvents: 'auto',
-                        backgroundColor: 'rgba(0, 0, 0, 0.85)',
-                        padding: '12px 16px',
-                        borderRadius: '12px',
-                        border: '3px solid',
-                        borderColor: chart.manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(234, 179, 8)',
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)'
+                        fontSize: '16px',
+                        fontWeight: '900',
+                        color: 'black',
+                        whiteSpace: 'nowrap',
+                        textShadow: '0 0 4px rgba(255,255,255,0.5)'
                       }}
                     >
-                      <button
-                        onClick={() => toggleManualChannelDragMode(chart.id)}
-                        style={{
-                          padding: '12px',
-                          backgroundColor: chart.manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(234, 179, 8)',
-                          border: '3px solid',
-                          borderColor: chart.manualChannelDragMode ? 'rgb(22, 163, 74)' : 'rgb(202, 138, 4)',
-                          borderRadius: '10px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.2s'
-                        }}
-                        title={chart.manualChannelDragMode ? "Drag mode ON - Draw rectangle to plot channel" : "Click to enable drag mode"}
-                      >
-                        <Hand
-                          style={{
-                            width: '32px',
-                            height: '32px',
-                            color: 'white',
-                            strokeWidth: 3
-                          }}
-                        />
-                      </button>
-                      <div
-                        style={{
-                          fontSize: '14px',
-                          fontWeight: '700',
-                          color: chart.manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(234, 179, 8)',
-                          whiteSpace: 'nowrap'
-                        }}
-                      >
-                        {chart.manualChannelDragMode ? 'DRAW MODE' : 'PAN MODE'}
-                      </div>
+                      {chart.manualChannelDragMode ? 'DRAW MODE' : 'PAN MODE'}
                     </div>
-                  )}
+                  </div>
+                )}
+
+                {!chart.collapsed && <div className="pr-0">
                   <PriceChart
                     prices={chart.data.prices}
                     indicators={chart.data.indicators}
@@ -1149,18 +1150,18 @@ function StockAnalyzer() {
                 {/* Time Period Selector - Right Side (Desktop) / Bottom (Mobile) */}
                 {!chart.collapsed && (
                   <div className="absolute top-1/2 right-0 -translate-y-1/2 hidden md:block" style={{ zIndex: 5 }}>
-                    <div className="flex flex-col gap-px bg-slate-900/95 p-px rounded border border-slate-700 backdrop-blur-sm shadow-lg">
+                    <div className="flex flex-col gap-0 bg-slate-900/95 p-0 rounded border border-slate-700 backdrop-blur-sm shadow-lg">
                       {timeRanges.map((range) => (
                         <button
                           type="button"
                           key={range.label}
                           onClick={() => changeTimeRange(range.days)}
-                          className={`px-2 py-1 text-xs rounded font-semibold transition-all whitespace-nowrap ${
+                          className={`px-1.5 py-0.5 text-xs rounded-none first:rounded-t last:rounded-b font-semibold transition-all whitespace-nowrap ${
                             days === range.days
                               ? 'bg-purple-600 text-white shadow-md'
                               : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                           }`}
-                          style={{ minWidth: '42px' }}
+                          style={{ minWidth: '38px' }}
                         >
                           {range.label}
                         </button>
