@@ -2454,18 +2454,30 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 />
 
                 {/* Volume percentage label at the end of the line */}
-                <text
-                  x={lastPoint.x + 5}
-                  y={lastPoint.y}
-                  fill={color}
-                  fontSize="11"
-                  fontWeight="600"
-                  textAnchor="start"
-                  dominantBaseline="middle"
-                  opacity={0.95}
-                >
-                  {(zone.volumeWeight * 100).toFixed(1)}%
-                </text>
+                <g>
+                  {/* Background rectangle for better readability */}
+                  <rect
+                    x={lastPoint.x - 30}
+                    y={lastPoint.y - 8}
+                    width={25}
+                    height={16}
+                    fill="rgba(15, 23, 42, 0.85)"
+                    stroke={color}
+                    strokeWidth={0.5}
+                    rx={2}
+                  />
+                  <text
+                    x={lastPoint.x - 5}
+                    y={lastPoint.y}
+                    fill={color}
+                    fontSize="11"
+                    fontWeight="700"
+                    textAnchor="end"
+                    dominantBaseline="middle"
+                  >
+                    {(zone.volumeWeight * 100).toFixed(1)}%
+                  </text>
+                </g>
               </g>
             )
           })
@@ -2549,26 +2561,45 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 />
 
                 {/* Volume percentage label at the end of the line with gradient color based on weight */}
-                <text
-                  x={lastPoint.x + 5}
-                  y={lastPoint.y}
-                  fill={(() => {
-                    // Conditional formatting: higher weight = warmer/brighter colors
-                    const weight = zone.volumeWeight
-                    if (weight >= 0.25) return '#22c55e' // Green - high volume
-                    if (weight >= 0.20) return '#84cc16' // Lime - above average
-                    if (weight >= 0.15) return '#eab308' // Yellow - average
-                    if (weight >= 0.10) return '#f97316' // Orange - below average
-                    return '#ef4444' // Red - low volume
-                  })()}
-                  fontSize="11"
-                  fontWeight="600"
-                  textAnchor="start"
-                  dominantBaseline="middle"
-                  opacity={0.95}
-                >
-                  {(zone.volumeWeight * 100).toFixed(1)}%
-                </text>
+                <g>
+                  {/* Background rectangle for better readability */}
+                  <rect
+                    x={lastPoint.x - 30}
+                    y={lastPoint.y - 8}
+                    width={25}
+                    height={16}
+                    fill="rgba(15, 23, 42, 0.85)"
+                    stroke={(() => {
+                      const weight = zone.volumeWeight
+                      if (weight >= 0.25) return '#22c55e'
+                      if (weight >= 0.20) return '#84cc16'
+                      if (weight >= 0.15) return '#eab308'
+                      if (weight >= 0.10) return '#f97316'
+                      return '#ef4444'
+                    })()}
+                    strokeWidth={0.5}
+                    rx={2}
+                  />
+                  <text
+                    x={lastPoint.x - 5}
+                    y={lastPoint.y}
+                    fill={(() => {
+                      // Conditional formatting: higher weight = warmer/brighter colors
+                      const weight = zone.volumeWeight
+                      if (weight >= 0.25) return '#22c55e' // Green - high volume
+                      if (weight >= 0.20) return '#84cc16' // Lime - above average
+                      if (weight >= 0.15) return '#eab308' // Yellow - average
+                      if (weight >= 0.10) return '#f97316' // Orange - below average
+                      return '#ef4444' // Red - low volume
+                    })()}
+                    fontSize="11"
+                    fontWeight="700"
+                    textAnchor="end"
+                    dominantBaseline="middle"
+                  >
+                    {(zone.volumeWeight * 100).toFixed(1)}%
+                  </text>
+                </g>
               </g>
             )
           })
