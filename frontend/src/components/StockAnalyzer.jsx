@@ -1070,9 +1070,32 @@ function StockAnalyzer() {
                   onExtendPeriod={extendTimePeriod}
                 />}
 
-                {/* Time Period Selector - Bottom Right */}
+                {/* Time Period Selector - Right Side (Desktop) / Bottom (Mobile) */}
                 {!chart.collapsed && (
-                  <div className="flex justify-end mt-2">
+                  <div className="absolute top-1/2 right-2 -translate-y-1/2 hidden md:block" style={{ zIndex: 5 }}>
+                    <div className="flex flex-col gap-1 bg-slate-900/95 p-2 rounded-lg border border-slate-700 backdrop-blur-sm shadow-lg">
+                      {timeRanges.map((range) => (
+                        <button
+                          type="button"
+                          key={range.label}
+                          onClick={() => changeTimeRange(range.days)}
+                          className={`px-3 py-1.5 text-xs rounded font-semibold transition-all whitespace-nowrap ${
+                            days === range.days
+                              ? 'bg-purple-600 text-white shadow-md scale-105'
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600 hover:scale-105'
+                          }`}
+                          style={{ minWidth: '50px' }}
+                        >
+                          {range.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Time Period Selector - Mobile Bottom */}
+                {!chart.collapsed && (
+                  <div className="flex justify-end mt-2 md:hidden">
                     <div className="inline-flex gap-1 bg-slate-900 p-2 rounded-lg border border-slate-700">
                       {timeRanges.map((range) => (
                         <button
