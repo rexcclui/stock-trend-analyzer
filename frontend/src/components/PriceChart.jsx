@@ -2403,13 +2403,25 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Custom component to render volume profile horizontal bars (supports multiple profiles)
   const CustomVolumeProfile = (props) => {
+    console.log('CustomVolumeProfile render:', {
+      volumeProfileEnabled,
+      profilesCount: volumeProfiles.length,
+      volumeProfileMode,
+      profiles: volumeProfiles
+    })
+
     if (!volumeProfileEnabled || volumeProfiles.length === 0) return null
 
     const { xAxisMap, yAxisMap, offset } = props
     const xAxis = xAxisMap?.[0]
     const yAxis = yAxisMap?.[0]
 
-    if (!xAxis || !yAxis) return null
+    if (!xAxis || !yAxis) {
+      console.log('CustomVolumeProfile: no xAxis or yAxis')
+      return null
+    }
+
+    console.log('CustomVolumeProfile: rendering', volumeProfiles.length, 'profiles')
 
     return (
       <g>
