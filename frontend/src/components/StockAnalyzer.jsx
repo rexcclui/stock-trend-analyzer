@@ -1034,7 +1034,7 @@ function StockAnalyzer() {
                     </button>
                   </div>}
                 </div>
-                {!chart.collapsed && <div className="pr-0 md:pr-[58px]">
+                {!chart.collapsed && <div className="pr-0 md:pr-[46px]">
                   <PriceChart
                     prices={chart.data.prices}
                     indicators={chart.data.indicators}
@@ -1075,7 +1075,7 @@ function StockAnalyzer() {
                 {/* Time Period Selector - Right Side (Desktop) / Bottom (Mobile) */}
                 {!chart.collapsed && (
                   <div className="absolute top-1/2 right-0 -translate-y-1/2 hidden md:block" style={{ zIndex: 5 }}>
-                    <div className="flex flex-col gap-0.5 bg-slate-900/95 p-1 rounded-lg border border-slate-700 backdrop-blur-sm shadow-lg">
+                    <div className="flex flex-col gap-0.5 bg-slate-900/95 p-0.5 rounded border border-slate-700 backdrop-blur-sm shadow-lg">
                       {timeRanges.map((range) => (
                         <button
                           type="button"
