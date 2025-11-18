@@ -2714,23 +2714,29 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             position: 'absolute',
             top: '10px',
             right: '10px',
-            zIndex: 10,
-            padding: '6px',
+            zIndex: 1000,
+            padding: '8px',
             backgroundColor: manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(71, 85, 105)',
-            border: 'none',
-            borderRadius: '6px',
+            border: '2px solid',
+            borderColor: manualChannelDragMode ? 'rgb(22, 163, 74)' : 'rgb(100, 116, 139)',
+            borderRadius: '8px',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            transition: 'background-color 0.2s',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
+            transition: 'all 0.2s',
+            boxShadow: manualChannelDragMode
+              ? '0 4px 6px rgba(34, 197, 94, 0.4)'
+              : '0 2px 4px rgba(0,0,0,0.3)'
           }}
           title={manualChannelDragMode ? "Drag mode enabled - Draw rectangle to plot channel" : "Click to enable drag mode"}
         >
           <Hand
-            className="w-4 h-4"
-            style={{ color: manualChannelDragMode ? 'white' : 'rgb(203, 213, 225)' }}
+            className="w-5 h-5"
+            style={{
+              color: manualChannelDragMode ? 'white' : 'rgb(203, 213, 225)',
+              strokeWidth: 2.5
+            }}
           />
         </button>
       )}
