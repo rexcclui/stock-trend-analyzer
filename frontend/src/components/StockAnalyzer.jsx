@@ -1115,8 +1115,8 @@ function StockAnalyzer() {
                           </button>
                           <input
                             type="text"
-                            placeholder="Add symbol (e.g., SPY)"
-                            className="w-28 px-2 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-100 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="Type symbol, press Enter"
+                            className="w-32 px-2 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-100 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
                             onKeyPress={(e) => {
                               if (e.key === 'Enter' && e.target.value.trim()) {
                                 const symbol = e.target.value.toUpperCase().trim()
@@ -1124,7 +1124,7 @@ function StockAnalyzer() {
                                 addComparisonStock(chart.id, symbol)
                               }
                             }}
-                            title="Enter symbol and press Enter to add"
+                            title="Type symbol and press Enter to add (e.g., SPY)"
                           />
                           {chart.comparisonStocks && chart.comparisonStocks.length > 0 && (
                             <div className="flex gap-1 items-center">
