@@ -949,6 +949,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Calculate volume profiles - returns array of profiles
   const calculateVolumeProfiles = () => {
+    console.log('calculateVolumeProfiles called - enabled:', volumeProfileEnabled, 'mode:', volumeProfileMode, 'displayPrices:', displayPrices.length, 'zoomRange:', zoomRange, 'days:', days)
+
     if (!volumeProfileEnabled || displayPrices.length === 0) return []
 
     if (volumeProfileMode === 'auto') {
@@ -960,8 +962,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const visiblePrices = visibleData.map(p => p.close)
       const yAxisMax = visiblePrices.length > 0 ? Math.max(...visiblePrices) : 0
 
+      console.log('Volume Profile Auto calculation:')
+      console.log('  - displayPrices.length:', displayPrices.length)
+      console.log('  - zoomRange:', zoomRange)
+      console.log('  - visibleData.length:', visibleData.length)
+      console.log('  - yAxisMax:', yAxisMax)
+
       const profile = calculateSingleVolumeProfile(visibleData, yAxisMax, null)
-      console.log('Volume Profile Auto - zoomRange:', zoomRange, 'visibleData:', visibleData.length, 'yAxisMax:', yAxisMax, 'profile zones:', profile?.zones.length)
+      console.log('  - profile result:', profile ? `${profile.zones.length} zones, maxVolume: ${profile.maxVolume}` : 'NULL')
       return profile ? [profile] : []
     } else {
       // Manual mode: one profile for each selected range
