@@ -2391,13 +2391,20 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           // Find the middle point of the lower bound line
           const midIndex = Math.floor((channel.startIndex + channel.endIndex) / 2)
 
-          // Adjust for zoom offset - chartDataWithZones is sliced from zoomRange.start
-          const adjustedIndex = midIndex - zoomRange.start
+          // IMPORTANT: channel indices are in displayPrices space (oldest to newest)
+          // But chartData is REVERSED (newest to oldest), so we need to convert
+          const totalDataLength = displayPrices.length
+          const midIndexReversed = totalDataLength - 1 - midIndex
+
+          // Now adjust for zoom offset - chartDataWithZones is sliced from zoomRange.start
+          const adjustedIndex = midIndexReversed - zoomRange.start
 
           console.log(`CustomManualChannelLabels channel ${channelIndex}:`, {
             channelStartIndex: channel.startIndex,
             channelEndIndex: channel.endIndex,
             midIndex,
+            totalDataLength,
+            midIndexReversed,
             adjustedIndex,
             zoomStart: zoomRange.start,
             chartDataWithZonesLength: chartDataWithZones.length,
