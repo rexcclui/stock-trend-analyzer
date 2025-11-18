@@ -3312,24 +3312,36 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             const compPositiveKey = `compPos_${compStock.symbol}`
             const compNegativeKey = `compNeg_${compStock.symbol}`
 
+            // Base colors for each comparison stock
+            const baseColors = [
+              { light: '#93c5fd', dark: '#1e40af' }, // Blue
+              { light: '#86efac', dark: '#15803d' }, // Green
+              { light: '#fde047', dark: '#a16207' }, // Yellow
+              { light: '#c4b5fd', dark: '#6d28d9' }, // Purple
+              { light: '#f9a8d4', dark: '#be185d' }, // Pink
+              { light: '#5eead4', dark: '#0f766e' }, // Teal
+            ]
+
+            const colorPair = baseColors[index % baseColors.length]
+
             return (
               <React.Fragment key={compStock.symbol}>
-                {/* Blue line when above selected stock (outperforming) */}
+                {/* Deeper/darker color when ABOVE selected stock (outperforming) */}
                 <Line
                   type="monotone"
                   dataKey={compPositiveKey}
-                  stroke="#3b82f6"
-                  strokeWidth={2}
+                  stroke={colorPair.dark}
+                  strokeWidth={2.5}
                   dot={false}
                   name={`${compStock.symbol} (Above)`}
                   connectNulls={false}
                 />
-                {/* Red line when below selected stock (underperforming) */}
+                {/* Lighter color when BELOW selected stock (underperforming) */}
                 <Line
                   type="monotone"
                   dataKey={compNegativeKey}
-                  stroke="#ef4444"
-                  strokeWidth={2}
+                  stroke={colorPair.light}
+                  strokeWidth={2.5}
                   dot={false}
                   name={`${compStock.symbol} (Below)`}
                   connectNulls={false}

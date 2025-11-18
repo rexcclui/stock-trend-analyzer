@@ -1145,22 +1145,35 @@ function StockAnalyzer() {
                           />
                           {chart.comparisonStocks && chart.comparisonStocks.length > 0 && (
                             <div className="flex gap-1 items-center">
-                              {chart.comparisonStocks.map((stock, index) => (
-                                <span
-                                  key={index}
-                                  className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 text-white rounded"
-                                >
-                                  {stock.symbol}
-                                  <button
-                                    type="button"
-                                    onClick={() => removeComparisonStock(chart.id, index)}
-                                    className="hover:text-red-300"
-                                    title="Remove"
+                              {chart.comparisonStocks.map((stock, index) => {
+                                // Match the color palette from PriceChart
+                                const tagColors = [
+                                  'bg-blue-600',   // Blue
+                                  'bg-green-600',  // Green
+                                  'bg-yellow-600', // Yellow
+                                  'bg-purple-600', // Purple
+                                  'bg-pink-600',   // Pink
+                                  'bg-teal-600',   // Teal
+                                ]
+                                const tagColor = tagColors[index % tagColors.length]
+
+                                return (
+                                  <span
+                                    key={index}
+                                    className={`inline-flex items-center gap-1 px-2 py-1 text-xs ${tagColor} text-white rounded`}
                                   >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                </span>
-                              ))}
+                                    {stock.symbol}
+                                    <button
+                                      type="button"
+                                      onClick={() => removeComparisonStock(chart.id, index)}
+                                      className="hover:text-red-300"
+                                      title="Remove"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </span>
+                                )
+                              })}
                             </div>
                           )}
                         </>
