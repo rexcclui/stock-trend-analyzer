@@ -1034,7 +1034,7 @@ function StockAnalyzer() {
                     </button>
                   </div>}
                 </div>
-                {!chart.collapsed && <div className="pr-0 md:pr-20">
+                {!chart.collapsed && <div className="pr-0 md:pr-1">
                   <PriceChart
                     prices={chart.data.prices}
                     indicators={chart.data.indicators}

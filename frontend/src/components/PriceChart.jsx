@@ -1293,10 +1293,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // Handle manual channel selection - only when drag mode is enabled
     if (manualChannelEnabled && manualChannelDragMode && isSelecting && e && e.activeLabel) {
       setSelectionEnd(e.activeLabel)
+      return // Prevent volume profile selection when in manual channel drag mode
     }
 
-    // Handle volume profile manual selection
-    if (volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && e && e.activeLabel) {
+    // Handle volume profile manual selection - only when NOT in manual channel drag mode
+    if (volumeProfileEnabled && volumeProfileMode === 'manual' && !manualChannelDragMode && isSelectingVolumeProfile && e && e.activeLabel) {
       setVolumeProfileSelectionEnd(e.activeLabel)
     }
   }
@@ -1326,8 +1327,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       setSelectionStart(e.activeLabel)
       setSelectionEnd(e.activeLabel)
       // Don't clear previous channels - they accumulate
+      return // Prevent volume profile selection when in manual channel drag mode
     }
-    if (volumeProfileEnabled && volumeProfileMode === 'manual' && e && e.activeLabel) {
+    // Volume profile manual selection - only when NOT in manual channel drag mode
+    if (volumeProfileEnabled && volumeProfileMode === 'manual' && !manualChannelDragMode && e && e.activeLabel) {
       setIsSelectingVolumeProfile(true)
       setVolumeProfileSelectionStart(e.activeLabel)
       setVolumeProfileSelectionEnd(e.activeLabel)
@@ -2714,7 +2717,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           style={{
             position: 'absolute',
             top: '50%',
-            right: '85px',
+            right: '72px',
             transform: 'translateY(-50%)',
             zIndex: 1001,
             display: 'flex',
