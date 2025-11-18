@@ -957,8 +957,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const yAxisMax = Math.max(...allPrices)
 
     if (volumeProfileMode === 'auto') {
-      // Auto mode: single profile for all data
-      const profile = calculateSingleVolumeProfile(displayPrices, yAxisMax, null)
+      // Auto mode: single profile for visible (zoomed) data
+      // Use visibleChartData to respect current zoom/pan state
+      const visibleData = displayPrices.slice(zoomRange.start, zoomRange.end === null ? displayPrices.length : zoomRange.end)
+      const profile = calculateSingleVolumeProfile(visibleData, yAxisMax, null)
       return profile ? [profile] : []
     } else {
       // Manual mode: one profile for each selected range

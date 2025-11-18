@@ -808,27 +808,6 @@ function StockAnalyzer() {
                   </button>
                 </div>
               </div>
-              <div className="flex flex-col">
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Time Period
-                </label>
-                <div className="flex gap-1 flex-wrap">
-                  {timeRanges.map((range) => (
-                    <button
-                      type="button"
-                      key={range.label}
-                      onClick={() => changeTimeRange(range.days)}
-                      className={`px-2 py-1 text-sm rounded font-medium transition-colors ${
-                        days === range.days
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                    >
-                      {range.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -1090,6 +1069,28 @@ function StockAnalyzer() {
                   onZoomChange={updateGlobalZoom}
                   onExtendPeriod={extendTimePeriod}
                 />}
+
+                {/* Time Period Selector - Bottom Right */}
+                {!chart.collapsed && (
+                  <div className="flex justify-end mt-2">
+                    <div className="inline-flex gap-1 bg-slate-900 p-2 rounded-lg border border-slate-700">
+                      {timeRanges.map((range) => (
+                        <button
+                          type="button"
+                          key={range.label}
+                          onClick={() => changeTimeRange(range.days)}
+                          className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
+                            days === range.days
+                              ? 'bg-purple-600 text-white'
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        >
+                          {range.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Technical Indicators */}
