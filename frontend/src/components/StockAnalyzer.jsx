@@ -562,6 +562,8 @@ function StockAnalyzer() {
     const chart = charts.find(c => c.id === chartId)
     if (!chart) return
 
+    console.log(`[Comparison] Adding comparison stock: ${symbol}`)
+
     // Check if symbol already exists
     if (chart.comparisonStocks.some(s => s.symbol === symbol)) {
       setError(`${symbol} is already added for comparison`)
@@ -590,6 +592,8 @@ function StockAnalyzer() {
         console.log(`[Cache] ✅ Cache HIT for ${symbol}:${maxDays}`)
       }
 
+      console.log(`[Comparison] Successfully added ${symbol} to comparison stocks`)
+
       setCharts(prevCharts =>
         prevCharts.map(c => {
           if (c.id === chartId) {
@@ -602,7 +606,7 @@ function StockAnalyzer() {
         })
       )
     } catch (err) {
-      console.error('Failed to fetch comparison stock data:', err)
+      console.error('[Comparison] Failed to fetch comparison stock data:', err)
       setError(`Failed to fetch ${symbol} data for comparison`)
       setTimeout(() => setError(null), 3000)
     }
@@ -1118,8 +1122,10 @@ function StockAnalyzer() {
                             placeholder="Type symbol, press Enter"
                             className="w-32 px-2 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-100 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
                             onKeyPress={(e) => {
+                              console.log(`[Input] Key pressed: ${e.key}, value: ${e.target.value}`)
                               if (e.key === 'Enter' && e.target.value.trim()) {
                                 const symbol = e.target.value.toUpperCase().trim()
+                                console.log(`[Input] Enter pressed, adding symbol: ${symbol}`)
                                 e.target.value = ''
                                 addComparisonStock(chart.id, symbol)
                               }
