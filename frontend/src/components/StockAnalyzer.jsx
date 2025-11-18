@@ -18,7 +18,7 @@ function StockAnalyzer() {
   const [syncedMouseDate, setSyncedMouseDate] = useState(null)
   const [stockHistory, setStockHistory] = useState([])
   const [displayColumns, setDisplayColumns] = useState(1)
-  const [chartHeight, setChartHeight] = useState(400)
+  const [chartHeight, setChartHeight] = useState(460) // Increased by 15% from 400
   const [smaDialogOpen, setSmaDialogOpen] = useState(false)
   const [editingSmaChartId, setEditingSmaChartId] = useState(null)
   const [slopeChannelDialogOpen, setSlopeChannelDialogOpen] = useState(false)

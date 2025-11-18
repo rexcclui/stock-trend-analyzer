@@ -2708,37 +2708,74 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
       {/* Manual Channel Drag Mode Toggle Button */}
       {manualChannelEnabled && (
-        <button
-          onClick={() => setManualChannelDragMode(!manualChannelDragMode)}
+        <div
           style={{
             position: 'absolute',
-            top: '10px',
-            right: '10px',
+            top: '50%',
+            right: '5px',
+            transform: 'translateY(-50%)',
             zIndex: 1000,
-            padding: '8px',
-            backgroundColor: manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(71, 85, 105)',
-            border: '2px solid',
-            borderColor: manualChannelDragMode ? 'rgb(22, 163, 74)' : 'rgb(100, 116, 139)',
-            borderRadius: '8px',
-            cursor: 'pointer',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.2s',
-            boxShadow: manualChannelDragMode
-              ? '0 4px 6px rgba(34, 197, 94, 0.4)'
-              : '0 2px 4px rgba(0,0,0,0.3)'
+            flexDirection: 'column',
+            gap: '4px',
+            alignItems: 'center'
           }}
-          title={manualChannelDragMode ? "Drag mode enabled - Draw rectangle to plot channel" : "Click to enable drag mode"}
         >
-          <Hand
-            className="w-5 h-5"
+          {/* Label */}
+          <div
             style={{
-              color: manualChannelDragMode ? 'white' : 'rgb(203, 213, 225)',
-              strokeWidth: 2.5
+              fontSize: '10px',
+              fontWeight: '600',
+              color: manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(148, 163, 184)',
+              backgroundColor: 'rgba(15, 23, 42, 0.9)',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              whiteSpace: 'nowrap',
+              border: '1px solid',
+              borderColor: manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(71, 85, 105)'
             }}
-          />
-        </button>
+          >
+            {manualChannelDragMode ? 'DRAW' : 'PAN'}
+          </div>
+
+          {/* Hand Icon Button */}
+          <button
+            onClick={() => setManualChannelDragMode(!manualChannelDragMode)}
+            style={{
+              padding: '10px',
+              backgroundColor: manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(71, 85, 105)',
+              border: '3px solid',
+              borderColor: manualChannelDragMode ? 'rgb(22, 163, 74)' : 'rgb(100, 116, 139)',
+              borderRadius: '12px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s',
+              boxShadow: manualChannelDragMode
+                ? '0 0 12px rgba(34, 197, 94, 0.6), 0 4px 8px rgba(0,0,0,0.3)'
+                : '0 2px 4px rgba(0,0,0,0.3)',
+              animation: manualChannelDragMode ? 'pulse 2s infinite' : 'none'
+            }}
+            title={manualChannelDragMode ? "Drag mode ON - Draw rectangle to plot channel" : "Click to enable drag mode"}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.1)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)'
+            }}
+          >
+            <Hand
+              style={{
+                width: '24px',
+                height: '24px',
+                color: 'white',
+                strokeWidth: 2.5,
+                filter: manualChannelDragMode ? 'drop-shadow(0 0 2px rgba(255,255,255,0.5))' : 'none'
+              }}
+            />
+          </button>
+        </div>
       )}
 
       <ResponsiveContainer>
