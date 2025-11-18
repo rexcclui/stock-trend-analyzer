@@ -1093,15 +1093,23 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       console.log(`[Comparison] First date: ${firstDisplayDate}, Selected: ${selectedFirstPrice}, ${compStock.symbol}: ${compFirstPrice}`)
 
       // Calculate line values for each data point
+      // IMPORTANT: Only calculate for points from visibleStartIndex onwards
+      // Points before the visible start should be null
       for (let i = 0; i < displayPrices.length; i++) {
+        // Skip points before visible start - they should be null
+        if (i < visibleStartIndex) {
+          lineData[i] = null
+          continue
+        }
+
         const currentPrice = displayPrices[i]
         const compCurrentPrice = compPriceByDate[currentPrice.date]
 
         if (compCurrentPrice && currentPrice.close && selectedFirstPrice !== 0 && compFirstPrice !== 0) {
-          // Historical % change of selected stock (from first displayed date)
+          // Historical % change of selected stock (from first VISIBLE date)
           const selectedHistPctChg = (currentPrice.close - selectedFirstPrice) / selectedFirstPrice
 
-          // Historical % change of comparison stock (from first displayed date)
+          // Historical % change of comparison stock (from first VISIBLE date)
           const compHistPctChg = (compCurrentPrice - compFirstPrice) / compFirstPrice
 
           // Perf Difference %
@@ -1210,28 +1218,15 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             const perfDiff = ((lineValue / price.close) - 1) * 100
             dataPoint[compPerfKey] = perfDiff
 
-            // Check if this is a crossover point (previous point had opposite sign)
-            const prevIndex = index - 1
-            let isCrossover = false
-            if (prevIndex >= 0 && comparisonLines[symbol][prevIndex] && displayPrices[prevIndex]) {
-              const prevLineValue = comparisonLines[symbol][prevIndex]
-              const prevPrice = displayPrices[prevIndex].close
-              const prevPerfDiff = ((prevLineValue / prevPrice) - 1) * 100
-              isCrossover = (perfDiff > 0) !== (prevPerfDiff > 0) // Sign changed
-            }
-
-            // Split into positive (blue, outperforming) and negative (red, underperforming)
-            // At crossover points, set both values to ensure continuity
-            if (perfDiff > 0 || isCrossover) {
+            // Simple split: no crossover overlap
+            // Blue when comparison line is above selected stock (outperforming)
+            // Red when comparison line is below selected stock (underperforming)
+            if (lineValue > price.close) {
               dataPoint[compPositiveKey] = lineValue
+              dataPoint[compNegativeKey] = null
             } else {
               dataPoint[compPositiveKey] = null
-            }
-
-            if (perfDiff <= 0 || isCrossover) {
               dataPoint[compNegativeKey] = lineValue
-            } else {
-              dataPoint[compNegativeKey] = null
             }
           } else {
             dataPoint[compPerfKey] = null
