@@ -951,20 +951,26 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const calculateVolumeProfiles = () => {
     if (!volumeProfileEnabled || displayPrices.length === 0) return []
 
-    // Calculate y-axis maximum from all displayed data
-    const allPrices = displayPrices.map(p => p.close)
-    const yAxisMax = Math.max(...allPrices)
-
     if (volumeProfileMode === 'auto') {
       // Auto mode: single profile for visible (zoomed) data
       // Use visibleChartData to respect current zoom/pan state
       const visibleData = displayPrices.slice(zoomRange.start, zoomRange.end === null ? displayPrices.length : zoomRange.end)
+
+      // Calculate y-axis max from VISIBLE data only for proper scaling
+      const visiblePrices = visibleData.map(p => p.close)
+      const yAxisMax = visiblePrices.length > 0 ? Math.max(...visiblePrices) : 0
+
       const profile = calculateSingleVolumeProfile(visibleData, yAxisMax, null)
-      console.log('Volume Profile Auto - zoomRange:', zoomRange, 'visibleData:', visibleData.length, 'profile zones:', profile?.zones.length)
+      console.log('Volume Profile Auto - zoomRange:', zoomRange, 'visibleData:', visibleData.length, 'yAxisMax:', yAxisMax, 'profile zones:', profile?.zones.length)
       return profile ? [profile] : []
     } else {
       // Manual mode: one profile for each selected range
       if (volumeProfileManualRanges.length === 0) return []
+
+      // Calculate y-axis max from visible (zoomed) data for proper scaling
+      const visibleData = displayPrices.slice(zoomRange.start, zoomRange.end === null ? displayPrices.length : zoomRange.end)
+      const visiblePrices = visibleData.map(p => p.close)
+      const yAxisMax = visiblePrices.length > 0 ? Math.max(...visiblePrices) : 0
 
       const profiles = []
       volumeProfileManualRanges.forEach(range => {
