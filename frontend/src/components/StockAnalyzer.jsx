@@ -1016,6 +1016,21 @@ function StockAnalyzer() {
                     >
                       Manual Channel
                     </button>
+                    {chart.manualChannelEnabled && (
+                      <button
+                        type="button"
+                        onClick={() => toggleManualChannelDragMode(chart.id)}
+                        className={`px-3 py-1 text-sm rounded font-bold transition-colors flex items-center gap-1 ${
+                          chart.manualChannelDragMode
+                            ? 'bg-green-600 text-white animate-pulse'
+                            : 'bg-yellow-500 text-black'
+                        }`}
+                        title={chart.manualChannelDragMode ? "DRAW MODE - Drag to select range" : "PAN MODE - Click to enable draw mode"}
+                      >
+                        <Hand className="w-4 h-4" />
+                        {chart.manualChannelDragMode ? 'DRAW' : 'PAN'}
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => openSmaDialog(chart.id)}
@@ -1049,66 +1064,7 @@ function StockAnalyzer() {
                     </button>
                   </div>}
                 </div>
-                {/* Hand Icon - Toggle Drag Mode (positioned relative to parent chart container) */}
-                {!chart.collapsed && chart.manualChannelEnabled && (
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '80px',
-                      left: '30px',
-                      zIndex: 10000,
-                      display: 'flex',
-                      flexDirection: 'row',
-                      gap: '8px',
-                      alignItems: 'center',
-                      pointerEvents: 'auto',
-                      backgroundColor: 'rgba(234, 179, 8, 0.95)',
-                      padding: '16px 20px',
-                      borderRadius: '12px',
-                      border: '4px solid rgb(202, 138, 4)',
-                      boxShadow: '0 0 30px rgba(234, 179, 8, 1), 0 4px 12px rgba(0, 0, 0, 0.8)'
-                    }}
-                  >
-                    <button
-                      onClick={() => toggleManualChannelDragMode(chart.id)}
-                      style={{
-                        padding: '14px',
-                        backgroundColor: chart.manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(234, 179, 8)',
-                        border: '4px solid',
-                        borderColor: chart.manualChannelDragMode ? 'rgb(22, 163, 74)' : 'rgb(202, 138, 4)',
-                        borderRadius: '10px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 0.2s'
-                      }}
-                      title={chart.manualChannelDragMode ? "Drag mode ON - Draw rectangle to plot channel" : "Click to enable drag mode"}
-                    >
-                      <Hand
-                        style={{
-                          width: '36px',
-                          height: '36px',
-                          color: 'black',
-                          strokeWidth: 3
-                        }}
-                      />
-                    </button>
-                    <div
-                      style={{
-                        fontSize: '16px',
-                        fontWeight: '900',
-                        color: 'black',
-                        whiteSpace: 'nowrap',
-                        textShadow: '0 0 4px rgba(255,255,255,0.5)'
-                      }}
-                    >
-                      {chart.manualChannelDragMode ? 'DRAW MODE' : 'PAN MODE'}
-                    </div>
-                  </div>
-                )}
-
-                {!chart.collapsed && <div className="pr-0">
+                {!chart.collapsed && <div className="pr-0 md:pr-10">
                   <PriceChart
                     prices={chart.data.prices}
                     indicators={chart.data.indicators}
@@ -1150,18 +1106,18 @@ function StockAnalyzer() {
                 {/* Time Period Selector - Right Side (Desktop) / Bottom (Mobile) */}
                 {!chart.collapsed && (
                   <div className="absolute top-1/2 right-0 -translate-y-1/2 hidden md:block" style={{ zIndex: 5 }}>
-                    <div className="flex flex-col gap-0 bg-slate-900/95 p-0 rounded border border-slate-700 backdrop-blur-sm shadow-lg">
+                    <div className="flex flex-col gap-0 bg-slate-900/95 rounded border border-slate-700 backdrop-blur-sm shadow-lg overflow-hidden">
                       {timeRanges.map((range) => (
                         <button
                           type="button"
                           key={range.label}
                           onClick={() => changeTimeRange(range.days)}
-                          className={`px-1.5 py-0.5 text-xs rounded-none first:rounded-t last:rounded-b font-semibold transition-all whitespace-nowrap ${
+                          className={`px-1 py-0.5 text-[10px] font-bold transition-all whitespace-nowrap border-0 ${
                             days === range.days
-                              ? 'bg-purple-600 text-white shadow-md'
+                              ? 'bg-purple-600 text-white'
                               : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                           }`}
-                          style={{ minWidth: '38px' }}
+                          style={{ minWidth: '32px', lineHeight: '1.2' }}
                         >
                           {range.label}
                         </button>
