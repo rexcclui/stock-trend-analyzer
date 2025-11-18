@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
-import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp, Hand } from 'lucide-react'
 import PriceChart from './PriceChart'
 import IndicatorsChart from './IndicatorsChart'
 import SignalsList from './SignalsList'
@@ -111,6 +111,7 @@ function StockAnalyzer() {
         slopeChannelWidthMultiplier: 2.5,
         findAllChannelEnabled: false,
         manualChannelEnabled: false,
+        manualChannelDragMode: false,
         collapsed: false
       }
       setCharts(prevCharts => [...prevCharts, newChart])
@@ -330,6 +331,20 @@ function StockAnalyzer() {
           return {
             ...chart,
             manualChannelEnabled: !chart.manualChannelEnabled
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const toggleManualChannelDragMode = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            manualChannelDragMode: !chart.manualChannelDragMode
           }
         }
         return chart
@@ -830,7 +845,7 @@ function StockAnalyzer() {
           {charts.map((chart) => (
             <div key={chart.id} className="space-y-6">
               {/* Price Chart */}
-              <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 relative">
+              <div className="bg-slate-800 p-6 pr-0 rounded-lg border border-slate-700 relative">
                 {/* Collapse and Close buttons */}
                 <div className="absolute top-4 right-4 flex gap-2">
                   <button
@@ -1034,7 +1049,65 @@ function StockAnalyzer() {
                     </button>
                   </div>}
                 </div>
-                {!chart.collapsed && <div className="pr-0 md:pr-[44px]">
+                {!chart.collapsed && <div className="pr-0 md:pr-12 relative">
+                  {/* Hand Icon - Toggle Drag Mode */}
+                  {chart.manualChannelEnabled && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '20px',
+                        left: '20px',
+                        zIndex: 1000,
+                        display: 'flex',
+                        flexDirection: 'row',
+                        gap: '8px',
+                        alignItems: 'center',
+                        pointerEvents: 'auto',
+                        backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                        padding: '12px 16px',
+                        borderRadius: '12px',
+                        border: '3px solid',
+                        borderColor: chart.manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(234, 179, 8)',
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)'
+                      }}
+                    >
+                      <button
+                        onClick={() => toggleManualChannelDragMode(chart.id)}
+                        style={{
+                          padding: '12px',
+                          backgroundColor: chart.manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(234, 179, 8)',
+                          border: '3px solid',
+                          borderColor: chart.manualChannelDragMode ? 'rgb(22, 163, 74)' : 'rgb(202, 138, 4)',
+                          borderRadius: '10px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 0.2s'
+                        }}
+                        title={chart.manualChannelDragMode ? "Drag mode ON - Draw rectangle to plot channel" : "Click to enable drag mode"}
+                      >
+                        <Hand
+                          style={{
+                            width: '32px',
+                            height: '32px',
+                            color: 'white',
+                            strokeWidth: 3
+                          }}
+                        />
+                      </button>
+                      <div
+                        style={{
+                          fontSize: '14px',
+                          fontWeight: '700',
+                          color: chart.manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(234, 179, 8)',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {chart.manualChannelDragMode ? 'DRAW MODE' : 'PAN MODE'}
+                      </div>
+                    </div>
+                  )}
                   <PriceChart
                     prices={chart.data.prices}
                     indicators={chart.data.indicators}
@@ -1064,6 +1137,7 @@ function StockAnalyzer() {
                     onSlopeChannelParamsChange={(params) => updateSlopeChannelParams(chart.id, params)}
                     findAllChannelEnabled={chart.findAllChannelEnabled}
                     manualChannelEnabled={chart.manualChannelEnabled}
+                    manualChannelDragMode={chart.manualChannelDragMode}
                     chartHeight={chartHeight}
                     days={days}
                     zoomRange={globalZoomRange}
