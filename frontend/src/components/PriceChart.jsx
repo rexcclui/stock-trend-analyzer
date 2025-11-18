@@ -1048,88 +1048,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     }
   })()
 
-  // Calculate comparison lines for 'line' mode
-  // Each line value = (Perf Difference % + 1) × current data point of selected stock
-  // Perf Difference % = (historical % chg of compare stock - historical % chg of selected stock)
-  const comparisonLines = (() => {
-    if (comparisonMode !== 'line' || !comparisonStocks || comparisonStocks.length === 0) {
-      return {}
-    }
-
-    const result = {}
-
-    // Get first date and price of VISIBLE (zoomed) selected stock data
-    if (displayPrices.length === 0) return result
-
-    // Use zoomRange to find the visible start index
-    const visibleStartIndex = zoomRange.start || 0
-    if (visibleStartIndex >= displayPrices.length) return result
-
-    const firstDisplayDate = displayPrices[visibleStartIndex].date
-    const selectedFirstPrice = displayPrices[visibleStartIndex].close
-    if (!selectedFirstPrice) return result
-
-    console.log(`[Comparison] Zoom range: ${zoomRange.start} to ${zoomRange.end}, Using visible start index: ${visibleStartIndex}, date: ${firstDisplayDate}`)
-
-    comparisonStocks.forEach((compStock) => {
-      const lineData = []
-
-      // Build a map of comparison stock prices by date
-      const compPriceByDate = {}
-      if (compStock.data && compStock.data.prices) {
-        compStock.data.prices.forEach(p => {
-          compPriceByDate[p.date] = p.close
-        })
-      }
-
-      // Get first price of comparison stock ON THE SAME DATE as the first displayed price
-      const compFirstPrice = compPriceByDate[firstDisplayDate]
-      if (!compFirstPrice) {
-        console.warn(`[Comparison] No data for ${compStock.symbol} on start date ${firstDisplayDate}`)
-        result[compStock.symbol] = []
-        return
-      }
-
-      console.log(`[Comparison] First date: ${firstDisplayDate}, Selected: ${selectedFirstPrice}, ${compStock.symbol}: ${compFirstPrice}`)
-
-      // Calculate line values for each data point
-      // IMPORTANT: Only calculate for points from visibleStartIndex onwards
-      // Points before the visible start should be null
-      for (let i = 0; i < displayPrices.length; i++) {
-        // Skip points before visible start - they should be null
-        if (i < visibleStartIndex) {
-          lineData[i] = null
-          continue
-        }
-
-        const currentPrice = displayPrices[i]
-        const compCurrentPrice = compPriceByDate[currentPrice.date]
-
-        if (compCurrentPrice && currentPrice.close && selectedFirstPrice !== 0 && compFirstPrice !== 0) {
-          // Historical % change of selected stock (from first VISIBLE date)
-          const selectedHistPctChg = (currentPrice.close - selectedFirstPrice) / selectedFirstPrice
-
-          // Historical % change of comparison stock (from first VISIBLE date)
-          const compHistPctChg = (compCurrentPrice - compFirstPrice) / compFirstPrice
-
-          // Perf Difference %
-          const perfDiffPct = compHistPctChg - selectedHistPctChg
-
-          // Plot value = (Perf Difference % + 1) × current data point of selected stock
-          const plotValue = (perfDiffPct + 1) * currentPrice.close
-
-          lineData[i] = plotValue
-        } else {
-          lineData[i] = null
-        }
-      }
-
-      result[compStock.symbol] = lineData
-    })
-
-    return result
-  })()
-
   const slopeChannelInfo = slopeChannelEnabled ? calculateSlopeChannel(displayPrices, true, slopeChannelVolumeWeighted) : null
   const zoneColors = slopeChannelEnabled && slopeChannelInfo
     ? calculateZoneColors(displayPrices, slopeChannelInfo, slopeChannelZones)
@@ -1190,52 +1108,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // Try backend data first, fall back to frontend calculation
       dataPoint[smaKey] = indicator[smaKey] || smaCache[period][index]
     })
-
-    // Add comparison line data for 'line' mode
-    if (comparisonMode === 'line' && Object.keys(comparisonLines).length > 0) {
-      Object.keys(comparisonLines).forEach(symbol => {
-        const compLineKey = `comp_${symbol}`
-        const compPriceKey = `compPrice_${symbol}` // Actual price of comparison stock
-        const compPerfKey = `compPerf_${symbol}` // Performance difference %
-        const compPositiveKey = `compPos_${symbol}` // Line value when outperforming (blue)
-        const compNegativeKey = `compNeg_${symbol}` // Line value when underperforming (red)
-
-        const lineValue = comparisonLines[symbol][index]
-        dataPoint[compLineKey] = lineValue
-
-        // Store the actual comparison stock price and performance % for tooltip
-        const compStock = comparisonStocks.find(cs => cs.symbol === symbol)
-        if (compStock && compStock.data && compStock.data.prices) {
-          const compPriceByDate = {}
-          compStock.data.prices.forEach(p => {
-            compPriceByDate[p.date] = p.close
-          })
-          const compPrice = compPriceByDate[price.date]
-          dataPoint[compPriceKey] = compPrice || null
-
-          // Calculate performance difference %
-          if (lineValue && price.close) {
-            const perfDiff = ((lineValue / price.close) - 1) * 100
-            dataPoint[compPerfKey] = perfDiff
-
-            // Simple split: no crossover overlap
-            // Blue when comparison line is above selected stock (outperforming)
-            // Red when comparison line is below selected stock (underperforming)
-            if (lineValue > price.close) {
-              dataPoint[compPositiveKey] = lineValue
-              dataPoint[compNegativeKey] = null
-            } else {
-              dataPoint[compPositiveKey] = null
-              dataPoint[compNegativeKey] = lineValue
-            }
-          } else {
-            dataPoint[compPerfKey] = null
-            dataPoint[compPositiveKey] = null
-            dataPoint[compNegativeKey] = null
-          }
-        }
-      })
-    }
 
     // Add slope channel data if enabled
     if (slopeChannelInfo && slopeChannelInfo.channelData[index]) {
@@ -1324,9 +1196,74 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return dataPoint
   }).reverse() // Show oldest to newest
 
-  // Apply zoom range to chart data
+  // Apply zoom range to chart data FIRST
   const endIndex = zoomRange.end === null ? chartData.length : zoomRange.end
-  const visibleChartData = chartData.slice(zoomRange.start, endIndex)
+  let visibleChartData = chartData.slice(zoomRange.start, endIndex)
+
+  // NOW calculate and inject comparison lines based on the ACTUAL visible data
+  // This ensures the baseline is ALWAYS the first VISIBLE point
+  if (comparisonMode === 'line' && comparisonStocks && comparisonStocks.length > 0 && visibleChartData.length > 0) {
+    // Get the FIRST VISIBLE data point as baseline
+    const firstVisiblePoint = visibleChartData[0]
+    const firstVisibleDate = firstVisiblePoint.date
+    const selectedFirstPrice = firstVisiblePoint.close
+
+    if (selectedFirstPrice) {
+      console.log(`[Comparison] Baseline from FIRST VISIBLE point - Date: ${firstVisibleDate}, Price: ${selectedFirstPrice}`)
+
+      comparisonStocks.forEach((compStock) => {
+        // Build a map of comparison stock prices by date
+        const compPriceByDate = {}
+        if (compStock.data && compStock.data.prices) {
+          compStock.data.prices.forEach(p => {
+            compPriceByDate[p.date] = p.close
+          })
+        }
+
+        // Get baseline comparison price at the SAME date
+        const compFirstPrice = compPriceByDate[firstVisibleDate]
+        if (!compFirstPrice) {
+          console.warn(`[Comparison] No data for ${compStock.symbol} on baseline date ${firstVisibleDate}`)
+          return
+        }
+
+        console.log(`[Comparison] ${compStock.symbol} baseline: ${compFirstPrice}`)
+
+        // Inject comparison data into each visible point
+        visibleChartData = visibleChartData.map((point, index) => {
+          const compCurrentPrice = compPriceByDate[point.date]
+
+          if (!compCurrentPrice || !point.close) {
+            return point
+          }
+
+          // Historical % change from baseline (first visible point)
+          const selectedHistPctChg = (point.close - selectedFirstPrice) / selectedFirstPrice
+          const compHistPctChg = (compCurrentPrice - compFirstPrice) / compFirstPrice
+
+          // Performance difference
+          const perfDiffPct = compHistPctChg - selectedHistPctChg
+
+          // Comparison line value
+          const lineValue = (perfDiffPct + 1) * point.close
+
+          // Add comparison data to this point
+          const compPriceKey = `compPrice_${compStock.symbol}`
+          const compPerfKey = `compPerf_${compStock.symbol}`
+          const compPositiveKey = `compPos_${compStock.symbol}`
+          const compNegativeKey = `compNeg_${compStock.symbol}`
+
+          return {
+            ...point,
+            [compPriceKey]: compCurrentPrice,
+            [compPerfKey]: perfDiffPct * 100,
+            [compPositiveKey]: lineValue > point.close ? lineValue : null,
+            [compNegativeKey]: lineValue <= point.close ? lineValue : null
+          }
+        })
+      })
+    }
+  }
 
   // Handle mouse wheel for zoom
   const handleWheel = (e) => {
