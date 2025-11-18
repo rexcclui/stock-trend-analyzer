@@ -950,8 +950,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Calculate volume profiles - returns array of profiles
   const calculateVolumeProfiles = () => {
-    console.log('calculateVolumeProfiles called - enabled:', volumeProfileEnabled, 'mode:', volumeProfileMode, 'displayPrices:', displayPrices.length, 'zoomRange:', zoomRange, 'days:', days)
-
     if (!volumeProfileEnabled || displayPrices.length === 0) return []
 
     // Important: chartData is reversed, so we need to use reversed displayPrices for correct slicing
@@ -966,14 +964,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const visiblePrices = visibleData.map(p => p.close)
       const yAxisMax = visiblePrices.length > 0 ? Math.max(...visiblePrices) : 0
 
-      console.log('Volume Profile Auto calculation:')
-      console.log('  - displayPrices.length:', displayPrices.length)
-      console.log('  - zoomRange:', zoomRange)
-      console.log('  - visibleData.length:', visibleData.length)
-      console.log('  - yAxisMax:', yAxisMax)
-
       const profile = calculateSingleVolumeProfile(visibleData, yAxisMax, null, false)
-      console.log('  - profile result:', profile ? `${profile.zones.length} zones, maxVolume: ${profile.maxVolume}` : 'NULL')
       return profile ? [profile] : []
     } else {
       // Manual mode: one profile for each selected range (20% more zones than auto)
@@ -1401,7 +1392,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const dataSegment = displayPrices.slice(minIndex, maxIndex + 1)
 
     if (dataSegment.length < 5) {
-      console.log('Selected range too small (minimum 5 points required)')
       return
     }
 
@@ -2430,14 +2420,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Custom component to render stdev labels beneath middle of lower bound slope for manual channels
   const CustomManualChannelLabels = (props) => {
-    console.log('CustomManualChannelLabels render:', {
-      manualChannelEnabled,
-      manualChannelsCount: manualChannels.length,
-      zoomStart: zoomRange.start,
-      chartDataWithZonesLength: chartDataWithZones.length,
-      manualChannels
-    })
-
     if (!manualChannelEnabled || manualChannels.length === 0) return null
 
     const { xAxisMap, yAxisMap } = props
@@ -2445,7 +2427,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const yAxis = yAxisMap?.[0]
 
     if (!xAxis || !yAxis) {
-      console.log('CustomManualChannelLabels: No xAxis or yAxis')
       return null
     }
 
@@ -2471,51 +2452,31 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           // Now adjust for zoom offset - chartDataWithZones is sliced from zoomRange.start
           const adjustedIndex = midIndexReversed - zoomRange.start
 
-          console.log(`CustomManualChannelLabels channel ${channelIndex}:`, {
-            channelStartIndex: channel.startIndex,
-            channelEndIndex: channel.endIndex,
-            midIndex,
-            totalDataLength,
-            midIndexReversed,
-            adjustedIndex,
-            zoomStart: zoomRange.start,
-            chartDataWithZonesLength: chartDataWithZones.length,
-            optimalStdevMult: channel.optimalStdevMult
-          })
-
           // Check if the midpoint is within the visible range
           if (adjustedIndex < 0 || adjustedIndex >= chartDataWithZones.length) {
-            console.log(`CustomManualChannelLabels channel ${channelIndex}: OUT OF RANGE`)
             return null
           }
 
           // Get the data point at the middle
           const midPoint = chartDataWithZones[adjustedIndex]
           if (!midPoint) {
-            console.log(`CustomManualChannelLabels channel ${channelIndex}: NO MID POINT`)
             return null
           }
 
           const lowerValue = midPoint[`manualChannel${channelIndex}Lower`]
           if (lowerValue === undefined) {
-            console.log(`CustomManualChannelLabels channel ${channelIndex}: NO LOWER VALUE`)
             return null
           }
 
           const x = xAxis.scale(midPoint.date)
           const y = yAxis.scale(lowerValue)
 
-          console.log(`CustomManualChannelLabels channel ${channelIndex}: x=${x}, y=${y}, lowerValue=${lowerValue}`)
-
           if (x === undefined || y === undefined) {
-            console.log(`CustomManualChannelLabels channel ${channelIndex}: X or Y is undefined`)
             return null
           }
 
           const color = channelColors[channelIndex % channelColors.length]
           const stdevText = `${channel.optimalStdevMult.toFixed(2)}σ`
-
-          console.log(`CustomManualChannelLabels channel ${channelIndex}: RENDERING LABEL at (${x}, ${y}) with text "${stdevText}"`)
 
           return (
             <g key={`manual-channel-label-${channelIndex}`}>
@@ -2551,13 +2512,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Custom component to render volume profile horizontal bars (supports multiple profiles)
   const CustomVolumeProfile = (props) => {
-    console.log('CustomVolumeProfile render:', {
-      volumeProfileEnabled,
-      profilesCount: volumeProfiles.length,
-      volumeProfileMode,
-      profiles: volumeProfiles
-    })
-
     if (!volumeProfileEnabled || volumeProfiles.length === 0) return null
 
     const { xAxisMap, yAxisMap, offset } = props
@@ -2565,11 +2519,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const yAxis = yAxisMap?.[0]
 
     if (!xAxis || !yAxis) {
-      console.log('CustomVolumeProfile: no xAxis or yAxis')
       return null
     }
-
-    console.log('CustomVolumeProfile: rendering', volumeProfiles.length, 'profiles')
 
     return (
       <g>
