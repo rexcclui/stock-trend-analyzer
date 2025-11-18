@@ -2548,7 +2548,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
   return (
-    <div ref={chartContainerRef} style={{ width: '100%', height: chartHeight, position: 'relative', cursor: getCursorStyle() }}>
+    <div ref={chartContainerRef} style={{ width: '100%', height: chartHeight, position: 'relative', cursor: getCursorStyle(), userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', msUserSelect: 'none' }}>
       {/* Slope Channel Controls Panel */}
       {slopeChannelEnabled && slopeChannelInfo && onSlopeChannelParamsChange && controlsVisible && (
         <div
