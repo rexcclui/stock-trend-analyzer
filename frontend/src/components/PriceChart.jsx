@@ -954,10 +954,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     if (!volumeProfileEnabled || displayPrices.length === 0) return []
 
+    // Important: chartData is reversed, so we need to use reversed displayPrices for correct slicing
+    const reversedDisplayPrices = [...displayPrices].reverse()
+
     if (volumeProfileMode === 'auto') {
       // Auto mode: single profile for visible (zoomed) data
-      // Use visibleChartData to respect current zoom/pan state
-      const visibleData = displayPrices.slice(zoomRange.start, zoomRange.end === null ? displayPrices.length : zoomRange.end)
+      // Use reversed prices to match chartData order
+      const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
 
       // Calculate y-axis max from VISIBLE data only for proper scaling
       const visiblePrices = visibleData.map(p => p.close)
@@ -977,14 +980,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       if (volumeProfileManualRanges.length === 0) return []
 
       // Calculate y-axis max from visible (zoomed) data for proper scaling
-      const visibleData = displayPrices.slice(zoomRange.start, zoomRange.end === null ? displayPrices.length : zoomRange.end)
+      const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
       const visiblePrices = visibleData.map(p => p.close)
       const yAxisMax = visiblePrices.length > 0 ? Math.max(...visiblePrices) : 0
 
       const profiles = []
       volumeProfileManualRanges.forEach(range => {
         const { startDate, endDate } = range
-        const dataToAnalyze = displayPrices.filter(price => {
+        const dataToAnalyze = reversedDisplayPrices.filter(price => {
           const priceDate = price.date
           return priceDate >= startDate && priceDate <= endDate
         })
