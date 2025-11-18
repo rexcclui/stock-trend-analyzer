@@ -1058,11 +1058,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     const result = {}
 
-    // Get first date and price of selected stock (for calculating historical % change)
+    // Get first date and price of VISIBLE (zoomed) selected stock data
     if (displayPrices.length === 0) return result
-    const firstDisplayDate = displayPrices[0].date
-    const selectedFirstPrice = displayPrices[0].close
+
+    // Use zoomRange to find the visible start index
+    const visibleStartIndex = zoomRange.start || 0
+    if (visibleStartIndex >= displayPrices.length) return result
+
+    const firstDisplayDate = displayPrices[visibleStartIndex].date
+    const selectedFirstPrice = displayPrices[visibleStartIndex].close
     if (!selectedFirstPrice) return result
+
+    console.log(`[Comparison] Zoom range: ${zoomRange.start} to ${zoomRange.end}, Using visible start index: ${visibleStartIndex}, date: ${firstDisplayDate}`)
 
     comparisonStocks.forEach((compStock) => {
       const lineData = []
