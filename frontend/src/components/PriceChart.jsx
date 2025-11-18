@@ -760,7 +760,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     if (!channel || !data) return []
 
     const zoneColors = []
-    const numZones = 3 // Fixed at 3 zones
+    const numZones = 5 // Fixed at 5 zones
 
     // Create zones from lower to upper
     for (let i = 0; i < numZones; i++) {
@@ -2327,11 +2327,19 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   opacity={opacity}
                 />
 
-                {/* Volume percentage label at the end of the line */}
+                {/* Volume percentage label at the end of the line with gradient color based on weight */}
                 <text
                   x={lastPoint.x + 5}
                   y={lastPoint.y}
-                  fill={color}
+                  fill={(() => {
+                    // Conditional formatting: higher weight = warmer/brighter colors
+                    const weight = zone.volumeWeight
+                    if (weight >= 0.25) return '#22c55e' // Green - high volume
+                    if (weight >= 0.20) return '#84cc16' // Lime - above average
+                    if (weight >= 0.15) return '#eab308' // Yellow - average
+                    if (weight >= 0.10) return '#f97316' // Orange - below average
+                    return '#ef4444' // Red - low volume
+                  })()}
                   fontSize="11"
                   fontWeight="600"
                   textAnchor="start"
