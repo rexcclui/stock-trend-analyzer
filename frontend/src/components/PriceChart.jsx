@@ -1248,15 +1248,20 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const lineValue = (perfDiffPct + 1) * point.close
 
           // Add comparison data to this point
-          const compLineKey = `comp_${compStock.symbol}`
           const compPriceKey = `compPrice_${compStock.symbol}`
           const compPerfKey = `compPerf_${compStock.symbol}`
+          const compPositiveKey = `compPos_${compStock.symbol}` // Blue: above
+          const compNegativeKey = `compNeg_${compStock.symbol}` // Red: below
+
+          // Split based on whether comparison line is above or below selected stock
+          const isAbove = lineValue > point.close
 
           return {
             ...point,
-            [compLineKey]: lineValue,
             [compPriceKey]: compCurrentPrice,
-            [compPerfKey]: perfDiffPct * 100
+            [compPerfKey]: perfDiffPct * 100,
+            [compPositiveKey]: isAbove ? lineValue : null,
+            [compNegativeKey]: !isAbove ? lineValue : null
           }
         })
       })
@@ -3284,21 +3289,32 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             </>
           )}
           {comparisonMode === 'line' && comparisonStocks && comparisonStocks.map((compStock, index) => {
-            const compLineKey = `comp_${compStock.symbol}`
-            const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6']
-            const color = colors[index % colors.length]
+            const compPositiveKey = `compPos_${compStock.symbol}`
+            const compNegativeKey = `compNeg_${compStock.symbol}`
 
             return (
-              <Line
-                key={compLineKey}
-                type="monotone"
-                dataKey={compLineKey}
-                stroke={color}
-                strokeWidth={2}
-                dot={false}
-                name={`Vs ${compStock.symbol}`}
-                connectNulls={true}
-              />
+              <React.Fragment key={compStock.symbol}>
+                {/* Blue line when above selected stock (outperforming) */}
+                <Line
+                  type="monotone"
+                  dataKey={compPositiveKey}
+                  stroke="#3b82f6"
+                  strokeWidth={2}
+                  dot={false}
+                  name={`${compStock.symbol} (Above)`}
+                  connectNulls={false}
+                />
+                {/* Red line when below selected stock (underperforming) */}
+                <Line
+                  type="monotone"
+                  dataKey={compNegativeKey}
+                  stroke="#ef4444"
+                  strokeWidth={2}
+                  dot={false}
+                  name={`${compStock.symbol} (Below)`}
+                  connectNulls={false}
+                />
+              </React.Fragment>
             )
           })}
           {smaPeriods.map((period, index) => {
