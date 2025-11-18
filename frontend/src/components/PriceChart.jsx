@@ -2728,7 +2728,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       <ResponsiveContainer>
         <ComposedChart
           data={chartDataWithZones}
-          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+          margin={{ top: 5, right: 0, left: 20, bottom: 5 }}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
           onMouseDown={handleMouseDown}
