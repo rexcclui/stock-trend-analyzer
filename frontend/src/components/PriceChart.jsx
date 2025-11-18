@@ -2358,13 +2358,24 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Custom component to render stdev labels beneath middle of lower bound slope for manual channels
   const CustomManualChannelLabels = (props) => {
+    console.log('CustomManualChannelLabels render:', {
+      manualChannelEnabled,
+      manualChannelsCount: manualChannels.length,
+      zoomStart: zoomRange.start,
+      chartDataWithZonesLength: chartDataWithZones.length,
+      manualChannels
+    })
+
     if (!manualChannelEnabled || manualChannels.length === 0) return null
 
     const { xAxisMap, yAxisMap } = props
     const xAxis = xAxisMap?.[0]
     const yAxis = yAxisMap?.[0]
 
-    if (!xAxis || !yAxis) return null
+    if (!xAxis || !yAxis) {
+      console.log('CustomManualChannelLabels: No xAxis or yAxis')
+      return null
+    }
 
     const channelColors = [
       '#22c55e', // Green
@@ -2383,23 +2394,49 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           // Adjust for zoom offset - chartDataWithZones is sliced from zoomRange.start
           const adjustedIndex = midIndex - zoomRange.start
 
+          console.log(`CustomManualChannelLabels channel ${channelIndex}:`, {
+            channelStartIndex: channel.startIndex,
+            channelEndIndex: channel.endIndex,
+            midIndex,
+            adjustedIndex,
+            zoomStart: zoomRange.start,
+            chartDataWithZonesLength: chartDataWithZones.length,
+            optimalStdevMult: channel.optimalStdevMult
+          })
+
           // Check if the midpoint is within the visible range
-          if (adjustedIndex < 0 || adjustedIndex >= chartDataWithZones.length) return null
+          if (adjustedIndex < 0 || adjustedIndex >= chartDataWithZones.length) {
+            console.log(`CustomManualChannelLabels channel ${channelIndex}: OUT OF RANGE`)
+            return null
+          }
 
           // Get the data point at the middle
           const midPoint = chartDataWithZones[adjustedIndex]
-          if (!midPoint) return null
+          if (!midPoint) {
+            console.log(`CustomManualChannelLabels channel ${channelIndex}: NO MID POINT`)
+            return null
+          }
 
           const lowerValue = midPoint[`manualChannel${channelIndex}Lower`]
-          if (lowerValue === undefined) return null
+          if (lowerValue === undefined) {
+            console.log(`CustomManualChannelLabels channel ${channelIndex}: NO LOWER VALUE`)
+            return null
+          }
 
           const x = xAxis.scale(midPoint.date)
           const y = yAxis.scale(lowerValue)
 
-          if (x === undefined || y === undefined) return null
+          console.log(`CustomManualChannelLabels channel ${channelIndex}: x=${x}, y=${y}, lowerValue=${lowerValue}`)
+
+          if (x === undefined || y === undefined) {
+            console.log(`CustomManualChannelLabels channel ${channelIndex}: X or Y is undefined`)
+            return null
+          }
 
           const color = channelColors[channelIndex % channelColors.length]
           const stdevText = `${channel.optimalStdevMult.toFixed(2)}σ`
+
+          console.log(`CustomManualChannelLabels channel ${channelIndex}: RENDERING LABEL at (${x}, ${y}) with text "${stdevText}"`)
 
           return (
             <g key={`manual-channel-label-${channelIndex}`}>
