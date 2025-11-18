@@ -1115,6 +1115,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       dataPoint.channelUpper = channel.upper
       dataPoint.channelMid = channel.mid
       dataPoint.channelLower = channel.lower
+
+      // Add zone boundaries for slope channel
+      if (zoneColors.length > 0) {
+        const channelRange = channel.upper - channel.lower
+        zoneColors.forEach((zone, zoneIndex) => {
+          const zoneLower = channel.lower + channelRange * zone.zoneStart
+          const zoneUpper = channel.lower + channelRange * zone.zoneEnd
+          dataPoint[`zone${zoneIndex}Lower`] = zoneLower
+          dataPoint[`zone${zoneIndex}Upper`] = zoneUpper
+        })
+      }
     }
 
     // Add all channels data if enabled
@@ -2028,24 +2039,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     )
   }
 
-  // Add zone boundaries to chart data
-  const chartDataWithZones = visibleChartData.map((point) => {
-    if (!slopeChannelEnabled || !point.channelUpper || !point.channelLower) {
-      return point
-    }
-
-    const channelRange = point.channelUpper - point.channelLower
-    const zoneData = {}
-
-    zoneColors.forEach((zone, index) => {
-      const lower = point.channelLower + channelRange * zone.zoneStart
-      const upper = point.channelLower + channelRange * zone.zoneEnd
-      zoneData[`zone${index}Lower`] = lower
-      zoneData[`zone${index}Upper`] = upper
-    })
-
-    return { ...point, ...zoneData }
-  })
+  // Use visible chart data directly (zones are now added during chartData creation)
+  const chartDataWithZones = visibleChartData
 
   // Custom component to render zone lines with labels
   const CustomZoneLines = (props) => {
