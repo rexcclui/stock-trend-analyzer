@@ -960,11 +960,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // Use visibleChartData to respect current zoom/pan state
       const visibleData = displayPrices.slice(zoomRange.start, zoomRange.end === null ? displayPrices.length : zoomRange.end)
       const profile = calculateSingleVolumeProfile(visibleData, yAxisMax, null)
-      if (profile) {
-        console.log('Volume Profile Auto calculated:', profile.zones.length, 'zones')
-      } else {
-        console.log('Volume Profile Auto: no profile generated, visibleData length:', visibleData.length)
-      }
+      console.log('Volume Profile Auto - zoomRange:', zoomRange, 'visibleData:', visibleData.length, 'profile zones:', profile?.zones.length)
       return profile ? [profile] : []
     } else {
       // Manual mode: one profile for each selected range
