@@ -1180,7 +1180,43 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     if (comparisonMode === 'line' && Object.keys(comparisonLines).length > 0) {
       Object.keys(comparisonLines).forEach(symbol => {
         const compLineKey = `comp_${symbol}`
-        dataPoint[compLineKey] = comparisonLines[symbol][index]
+        const compPriceKey = `compPrice_${symbol}` // Actual price of comparison stock
+        const compPerfKey = `compPerf_${symbol}` // Performance difference %
+        const compPositiveKey = `compPos_${symbol}` // Line value when outperforming (blue)
+        const compNegativeKey = `compNeg_${symbol}` // Line value when underperforming (red)
+
+        const lineValue = comparisonLines[symbol][index]
+        dataPoint[compLineKey] = lineValue
+
+        // Store the actual comparison stock price and performance % for tooltip
+        const compStock = comparisonStocks.find(cs => cs.symbol === symbol)
+        if (compStock && compStock.data && compStock.data.prices) {
+          const compPriceByDate = {}
+          compStock.data.prices.forEach(p => {
+            compPriceByDate[p.date] = p.close
+          })
+          const compPrice = compPriceByDate[price.date]
+          dataPoint[compPriceKey] = compPrice || null
+
+          // Calculate performance difference %
+          if (lineValue && price.close) {
+            const perfDiff = ((lineValue / price.close) - 1) * 100
+            dataPoint[compPerfKey] = perfDiff
+
+            // Split into positive (blue, outperforming) and negative (red, underperforming)
+            if (perfDiff > 0) {
+              dataPoint[compPositiveKey] = lineValue
+              dataPoint[compNegativeKey] = null
+            } else {
+              dataPoint[compPositiveKey] = null
+              dataPoint[compNegativeKey] = lineValue
+            }
+          } else {
+            dataPoint[compPerfKey] = null
+            dataPoint[compPositiveKey] = null
+            dataPoint[compNegativeKey] = null
+          }
+        }
       })
     }
 
@@ -1336,6 +1372,28 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         <div className="bg-slate-800 p-3 border border-slate-600 rounded shadow-lg">
           <p className="font-semibold text-slate-100">{data.date}</p>
           <p className="text-sm text-slate-300">Close: ${data.close?.toFixed(2)}</p>
+
+          {/* Show comparison stock prices and performance */}
+          {comparisonMode === 'line' && comparisonStocks && comparisonStocks.map(compStock => {
+            const compPriceKey = `compPrice_${compStock.symbol}`
+            const compPerfKey = `compPerf_${compStock.symbol}`
+            const compPrice = data[compPriceKey]
+            const compPerf = data[compPerfKey]
+
+            if (compPrice !== null && compPrice !== undefined) {
+              const perfColor = compPerf > 0 ? '#3b82f6' : '#ef4444' // Blue for positive, red for negative
+              return (
+                <div key={compStock.symbol} className="text-sm mt-1">
+                  <p style={{ color: perfColor }}>
+                    {compStock.symbol}: ${compPrice.toFixed(2)}
+                    {compPerf !== null && ` (${compPerf >= 0 ? '+' : ''}${compPerf.toFixed(2)}%)`}
+                  </p>
+                </div>
+              )
+            }
+            return null
+          })}
+
           {smaPeriods.map(period => {
             const smaKey = `sma${period}`
             const smaValue = data[smaKey]
@@ -3274,21 +3332,32 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             </>
           )}
           {comparisonMode === 'line' && comparisonStocks && comparisonStocks.map((compStock, index) => {
-            const compLineKey = `comp_${compStock.symbol}`
-            const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6']
-            const color = colors[index % colors.length]
+            const compPositiveKey = `compPos_${compStock.symbol}`
+            const compNegativeKey = `compNeg_${compStock.symbol}`
 
             return (
-              <Line
-                key={compLineKey}
-                type="monotone"
-                dataKey={compLineKey}
-                stroke={color}
-                strokeWidth={2}
-                dot={false}
-                name={`Vs ${compStock.symbol}`}
-                connectNulls={true}
-              />
+              <React.Fragment key={compStock.symbol}>
+                {/* Blue line when outperforming (line above selected stock) */}
+                <Line
+                  type="monotone"
+                  dataKey={compPositiveKey}
+                  stroke="#3b82f6"
+                  strokeWidth={2}
+                  dot={false}
+                  name={`${compStock.symbol} (Outperforming)`}
+                  connectNulls={true}
+                />
+                {/* Red line when underperforming (line below selected stock) */}
+                <Line
+                  type="monotone"
+                  dataKey={compNegativeKey}
+                  stroke="#ef4444"
+                  strokeWidth={2}
+                  dot={false}
+                  name={`${compStock.symbol} (Underperforming)`}
+                  connectNulls={true}
+                />
+              </React.Fragment>
             )
           })}
           {smaPeriods.map((period, index) => {
