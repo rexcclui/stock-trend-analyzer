@@ -2711,76 +2711,65 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         </div>
       )}
 
-      {/* Manual Channel Drag Mode Toggle Button */}
+      {/* Manual Channel Drag Mode Toggle Button - LEFT SIDE */}
       {manualChannelEnabled && (
         <div
           style={{
             position: 'absolute',
-            top: '50%',
-            right: '68px',
-            transform: 'translateY(-50%)',
-            zIndex: 1001,
+            top: '20px',
+            left: '20px',
+            zIndex: 9999,
             display: 'flex',
-            flexDirection: 'column',
-            gap: '4px',
+            flexDirection: 'row',
+            gap: '8px',
             alignItems: 'center',
-            pointerEvents: 'auto'
+            pointerEvents: 'auto',
+            backgroundColor: 'rgba(0, 0, 0, 0.85)',
+            padding: '12px 16px',
+            borderRadius: '12px',
+            border: '3px solid',
+            borderColor: manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(234, 179, 8)',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)'
           }}
         >
-          {/* Label */}
-          <div
-            style={{
-              fontSize: '10px',
-              fontWeight: '600',
-              color: manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(148, 163, 184)',
-              backgroundColor: 'rgba(15, 23, 42, 0.9)',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              whiteSpace: 'nowrap',
-              border: '1px solid',
-              borderColor: manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(71, 85, 105)'
-            }}
-          >
-            {manualChannelDragMode ? 'DRAW' : 'PAN'}
-          </div>
-
           {/* Hand Icon Button */}
           <button
             onClick={() => setManualChannelDragMode(!manualChannelDragMode)}
             style={{
-              padding: '10px',
-              backgroundColor: manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(71, 85, 105)',
+              padding: '12px',
+              backgroundColor: manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(234, 179, 8)',
               border: '3px solid',
-              borderColor: manualChannelDragMode ? 'rgb(22, 163, 74)' : 'rgb(100, 116, 139)',
-              borderRadius: '12px',
+              borderColor: manualChannelDragMode ? 'rgb(22, 163, 74)' : 'rgb(202, 138, 4)',
+              borderRadius: '10px',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: 'all 0.2s',
-              boxShadow: manualChannelDragMode
-                ? '0 0 12px rgba(34, 197, 94, 0.6), 0 4px 8px rgba(0,0,0,0.3)'
-                : '0 2px 4px rgba(0,0,0,0.3)',
-              animation: manualChannelDragMode ? 'pulse 2s infinite' : 'none'
+              transition: 'all 0.2s'
             }}
             title={manualChannelDragMode ? "Drag mode ON - Draw rectangle to plot channel" : "Click to enable drag mode"}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'scale(1.1)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'scale(1)'
-            }}
           >
             <Hand
               style={{
-                width: '24px',
-                height: '24px',
+                width: '32px',
+                height: '32px',
                 color: 'white',
-                strokeWidth: 2.5,
-                filter: manualChannelDragMode ? 'drop-shadow(0 0 2px rgba(255,255,255,0.5))' : 'none'
+                strokeWidth: 3
               }}
             />
           </button>
+
+          {/* Label */}
+          <div
+            style={{
+              fontSize: '14px',
+              fontWeight: '700',
+              color: manualChannelDragMode ? 'rgb(34, 197, 94)' : 'rgb(234, 179, 8)',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {manualChannelDragMode ? 'DRAW MODE' : 'PAN MODE'}
+          </div>
         </div>
       )}
 

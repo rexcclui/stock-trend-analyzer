@@ -1034,7 +1034,7 @@ function StockAnalyzer() {
                     </button>
                   </div>}
                 </div>
-                {!chart.collapsed && <div className="pr-0 md:pr-16">
+                {!chart.collapsed && <div className="pr-0 md:pr-[58px]">
                   <PriceChart
                     prices={chart.data.prices}
                     indicators={chart.data.indicators}
@@ -1075,18 +1075,18 @@ function StockAnalyzer() {
                 {/* Time Period Selector - Right Side (Desktop) / Bottom (Mobile) */}
                 {!chart.collapsed && (
                   <div className="absolute top-1/2 right-0 -translate-y-1/2 hidden md:block" style={{ zIndex: 5 }}>
-                    <div className="flex flex-col gap-1 bg-slate-900/95 p-2 rounded-lg border border-slate-700 backdrop-blur-sm shadow-lg">
+                    <div className="flex flex-col gap-0.5 bg-slate-900/95 p-1 rounded-lg border border-slate-700 backdrop-blur-sm shadow-lg">
                       {timeRanges.map((range) => (
                         <button
                           type="button"
                           key={range.label}
                           onClick={() => changeTimeRange(range.days)}
-                          className={`px-3 py-1.5 text-xs rounded font-semibold transition-all whitespace-nowrap ${
+                          className={`px-2 py-1 text-xs rounded font-semibold transition-all whitespace-nowrap ${
                             days === range.days
-                              ? 'bg-purple-600 text-white shadow-md scale-105'
-                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600 hover:scale-105'
+                              ? 'bg-purple-600 text-white shadow-md'
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                           }`}
-                          style={{ minWidth: '50px' }}
+                          style={{ minWidth: '42px' }}
                         >
                           {range.label}
                         </button>
