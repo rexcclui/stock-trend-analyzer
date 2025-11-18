@@ -1094,12 +1094,14 @@ function StockAnalyzer() {
                                 className="w-16 px-2 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-100 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
                                 title="Benchmark symbol (press Enter or blur to load)"
                               />
-                              <input
-                                type="number"
-                                value={chart.performanceComparisonDays}
-                                onChange={(e) => {
-                                  const value = parseInt(e.target.value)
-                                  if (!isNaN(value) && value > 0 && value <= 365) {
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="range"
+                                  min="1"
+                                  max="365"
+                                  value={chart.performanceComparisonDays}
+                                  onChange={(e) => {
+                                    const value = parseInt(e.target.value)
                                     setCharts(prevCharts =>
                                       prevCharts.map(c =>
                                         c.id === chart.id
@@ -1107,14 +1109,12 @@ function StockAnalyzer() {
                                           : c
                                       )
                                     )
-                                  }
-                                }}
-                                min="1"
-                                max="365"
-                                placeholder="30"
-                                className="w-14 px-2 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-100 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                                title="Lookback days"
-                              />
+                                  }}
+                                  className="w-24 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                  title="Lookback days"
+                                />
+                                <span className="text-xs text-slate-300 w-8 text-right">{chart.performanceComparisonDays}d</span>
+                              </div>
                             </>
                           )}
                         </>
