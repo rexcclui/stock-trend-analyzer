@@ -1203,13 +1203,28 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             const perfDiff = ((lineValue / price.close) - 1) * 100
             dataPoint[compPerfKey] = perfDiff
 
+            // Check if this is a crossover point (previous point had opposite sign)
+            const prevIndex = index - 1
+            let isCrossover = false
+            if (prevIndex >= 0 && comparisonLines[symbol][prevIndex] && displayPrices[prevIndex]) {
+              const prevLineValue = comparisonLines[symbol][prevIndex]
+              const prevPrice = displayPrices[prevIndex].close
+              const prevPerfDiff = ((prevLineValue / prevPrice) - 1) * 100
+              isCrossover = (perfDiff > 0) !== (prevPerfDiff > 0) // Sign changed
+            }
+
             // Split into positive (blue, outperforming) and negative (red, underperforming)
-            if (perfDiff > 0) {
+            // At crossover points, set both values to ensure continuity
+            if (perfDiff > 0 || isCrossover) {
               dataPoint[compPositiveKey] = lineValue
-              dataPoint[compNegativeKey] = null
             } else {
               dataPoint[compPositiveKey] = null
+            }
+
+            if (perfDiff <= 0 || isCrossover) {
               dataPoint[compNegativeKey] = lineValue
+            } else {
+              dataPoint[compNegativeKey] = null
             }
           } else {
             dataPoint[compPerfKey] = null

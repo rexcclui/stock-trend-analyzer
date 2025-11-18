@@ -24,6 +24,7 @@ function StockAnalyzer() {
   const [slopeChannelDialogOpen, setSlopeChannelDialogOpen] = useState(false)
   const [editingSlopeChannelChartId, setEditingSlopeChannelChartId] = useState(null)
   const [globalZoomRange, setGlobalZoomRange] = useState({ start: 0, end: null })
+  const [loadingComparisonStocks, setLoadingComparisonStocks] = useState({}) // Track loading state per chart
 
   // Load stock history from localStorage on mount
   useEffect(() => {
@@ -571,6 +572,9 @@ function StockAnalyzer() {
       return
     }
 
+    // Set loading state for this chart
+    setLoadingComparisonStocks(prev => ({ ...prev, [chartId]: symbol }))
+
     try {
       // Always fetch maximum data (3650 days) to have full history available
       const maxDays = '3650'
@@ -609,6 +613,13 @@ function StockAnalyzer() {
       console.error('[Comparison] Failed to fetch comparison stock data:', err)
       setError(`Failed to fetch ${symbol} data for comparison`)
       setTimeout(() => setError(null), 3000)
+    } finally {
+      // Clear loading state for this chart
+      setLoadingComparisonStocks(prev => {
+        const newState = { ...prev }
+        delete newState[chartId]
+        return newState
+      })
     }
   }
 
@@ -1265,7 +1276,16 @@ function StockAnalyzer() {
                     </button>
                   </div>}
                 </div>
-                {!chart.collapsed && <div className="pr-0 md:pr-14">
+                {!chart.collapsed && <div className="pr-0 md:pr-14 relative">
+                  {/* Loading overlay when fetching comparison stock */}
+                  {loadingComparisonStocks[chart.id] && (
+                    <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center z-50 rounded">
+                      <div className="text-center">
+                        <Loader2 className="w-8 h-8 animate-spin text-purple-500 mx-auto mb-2" />
+                        <p className="text-slate-200 font-medium">Loading {loadingComparisonStocks[chart.id]}...</p>
+                      </div>
+                    </div>
+                  )}
                   <PriceChart
                     prices={chart.data.prices}
                     indicators={chart.data.indicators}
