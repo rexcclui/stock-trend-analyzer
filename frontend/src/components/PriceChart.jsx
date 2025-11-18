@@ -2513,11 +2513,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                       opacity={opacity}
                     />
 
-                    {/* Volume percentage label in the center */}
+                    {/* Volume percentage label in the center with gradient color */}
                     <text
                       x={barX + barWidth / 2}
                       y={yTop + height / 2}
-                      fill="#ffffff"
+                      fill={volumeWeight > 0.7
+                        ? `hsl(45, 100%, ${85 - (volumeWeight * 25)}%)` // High volume: bright yellow to orange
+                        : volumeWeight > 0.4
+                        ? `hsl(0, 0%, ${95 - (volumeWeight * 20)}%)` // Medium volume: white to light gray
+                        : `hsl(200, 30%, ${70 + (volumeWeight * 20)}%)` // Low volume: light blue-gray
+                      }
                       fontSize="11"
                       fontWeight="700"
                       textAnchor="middle"
