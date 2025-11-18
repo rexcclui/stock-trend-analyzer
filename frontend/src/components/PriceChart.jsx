@@ -2717,7 +2717,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           style={{
             position: 'absolute',
             top: '50%',
-            right: '72px',
+            right: '68px',
             transform: 'translateY(-50%)',
             zIndex: 1001,
             display: 'flex',
