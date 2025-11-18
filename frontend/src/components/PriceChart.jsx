@@ -1289,15 +1289,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return
     }
 
-    // Handle manual channel selection - only when drag mode is enabled
-    if (manualChannelEnabled && manualChannelDragMode && isSelecting && e && e.activeLabel) {
-      setSelectionEnd(e.activeLabel)
-      return // Prevent volume profile selection when in manual channel drag mode
+    // Handle volume profile manual selection
+    if (volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && e && e.activeLabel) {
+      setVolumeProfileSelectionEnd(e.activeLabel)
+      return
     }
 
-    // Handle volume profile manual selection - only when NOT in manual channel drag mode
-    if (volumeProfileEnabled && volumeProfileMode === 'manual' && !manualChannelDragMode && isSelectingVolumeProfile && e && e.activeLabel) {
-      setVolumeProfileSelectionEnd(e.activeLabel)
+    // Handle manual channel selection
+    if (manualChannelEnabled && manualChannelDragMode && isSelecting && e && e.activeLabel) {
+      setSelectionEnd(e.activeLabel)
+      return
     }
   }
 
@@ -1312,27 +1313,28 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
   const handleMouseDown = (e) => {
-    // Start panning when NOT in manual channel drag mode
-    if (!manualChannelDragMode && e && e.chartX !== undefined) {
-      setIsPanning(true)
-      setPanStartX(e.chartX)
-      setPanStartZoom({ ...zoomRange })
+    // Volume profile manual selection - highest priority
+    if (volumeProfileEnabled && volumeProfileMode === 'manual' && e && e.activeLabel) {
+      setIsSelectingVolumeProfile(true)
+      setVolumeProfileSelectionStart(e.activeLabel)
+      setVolumeProfileSelectionEnd(e.activeLabel)
       return
     }
 
-    // Only allow selection when drag mode is enabled
+    // Manual channel selection - second priority
     if (manualChannelEnabled && manualChannelDragMode && e && e.activeLabel) {
       setIsSelecting(true)
       setSelectionStart(e.activeLabel)
       setSelectionEnd(e.activeLabel)
-      // Don't clear previous channels - they accumulate
-      return // Prevent volume profile selection when in manual channel drag mode
+      return
     }
-    // Volume profile manual selection - only when NOT in manual channel drag mode
-    if (volumeProfileEnabled && volumeProfileMode === 'manual' && !manualChannelDragMode && e && e.activeLabel) {
-      setIsSelectingVolumeProfile(true)
-      setVolumeProfileSelectionStart(e.activeLabel)
-      setVolumeProfileSelectionEnd(e.activeLabel)
+
+    // Panning - only when neither manual mode is active
+    if (e && e.chartX !== undefined) {
+      setIsPanning(true)
+      setPanStartX(e.chartX)
+      setPanStartZoom({ ...zoomRange })
+      return
     }
   }
 
