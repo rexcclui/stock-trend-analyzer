@@ -1253,15 +1253,35 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const compPositiveKey = `compPos_${compStock.symbol}` // Blue: above
           const compNegativeKey = `compNeg_${compStock.symbol}` // Red: below
 
-          // Split based on whether comparison line is above or below selected stock
+          // Determine if line is above or below
           const isAbove = lineValue > point.close
 
+          // Check if this is a crossover point by looking at previous point
+          let isCrossover = false
+          if (index > 0) {
+            const prevPoint = visibleChartData[index - 1]
+            const prevCompPrice = compPriceByDate[prevPoint.date]
+
+            if (prevCompPrice && prevPoint.close) {
+              const prevSelectedHistPctChg = (prevPoint.close - selectedFirstPrice) / selectedFirstPrice
+              const prevCompHistPctChg = (prevCompPrice - compFirstPrice) / compFirstPrice
+              const prevPerfDiffPct = prevCompHistPctChg - prevSelectedHistPctChg
+              const prevLineValue = (prevPerfDiffPct + 1) * prevPoint.close
+              const prevIsAbove = prevLineValue > prevPoint.close
+
+              // Crossover detected if direction changed
+              isCrossover = isAbove !== prevIsAbove
+            }
+          }
+
+          // At crossover points, set BOTH values to ensure continuity
+          // Otherwise, set only one value
           return {
             ...point,
             [compPriceKey]: compCurrentPrice,
             [compPerfKey]: perfDiffPct * 100,
-            [compPositiveKey]: isAbove ? lineValue : null,
-            [compNegativeKey]: !isAbove ? lineValue : null
+            [compPositiveKey]: (isAbove || isCrossover) ? lineValue : null,
+            [compNegativeKey]: (!isAbove || isCrossover) ? lineValue : null
           }
         })
       })
