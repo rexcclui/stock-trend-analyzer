@@ -1058,8 +1058,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     const result = {}
 
-    // Get first price of selected stock (for calculating historical % change)
-    const selectedFirstPrice = displayPrices.length > 0 ? displayPrices[0].close : null
+    // Get first date and price of selected stock (for calculating historical % change)
+    if (displayPrices.length === 0) return result
+    const firstDisplayDate = displayPrices[0].date
+    const selectedFirstPrice = displayPrices[0].close
     if (!selectedFirstPrice) return result
 
     comparisonStocks.forEach((compStock) => {
@@ -1073,12 +1075,15 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         })
       }
 
-      // Get first price of comparison stock
-      const compFirstPrice = compStock.data?.prices?.[0]?.close
+      // Get first price of comparison stock ON THE SAME DATE as the first displayed price
+      const compFirstPrice = compPriceByDate[firstDisplayDate]
       if (!compFirstPrice) {
+        console.warn(`[Comparison] No data for ${compStock.symbol} on start date ${firstDisplayDate}`)
         result[compStock.symbol] = []
         return
       }
+
+      console.log(`[Comparison] First date: ${firstDisplayDate}, Selected: ${selectedFirstPrice}, ${compStock.symbol}: ${compFirstPrice}`)
 
       // Calculate line values for each data point
       for (let i = 0; i < displayPrices.length; i++) {
@@ -1086,10 +1091,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const compCurrentPrice = compPriceByDate[currentPrice.date]
 
         if (compCurrentPrice && currentPrice.close && selectedFirstPrice !== 0 && compFirstPrice !== 0) {
-          // Historical % change of selected stock
+          // Historical % change of selected stock (from first displayed date)
           const selectedHistPctChg = (currentPrice.close - selectedFirstPrice) / selectedFirstPrice
 
-          // Historical % change of comparison stock
+          // Historical % change of comparison stock (from first displayed date)
           const compHistPctChg = (compCurrentPrice - compFirstPrice) / compFirstPrice
 
           // Perf Difference %
