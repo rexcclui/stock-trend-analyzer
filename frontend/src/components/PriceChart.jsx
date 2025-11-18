@@ -2714,13 +2714,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           style={{
             position: 'absolute',
             top: '50%',
-            right: '5px',
+            right: '85px',
             transform: 'translateY(-50%)',
-            zIndex: 1000,
+            zIndex: 1001,
             display: 'flex',
             flexDirection: 'column',
             gap: '4px',
-            alignItems: 'center'
+            alignItems: 'center',
+            pointerEvents: 'auto'
           }}
         >
           {/* Label */}
