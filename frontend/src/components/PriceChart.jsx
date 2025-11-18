@@ -2380,8 +2380,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           // Find the middle point of the lower bound line
           const midIndex = Math.floor((channel.startIndex + channel.endIndex) / 2)
 
+          // Adjust for zoom offset - chartDataWithZones is sliced from zoomRange.start
+          const adjustedIndex = midIndex - zoomRange.start
+
+          // Check if the midpoint is within the visible range
+          if (adjustedIndex < 0 || adjustedIndex >= chartDataWithZones.length) return null
+
           // Get the data point at the middle
-          const midPoint = chartDataWithZones[midIndex]
+          const midPoint = chartDataWithZones[adjustedIndex]
           if (!midPoint) return null
 
           const lowerValue = midPoint[`manualChannel${channelIndex}Lower`]
