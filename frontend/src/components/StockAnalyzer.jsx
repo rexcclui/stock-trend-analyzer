@@ -1034,41 +1034,43 @@ function StockAnalyzer() {
                     </button>
                   </div>}
                 </div>
-                {!chart.collapsed && <PriceChart
-                  prices={chart.data.prices}
-                  indicators={chart.data.indicators}
-                  signals={chart.data.signals}
-                  syncedMouseDate={syncedMouseDate}
-                  setSyncedMouseDate={setSyncedMouseDate}
-                  smaPeriods={chart.smaPeriods}
-                  smaVisibility={chart.smaVisibility}
-                  onToggleSma={(period) => toggleSmaVisibility(chart.id, period)}
-                  onDeleteSma={(period) => deleteSma(chart.id, period)}
-                  volumeColorEnabled={chart.volumeColorEnabled}
-                  volumeColorMode={chart.volumeColorMode}
-                  volumeProfileEnabled={chart.volumeProfileEnabled}
-                  volumeProfileMode={chart.volumeProfileMode}
-                  volumeProfileManualRanges={chart.volumeProfileManualRanges}
-                  onVolumeProfileManualRangeChange={(range) => updateVolumeProfileManualRange(chart.id, range)}
-                  onVolumeProfileRangeRemove={(rangeIndex) => removeVolumeProfileRange(chart.id, rangeIndex)}
-                  spyData={chart.spyData}
-                  performanceComparisonEnabled={chart.performanceComparisonEnabled}
-                  performanceComparisonBenchmark={chart.performanceComparisonBenchmark}
-                  performanceComparisonDays={chart.performanceComparisonDays}
-                  slopeChannelEnabled={chart.slopeChannelEnabled}
-                  slopeChannelVolumeWeighted={chart.slopeChannelVolumeWeighted}
-                  slopeChannelZones={chart.slopeChannelZones}
-                  slopeChannelDataPercent={chart.slopeChannelDataPercent}
-                  slopeChannelWidthMultiplier={chart.slopeChannelWidthMultiplier}
-                  onSlopeChannelParamsChange={(params) => updateSlopeChannelParams(chart.id, params)}
-                  findAllChannelEnabled={chart.findAllChannelEnabled}
-                  manualChannelEnabled={chart.manualChannelEnabled}
-                  chartHeight={chartHeight}
-                  days={days}
-                  zoomRange={globalZoomRange}
-                  onZoomChange={updateGlobalZoom}
-                  onExtendPeriod={extendTimePeriod}
-                />}
+                {!chart.collapsed && <div className="pr-0 md:pr-20">
+                  <PriceChart
+                    prices={chart.data.prices}
+                    indicators={chart.data.indicators}
+                    signals={chart.data.signals}
+                    syncedMouseDate={syncedMouseDate}
+                    setSyncedMouseDate={setSyncedMouseDate}
+                    smaPeriods={chart.smaPeriods}
+                    smaVisibility={chart.smaVisibility}
+                    onToggleSma={(period) => toggleSmaVisibility(chart.id, period)}
+                    onDeleteSma={(period) => deleteSma(chart.id, period)}
+                    volumeColorEnabled={chart.volumeColorEnabled}
+                    volumeColorMode={chart.volumeColorMode}
+                    volumeProfileEnabled={chart.volumeProfileEnabled}
+                    volumeProfileMode={chart.volumeProfileMode}
+                    volumeProfileManualRanges={chart.volumeProfileManualRanges}
+                    onVolumeProfileManualRangeChange={(range) => updateVolumeProfileManualRange(chart.id, range)}
+                    onVolumeProfileRangeRemove={(rangeIndex) => removeVolumeProfileRange(chart.id, rangeIndex)}
+                    spyData={chart.spyData}
+                    performanceComparisonEnabled={chart.performanceComparisonEnabled}
+                    performanceComparisonBenchmark={chart.performanceComparisonBenchmark}
+                    performanceComparisonDays={chart.performanceComparisonDays}
+                    slopeChannelEnabled={chart.slopeChannelEnabled}
+                    slopeChannelVolumeWeighted={chart.slopeChannelVolumeWeighted}
+                    slopeChannelZones={chart.slopeChannelZones}
+                    slopeChannelDataPercent={chart.slopeChannelDataPercent}
+                    slopeChannelWidthMultiplier={chart.slopeChannelWidthMultiplier}
+                    onSlopeChannelParamsChange={(params) => updateSlopeChannelParams(chart.id, params)}
+                    findAllChannelEnabled={chart.findAllChannelEnabled}
+                    manualChannelEnabled={chart.manualChannelEnabled}
+                    chartHeight={chartHeight}
+                    days={days}
+                    zoomRange={globalZoomRange}
+                    onZoomChange={updateGlobalZoom}
+                    onExtendPeriod={extendTimePeriod}
+                  />
+                </div>}
 
                 {/* Time Period Selector - Right Side (Desktop) / Bottom (Mobile) */}
                 {!chart.collapsed && (
