@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
-import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp, Hand } from 'lucide-react'
+import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp } from 'lucide-react'
 import PriceChart from './PriceChart'
 import IndicatorsChart from './IndicatorsChart'
 import SignalsList from './SignalsList'
@@ -899,24 +899,56 @@ function StockAnalyzer() {
                         onClick={() => toggleVolumeProfile(chart.id)}
                         className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
                           chart.volumeProfileEnabled
-                            ? (chart.volumeProfileMode === 'manual' ? 'bg-purple-600 text-white' : 'bg-yellow-600 text-white')
+                            ? 'bg-yellow-600 text-white'
                             : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                         }`}
-                        title={chart.volumeProfileMode === 'manual'
-                          ? "Manual volume profile - draw a rectangle to select date range"
-                          : "Show horizontal volume profile across all data"}
+                        title="Show horizontal volume profile"
                       >
-                        {chart.volumeProfileMode === 'manual' ? 'Manual Vol' : 'Volume Profile'}
+                        Volume Profile
                       </button>
                       {chart.volumeProfileEnabled && (
-                        <button
-                          type="button"
-                          onClick={() => cycleVolumeProfileMode(chart.id)}
-                          className="px-2 py-1 text-xs rounded font-medium bg-slate-600 text-slate-200 hover:bg-slate-500 transition-colors"
-                          title="Click to cycle: Auto → Manual"
-                        >
-                          {chart.volumeProfileMode === 'auto' ? 'AUTO' : 'MAN'}
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCharts(prevCharts =>
+                                prevCharts.map(c =>
+                                  c.id === chart.id
+                                    ? { ...c, volumeProfileMode: 'auto' }
+                                    : c
+                                )
+                              )
+                            }}
+                            className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
+                              chart.volumeProfileMode === 'auto'
+                                ? 'bg-yellow-600 text-white'
+                                : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
+                            }`}
+                            title="Auto volume profile - across visible data"
+                          >
+                            Auto
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCharts(prevCharts =>
+                                prevCharts.map(c =>
+                                  c.id === chart.id
+                                    ? { ...c, volumeProfileMode: 'manual' }
+                                    : c
+                                )
+                              )
+                            }}
+                            className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
+                              chart.volumeProfileMode === 'manual'
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
+                            }`}
+                            title="Manual volume profile - draw rectangle to select range"
+                          >
+                            Man
+                          </button>
+                        </>
                       )}
                     </div>
                     <div className="flex gap-1 items-center">
@@ -1017,19 +1049,48 @@ function StockAnalyzer() {
                       Manual Channel
                     </button>
                     {chart.manualChannelEnabled && (
-                      <button
-                        type="button"
-                        onClick={() => toggleManualChannelDragMode(chart.id)}
-                        className={`px-3 py-1 text-sm rounded font-bold transition-colors flex items-center gap-1 ${
-                          chart.manualChannelDragMode
-                            ? 'bg-green-600 text-white animate-pulse'
-                            : 'bg-yellow-500 text-black'
-                        }`}
-                        title={chart.manualChannelDragMode ? "DRAW MODE - Drag to select range" : "PAN MODE - Click to enable draw mode"}
-                      >
-                        <Hand className="w-4 h-4" />
-                        {chart.manualChannelDragMode ? 'DRAW' : 'PAN'}
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCharts(prevCharts =>
+                              prevCharts.map(c =>
+                                c.id === chart.id
+                                  ? { ...c, manualChannelDragMode: false }
+                                  : c
+                              )
+                            )
+                          }}
+                          className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
+                            !chart.manualChannelDragMode
+                              ? 'bg-green-600 text-white'
+                              : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
+                          }`}
+                          title="Auto mode - pan the chart"
+                        >
+                          Auto
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCharts(prevCharts =>
+                              prevCharts.map(c =>
+                                c.id === chart.id
+                                  ? { ...c, manualChannelDragMode: true }
+                                  : c
+                              )
+                            )
+                          }}
+                          className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
+                            chart.manualChannelDragMode
+                              ? 'bg-purple-600 text-white'
+                              : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
+                          }`}
+                          title="Manual mode - drag to select range for channel"
+                        >
+                          Man
+                        </button>
+                      </>
                     )}
                     <button
                       type="button"
@@ -1064,7 +1125,7 @@ function StockAnalyzer() {
                     </button>
                   </div>}
                 </div>
-                {!chart.collapsed && <div className="pr-0 md:pr-10">
+                {!chart.collapsed && <div className="pr-0 md:pr-14">
                   <PriceChart
                     prices={chart.data.prices}
                     indicators={chart.data.indicators}
@@ -1112,12 +1173,12 @@ function StockAnalyzer() {
                           type="button"
                           key={range.label}
                           onClick={() => changeTimeRange(range.days)}
-                          className={`px-1 py-0.5 text-[10px] font-bold transition-all whitespace-nowrap border-0 ${
+                          className={`px-2 py-1 text-xs font-bold transition-all whitespace-nowrap border-0 ${
                             days === range.days
                               ? 'bg-purple-600 text-white'
                               : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                           }`}
-                          style={{ minWidth: '32px', lineHeight: '1.2' }}
+                          style={{ minWidth: '44px' }}
                         >
                           {range.label}
                         </button>
