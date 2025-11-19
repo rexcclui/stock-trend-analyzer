@@ -128,7 +128,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const channelWidth = stdDev * stdevMult
           let outsideCount = 0
           let touchCount = 0
-          const touchTolerance = 0.05
+          const touchTolerance = 0.025
           const n = includedPoints.length
 
           includedPoints.forEach(({ point, originalIndex }) => {
@@ -465,7 +465,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         for (const stdevMult of stdevMultipliers) {
           const channelWidth = stdDev * stdevMult
           let touchCount = 0
-          const touchTolerance = 0.05
+          const touchTolerance = 0.025
           let hasUpperTouch = false
           let hasLowerTouch = false
           let pointsWithinBounds = 0
@@ -478,7 +478,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             const distanceToUpper = Math.abs(point.close - upperBound)
             const distanceToLower = Math.abs(point.close - lowerBound)
 
-            // Touch tolerance: 5% of the boundary value itself (looser definition)
+            // Touch tolerance: 2.5% of the boundary value itself (looser definition)
             const upperTolerance = Math.abs(upperBound * touchTolerance)
             const lowerTolerance = Math.abs(lowerBound * touchTolerance)
 
@@ -487,7 +487,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               pointsWithinBounds++
             }
 
-            // Check for boundary touches - within 5% of boundary value
+            // Check for boundary touches - within 2.5% of boundary value
             if (distanceToUpper <= upperTolerance) {
               touchCount++
               hasUpperTouch = true
@@ -503,10 +503,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           // Must meet ALL criteria:
           // 1. At least one touch on upper or lower bound
-          // 2. At least 80% of data points within the channel
+          // 2. At least 90% of data points within the channel
           // 3. More touches than previous best (for tie-breaking)
           if ((hasUpperTouch || hasLowerTouch) &&
-              percentWithinBounds >= 0.8 &&
+              percentWithinBounds >= 0.9 &&
               touchCount > bestTouchCount) {
             bestTouchCount = touchCount
             bestStdevMult = stdevMult
@@ -587,7 +587,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
       // Count touches
       let touchCount = 0
-      const touchTolerance = 0.05
+      const touchTolerance = 0.025
 
       channelSegment.forEach((point, index) => {
         const predictedY = slope * index + intercept
@@ -683,7 +683,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         for (const stdevMult of stdevMultipliers) {
           const channelWidth = stdDev * stdevMult
           let touchCount = 0
-          const touchTolerance = 0.05
+          const touchTolerance = 0.025
           let hasUpperTouch = false
           let hasLowerTouch = false
           let pointsWithinBounds = 0
@@ -721,7 +721,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           }
 
           if ((hasUpperTouch || hasLowerTouch) &&
-              percentWithinBounds >= 0.8 &&
+              percentWithinBounds >= 0.9 &&
               touchCount > bestTouchCount) {
             bestTouchCount = touchCount
             bestStdevMult = stdevMult
@@ -732,12 +732,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           return { slope, intercept, stdDev, optimalStdevMult: bestStdevMult }
         }
 
-        if (bestCoverage >= 0.8) {
+        if (bestCoverage >= 0.9) {
           return { slope, intercept, stdDev, optimalStdevMult: bestCoverageStdevMult }
         }
 
         const absoluteDistances = distances.map(d => Math.abs(d)).sort((a, b) => a - b)
-        const targetIndex = Math.max(Math.floor(absoluteDistances.length * 0.8) - 1, 0)
+        const targetIndex = Math.max(Math.floor(absoluteDistances.length * 0.9) - 1, 0)
         const targetDistance = absoluteDistances[targetIndex]
         const coverageMultiplier = stdDev > 0 ? targetDistance / stdDev : 0
         const enforcedStdevMult = Math.max(coverageMultiplier, bestCoverageStdevMult, 1)
@@ -803,7 +803,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const rSquared = 1 - (ssResidual / ssTotal)
 
       let touchCount = 0
-      const touchTolerance = 0.05
+      const touchTolerance = 0.025
 
       channelSegment.forEach((point, index) => {
         const predictedY = slope * index + intercept
