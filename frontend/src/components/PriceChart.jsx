@@ -193,29 +193,41 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       ref={chartContainerRef}
       style={{ width: '100%', height: chartHeight, position: 'relative', cursor: getCursorStyle(), userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', msUserSelect: 'none' }}
       onMouseDown={(e) => {
-        // For volume profile and manual channel selection, we need native DOM events
-        // Convert to Recharts-like format
-        const chartRect = chartContainerRef.current?.getBoundingClientRect()
-        if (!chartRect) return
+        // Only intercept when selection modes are active
+        if ((volumeProfileEnabled && volumeProfileMode === 'manual') ||
+            (manualChannelEnabled && manualChannelDragMode)) {
+          // For volume profile and manual channel selection, we need native DOM events
+          // Convert to Recharts-like format
+          const chartRect = chartContainerRef.current?.getBoundingClientRect()
+          if (!chartRect) return
 
-        // Get the approximate date from X position
-        const xPercent = (e.clientX - chartRect.left) / chartRect.width
-        const dataIndex = Math.floor(xPercent * chartDataWithZones.length)
-        const activeLabel = chartDataWithZones[dataIndex]?.date
+          // Get the approximate date from X position
+          const xPercent = (e.clientX - chartRect.left) / chartRect.width
+          const dataIndex = Math.floor(xPercent * chartDataWithZones.length)
+          const activeLabel = chartDataWithZones[dataIndex]?.date
 
-        // Call the original handler with enriched event
-        handleMouseDown({ ...e, activeLabel, chartX: e.clientX - chartRect.left })
+          // Call the original handler with enriched event
+          handleMouseDown({ ...e, activeLabel, chartX: e.clientX - chartRect.left })
+        }
       }}
-      onMouseUp={handleMouseUp}
+      onMouseUp={(e) => {
+        // Only handle if we're in a selection mode
+        if (isSelecting || isSelectingVolumeProfile || isPanning) {
+          handleMouseUp(e)
+        }
+      }}
       onMouseMove={(e) => {
-        const chartRect = chartContainerRef.current?.getBoundingClientRect()
-        if (!chartRect) return
+        // Only intercept when actively selecting or panning
+        if (isSelecting || isSelectingVolumeProfile || isPanning) {
+          const chartRect = chartContainerRef.current?.getBoundingClientRect()
+          if (!chartRect) return
 
-        const xPercent = (e.clientX - chartRect.left) / chartRect.width
-        const dataIndex = Math.floor(xPercent * chartDataWithZones.length)
-        const activeLabel = chartDataWithZones[dataIndex]?.date
+          const xPercent = (e.clientX - chartRect.left) / chartRect.width
+          const dataIndex = Math.floor(xPercent * chartDataWithZones.length)
+          const activeLabel = chartDataWithZones[dataIndex]?.date
 
-        handleMouseMove({ ...e, activeLabel, chartX: e.clientX - chartRect.left })
+          handleMouseMove({ ...e, activeLabel, chartX: e.clientX - chartRect.left })
+        }
       }}
       onMouseLeave={handleMouseLeave}
     >
@@ -382,6 +394,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         <ComposedChart
           data={chartDataWithZones}
           margin={{ top: 5, right: 0, left: 20, bottom: 5 }}
+          onMouseMove={!isSelecting && !isSelectingVolumeProfile && !isPanning ? handleMouseMove : undefined}
+          onMouseLeave={!isSelecting && !isSelectingVolumeProfile && !isPanning ? handleMouseLeave : undefined}
         >
           <defs>
             {slopeChannelEnabled && zoneColors.map((zone, index) => (
