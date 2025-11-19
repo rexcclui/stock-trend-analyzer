@@ -146,10 +146,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // Calculate volume profiles if enabled
   const volumeProfiles = volumeProfileEnabled
     ? calculateVolumeProfiles({
+        volumeProfileEnabled,
         volumeProfileMode,
         volumeProfileManualRanges,
         displayPrices,
-        days
+        zoomRange
       })
     : []
 
