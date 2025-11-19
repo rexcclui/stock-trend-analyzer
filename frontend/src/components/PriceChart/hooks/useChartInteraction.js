@@ -221,6 +221,11 @@ export const useChartInteraction = ({
       manualChannelDragMode
     })
 
+    // Update synced mouse date to keep reference line visible during click
+    if (e && e.activeLabel) {
+      setSyncedMouseDate(e.activeLabel)
+    }
+
     // Volume profile manual selection - highest priority
     if (volumeProfileEnabled && volumeProfileMode === 'manual' && e && e.activeLabel) {
       console.log('[handleMouseDown] Starting volume profile selection:', e.activeLabel)

@@ -620,66 +620,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             }} />
           )}
 
-          {/* Volume Profile Selection Rectangle */}
-          {(() => {
-            const shouldRender = volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && volumeProfileSelectionStart && volumeProfileSelectionEnd
-            console.log('[Selection Rectangle]', {
-              shouldRender,
-              volumeProfileEnabled,
-              volumeProfileMode,
-              isSelectingVolumeProfile,
-              volumeProfileSelectionStart,
-              volumeProfileSelectionEnd
-            })
-            return shouldRender
-          })() && (
-            <Customized component={(props) => {
-              const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
-              if (!xAxisMap || !yAxisMap) {
-                console.log('[Rectangle] No axis maps')
-                return null
-              }
-
-              const xAxis = xAxisMap[0]
-              const yAxis = yAxisMap[0]
-
-              if (!xAxis || !yAxis) {
-                console.log('[Rectangle] No axes')
-                return null
-              }
-
-              const startX = xAxis.scale(volumeProfileSelectionStart)
-              const endX = xAxis.scale(volumeProfileSelectionEnd)
-              console.log('[Rectangle Render]', {
-                volumeProfileSelectionStart,
-                volumeProfileSelectionEnd,
-                startX,
-                endX,
-                minX: Math.min(startX, endX),
-                width: Math.abs(endX - startX)
-              })
-
-              const minX = Math.min(startX, endX)
-              const maxX = Math.max(startX, endX)
-              const width = maxX - minX
-
-              return (
-                <g>
-                  <rect
-                    x={minX}
-                    y={offset.top}
-                    width={width}
-                    height={chartHeight - offset.top - offset.bottom}
-                    fill="rgba(59, 130, 246, 0.1)"
-                    stroke="rgba(59, 130, 246, 0.5)"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                  />
-                </g>
-              )
-            }} />
-          )}
-
           <Line
             type="monotone"
             dataKey="close"
@@ -781,6 +721,67 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               />
             )
           })}
+
+          {/* Volume Profile Selection Rectangle - MUST BE LAST to render on top */}
+          {(() => {
+            const shouldRender = volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && volumeProfileSelectionStart && volumeProfileSelectionEnd
+            console.log('[Selection Rectangle]', {
+              shouldRender,
+              volumeProfileEnabled,
+              volumeProfileMode,
+              isSelectingVolumeProfile,
+              volumeProfileSelectionStart,
+              volumeProfileSelectionEnd
+            })
+            return shouldRender
+          })() && (
+            <Customized component={(props) => {
+              const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
+              if (!xAxisMap || !yAxisMap) {
+                console.log('[Rectangle] No axis maps')
+                return null
+              }
+
+              const xAxis = xAxisMap[0]
+              const yAxis = yAxisMap[0]
+
+              if (!xAxis || !yAxis) {
+                console.log('[Rectangle] No axes')
+                return null
+              }
+
+              const startX = xAxis.scale(volumeProfileSelectionStart)
+              const endX = xAxis.scale(volumeProfileSelectionEnd)
+              console.log('[Rectangle Render]', {
+                volumeProfileSelectionStart,
+                volumeProfileSelectionEnd,
+                startX,
+                endX,
+                minX: Math.min(startX, endX),
+                width: Math.abs(endX - startX)
+              })
+
+              const minX = Math.min(startX, endX)
+              const maxX = Math.max(startX, endX)
+              const width = maxX - minX
+
+              return (
+                <g style={{ pointerEvents: 'none' }}>
+                  <rect
+                    x={minX}
+                    y={offset.top}
+                    width={width}
+                    height={chartHeight - offset.top - offset.bottom}
+                    fill="rgba(59, 130, 246, 0.1)"
+                    stroke="rgba(59, 130, 246, 0.5)"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    pointerEvents="none"
+                  />
+                </g>
+              )
+            }} />
+          )}
         </ComposedChart>
       </ResponsiveContainer>
 
