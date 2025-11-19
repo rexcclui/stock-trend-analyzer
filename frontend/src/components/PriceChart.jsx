@@ -3619,7 +3619,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   stroke={channelColor}
                   strokeWidth={2}
                   dot={false}
-                  name={`Ch${index + 1} (${channel.lookbackCount}pts, R²=${(channel.rSquared * 100).toFixed(1)}%)`}
+                  name={`Ch${index + 1}`}
                   strokeDasharray="5 5"
                   opacity={1.0}
                   hide={!isVisible}
@@ -3674,7 +3674,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   stroke={channelColor}
                   strokeWidth={2}
                   dot={false}
-                  name={`Rev${index + 1} (${channel.lookbackCount}pts, R²=${(channel.rSquared * 100).toFixed(1)}%)`}
+                  name={`Rev${index + 1}`}
                   strokeDasharray="5 5"
                   opacity={1.0}
                   hide={!isVisible}
