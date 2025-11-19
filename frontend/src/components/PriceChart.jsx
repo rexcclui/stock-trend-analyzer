@@ -206,6 +206,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const dataIndex = Math.floor(xPercent * chartDataWithZones.length)
           const activeLabel = chartDataWithZones[dataIndex]?.date
 
+          console.log('[MouseDown]', {
+            clientX: e.clientX,
+            chartLeft: chartRect.left,
+            xPercent,
+            dataIndex,
+            activeLabel,
+            volumeProfileMode,
+            volumeProfileEnabled
+          })
+
           // Call the original handler with enriched event
           handleMouseDown({ ...e, activeLabel, chartX: e.clientX - chartRect.left })
         }
@@ -410,7 +420,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             stroke="#475569"
           />
           <YAxis domain={['auto', 'auto']} tick={{ fill: '#94a3b8' }} stroke="#475569" />
-          <Tooltip content={<ChartTooltip comparisonStocks={comparisonStocks} comparisonMode={comparisonMode} smaPeriods={smaPeriods} smaVisibility={smaVisibility} />} />
+          <Tooltip
+            content={<ChartTooltip comparisonStocks={comparisonStocks} comparisonMode={comparisonMode} smaPeriods={smaPeriods} smaVisibility={smaVisibility} />}
+            cursor={false}
+          />
           <Legend content={<ChartLegend
             smaVisibility={smaVisibility}
             onToggleSma={onToggleSma}
@@ -431,7 +444,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             setManualChannels={setManualChannels}
             extendManualChannel={extendManualChannel}
           />} />
-          {syncedMouseDate && (
+          {(() => {
+            console.log('[ReferenceLine]', { syncedMouseDate })
+            return syncedMouseDate
+          })() && (
             <ReferenceLine
               x={syncedMouseDate}
               stroke="#94a3b8"
@@ -578,18 +594,44 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           )}
 
           {/* Volume Profile Selection Rectangle */}
-          {volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && volumeProfileSelectionStart && volumeProfileSelectionEnd && (
+          {(() => {
+            const shouldRender = volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && volumeProfileSelectionStart && volumeProfileSelectionEnd
+            console.log('[Selection Rectangle]', {
+              shouldRender,
+              volumeProfileEnabled,
+              volumeProfileMode,
+              isSelectingVolumeProfile,
+              volumeProfileSelectionStart,
+              volumeProfileSelectionEnd
+            })
+            return shouldRender
+          })() && (
             <Customized component={(props) => {
               const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
-              if (!xAxisMap || !yAxisMap) return null
+              if (!xAxisMap || !yAxisMap) {
+                console.log('[Rectangle] No axis maps')
+                return null
+              }
 
               const xAxis = xAxisMap[0]
               const yAxis = yAxisMap[0]
 
-              if (!xAxis || !yAxis) return null
+              if (!xAxis || !yAxis) {
+                console.log('[Rectangle] No axes')
+                return null
+              }
 
               const startX = xAxis.scale(volumeProfileSelectionStart)
               const endX = xAxis.scale(volumeProfileSelectionEnd)
+              console.log('[Rectangle Render]', {
+                volumeProfileSelectionStart,
+                volumeProfileSelectionEnd,
+                startX,
+                endX,
+                minX: Math.min(startX, endX),
+                width: Math.abs(endX - startX)
+              })
+
               const minX = Math.min(startX, endX)
               const maxX = Math.max(startX, endX)
               const width = maxX - minX
