@@ -500,6 +500,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             <VolumeProfile
               {...props}
               volumeProfileEnabled={volumeProfileEnabled}
+              volumeProfileMode={volumeProfileMode}
               volumeProfiles={volumeProfiles}
               displayPrices={displayPrices}
               onVolumeProfileRangeRemove={onVolumeProfileRangeRemove}
