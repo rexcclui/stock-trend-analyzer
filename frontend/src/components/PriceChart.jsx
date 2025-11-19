@@ -189,7 +189,36 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   })
 
   return (
-    <div ref={chartContainerRef} style={{ width: '100%', height: chartHeight, position: 'relative', cursor: getCursorStyle(), userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', msUserSelect: 'none' }}>
+    <div
+      ref={chartContainerRef}
+      style={{ width: '100%', height: chartHeight, position: 'relative', cursor: getCursorStyle(), userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', msUserSelect: 'none' }}
+      onMouseDown={(e) => {
+        // For volume profile and manual channel selection, we need native DOM events
+        // Convert to Recharts-like format
+        const chartRect = chartContainerRef.current?.getBoundingClientRect()
+        if (!chartRect) return
+
+        // Get the approximate date from X position
+        const xPercent = (e.clientX - chartRect.left) / chartRect.width
+        const dataIndex = Math.floor(xPercent * chartDataWithZones.length)
+        const activeLabel = chartDataWithZones[dataIndex]?.date
+
+        // Call the original handler with enriched event
+        handleMouseDown({ ...e, activeLabel, chartX: e.clientX - chartRect.left })
+      }}
+      onMouseUp={handleMouseUp}
+      onMouseMove={(e) => {
+        const chartRect = chartContainerRef.current?.getBoundingClientRect()
+        if (!chartRect) return
+
+        const xPercent = (e.clientX - chartRect.left) / chartRect.width
+        const dataIndex = Math.floor(xPercent * chartDataWithZones.length)
+        const activeLabel = chartDataWithZones[dataIndex]?.date
+
+        handleMouseMove({ ...e, activeLabel, chartX: e.clientX - chartRect.left })
+      }}
+      onMouseLeave={handleMouseLeave}
+    >
       {/* Slope Channel Controls Panel */}
       {slopeChannelEnabled && slopeChannelInfo && onSlopeChannelParamsChange && controlsVisible && (
         <div
@@ -353,10 +382,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         <ComposedChart
           data={chartDataWithZones}
           margin={{ top: 5, right: 0, left: 20, bottom: 5 }}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-          onMouseDown={handleMouseDown}
-          onMouseUp={handleMouseUp}
         >
           <defs>
             {slopeChannelEnabled && zoneColors.map((zone, index) => (
