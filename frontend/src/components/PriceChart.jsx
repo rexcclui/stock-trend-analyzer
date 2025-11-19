@@ -677,6 +677,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
         let bestTouchCount = 0
         let bestStdevMult = 2.5
+        let bestCoverage = 0
+        let bestCoverageStdevMult = 2.5
 
         for (const stdevMult of stdevMultipliers) {
           const channelWidth = stdDev * stdevMult
@@ -713,6 +715,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           const percentWithinBounds = pointsWithinBounds / dataSegment.length
 
+          if (percentWithinBounds > bestCoverage) {
+            bestCoverage = percentWithinBounds
+            bestCoverageStdevMult = stdevMult
+          }
+
           if ((hasUpperTouch || hasLowerTouch) &&
               percentWithinBounds >= 0.8 &&
               touchCount > bestTouchCount) {
@@ -721,7 +728,21 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           }
         }
 
-        return { slope, intercept, stdDev, optimalStdevMult: bestStdevMult }
+        if (bestTouchCount > 0) {
+          return { slope, intercept, stdDev, optimalStdevMult: bestStdevMult }
+        }
+
+        if (bestCoverage >= 0.8) {
+          return { slope, intercept, stdDev, optimalStdevMult: bestCoverageStdevMult }
+        }
+
+        const absoluteDistances = distances.map(d => Math.abs(d)).sort((a, b) => a - b)
+        const targetIndex = Math.max(Math.floor(absoluteDistances.length * 0.8) - 1, 0)
+        const targetDistance = absoluteDistances[targetIndex]
+        const coverageMultiplier = stdDev > 0 ? targetDistance / stdDev : 0
+        const enforcedStdevMult = Math.max(coverageMultiplier, bestCoverageStdevMult, 1)
+
+        return { slope, intercept, stdDev, optimalStdevMult: enforcedStdevMult }
       }
 
       let currentSegment = data.slice(currentStartIndex, currentStartIndex + lookbackCount)
