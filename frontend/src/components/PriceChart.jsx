@@ -541,18 +541,41 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           )}
 
           {/* Volume Profile Selection Rectangle */}
-          {volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && volumeProfileSelectionStart && volumeProfileSelectionEnd && (
+          {(() => {
+            const shouldRender = volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && volumeProfileSelectionStart && volumeProfileSelectionEnd
+            console.log('Volume Profile Selection Rectangle:', {
+              shouldRender,
+              volumeProfileEnabled,
+              volumeProfileMode,
+              isSelectingVolumeProfile,
+              volumeProfileSelectionStart,
+              volumeProfileSelectionEnd
+            })
+            return shouldRender
+          })() && (
             <Customized component={(props) => {
               const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
-              if (!xAxisMap || !yAxisMap) return null
+              if (!xAxisMap || !yAxisMap) {
+                console.log('Selection rectangle: No axis maps')
+                return null
+              }
 
               const xAxis = xAxisMap[0]
               const yAxis = yAxisMap[0]
 
-              if (!xAxis || !yAxis) return null
+              if (!xAxis || !yAxis) {
+                console.log('Selection rectangle: No axes')
+                return null
+              }
 
               const startX = xAxis.scale(volumeProfileSelectionStart)
               const endX = xAxis.scale(volumeProfileSelectionEnd)
+              console.log('Selection rectangle rendering:', {
+                volumeProfileSelectionStart,
+                volumeProfileSelectionEnd,
+                startX,
+                endX
+              })
               const minX = Math.min(startX, endX)
               const maxX = Math.max(startX, endX)
               const width = maxX - minX

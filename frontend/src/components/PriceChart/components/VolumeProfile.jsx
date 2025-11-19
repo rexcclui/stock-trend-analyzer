@@ -27,6 +27,12 @@ const VolumeProfile = (props) => {
     return null
   }
 
+  console.log('VolumeProfile rendering:', {
+    volumeProfileMode,
+    profilesCount: volumeProfiles.length,
+    firstProfile: volumeProfiles[0]
+  })
+
   return (
     <g>
       {volumeProfiles.map((volumeProfile, profileIndex) => {
@@ -37,13 +43,25 @@ const VolumeProfile = (props) => {
         // In manual mode, only span the selected date range
         if (volumeProfileMode === 'manual' && volumeProfile.dateRange) {
           const { startDate, endDate } = volumeProfile.dateRange
+          console.log('Manual mode volume profile:', {
+            profileIndex,
+            startDate,
+            endDate,
+            dateRange: volumeProfile.dateRange
+          })
           const startX = xAxis.scale(startDate)
           const endX = xAxis.scale(endDate)
+          console.log('X positions:', { startX, endX })
 
           if (startX !== undefined && endX !== undefined) {
             barX = Math.min(startX, endX)
             barWidth = Math.abs(endX - startX)
+            console.log('Calculated bar dimensions:', { barX, barWidth })
+          } else {
+            console.log('ERROR: X positions are undefined!')
           }
+        } else if (volumeProfileMode === 'manual') {
+          console.log('Manual mode but NO dateRange:', volumeProfile)
         }
 
         // Determine if price is upward slope (for X button positioning)
