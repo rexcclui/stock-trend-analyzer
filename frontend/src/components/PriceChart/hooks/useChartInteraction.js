@@ -174,6 +174,17 @@ export const useChartInteraction = ({
       setPanStartX(null)
       setPanStartZoom(null)
     }
+    // Cancel any ongoing selections when mouse leaves
+    if (isSelecting) {
+      setIsSelecting(false)
+      setSelectionStart(null)
+      setSelectionEnd(null)
+    }
+    if (isSelectingVolumeProfile) {
+      setIsSelectingVolumeProfile(false)
+      setVolumeProfileSelectionStart(null)
+      setVolumeProfileSelectionEnd(null)
+    }
   }
 
   /**
@@ -227,6 +238,8 @@ export const useChartInteraction = ({
       // Calculate manual channel for selected range
       fitManualChannel(selectionStart, selectionEnd)
       setIsSelecting(false)
+      setSelectionStart(null)
+      setSelectionEnd(null)
     }
     if (volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && volumeProfileSelectionStart && volumeProfileSelectionEnd) {
       // Set the manual range for volume profile
@@ -236,6 +249,8 @@ export const useChartInteraction = ({
       const dates = [startDate, endDate].sort()
       onVolumeProfileManualRangeChange({ startDate: dates[0], endDate: dates[1] })
       setIsSelectingVolumeProfile(false)
+      setVolumeProfileSelectionStart(null)
+      setVolumeProfileSelectionEnd(null)
     }
   }
 
