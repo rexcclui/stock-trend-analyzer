@@ -937,7 +937,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     allChannels.forEach((channel, channelIndex) => {
       const zoneColors = []
-      const numZones = 3 // Fixed at 3 zones for all channels
+      const numZones = 5 // Fixed at 5 zones for all channels
 
       // Create zones from lower to upper
       for (let i = 0; i < numZones; i++) {
@@ -2747,9 +2747,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   <text
                     x={lastPoint.x - 5}
                     y={lastPoint.y}
-                    fill={color}
+                    fill={`hsl(${hue}, 70%, ${Math.max(20, lightness - (zone.volumeWeight * 30))}%)`}
                     fontSize="11"
-                    fontWeight="700"
+                    fontWeight={zone.volumeWeight > 0.3 ? "800" : "700"}
                     textAnchor="end"
                     dominantBaseline="middle"
                   >
@@ -2867,9 +2867,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   <text
                     x={lastPoint.x - 5}
                     y={lastPoint.y}
-                    fill={color}
+                    fill={`hsl(${hue}, 70%, ${Math.max(20, lightness - (zone.volumeWeight * 30))}%)`}
                     fontSize="11"
-                    fontWeight="700"
+                    fontWeight={zone.volumeWeight > 0.3 ? "800" : "700"}
                     textAnchor="end"
                     dominantBaseline="middle"
                   >
