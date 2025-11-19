@@ -114,7 +114,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       }
 
       const maxOutsidePercent = 0.05 // 5% maximum outside threshold
-      const trendBreakThreshold = 0.5 // Break if >50% of new data is outside
+      const trendBreakThreshold = 0.08 // Break if >8% of the newest data is outside
 
       // Start with minimum lookback and try to extend
       let currentCount = minPoints
@@ -206,7 +206,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // Try to extend the lookback period
       for (let count = currentCount + 1; count <= maxPoints; count++) {
         const previousCount = count - 1
-        const previous90Percent = Math.floor(previousCount * 0.9)
+        const previous85Percent = Math.floor(previousCount * 0.85)
 
         // Get extended data
         testData = data.slice(0, count)
@@ -216,8 +216,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
         if (includedPoints.length < 10) continue
 
-        // Check if new 10% of data (older historical data) fits within current channel
-        const newDataPoints = includedPoints.filter(({ originalIndex }) => originalIndex >= previous90Percent)
+        // Check if new 15% of data (older historical data) fits within current channel
+        const newDataPoints = includedPoints.filter(({ originalIndex }) => originalIndex >= previous85Percent)
         const channelWidth = stdDev * currentStdevMult
 
         let pointsOutside = 0
@@ -526,22 +526,22 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // Try to extend the lookback period
       while (lookbackCount < remainingData.length) {
         const previousLookback = lookbackCount
-        const previous90Percent = Math.floor(previousLookback * 0.9)
+        const previous85Percent = Math.floor(previousLookback * 0.85)
 
         // Try to extend by adding more data
         lookbackCount++
         const extendedSegment = remainingData.slice(0, lookbackCount)
 
-        // Check the newly added first 10% of data (going backward) against the existing channel
-        // bounds that were computed from the prior 90% slice before we refit with the extra data
-        const newPoints = extendedSegment.slice(previous90Percent, lookbackCount)
+        // Check the newly added first 15% of data (going backward) against the existing channel
+        // bounds that were computed from the prior 85% slice before we refit with the extra data
+        const newPoints = extendedSegment.slice(previous85Percent, lookbackCount)
 
         // Use previous channel parameters to check
         const channelWidth = stdDev * optimalStdevMult
         let pointsOutside = 0
 
         newPoints.forEach((point, index) => {
-          const globalIndex = previous90Percent + index
+          const globalIndex = previous85Percent + index
           const predictedY = slope * globalIndex + intercept
           const upperBound = predictedY + channelWidth
           const lowerBound = predictedY - channelWidth
@@ -551,8 +551,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           }
         })
 
-        // If more than 5% of the new 10% points are outside, break the trend
-        if (newPoints.length > 0 && pointsOutside / newPoints.length > 0.05) {
+        // If more than 8% of the new 15% points are outside, break the trend
+        if (newPoints.length > 0 && pointsOutside / newPoints.length > 0.08) {
           channelBroken = true
           breakIndex = currentStartIndex + previousLookback
           lookbackCount = previousLookback
@@ -798,18 +798,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
       while (currentStartIndex + lookbackCount < data.length) {
         const previousLookback = lookbackCount
-        const previous90Percent = Math.floor(previousLookback * 0.9)
+        const previous85Percent = Math.floor(previousLookback * 0.85)
 
         lookbackCount++
         const extendedSegment = data.slice(currentStartIndex, currentStartIndex + lookbackCount)
 
         const channelWidth = stdDev * optimalStdevMult
-        // Use the channel bounds from the previous 90% (before refitting) to test the new 10%
-        const newPoints = extendedSegment.slice(previous90Percent)
+        // Use the channel bounds from the previous 85% (before refitting) to test the new 15%
+        const newPoints = extendedSegment.slice(previous85Percent)
         let pointsOutside = 0
 
         newPoints.forEach((point, index) => {
-          const globalIndex = previous90Percent + index
+          const globalIndex = previous85Percent + index
           const predictedY = slope * globalIndex + intercept
           const upperBound = predictedY + channelWidth
           const lowerBound = predictedY - channelWidth
@@ -819,7 +819,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           }
         })
 
-        if (newPoints.length > 0 && pointsOutside / newPoints.length > 0.05) {
+        if (newPoints.length > 0 && pointsOutside / newPoints.length > 0.08) {
           channelBroken = true
           breakIndex = currentStartIndex + previousLookback
           lookbackCount = previousLookback
@@ -2095,7 +2095,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const { slope, stdDev, optimalStdevMult, channelWidth } = manualChannel
     let { startIndex, endIndex, intercept } = manualChannel
 
-    const trendBreakThreshold = 0.1 // If >10% of new points are outside, break
+    const trendBreakThreshold = 0.08 // If >8% of new points are outside, break
 
     // Step 1: Extend forward (from endIndex to end of data) point by point
     let forwardExtended = false
@@ -2108,30 +2108,30 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // Calculate the total extended range
       const totalExtendedLength = testEndIndex - startIndex + 1
 
-      // Get the LAST 10% of the extended range
-      const windowSize = Math.max(1, Math.floor(totalExtendedLength * 0.1))
+      // Get the LAST 15% of the extended range
+      const windowSize = Math.max(1, Math.floor(totalExtendedLength * 0.15))
       const windowStartIdx = testEndIndex - windowSize + 1
-      const last10PercentPoints = displayPrices.slice(windowStartIdx, testEndIndex + 1)
+      const last15PercentPoints = displayPrices.slice(windowStartIdx, testEndIndex + 1)
 
-      // Check how many of the LAST 10% points fall outside the channel
+      // Check how many of the LAST 15% points fall outside the channel
       let outsideCount = 0
-      for (let i = 0; i < last10PercentPoints.length; i++) {
+      for (let i = 0; i < last15PercentPoints.length; i++) {
         const globalIndex = windowStartIdx + i
         const localIndex = globalIndex - startIndex
         const predictedY = slope * localIndex + intercept
         const upperBound = predictedY + channelWidth
         const lowerBound = predictedY - channelWidth
-        const actualY = last10PercentPoints[i].close
+        const actualY = last15PercentPoints[i].close
 
         if (actualY > upperBound || actualY < lowerBound) {
           outsideCount++
         }
       }
 
-      const outsidePercent = outsideCount / last10PercentPoints.length
+      const outsidePercent = outsideCount / last15PercentPoints.length
 
       if (outsidePercent > trendBreakThreshold) {
-        // >10% of the last 10% points are outside, stop extending forward
+        // >8% of the last 15% points are outside, stop extending forward
         break
       }
 
@@ -2158,30 +2158,30 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // Calculate the total extended range
       const totalExtendedLength = endIndex - testStartIndex + 1
 
-      // Get the FIRST 10% of the extended range
-      const windowSize = Math.max(1, Math.floor(totalExtendedLength * 0.1))
+      // Get the FIRST 15% of the extended range
+      const windowSize = Math.max(1, Math.floor(totalExtendedLength * 0.15))
       const windowEndIdx = testStartIndex + windowSize - 1
-      const first10PercentPoints = displayPrices.slice(testStartIndex, windowEndIdx + 1)
+      const first15PercentPoints = displayPrices.slice(testStartIndex, windowEndIdx + 1)
 
-      // Check how many of the FIRST 10% points fall outside the channel
+      // Check how many of the FIRST 15% points fall outside the channel
       let outsideCount = 0
-      for (let i = 0; i < first10PercentPoints.length; i++) {
+      for (let i = 0; i < first15PercentPoints.length; i++) {
         const globalIndex = testStartIndex + i
         const localIndex = globalIndex - testStartIndex
         const predictedY = slope * localIndex + newIntercept
         const upperBound = predictedY + channelWidth
         const lowerBound = predictedY - channelWidth
-        const actualY = first10PercentPoints[i].close
+        const actualY = first15PercentPoints[i].close
 
         if (actualY > upperBound || actualY < lowerBound) {
           outsideCount++
         }
       }
 
-      const outsidePercent = outsideCount / first10PercentPoints.length
+      const outsidePercent = outsideCount / first15PercentPoints.length
 
       if (outsidePercent > trendBreakThreshold) {
-        // >10% of the first 10% points are outside, stop extending backward
+        // >8% of the first 15% points are outside, stop extending backward
         break
       }
 
