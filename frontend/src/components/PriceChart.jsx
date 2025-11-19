@@ -219,6 +219,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         // Check if new 20% of data (older historical data) fits within current channel
         const newDataPoints = includedPoints.filter(({ originalIndex }) => originalIndex >= previous80Percent)
         const channelWidth = stdDev * currentStdevMult
+        const boundRange = channelWidth * 2
+        const outsideTolerance = boundRange * 0.05
 
         let pointsOutside = 0
         newDataPoints.forEach(({ point, originalIndex }) => {
@@ -226,7 +228,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const upperBound = predictedY + channelWidth
           const lowerBound = predictedY - channelWidth
 
-          if (point.close > upperBound || point.close < lowerBound) {
+          if (point.close > upperBound + outsideTolerance || point.close < lowerBound - outsideTolerance) {
             pointsOutside++
           }
         })
@@ -538,6 +540,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
         // Use previous channel parameters to check
         const channelWidth = stdDev * optimalStdevMult
+        const boundRange = channelWidth * 2
+        const outsideTolerance = boundRange * 0.05
         let pointsOutside = 0
 
         newPoints.forEach((point, index) => {
@@ -546,7 +550,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const upperBound = predictedY + channelWidth
           const lowerBound = predictedY - channelWidth
 
-          if (point.close > upperBound || point.close < lowerBound) {
+          if (point.close > upperBound + outsideTolerance || point.close < lowerBound - outsideTolerance) {
             pointsOutside++
           }
         })
@@ -804,6 +808,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const extendedSegment = data.slice(currentStartIndex, currentStartIndex + lookbackCount)
 
         const channelWidth = stdDev * optimalStdevMult
+        const boundRange = channelWidth * 2
+        const outsideTolerance = boundRange * 0.05
         // Use the channel bounds from the previous 80% (before refitting) to test the new 20%
         const newPoints = extendedSegment.slice(previous80Percent)
         let pointsOutside = 0
@@ -814,7 +820,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const upperBound = predictedY + channelWidth
           const lowerBound = predictedY - channelWidth
 
-          if (point.close > upperBound || point.close < lowerBound) {
+          if (point.close > upperBound + outsideTolerance || point.close < lowerBound - outsideTolerance) {
             pointsOutside++
           }
         })
@@ -2095,6 +2101,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const { slope, stdDev, optimalStdevMult, channelWidth } = manualChannel
     let { startIndex, endIndex, intercept } = manualChannel
 
+    const boundRange = channelWidth * 2
+    const outsideTolerance = boundRange * 0.05
     const trendBreakThreshold = 0.1 // If >10% of new points are outside, break
 
     // Step 1: Extend forward (from endIndex to end of data) point by point
@@ -2123,7 +2131,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const lowerBound = predictedY - channelWidth
         const actualY = last20PercentPoints[i].close
 
-        if (actualY > upperBound || actualY < lowerBound) {
+        if (actualY > upperBound + outsideTolerance || actualY < lowerBound - outsideTolerance) {
           outsideCount++
         }
       }
@@ -2173,7 +2181,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const lowerBound = predictedY - channelWidth
         const actualY = first20PercentPoints[i].close
 
-        if (actualY > upperBound || actualY < lowerBound) {
+        if (actualY > upperBound + outsideTolerance || actualY < lowerBound - outsideTolerance) {
           outsideCount++
         }
       }
