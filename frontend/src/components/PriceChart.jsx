@@ -98,7 +98,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   })
 
   // Use chart data transformation hook (needs manualChannels from interaction hook)
-  const { chartData, visibleChartData, smaCache } = useChartDataTransform({
+  const { chartData, visibleChartData, smaCache, allChannelZones, revAllChannelZones, allManualChannelZones } = useChartDataTransform({
     prices,
     indicators,
     smaPeriods,
@@ -432,6 +432,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               findAllChannelEnabled={findAllChannelEnabled}
               allChannels={allChannels}
               allChannelsVisibility={allChannelsVisibility}
+              allChannelZones={allChannelZones}
+              chartDataWithZones={chartDataWithZones}
             />
           )} />
 
@@ -442,6 +444,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               revAllChannelEnabled={revAllChannelEnabled}
               revAllChannels={revAllChannels}
               revAllChannelsVisibility={revAllChannelsVisibility}
+              revAllChannelZones={revAllChannelZones}
+              chartDataWithZones={chartDataWithZones}
             />
           )} />
 
@@ -452,6 +456,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               findAllChannelEnabled={findAllChannelEnabled}
               allChannels={allChannels}
               allChannelsVisibility={allChannelsVisibility}
+              chartDataWithZones={chartDataWithZones}
             />
           )} />
 
@@ -462,6 +467,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               revAllChannelEnabled={revAllChannelEnabled}
               revAllChannels={revAllChannels}
               revAllChannelsVisibility={revAllChannelsVisibility}
+              chartDataWithZones={chartDataWithZones}
             />
           )} />
 
@@ -471,6 +477,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               {...props}
               manualChannelEnabled={manualChannelEnabled}
               manualChannels={manualChannels}
+              allManualChannelZones={allManualChannelZones}
+              chartDataWithZones={chartDataWithZones}
             />
           )} />
 
@@ -481,6 +489,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               manualChannelEnabled={manualChannelEnabled}
               manualChannels={manualChannels}
               setManualChannels={setManualChannels}
+              chartDataWithZones={chartDataWithZones}
+              displayPrices={displayPrices}
+              zoomRange={zoomRange}
             />
           )} />
 

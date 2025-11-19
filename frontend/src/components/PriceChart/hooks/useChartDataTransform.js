@@ -41,6 +41,9 @@ import { getVolumeLookbackWindow, calculateRollingThresholds } from '../calculat
  *   - visibleChartData: Chart data visible in the current zoom range with comparison lines
  *   - smaCache: Object mapping SMA periods to their calculated values
  *   - displayPrices: Processed price data synchronized with indicators
+ *   - allChannelZones: Zone data for all detected channels (forward direction)
+ *   - revAllChannelZones: Zone data for all detected channels (reversed direction)
+ *   - allManualChannelZones: Zone data for all manual channels
  */
 export const useChartDataTransform = ({
   prices,
@@ -461,7 +464,10 @@ export const useChartDataTransform = ({
       chartData,
       visibleChartData,
       smaCache,
-      displayPrices
+      displayPrices,
+      allChannelZones,
+      revAllChannelZones,
+      allManualChannelZones
     }
   }, [
     prices,
