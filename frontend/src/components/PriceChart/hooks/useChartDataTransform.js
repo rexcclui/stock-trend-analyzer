@@ -269,16 +269,6 @@ export const useChartDataTransform = ({
             dataPoint[`zone${zoneIndex}Lower`] = zoneLower
             dataPoint[`zone${zoneIndex}Upper`] = zoneUpper
           })
-          // Debug: Log first point's zone data
-          if (index === 0) {
-            console.log('First data point zone data:', {
-              index,
-              channelRange,
-              zoneCount: zoneColors.length,
-              zone0Upper: dataPoint[`zone0Upper`],
-              zone0Lower: dataPoint[`zone0Lower`]
-            })
-          }
         }
       }
 
@@ -381,8 +371,6 @@ export const useChartDataTransform = ({
       const selectedFirstPrice = firstVisiblePoint.close
 
       if (selectedFirstPrice) {
-        console.log(`[Comparison] Baseline from FIRST VISIBLE point - Date: ${firstVisibleDate}, Price: ${selectedFirstPrice}`)
-
         comparisonStocks.forEach((compStock) => {
           // Build a map of comparison stock prices by date
           const compPriceByDate = {}
@@ -398,8 +386,6 @@ export const useChartDataTransform = ({
             console.warn(`[Comparison] No data for ${compStock.symbol} on baseline date ${firstVisibleDate}`)
             return
           }
-
-          console.log(`[Comparison] ${compStock.symbol} baseline: ${compFirstPrice}`)
 
           // Inject comparison data into each visible point
           visibleChartData = visibleChartData.map((point, index) => {

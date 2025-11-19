@@ -16,15 +16,7 @@ import React from 'react'
 const SlopeChannelZones = (props) => {
   const { slopeChannelEnabled, zoneColors, chartDataWithZones, slopeChannelInfo } = props
 
-  console.log('SlopeChannelZones render:', {
-    slopeChannelEnabled,
-    zoneColorsLength: zoneColors?.length || 0,
-    zoneColors,
-    slopeChannelInfo: slopeChannelInfo ? 'exists' : 'null'
-  })
-
   if (!slopeChannelEnabled || !zoneColors || zoneColors.length === 0) {
-    console.log('SlopeChannelZones: Not rendering - slopeChannelEnabled:', slopeChannelEnabled, 'zoneColors.length:', zoneColors?.length || 0)
     return null
   }
 
@@ -33,11 +25,8 @@ const SlopeChannelZones = (props) => {
   const yAxis = yAxisMap?.[0]
 
   if (!xAxis || !yAxis) {
-    console.log('SlopeChannelZones: No xAxis or yAxis')
     return null
   }
-
-  console.log('SlopeChannelZones: Rendering zones, checking chartDataWithZones:', chartDataWithZones?.length || 0, 'points')
 
   // Generate distinct colors for each zone with depth based on volume weight
   const getZoneColor = (index, total, volumeWeight) => {
@@ -79,16 +68,7 @@ const SlopeChannelZones = (props) => {
           return { x, y }
         }).filter(p => p !== null)
 
-        console.log(`Zone ${zoneIndex}:`, {
-          totalDataPoints: chartDataWithZones.length,
-          validPoints: points.length,
-          volumeWeight: zone.volumeWeight,
-          firstPoint: points[0],
-          lastPoint: points[points.length - 1]
-        })
-
         if (points.length < 2) {
-          console.log(`Zone ${zoneIndex}: Not enough points (${points.length})`)
           return null
         }
 
