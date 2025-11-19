@@ -7,6 +7,12 @@ This directory contains the refactored PriceChart component, broken down into sm
 ```
 PriceChart/
 ├── components/          # Reusable sub-components
+│   ├── CustomTooltip.jsx
+│   ├── CustomXAxisTick.jsx
+│   ├── CustomZoneLines.jsx
+│   ├── CustomSlopeChannelLabel.jsx
+│   ├── CustomVolumeProfile.jsx
+│   └── index.js
 ├── hooks/              # Custom React hooks
 │   ├── useChannelState.js
 │   ├── useChartInteractions.js
@@ -23,6 +29,32 @@ PriceChart/
 │   └── index.js
 └── README.md
 ```
+
+## Components
+
+### `CustomTooltip`
+Chart tooltip displaying price, SMA values, and comparison stock data.
+
+### `CustomXAxisTick`
+X-axis tick with special highlighting for month/year transitions.
+
+### `CustomZoneLines`
+Slope channel zone visualization with volume-weighted coloring.
+
+### `CustomSlopeChannelLabel`
+Standard deviation multiplier label at channel midpoint.
+
+### `CustomVolumeProfile`
+Volume profile visualization showing volume distribution across price levels.
+
+**Note**: Additional components can be extracted:
+- CustomLegend
+- CustomAllChannelZoneLines
+- CustomRevAllChannelZoneLines
+- CustomAllChannelStdevLabels
+- CustomRevAllChannelStdevLabels
+- CustomManualChannelZoneLines
+- CustomManualChannelLabels
 
 ## Hooks
 
@@ -106,14 +138,36 @@ Advanced slope channel algorithms:
 
 The original PriceChart.jsx remains functional. To migrate to the refactored version:
 
-1. Import hooks: `import { useSlopeChannel, useChannelState } from './PriceChart/hooks'`
-2. Import utilities: `import { calculateSMA, getSmaColor } from './PriceChart/utils'`
-3. Replace inline calculations with hook calls
-4. Replace inline functions with imported utilities
+1. Import hooks:
+   ```javascript
+   import { useSlopeChannel, useChannelState, useVolumeProfile } from './PriceChart/hooks'
+   ```
 
-## Next Steps
+2. Import utilities:
+   ```javascript
+   import { calculateSMA, getSmaColor } from './PriceChart/utils'
+   ```
 
-- [ ] Extract chart overlay components (CustomZoneLines, etc.)
+3. Import components:
+   ```javascript
+   import { CustomTooltip, CustomZoneLines, CustomVolumeProfile } from './PriceChart/components'
+   ```
+
+4. Replace inline calculations with hook calls
+5. Replace inline functions with imported utilities
+6. Replace inline component definitions with imported components
+
+## Progress
+
+### ✅ Completed
+- [x] Extract calculation utilities (SMA, linear regression, volume calculations)
+- [x] Create custom hooks for state management and calculations
+- [x] Extract main chart overlay components
+- [x] Add comprehensive documentation
+
+### 🚧 In Progress / Future Work
+- [ ] Extract remaining overlay components (CustomLegend, channel-specific components)
 - [ ] Update main PriceChart.jsx to use refactored hooks and utilities
 - [ ] Add unit tests for utilities and hooks
 - [ ] Add TypeScript types for better type safety
+- [ ] Performance profiling and optimization
