@@ -533,8 +533,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         lookbackCount++
         const extendedSegment = remainingData.slice(0, lookbackCount)
 
-        // Check if the newly added first 20% of data (going backward) stays within the channel
-        // defined by the previous 80%
+        // Check the newly added first 20% of data (going backward) against the existing channel
+        // bounds that were computed from the prior 80% slice before we refit with the extra data
         const newPoints = extendedSegment.slice(previous80Percent, lookbackCount)
 
         // Use previous channel parameters to check
@@ -805,6 +805,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const extendedSegment = data.slice(currentStartIndex, currentStartIndex + lookbackCount)
 
         const channelWidth = stdDev * optimalStdevMult
+        // Use the channel bounds from the previous 80% (before refitting) to test the new 20%
         const newPoints = extendedSegment.slice(previous80Percent)
         let pointsOutside = 0
 
