@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
 import { X, ArrowLeftRight, Hand } from 'lucide-react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, revAllChannelEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, manualChannelEnabled = false, manualChannelDragMode = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -880,20 +880,64 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     if (revAllChannelEnabled && prices.length > 0) {
       const dataLength = Math.min(prices.length, indicators.length)
       const displayPrices = prices.slice(0, dataLength)
-      const foundChannels = findAllChannelsReversed(displayPrices)
-      setRevAllChannels(foundChannels)
+      const totalLength = displayPrices.length
 
-      // Initialize visibility for all channels (all visible by default)
-      const visibility = {}
-      foundChannels.forEach((_, index) => {
-        visibility[index] = true
+      if (totalLength === 0) {
+        setRevAllChannels([])
+        setRevAllChannelsVisibility({})
+        return
+      }
+
+      const visibleStart = zoomRange?.start ?? 0
+      const visibleEnd = zoomRange?.end === null ? totalLength : Math.min(totalLength, zoomRange.end)
+
+      const startDisplayIndex = Math.max(0, totalLength - visibleEnd)
+      const endDisplayIndex = Math.min(totalLength - 1, totalLength - 1 - visibleStart)
+
+      const visibleSlice = displayPrices.slice(startDisplayIndex, endDisplayIndex + 1)
+      const visibleOldestToNewest = visibleSlice.slice().reverse()
+
+      if (visibleOldestToNewest.length < 2) {
+        setRevAllChannels([])
+        setRevAllChannelsVisibility({})
+        return
+      }
+
+      const maxEndIndex = visibleOldestToNewest.length - 1
+      const clampedEndIndex = Math.min(
+        Math.max(revAllChannelEndIndex ?? maxEndIndex, 0),
+        maxEndIndex
+      )
+
+      const channelData = visibleOldestToNewest.slice(0, clampedEndIndex + 1)
+      const foundChannelsLocal = findAllChannelsReversed(channelData)
+
+      const adjustIndexToDisplay = (localIndex) => startDisplayIndex + (visibleOldestToNewest.length - 1 - localIndex)
+
+      const adjustedChannels = foundChannelsLocal.map(channel => {
+        const mappedStart = adjustIndexToDisplay(channel.startIndex)
+        const mappedEnd = adjustIndexToDisplay(channel.endIndex)
+
+        return {
+          ...channel,
+          startIndex: Math.min(mappedStart, mappedEnd),
+          endIndex: Math.max(mappedStart, mappedEnd)
+        }
       })
-      setRevAllChannelsVisibility(visibility)
+
+      setRevAllChannels(adjustedChannels)
+      setRevAllChannelsVisibility(prev => {
+        const visibility = {}
+        adjustedChannels.forEach((_, index) => {
+          visibility[index] = prev[index] !== false
+        })
+        return visibility
+      })
     } else {
       setRevAllChannels([])
       setRevAllChannelsVisibility({})
     }
-  }, [revAllChannelEnabled, prices, indicators])
+  }, [revAllChannelEnabled, prices, indicators, zoomRange, revAllChannelEndIndex])
 
   // Calculate volume-weighted zone colors
   const calculateZoneColors = (data, channelInfo, numZones) => {
@@ -1577,6 +1621,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       })
     }
   }
+
+  const revAllVisibleLength = visibleChartData.length
+  const maxRevAllChannelEndIndex = revAllVisibleLength > 0 ? revAllVisibleLength - 1 : 0
+  const effectiveRevAllChannelEndIndex = Math.min(
+    Math.max(revAllChannelEndIndex ?? maxRevAllChannelEndIndex, 0),
+    maxRevAllChannelEndIndex
+  )
+  const revAllChannelEndDate = revAllVisibleLength > 0
+    ? visibleChartData[effectiveRevAllChannelEndIndex]?.date
+    : null
 
   // Handle mouse wheel for zoom
   const handleWheel = (e) => {
@@ -3583,6 +3637,54 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 <div style={{ color: 'rgb(139, 92, 246)', fontWeight: '600' }}>Volume Weighted (bottom 20% ignored)</div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {revAllChannelEnabled && revAllVisibleLength > 1 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '4px',
+            left: 0,
+            right: 0,
+            padding: '0 16px',
+            zIndex: 7,
+            pointerEvents: 'none'
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              width: '100%',
+              background: 'rgba(30, 41, 59, 0.75)',
+              border: '1px solid rgba(148, 163, 184, 0.3)',
+              borderRadius: '8px',
+              padding: '6px 10px',
+              backdropFilter: 'blur(4px)',
+              boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
+              pointerEvents: 'auto'
+            }}
+          >
+            <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>Rev End</span>
+            <input
+              type="range"
+              min={0}
+              max={maxRevAllChannelEndIndex}
+              value={effectiveRevAllChannelEndIndex}
+              onChange={(e) => onRevAllChannelEndChange && onRevAllChannelEndChange(parseInt(e.target.value, 10))}
+              style={{
+                flex: 1,
+                height: '6px',
+                accentColor: '#6366f1',
+                cursor: 'pointer'
+              }}
+            />
+            <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600, minWidth: '80px', textAlign: 'right' }}>
+              {revAllChannelEndDate || '...'}
+            </span>
           </div>
         </div>
       )}
