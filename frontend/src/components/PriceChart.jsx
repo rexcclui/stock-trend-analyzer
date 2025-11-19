@@ -2955,15 +2955,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           const channelColor = channelColors[channelIndex % channelColors.length]
 
-          // Find the midpoint of this channel
-          const channelLength = channel.endIndex - channel.startIndex
-          const midChannelIndex = channel.startIndex + Math.floor(channelLength / 2)
+          // Find all points in chartDataWithZones that have this channel's data
+          const pointsWithChannel = chartDataWithZones
+            .map((point, idx) => ({ point, idx }))
+            .filter(({ point }) => point[`allChannel${channelIndex}Lower`] !== undefined)
 
-          // Get the data point at the middle of this channel
-          const midPoint = chartDataWithZones[midChannelIndex]
-          if (!midPoint || midPoint[`allChannel${channelIndex}Lower`] === undefined) {
-            return null
-          }
+          if (pointsWithChannel.length === 0) return null
+
+          // Find the midpoint among those points
+          const midIndex = Math.floor(pointsWithChannel.length / 2)
+          const { point: midPoint } = pointsWithChannel[midIndex]
 
           const x = xAxis.scale(midPoint.date)
           const y = yAxis.scale(midPoint[`allChannel${channelIndex}Lower`])
@@ -3036,15 +3037,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           const channelColor = channelColors[channelIndex % channelColors.length]
 
-          // Find the midpoint of this channel
-          const channelLength = channel.endIndex - channel.startIndex
-          const midChannelIndex = channel.startIndex + Math.floor(channelLength / 2)
+          // Find all points in chartDataWithZones that have this channel's data
+          const pointsWithChannel = chartDataWithZones
+            .map((point, idx) => ({ point, idx }))
+            .filter(({ point }) => point[`revAllChannel${channelIndex}Lower`] !== undefined)
 
-          // Get the data point at the middle of this channel
-          const midPoint = chartDataWithZones[midChannelIndex]
-          if (!midPoint || midPoint[`revAllChannel${channelIndex}Lower`] === undefined) {
-            return null
-          }
+          if (pointsWithChannel.length === 0) return null
+
+          // Find the midpoint among those points
+          const midIndex = Math.floor(pointsWithChannel.length / 2)
+          const { point: midPoint } = pointsWithChannel[midIndex]
 
           const x = xAxis.scale(midPoint.date)
           const y = yAxis.scale(midPoint[`revAllChannel${channelIndex}Lower`])
