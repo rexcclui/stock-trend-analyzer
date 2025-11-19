@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
 import { X, ArrowLeftRight, Hand } from 'lucide-react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, revAllChannelEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -13,6 +13,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // Store all found channels
   const [allChannels, setAllChannels] = useState([])
   const [allChannelsVisibility, setAllChannelsVisibility] = useState({})
+
+  // Store reversed all channels
+  const [revAllChannels, setRevAllChannels] = useState([])
+  const [revAllChannelsVisibility, setRevAllChannelsVisibility] = useState({})
 
   // Track main trend channel visibility
   const [trendChannelVisible, setTrendChannelVisible] = useState(true)
@@ -408,11 +412,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     if (!data || data.length < 20) return []
 
     const channels = []
-    const maxChannels = 5
     let currentStartIndex = 0
     const minLookback = 20
 
-    while (channels.length < maxChannels && currentStartIndex < data.length - minLookback) {
+    while (currentStartIndex < data.length - minLookback) {
       // Find optimal channel starting from currentStartIndex
       const remainingData = data.slice(currentStartIndex)
 
@@ -608,6 +611,214 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return channels
   }
 
+  // Find all channels in the data (REVERSED - start from first visible point and extend forward)
+  const findAllChannelsReversed = (data) => {
+    if (!data || data.length < 20) return []
+
+    const channels = []
+    let currentEndIndex = data.length - 1 // Start from the most recent point (rightmost)
+    const minLookback = 20
+
+    while (currentEndIndex >= minLookback - 1) {
+      // Find optimal channel ending at currentEndIndex
+      const currentStartIndex = Math.max(0, currentEndIndex - data.length + 1)
+      const remainingData = data.slice(currentStartIndex, currentEndIndex + 1)
+
+      if (remainingData.length < minLookback) break
+
+      // Start with minimum lookback and try to extend backward
+      let lookbackCount = minLookback
+      let optimalStdevMult = 2.5
+      let channelBroken = false
+      let breakIndex = currentEndIndex - lookbackCount
+
+      // First, find the optimal stddev for the initial lookback period
+      const findOptimalStdev = (dataSegment) => {
+        const stdevMultipliers = []
+        for (let mult = 1.0; mult <= 4.0; mult += 0.25) {
+          stdevMultipliers.push(mult)
+        }
+
+        // Calculate regression
+        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
+        const n = dataSegment.length
+
+        dataSegment.forEach((point, index) => {
+          sumX += index
+          sumY += point.close
+          sumXY += index * point.close
+          sumX2 += index * index
+        })
+
+        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+        const intercept = (sumY - slope * sumX) / n
+
+        // Calculate standard deviation
+        const distances = dataSegment.map((point, index) => {
+          const predictedY = slope * index + intercept
+          return point.close - predictedY
+        })
+
+        const meanDistance = distances.reduce((a, b) => a + b, 0) / distances.length
+        const variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
+        const stdDev = Math.sqrt(variance)
+
+        // Find best stdev multiplier based on boundary touches
+        let bestTouchCount = 0
+        let bestStdevMult = 2.5
+
+        for (const stdevMult of stdevMultipliers) {
+          const channelWidth = stdDev * stdevMult
+          let touchCount = 0
+          const touchTolerance = 0.05
+          let hasUpperTouch = false
+          let hasLowerTouch = false
+
+          dataSegment.forEach((point, index) => {
+            const predictedY = slope * index + intercept
+            const upperBound = predictedY + channelWidth
+            const lowerBound = predictedY - channelWidth
+
+            const distanceToUpper = Math.abs(point.close - upperBound)
+            const distanceToLower = Math.abs(point.close - lowerBound)
+            const boundRange = channelWidth * 2
+
+            if (distanceToUpper <= boundRange * touchTolerance) {
+              touchCount++
+              hasUpperTouch = true
+            }
+            if (distanceToLower <= boundRange * touchTolerance) {
+              touchCount++
+              hasLowerTouch = true
+            }
+          })
+
+          // Must have at least one touch on upper or lower bound
+          if ((hasUpperTouch || hasLowerTouch) && touchCount > bestTouchCount) {
+            bestTouchCount = touchCount
+            bestStdevMult = stdevMult
+          }
+        }
+
+        return { slope, intercept, stdDev, optimalStdevMult: bestStdevMult }
+      }
+
+      // Optimize initial channel (most recent points)
+      let initialSegment = remainingData.slice(-lookbackCount)
+      let channelParams = findOptimalStdev(initialSegment)
+      let { slope, intercept, stdDev, optimalStdevMult: currentStdevMult } = channelParams
+
+      optimalStdevMult = currentStdevMult
+
+      // Try to extend the lookback period backward
+      while (lookbackCount < remainingData.length) {
+        const previousLookback = lookbackCount
+        const previous80Percent = Math.floor(previousLookback * 0.8)
+        const first20Percent = previousLookback - previous80Percent
+
+        // Try to extend by adding more data backward
+        lookbackCount++
+        const extendedSegment = remainingData.slice(-lookbackCount)
+
+        // Check if the newly added first 20% of data (going backward) stays within the channel
+        const newPointsStartIdx = remainingData.length - lookbackCount
+        const newPointsEndIdx = newPointsStartIdx + (lookbackCount - previous80Percent)
+        const newPoints = remainingData.slice(newPointsStartIdx, newPointsEndIdx)
+
+        // Use previous channel parameters to check
+        const channelWidth = stdDev * optimalStdevMult
+        let pointsOutside = 0
+
+        newPoints.forEach((point, index) => {
+          const globalIndex = index
+          const predictedY = slope * globalIndex + intercept
+          const upperBound = predictedY + channelWidth
+          const lowerBound = predictedY - channelWidth
+
+          if (point.close > upperBound || point.close < lowerBound) {
+            pointsOutside++
+          }
+        })
+
+        // If most of the new 20% points are outside, break the trend
+        if (newPoints.length > 0 && pointsOutside / newPoints.length > 0.5) {
+          channelBroken = true
+          breakIndex = currentEndIndex - previousLookback
+          lookbackCount = previousLookback
+          break
+        }
+
+        // Update channel parameters with extended data
+        channelParams = findOptimalStdev(extendedSegment)
+        slope = channelParams.slope
+        intercept = channelParams.intercept
+        stdDev = channelParams.stdDev
+        optimalStdevMult = channelParams.optimalStdevMult
+      }
+
+      // Store this channel
+      const channelSegment = remainingData.slice(-lookbackCount)
+      const channelWidth = stdDev * optimalStdevMult
+
+      // Calculate R²
+      const meanY = channelSegment.reduce((sum, p) => sum + p.close, 0) / channelSegment.length
+      let ssTotal = 0
+      let ssResidual = 0
+
+      channelSegment.forEach((point, index) => {
+        const predictedY = slope * index + intercept
+        ssTotal += Math.pow(point.close - meanY, 2)
+        ssResidual += Math.pow(point.close - predictedY, 2)
+      })
+
+      const rSquared = 1 - (ssResidual / ssTotal)
+
+      // Count touches
+      let touchCount = 0
+      const touchTolerance = 0.05
+
+      channelSegment.forEach((point, index) => {
+        const predictedY = slope * index + intercept
+        const upperBound = predictedY + channelWidth
+        const lowerBound = predictedY - channelWidth
+        const distanceToUpper = Math.abs(point.close - upperBound)
+        const distanceToLower = Math.abs(point.close - lowerBound)
+        const boundRange = channelWidth * 2
+
+        if (distanceToUpper <= boundRange * touchTolerance ||
+            distanceToLower <= boundRange * touchTolerance) {
+          touchCount++
+        }
+      })
+
+      const actualStartIndex = currentEndIndex - lookbackCount + 1
+
+      channels.push({
+        startIndex: actualStartIndex,
+        endIndex: currentEndIndex + 1,
+        slope,
+        intercept,
+        channelWidth,
+        stdDev,
+        optimalStdevMult,
+        lookbackCount,
+        rSquared,
+        touchCount
+      })
+
+      // Move to next segment: start from the break point
+      if (channelBroken) {
+        // Next channel ends where this one broke
+        currentEndIndex = breakIndex - 1
+      } else {
+        // Channel extended to the start of data, stop
+        break
+      }
+    }
+
+    return channels
+  }
+
   // Effect to calculate all channels when findAllChannelEnabled changes
   useEffect(() => {
     if (findAllChannelEnabled && prices.length > 0) {
@@ -627,6 +838,26 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       setAllChannelsVisibility({})
     }
   }, [findAllChannelEnabled, prices, indicators])
+
+  // Effect to calculate reversed all channels when revAllChannelEnabled changes
+  useEffect(() => {
+    if (revAllChannelEnabled && prices.length > 0) {
+      const dataLength = Math.min(prices.length, indicators.length)
+      const displayPrices = prices.slice(0, dataLength)
+      const foundChannels = findAllChannelsReversed(displayPrices)
+      setRevAllChannels(foundChannels)
+
+      // Initialize visibility for all channels (all visible by default)
+      const visibility = {}
+      foundChannels.forEach((_, index) => {
+        visibility[index] = true
+      })
+      setRevAllChannelsVisibility(visibility)
+    } else {
+      setRevAllChannels([])
+      setRevAllChannelsVisibility({})
+    }
+  }, [revAllChannelEnabled, prices, indicators])
 
   // Calculate volume-weighted zone colors
   const calculateZoneColors = (data, channelInfo, numZones) => {
@@ -1058,6 +1289,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     ? calculateAllChannelZones(displayPrices, allChannels)
     : {}
 
+  // Calculate zones for reversed all channels
+  const revAllChannelZones = revAllChannelEnabled && revAllChannels.length > 0
+    ? calculateAllChannelZones(displayPrices, revAllChannels)
+    : {}
+
   // Calculate zones for all manual channels
   const allManualChannelZones = manualChannelEnabled && manualChannels.length > 0
     ? manualChannels.map(channel => calculateManualChannelZones(displayPrices, channel))
@@ -1160,6 +1396,34 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               const zoneUpper = lowerBound + channelRange * zone.zoneEnd
               dataPoint[`allChannel${channelIndex}Zone${zoneIndex}Lower`] = zoneLower
               dataPoint[`allChannel${channelIndex}Zone${zoneIndex}Upper`] = zoneUpper
+            })
+          }
+        }
+      })
+    }
+
+    // Add reversed all channels data if enabled
+    if (revAllChannelEnabled && revAllChannels.length > 0) {
+      revAllChannels.forEach((channel, channelIndex) => {
+        // Check if this index is within this channel's range
+        if (index >= channel.startIndex && index < channel.endIndex) {
+          const localIndex = index - channel.startIndex
+          const midValue = channel.slope * localIndex + channel.intercept
+          const upperBound = midValue + channel.channelWidth
+          const lowerBound = midValue - channel.channelWidth
+
+          dataPoint[`revAllChannel${channelIndex}Upper`] = upperBound
+          dataPoint[`revAllChannel${channelIndex}Mid`] = midValue
+          dataPoint[`revAllChannel${channelIndex}Lower`] = lowerBound
+
+          // Add zone boundaries for this channel
+          if (revAllChannelZones[channelIndex]) {
+            const channelRange = upperBound - lowerBound
+            revAllChannelZones[channelIndex].forEach((zone, zoneIndex) => {
+              const zoneLower = lowerBound + channelRange * zone.zoneStart
+              const zoneUpper = lowerBound + channelRange * zone.zoneEnd
+              dataPoint[`revAllChannel${channelIndex}Zone${zoneIndex}Lower`] = zoneLower
+              dataPoint[`revAllChannel${channelIndex}Zone${zoneIndex}Upper`] = zoneUpper
             })
           }
         }
@@ -1975,6 +2239,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const isAllChannel = entry.dataKey.startsWith('allChannel') && entry.dataKey.endsWith('Mid')
           const channelIndex = isAllChannel ? parseInt(entry.dataKey.replace('allChannel', '').replace('Mid', '')) : null
 
+          // Check if this is a reversed all channel line
+          const isRevAllChannel = entry.dataKey.startsWith('revAllChannel') && entry.dataKey.endsWith('Mid')
+          const revChannelIndex = isRevAllChannel ? parseInt(entry.dataKey.replace('revAllChannel', '').replace('Mid', '')) : null
+
           // Check if this is a manual channel line
           const isManualChannel = entry.dataKey.startsWith('manualChannel') && entry.dataKey.endsWith('Mid')
           const manualChannelIndex = isManualChannel ? parseInt(entry.dataKey.replace('manualChannel', '').replace('Mid', '')) : null
@@ -1993,13 +2261,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             return null
           }
 
+          // Skip rendering revAllChannel upper/lower bounds in legend
+          if (entry.dataKey && (entry.dataKey.includes('revAllChannel') && (entry.dataKey.endsWith('Upper') || entry.dataKey.endsWith('Lower')))) {
+            return null
+          }
+
           // Skip rendering manual channel upper/lower bounds in legend
           if (entry.dataKey && (entry.dataKey.includes('manualChannel') && (entry.dataKey.endsWith('Upper') || entry.dataKey.endsWith('Lower')))) {
             return null
           }
 
-          const isVisible = isSma ? smaVisibility[period] : (isAllChannel ? allChannelsVisibility[channelIndex] : (isTrendLine ? trendChannelVisible : true))
-          const isClickable = isSma || isAllChannel || isTrendLine
+          const isVisible = isSma ? smaVisibility[period] : (isAllChannel ? allChannelsVisibility[channelIndex] : (isRevAllChannel ? revAllChannelsVisibility[revChannelIndex] : (isTrendLine ? trendChannelVisible : true)))
+          const isClickable = isSma || isAllChannel || isRevAllChannel || isTrendLine
 
           return (
             <div
@@ -2014,6 +2287,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                     setAllChannelsVisibility(prev => ({
                       ...prev,
                       [channelIndex]: !prev[channelIndex]
+                    }))
+                  } else if (isRevAllChannel) {
+                    setRevAllChannelsVisibility(prev => ({
+                      ...prev,
+                      [revChannelIndex]: !prev[revChannelIndex]
                     }))
                   } else if (isTrendLine) {
                     setTrendChannelVisible(!trendChannelVisible)
@@ -2443,6 +2721,126 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
             return (
               <g key={`channel-${channelIndex}-zone-${zoneIndex}`}>
+                {/* Zone boundary line */}
+                <path
+                  d={pathData}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={1.5}
+                  strokeDasharray="2 2"
+                  opacity={opacity}
+                />
+
+                {/* Volume percentage label at the end of the line */}
+                <g>
+                  {/* Background rectangle for better readability */}
+                  <rect
+                    x={lastPoint.x - 30}
+                    y={lastPoint.y - 8}
+                    width={25}
+                    height={16}
+                    fill="rgba(15, 23, 42, 0.85)"
+                    stroke={color}
+                    strokeWidth={0.5}
+                    rx={2}
+                  />
+                  <text
+                    x={lastPoint.x - 5}
+                    y={lastPoint.y}
+                    fill={color}
+                    fontSize="11"
+                    fontWeight="700"
+                    textAnchor="end"
+                    dominantBaseline="middle"
+                  >
+                    {(zone.volumeWeight * 100).toFixed(1)}%
+                  </text>
+                </g>
+              </g>
+            )
+          })
+        })}
+      </g>
+    )
+  }
+
+  // Custom component to render zone lines for reversed all channels
+  const CustomRevAllChannelZoneLines = (props) => {
+    if (!revAllChannelEnabled || revAllChannels.length === 0 || Object.keys(revAllChannelZones).length === 0) return null
+
+    const { xAxisMap, yAxisMap } = props
+    const xAxis = xAxisMap?.[0]
+    const yAxis = yAxisMap?.[0]
+
+    if (!xAxis || !yAxis) return null
+
+    // Define color palette for channels (same as channel lines)
+    const channelColors = [
+      '#3b82f6',  // Blue
+      '#8b5cf6',  // Purple
+      '#f59e0b',  // Amber
+      '#10b981',  // Green
+      '#06b6d4',  // Cyan
+      '#f97316',  // Orange
+      '#ec4899',  // Pink
+      '#84cc16',  // Lime
+    ]
+
+    return (
+      <g>
+        {revAllChannels.map((channel, channelIndex) => {
+          const isVisible = revAllChannelsVisibility[channelIndex] !== false
+          if (!isVisible) return null
+
+          const channelColor = channelColors[channelIndex % channelColors.length]
+          const zones = revAllChannelZones[channelIndex]
+          if (!zones) return null
+
+          return zones.map((zone, zoneIndex) => {
+            const points = chartDataWithZones.map((point) => {
+              const upper = point[`revAllChannel${channelIndex}Zone${zoneIndex}Upper`]
+              if (upper === undefined) return null
+
+              const x = xAxis.scale(point.date)
+              const y = yAxis.scale(upper)
+              return { x, y }
+            }).filter(p => p !== null)
+
+            if (points.length < 2) return null
+
+            // Create path for the zone boundary line
+            let pathData = `M ${points[0].x} ${points[0].y}`
+            for (let i = 1; i < points.length; i++) {
+              pathData += ` L ${points[i].x} ${points[i].y}`
+            }
+
+            const lastPoint = points[points.length - 1]
+
+            // Opacity and color intensity based on volume weight: higher volume = more intense
+            const minOpacity = 0.3
+            const maxOpacity = 0.9
+            const opacity = minOpacity + (zone.volumeWeight * (maxOpacity - minOpacity))
+
+            // Parse the channel color and adjust lightness based on volume weight
+            // Higher volume = deeper/darker color
+            const colorMap = {
+              '#3b82f6': 217, // Blue
+              '#8b5cf6': 266, // Purple
+              '#f59e0b': 38,  // Amber
+              '#10b981': 160, // Green
+              '#06b6d4': 188, // Cyan
+              '#f97316': 25,  // Orange
+              '#ec4899': 330, // Pink
+              '#84cc16': 75,  // Lime
+            }
+            const hue = colorMap[channelColor] || 217
+            const minLightness = 35 // Darker
+            const maxLightness = 65 // Lighter
+            const lightness = maxLightness - (zone.volumeWeight * (maxLightness - minLightness))
+            const color = `hsl(${hue}, 70%, ${lightness}%)`
+
+            return (
+              <g key={`rev-channel-${channelIndex}-zone-${zoneIndex}`}>
                 {/* Zone boundary line */}
                 <path
                   d={pathData}
@@ -3064,6 +3462,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           {/* All Channels Zones as Parallel Lines */}
           <Customized component={CustomAllChannelZoneLines} />
 
+          {/* Reversed All Channels Zones as Parallel Lines */}
+          <Customized component={CustomRevAllChannelZoneLines} />
+
           {/* Manual Channel Zones as Parallel Lines */}
           <Customized component={CustomManualChannelZoneLines} />
 
@@ -3226,6 +3627,61 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 <Line
                   type="monotone"
                   dataKey={`allChannel${index}Lower`}
+                  stroke={channelColor}
+                  strokeWidth={1.5}
+                  dot={false}
+                  legendType="none"
+                  strokeDasharray="5 5"
+                  opacity={0.6}
+                  hide={!isVisible}
+                />
+              </React.Fragment>
+            )
+          })}
+
+          {/* Reversed All Channels Lines */}
+          {revAllChannelEnabled && revAllChannels.length > 0 && revAllChannels.map((channel, index) => {
+            // Define distinct colors for each channel - using single color per channel for consistency
+            const channelColors = [
+              '#3b82f6',  // Blue
+              '#8b5cf6',  // Purple
+              '#f59e0b',  // Amber
+              '#10b981',  // Green
+              '#06b6d4',  // Cyan
+              '#f97316',  // Orange
+              '#ec4899',  // Pink
+              '#84cc16',  // Lime
+            ]
+            const channelColor = channelColors[index % channelColors.length]
+            const isVisible = revAllChannelsVisibility[index] !== false
+
+            return (
+              <React.Fragment key={`rev-channel-${index}`}>
+                <Line
+                  type="monotone"
+                  dataKey={`revAllChannel${index}Upper`}
+                  stroke={channelColor}
+                  strokeWidth={1.5}
+                  dot={false}
+                  legendType="none"
+                  strokeDasharray="5 5"
+                  opacity={0.6}
+                  hide={!isVisible}
+                />
+                <Line
+                  type="monotone"
+                  dataKey={`revAllChannel${index}Mid`}
+                  stroke={channelColor}
+                  strokeWidth={2}
+                  dot={false}
+                  name={`Rev${index + 1} (${channel.lookbackCount}pts, R²=${(channel.rSquared * 100).toFixed(1)}%)`}
+                  strokeDasharray="5 5"
+                  opacity={1.0}
+                  hide={!isVisible}
+                />
+                <Line
+                  type="monotone"
+                  dataKey={`revAllChannel${index}Lower`}
                   stroke={channelColor}
                   strokeWidth={1.5}
                   dot={false}

@@ -113,6 +113,7 @@ function StockAnalyzer() {
         slopeChannelDataPercent: 30,
         slopeChannelWidthMultiplier: 2.5,
         findAllChannelEnabled: false,
+        revAllChannelEnabled: false,
         manualChannelEnabled: false,
         manualChannelDragMode: false,
         collapsed: false
@@ -320,6 +321,20 @@ function StockAnalyzer() {
           return {
             ...chart,
             findAllChannelEnabled: !chart.findAllChannelEnabled
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const toggleRevAllChannel = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            revAllChannelEnabled: !chart.revAllChannelEnabled
           }
         }
         return chart
@@ -1196,9 +1211,21 @@ function StockAnalyzer() {
                           ? 'bg-purple-600 text-white'
                           : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                       }`}
-                      title="Find All Channels"
+                      title="All Channels"
                     >
-                      Find All Channel
+                      All Channel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleRevAllChannel(chart.id)}
+                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
+                        chart.revAllChannelEnabled
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                      title="Reversed All Channels"
+                    >
+                      Rev All Channel
                     </button>
                     <button
                       type="button"
@@ -1329,6 +1356,7 @@ function StockAnalyzer() {
                     slopeChannelWidthMultiplier={chart.slopeChannelWidthMultiplier}
                     onSlopeChannelParamsChange={(params) => updateSlopeChannelParams(chart.id, params)}
                     findAllChannelEnabled={chart.findAllChannelEnabled}
+                    revAllChannelEnabled={chart.revAllChannelEnabled}
                     manualChannelEnabled={chart.manualChannelEnabled}
                     manualChannelDragMode={chart.manualChannelDragMode}
                     chartHeight={chartHeight}
