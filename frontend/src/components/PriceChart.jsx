@@ -217,17 +217,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         }
       }}
       onMouseMove={(e) => {
-        // Only intercept when actively selecting or panning
-        if (isSelecting || isSelectingVolumeProfile || isPanning) {
-          const chartRect = chartContainerRef.current?.getBoundingClientRect()
-          if (!chartRect) return
+        // ALWAYS handle mouse move for cursor tracking, regardless of selection state
+        const chartRect = chartContainerRef.current?.getBoundingClientRect()
+        if (!chartRect) return
 
-          const xPercent = (e.clientX - chartRect.left) / chartRect.width
-          const dataIndex = Math.floor(xPercent * chartDataWithZones.length)
-          const activeLabel = chartDataWithZones[dataIndex]?.date
+        const xPercent = (e.clientX - chartRect.left) / chartRect.width
+        const dataIndex = Math.floor(xPercent * chartDataWithZones.length)
+        const activeLabel = chartDataWithZones[dataIndex]?.date
 
-          handleMouseMove({ ...e, activeLabel, chartX: e.clientX - chartRect.left })
-        }
+        // Call handler with enriched event data
+        handleMouseMove({ ...e, activeLabel, chartX: e.clientX - chartRect.left })
       }}
       onMouseLeave={handleMouseLeave}
     >
@@ -394,8 +393,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         <ComposedChart
           data={chartDataWithZones}
           margin={{ top: 5, right: 0, left: 20, bottom: 5 }}
-          onMouseMove={!isSelecting && !isSelectingVolumeProfile && !isPanning ? handleMouseMove : undefined}
-          onMouseLeave={!isSelecting && !isSelectingVolumeProfile && !isPanning ? handleMouseLeave : undefined}
         >
           <defs>
             {slopeChannelEnabled && zoneColors.map((zone, index) => (
@@ -581,41 +578,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           )}
 
           {/* Volume Profile Selection Rectangle */}
-          {(() => {
-            const shouldRender = volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && volumeProfileSelectionStart && volumeProfileSelectionEnd
-            console.log('Volume Profile Selection Rectangle:', {
-              shouldRender,
-              volumeProfileEnabled,
-              volumeProfileMode,
-              isSelectingVolumeProfile,
-              volumeProfileSelectionStart,
-              volumeProfileSelectionEnd
-            })
-            return shouldRender
-          })() && (
+          {volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && volumeProfileSelectionStart && volumeProfileSelectionEnd && (
             <Customized component={(props) => {
               const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
-              if (!xAxisMap || !yAxisMap) {
-                console.log('Selection rectangle: No axis maps')
-                return null
-              }
+              if (!xAxisMap || !yAxisMap) return null
 
               const xAxis = xAxisMap[0]
               const yAxis = yAxisMap[0]
 
-              if (!xAxis || !yAxis) {
-                console.log('Selection rectangle: No axes')
-                return null
-              }
+              if (!xAxis || !yAxis) return null
 
               const startX = xAxis.scale(volumeProfileSelectionStart)
               const endX = xAxis.scale(volumeProfileSelectionEnd)
-              console.log('Selection rectangle rendering:', {
-                volumeProfileSelectionStart,
-                volumeProfileSelectionEnd,
-                startX,
-                endX
-              })
               const minX = Math.min(startX, endX)
               const maxX = Math.max(startX, endX)
               const width = maxX - minX
