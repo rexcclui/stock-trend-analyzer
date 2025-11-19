@@ -477,19 +477,22 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
             const distanceToUpper = Math.abs(point.close - upperBound)
             const distanceToLower = Math.abs(point.close - lowerBound)
-            const boundRange = channelWidth * 2
+
+            // Touch tolerance: 5% of the boundary value itself (looser definition)
+            const upperTolerance = Math.abs(upperBound * touchTolerance)
+            const lowerTolerance = Math.abs(lowerBound * touchTolerance)
 
             // Check if point is within bounds
             if (point.close >= lowerBound && point.close <= upperBound) {
               pointsWithinBounds++
             }
 
-            // Check for boundary touches
-            if (distanceToUpper <= boundRange * touchTolerance) {
+            // Check for boundary touches - within 5% of boundary value
+            if (distanceToUpper <= upperTolerance) {
               touchCount++
               hasUpperTouch = true
             }
-            if (distanceToLower <= boundRange * touchTolerance) {
+            if (distanceToLower <= lowerTolerance) {
               touchCount++
               hasLowerTouch = true
             }
@@ -697,19 +700,22 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
             const distanceToUpper = Math.abs(point.close - upperBound)
             const distanceToLower = Math.abs(point.close - lowerBound)
-            const boundRange = channelWidth * 2
+
+            // Touch tolerance: 5% of the boundary value itself (looser definition)
+            const upperTolerance = Math.abs(upperBound * touchTolerance)
+            const lowerTolerance = Math.abs(lowerBound * touchTolerance)
 
             // Check if point is within bounds
             if (point.close >= lowerBound && point.close <= upperBound) {
               pointsWithinBounds++
             }
 
-            // Check for boundary touches
-            if (distanceToUpper <= boundRange * touchTolerance) {
+            // Check for boundary touches - within 5% of boundary value
+            if (distanceToUpper <= upperTolerance) {
               touchCount++
               hasUpperTouch = true
             }
-            if (distanceToLower <= boundRange * touchTolerance) {
+            if (distanceToLower <= lowerTolerance) {
               touchCount++
               hasLowerTouch = true
             }
