@@ -115,6 +115,16 @@ export const useChartInteraction = ({
    * 3. Manual channel selection
    */
   const handleMouseMove = (e) => {
+    console.log('[handleMouseMove]', {
+      hasActiveLabel: !!e?.activeLabel,
+      activeLabel: e?.activeLabel,
+      isSelectingVolumeProfile,
+      volumeProfileSelectionStart,
+      volumeProfileSelectionEnd,
+      isSelecting,
+      isPanning
+    })
+
     // Update synced mouse date when available
     if (e && e.activeLabel) {
       setSyncedMouseDate(e.activeLabel)
@@ -122,6 +132,7 @@ export const useChartInteraction = ({
 
     // Handle volume profile manual selection - update on every move when selecting
     if (volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile) {
+      console.log('[handleMouseMove] Updating volume profile selection end:', e?.activeLabel)
       if (e && e.activeLabel) {
         setVolumeProfileSelectionEnd(e.activeLabel)
       }
@@ -130,6 +141,7 @@ export const useChartInteraction = ({
 
     // Handle manual channel selection - update on every move when selecting
     if (manualChannelEnabled && manualChannelDragMode && isSelecting) {
+      console.log('[handleMouseMove] Updating manual channel selection end:', e?.activeLabel)
       if (e && e.activeLabel) {
         setSelectionEnd(e.activeLabel)
       }
@@ -200,8 +212,18 @@ export const useChartInteraction = ({
    * 3. Chart panning (lowest priority)
    */
   const handleMouseDown = (e) => {
+    console.log('[handleMouseDown]', {
+      hasEvent: !!e,
+      activeLabel: e?.activeLabel,
+      volumeProfileEnabled,
+      volumeProfileMode,
+      manualChannelEnabled,
+      manualChannelDragMode
+    })
+
     // Volume profile manual selection - highest priority
     if (volumeProfileEnabled && volumeProfileMode === 'manual' && e && e.activeLabel) {
+      console.log('[handleMouseDown] Starting volume profile selection:', e.activeLabel)
       setIsSelectingVolumeProfile(true)
       setVolumeProfileSelectionStart(e.activeLabel)
       setVolumeProfileSelectionEnd(e.activeLabel)
@@ -210,6 +232,7 @@ export const useChartInteraction = ({
 
     // Manual channel selection - second priority
     if (manualChannelEnabled && manualChannelDragMode && e && e.activeLabel) {
+      console.log('[handleMouseDown] Starting manual channel selection:', e.activeLabel)
       setIsSelecting(true)
       setSelectionStart(e.activeLabel)
       setSelectionEnd(e.activeLabel)
@@ -218,11 +241,14 @@ export const useChartInteraction = ({
 
     // Panning - only when neither manual mode is active
     if (e && e.chartX !== undefined) {
+      console.log('[handleMouseDown] Starting panning')
       setIsPanning(true)
       setPanStartX(e.chartX)
       setPanStartZoom({ ...zoomRange })
       return
     }
+
+    console.log('[handleMouseDown] No action taken')
   }
 
   /**
