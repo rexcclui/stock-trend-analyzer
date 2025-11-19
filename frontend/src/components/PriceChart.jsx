@@ -634,6 +634,34 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const findAllChannelsReversed = (data) => {
     if (!data || data.length < 20) return []
 
+    const findTurningPointsForData = (series) => {
+      const turningPoints = []
+      const windowSize = 3
+
+      for (let i = windowSize; i < series.length - windowSize; i++) {
+        const current = series[i].close
+        let isLocalMax = true
+        let isLocalMin = true
+
+        for (let j = -windowSize; j <= windowSize; j++) {
+          if (j === 0) continue
+          const compare = series[i + j].close
+          if (compare >= current) isLocalMax = false
+          if (compare <= current) isLocalMin = false
+        }
+
+        if (isLocalMax) {
+          turningPoints.push({ index: i, type: 'max', value: current })
+        } else if (isLocalMin) {
+          turningPoints.push({ index: i, type: 'min', value: current })
+        }
+      }
+
+      return turningPoints
+    }
+
+    const turningPoints = findTurningPointsForData(data)
+
     const channels = []
     const minLookback = 20
     let currentStartIndex = 0
@@ -679,13 +707,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         let bestStdevMult = 2.5
         let bestCoverage = 0
         let bestCoverageStdevMult = 2.5
+        const turningPointsInSegment = turningPoints.filter(tp => tp.index >= currentStartIndex && tp.index < currentStartIndex + dataSegment.length)
 
         for (const stdevMult of stdevMultipliers) {
           const channelWidth = stdDev * stdevMult
           let touchCount = 0
-          const touchTolerance = 0.025
-          let hasUpperTouch = false
-          let hasLowerTouch = false
+          const touchTolerance = 0.05
           let pointsWithinBounds = 0
 
           dataSegment.forEach((point, index) => {
@@ -696,20 +723,25 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             const distanceToUpper = Math.abs(point.close - upperBound)
             const distanceToLower = Math.abs(point.close - lowerBound)
 
-            const upperTolerance = Math.abs(upperBound * touchTolerance)
-            const lowerTolerance = Math.abs(lowerBound * touchTolerance)
-
             if (point.close >= lowerBound && point.close <= upperBound) {
               pointsWithinBounds++
             }
+          })
 
-            if (distanceToUpper <= upperTolerance) {
+          const boundRange = channelWidth * 2
+          turningPointsInSegment.forEach(tp => {
+            const localIndex = tp.index - currentStartIndex
+            const predictedY = slope * localIndex + intercept
+            const upperBound = predictedY + channelWidth
+            const lowerBound = predictedY - channelWidth
+            const distanceToUpper = Math.abs(tp.value - upperBound)
+            const distanceToLower = Math.abs(tp.value - lowerBound)
+
+            const touchesUpper = distanceToUpper <= boundRange * touchTolerance && tp.type === 'max'
+            const touchesLower = distanceToLower <= boundRange * touchTolerance && tp.type === 'min'
+
+            if (touchesUpper || touchesLower) {
               touchCount++
-              hasUpperTouch = true
-            }
-            if (distanceToLower <= lowerTolerance) {
-              touchCount++
-              hasLowerTouch = true
             }
           })
 
@@ -720,8 +752,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             bestCoverageStdevMult = stdevMult
           }
 
-          if ((hasUpperTouch || hasLowerTouch) &&
-              percentWithinBounds >= 0.9 &&
+          if (touchCount > 0 &&
+              percentWithinBounds >= 0.8 &&
               touchCount > bestTouchCount) {
             bestTouchCount = touchCount
             bestStdevMult = stdevMult
@@ -732,12 +764,27 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           return { slope, intercept, stdDev, optimalStdevMult: bestStdevMult }
         }
 
-        if (bestCoverage >= 0.9) {
+        if (turningPointsInSegment.length > 0) {
+          let minMultForTurningPoint = bestStdevMult
+          turningPointsInSegment.forEach(tp => {
+            const localIndex = tp.index - currentStartIndex
+            const predictedY = slope * localIndex + intercept
+            const residual = Math.abs(tp.value - predictedY)
+            const requiredMult = stdDev > 0 ? residual / stdDev : 0
+            if (requiredMult >= 1) {
+              minMultForTurningPoint = Math.max(Math.min(requiredMult, 4), minMultForTurningPoint)
+            }
+          })
+
+          return { slope, intercept, stdDev, optimalStdevMult: minMultForTurningPoint }
+        }
+
+        if (bestCoverage >= 0.8) {
           return { slope, intercept, stdDev, optimalStdevMult: bestCoverageStdevMult }
         }
 
         const absoluteDistances = distances.map(d => Math.abs(d)).sort((a, b) => a - b)
-        const targetIndex = Math.max(Math.floor(absoluteDistances.length * 0.9) - 1, 0)
+        const targetIndex = Math.max(Math.floor(absoluteDistances.length * 0.8) - 1, 0)
         const targetDistance = absoluteDistances[targetIndex]
         const coverageMultiplier = stdDev > 0 ? targetDistance / stdDev : 0
         const enforcedStdevMult = Math.max(coverageMultiplier, bestCoverageStdevMult, 1)
@@ -789,6 +836,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
       const channelSegment = data.slice(currentStartIndex, currentStartIndex + lookbackCount)
       const channelWidth = stdDev * optimalStdevMult
+      const channelTurningPoints = turningPoints.filter(tp => tp.index >= currentStartIndex && tp.index < currentStartIndex + lookbackCount)
 
       const meanY = channelSegment.reduce((sum, p) => sum + p.close, 0) / channelSegment.length
       let ssTotal = 0
@@ -803,18 +851,19 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const rSquared = 1 - (ssResidual / ssTotal)
 
       let touchCount = 0
-      const touchTolerance = 0.025
+      const touchTolerance = 0.05
 
-      channelSegment.forEach((point, index) => {
-        const predictedY = slope * index + intercept
+      const boundRange = channelWidth * 2
+      channelTurningPoints.forEach(tp => {
+        const localIndex = tp.index - currentStartIndex
+        const predictedY = slope * localIndex + intercept
         const upperBound = predictedY + channelWidth
         const lowerBound = predictedY - channelWidth
-        const distanceToUpper = Math.abs(point.close - upperBound)
-        const distanceToLower = Math.abs(point.close - lowerBound)
-        const boundRange = channelWidth * 2
+        const distanceToUpper = Math.abs(tp.value - upperBound)
+        const distanceToLower = Math.abs(tp.value - lowerBound)
 
-        if (distanceToUpper <= boundRange * touchTolerance ||
-            distanceToLower <= boundRange * touchTolerance) {
+        if ((tp.type === 'max' && distanceToUpper <= boundRange * touchTolerance) ||
+            (tp.type === 'min' && distanceToLower <= boundRange * touchTolerance)) {
           touchCount++
         }
       })
