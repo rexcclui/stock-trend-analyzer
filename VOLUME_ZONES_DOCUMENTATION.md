@@ -6,12 +6,14 @@ Volume zones are visual indicators that show **where trading activity concentrat
 
 ## Visual Components
 
-### Zone Structure
-- Each channel (All Channel and Rev All Channel) is divided into **5 equal horizontal zones**
-- Zones are numbered from bottom to top: Zone 0 (bottom) → Zone 4 (top)
+### Zone Structure (Dynamic by Period)
+- Each channel (All Channel and Rev All Channel) is divided into **3 or 5 equal horizontal zones** depending on the time period:
+  - **Period < 1 year**: **3 zones** (simpler view for shorter timeframes)
+  - **Period ≥ 1 year**: **5 zones** (detailed analysis for longer timeframes)
+- Zones are numbered from bottom to top: Zone 0 (bottom) → Zone 2/4 (top)
 - Each zone boundary is drawn as a **dashed line** (2px dash, 2px gap)
 
-### Zone Boundaries
+### Zone Boundaries (5 Zones - Period ≥ 1 Year)
 ```
 Channel Upper ─────────────── Zone 4 Upper (100%)
               ╱╱╱╱╱╱╱╱╱╱╱╱╱╱ Zone 4: 80% - 100%
@@ -23,6 +25,17 @@ Channel Mid   ╱╱╱╱╱╱╱╱╱╱╱╱╱╱ Zone 2: 40% - 60%
               ╱╱╱╱╱╱╱╱╱╱╱╱╱╱ Zone 1: 20% - 40%
               ─────────────── Zone 0 Upper (20%)
               ╱╱╱╱╱╱╱╱╱╱╱╱╱╱ Zone 0: 0% - 20%
+Channel Lower ─────────────── Zone 0 Lower (0%)
+```
+
+### Zone Boundaries (3 Zones - Period < 1 Year)
+```
+Channel Upper ─────────────── Zone 2 Upper (100%)
+              ╱╱╱╱╱╱╱╱╱╱╱╱╱╱ Zone 2: 66.7% - 100%
+              ─────────────── Zone 1 Upper (66.7%)
+Channel Mid   ╱╱╱╱╱╱╱╱╱╱╱╱╱╱ Zone 1: 33.3% - 66.7%
+              ─────────────── Zone 0 Upper (33.3%)
+              ╱╱╱╱╱╱╱╱╱╱╱╱╱╱ Zone 0: 0% - 33.3%
 Channel Lower ─────────────── Zone 0 Lower (0%)
 ```
 
@@ -40,7 +53,7 @@ displayPercentage = volumeWeight × 100
 3. **Calculate Total Volume**: Sum all trading volume across the entire channel
 4. **Compute Percentage**: Divide zone volume by total volume and multiply by 100
 
-### Example
+### Example (5 Zones - Period ≥ 1 Year)
 ```
 Total channel volume: 10,000 units
 
@@ -49,6 +62,15 @@ Zone 3 (60-80%):  1,500 units → 15.0%
 Zone 2 (40-60%):  5,200 units → 52.0%  ← Highest volume!
 Zone 1 (20-40%):  2,000 units → 20.0%
 Zone 0 (0-20%):   500 units   → 5.0%
+```
+
+### Example (3 Zones - Period < 1 Year)
+```
+Total channel volume: 10,000 units
+
+Zone 2 (66.7-100%): 2,000 units → 20.0%
+Zone 1 (33.3-66.7%): 6,500 units → 65.0%  ← Highest volume!
+Zone 0 (0-33.3%):    1,500 units → 15.0%
 ```
 
 ## Visual Encoding System
@@ -200,7 +222,11 @@ When All Channel and Rev All Channel show similar high-volume zones:
 
 ### Key Configuration
 ```javascript
-const numZones = 5                    // 5 zones per channel
+// Dynamic zone count based on period
+const daysNum = parseInt(days) || 365
+const numZones = daysNum < 365 ? 3 : 5  // 3 zones for <1yr, 5 zones for ≥1yr
+
+// Visual encoding parameters
 const minOpacity = 0.3                // Minimum line opacity
 const maxOpacity = 0.9                // Maximum line opacity
 const minLightness = 35               // Darkest color (high volume)
@@ -248,7 +274,13 @@ Zone 0: 18.2%  ───── Medium tone
 
 ## Updates History
 
-### Version 2.0 (Current)
+### Version 2.1 (Current)
+- **Dynamic Zone Count**: Automatically adjusts based on time period
+  - Period < 1 year (< 365 days): **3 zones** for cleaner, simpler visualization
+  - Period ≥ 1 year: **5 zones** for detailed long-term analysis
+- **Rationale**: Shorter timeframes have less data, so fewer zones provide clearer signals without noise
+
+### Version 2.0
 - **Zones**: Increased from 3 to 5 zones for finer granularity
 - **Font Color**: Dynamic darkening based on volume percentage
 - **Font Weight**: Bold (800) for volumes >30%, normal bold (700) otherwise

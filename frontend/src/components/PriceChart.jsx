@@ -468,6 +468,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const touchTolerance = 0.05
           let hasUpperTouch = false
           let hasLowerTouch = false
+          let pointsWithinBounds = 0
 
           dataSegment.forEach((point, index) => {
             const predictedY = slope * index + intercept
@@ -478,6 +479,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             const distanceToLower = Math.abs(point.close - lowerBound)
             const boundRange = channelWidth * 2
 
+            // Check if point is within bounds
+            if (point.close >= lowerBound && point.close <= upperBound) {
+              pointsWithinBounds++
+            }
+
+            // Check for boundary touches
             if (distanceToUpper <= boundRange * touchTolerance) {
               touchCount++
               hasUpperTouch = true
@@ -488,8 +495,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             }
           })
 
-          // Must have at least one touch on upper or lower bound
-          if ((hasUpperTouch || hasLowerTouch) && touchCount > bestTouchCount) {
+          // Calculate percentage of points within bounds
+          const percentWithinBounds = pointsWithinBounds / dataSegment.length
+
+          // Must meet ALL criteria:
+          // 1. At least one touch on upper or lower bound
+          // 2. At least 80% of data points within the channel
+          // 3. More touches than previous best (for tie-breaking)
+          if ((hasUpperTouch || hasLowerTouch) &&
+              percentWithinBounds >= 0.8 &&
+              touchCount > bestTouchCount) {
             bestTouchCount = touchCount
             bestStdevMult = stdevMult
           }
@@ -673,6 +688,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const touchTolerance = 0.05
           let hasUpperTouch = false
           let hasLowerTouch = false
+          let pointsWithinBounds = 0
 
           dataSegment.forEach((point, index) => {
             const predictedY = slope * index + intercept
@@ -683,6 +699,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             const distanceToLower = Math.abs(point.close - lowerBound)
             const boundRange = channelWidth * 2
 
+            // Check if point is within bounds
+            if (point.close >= lowerBound && point.close <= upperBound) {
+              pointsWithinBounds++
+            }
+
+            // Check for boundary touches
             if (distanceToUpper <= boundRange * touchTolerance) {
               touchCount++
               hasUpperTouch = true
@@ -693,8 +715,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             }
           })
 
-          // Must have at least one touch on upper or lower bound
-          if ((hasUpperTouch || hasLowerTouch) && touchCount > bestTouchCount) {
+          // Calculate percentage of points within bounds
+          const percentWithinBounds = pointsWithinBounds / dataSegment.length
+
+          // Must meet ALL criteria:
+          // 1. At least one touch on upper or lower bound
+          // 2. At least 80% of data points within the channel
+          // 3. More touches than previous best (for tie-breaking)
+          if ((hasUpperTouch || hasLowerTouch) &&
+              percentWithinBounds >= 0.8 &&
+              touchCount > bestTouchCount) {
             bestTouchCount = touchCount
             bestStdevMult = stdevMult
           }
@@ -929,15 +959,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return zoneColors
   }
 
-  // Calculate volume-weighted zones for all channels (3 zones per channel)
-  const calculateAllChannelZones = (data, allChannels) => {
+  // Calculate volume-weighted zones for all channels (dynamic zones based on period)
+  const calculateAllChannelZones = (data, allChannels, numZones = 5) => {
     if (!allChannels || allChannels.length === 0 || !data) return {}
 
     const allZones = {}
 
     allChannels.forEach((channel, channelIndex) => {
       const zoneColors = []
-      const numZones = 5 // Fixed at 5 zones for all channels
 
       // Create zones from lower to upper
       for (let i = 0; i < numZones; i++) {
@@ -1284,14 +1313,20 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     ? calculateZoneColors(displayPrices, slopeChannelInfo, slopeChannelZones)
     : []
 
+  // Determine number of zones based on period
+  // Less than 1 year (365 days): 3 zones for simpler view
+  // 1 year or more: 5 zones for detailed analysis
+  const daysNum = parseInt(days) || 365
+  const numZonesForChannels = daysNum < 365 ? 3 : 5
+
   // Calculate zones for all channels
   const allChannelZones = findAllChannelEnabled && allChannels.length > 0
-    ? calculateAllChannelZones(displayPrices, allChannels)
+    ? calculateAllChannelZones(displayPrices, allChannels, numZonesForChannels)
     : {}
 
   // Calculate zones for reversed all channels
   const revAllChannelZones = revAllChannelEnabled && revAllChannels.length > 0
-    ? calculateAllChannelZones(displayPrices, revAllChannels)
+    ? calculateAllChannelZones(displayPrices, revAllChannels, numZonesForChannels)
     : {}
 
   // Calculate zones for all manual channels
