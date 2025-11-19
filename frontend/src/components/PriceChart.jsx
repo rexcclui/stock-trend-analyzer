@@ -419,17 +419,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               const dataIndex = Math.round(xPercent * (chartDataWithZones.length - 1))
               const activeLabel = chartDataWithZones[dataIndex]?.date
 
-              console.log('[SVG MouseDown]', {
-                clientX: e.clientX,
-                svgLeft: svgRect.left,
-                chartX,
-                xPos,
-                xPercent,
-                dataIndex,
-                activeLabel,
-                totalData: chartDataWithZones.length
-              })
-
               if (activeLabel) {
                 handleMouseDown({ activeLabel, chartX: xPos })
               }
@@ -471,10 +460,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             )
           }} />
 
-          {(() => {
-            console.log('[ReferenceLine]', { syncedMouseDate })
-            return syncedMouseDate
-          })() && (
+          {syncedMouseDate && (
             <ReferenceLine
               x={syncedMouseDate}
               stroke="#94a3b8"
@@ -723,43 +709,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           })}
 
           {/* Volume Profile Selection Rectangle - MUST BE LAST to render on top */}
-          {(() => {
-            const shouldRender = volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && volumeProfileSelectionStart && volumeProfileSelectionEnd
-            console.log('[Selection Rectangle]', {
-              shouldRender,
-              volumeProfileEnabled,
-              volumeProfileMode,
-              isSelectingVolumeProfile,
-              volumeProfileSelectionStart,
-              volumeProfileSelectionEnd
-            })
-            return shouldRender
-          })() && (
+          {volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && volumeProfileSelectionStart && volumeProfileSelectionEnd && (
             <Customized component={(props) => {
               const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
-              if (!xAxisMap || !yAxisMap) {
-                console.log('[Rectangle] No axis maps')
-                return null
-              }
+              if (!xAxisMap || !yAxisMap) return null
 
               const xAxis = xAxisMap[0]
               const yAxis = yAxisMap[0]
 
-              if (!xAxis || !yAxis) {
-                console.log('[Rectangle] No axes')
-                return null
-              }
+              if (!xAxis || !yAxis) return null
 
               const startX = xAxis.scale(volumeProfileSelectionStart)
               const endX = xAxis.scale(volumeProfileSelectionEnd)
-              console.log('[Rectangle Render]', {
-                volumeProfileSelectionStart,
-                volumeProfileSelectionEnd,
-                startX,
-                endX,
-                minX: Math.min(startX, endX),
-                width: Math.abs(endX - startX)
-              })
 
               const minX = Math.min(startX, endX)
               const maxX = Math.max(startX, endX)
