@@ -192,53 +192,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     <div
       ref={chartContainerRef}
       style={{ width: '100%', height: chartHeight, position: 'relative', cursor: getCursorStyle(), userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', msUserSelect: 'none' }}
-      onMouseDown={(e) => {
-        // Only intercept when selection modes are active
-        if ((volumeProfileEnabled && volumeProfileMode === 'manual') ||
-            (manualChannelEnabled && manualChannelDragMode)) {
-          // For volume profile and manual channel selection, we need native DOM events
-          // Convert to Recharts-like format
-          const chartRect = chartContainerRef.current?.getBoundingClientRect()
-          if (!chartRect) return
-
-          // Get the approximate date from X position
-          const xPercent = (e.clientX - chartRect.left) / chartRect.width
-          const dataIndex = Math.floor(xPercent * chartDataWithZones.length)
-          const activeLabel = chartDataWithZones[dataIndex]?.date
-
-          console.log('[MouseDown]', {
-            clientX: e.clientX,
-            chartLeft: chartRect.left,
-            xPercent,
-            dataIndex,
-            activeLabel,
-            volumeProfileMode,
-            volumeProfileEnabled
-          })
-
-          // Call the original handler with enriched event
-          handleMouseDown({ ...e, activeLabel, chartX: e.clientX - chartRect.left })
-        }
-      }}
-      onMouseUp={(e) => {
-        // Only handle if we're in a selection mode
-        if (isSelecting || isSelectingVolumeProfile || isPanning) {
-          handleMouseUp(e)
-        }
-      }}
-      onMouseMove={(e) => {
-        // ALWAYS handle mouse move for cursor tracking, regardless of selection state
-        const chartRect = chartContainerRef.current?.getBoundingClientRect()
-        if (!chartRect) return
-
-        const xPercent = (e.clientX - chartRect.left) / chartRect.width
-        const dataIndex = Math.floor(xPercent * chartDataWithZones.length)
-        const activeLabel = chartDataWithZones[dataIndex]?.date
-
-        // Call handler with enriched event data
-        handleMouseMove({ ...e, activeLabel, chartX: e.clientX - chartRect.left })
-      }}
-      onMouseLeave={handleMouseLeave}
     >
       {/* Slope Channel Controls Panel */}
       {slopeChannelEnabled && slopeChannelInfo && onSlopeChannelParamsChange && controlsVisible && (
@@ -444,6 +397,80 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             setManualChannels={setManualChannels}
             extendManualChannel={extendManualChannel}
           />} />
+          {/* Mouse Event Capture Overlay - captures events on empty space */}
+          <Customized component={(props) => {
+            const { xAxisMap, yAxisMap, width, height, offset } = props
+            if (!xAxisMap || !yAxisMap) return null
+
+            const xAxis = xAxisMap[0]
+            const yAxis = yAxisMap[0]
+            if (!xAxis || !yAxis) return null
+
+            // Chart area dimensions
+            const chartX = offset?.left || 0
+            const chartY = offset?.top || 0
+            const chartWidth = width - (offset?.left || 0) - (offset?.right || 0)
+            const chartHeight = height - (offset?.top || 0) - (offset?.bottom || 0)
+
+            const handleSvgMouseDown = (e) => {
+              const svgRect = e.currentTarget.ownerSVGElement.getBoundingClientRect()
+              const xPos = e.clientX - svgRect.left - chartX
+              const xPercent = xPos / chartWidth
+              const dataIndex = Math.round(xPercent * (chartDataWithZones.length - 1))
+              const activeLabel = chartDataWithZones[dataIndex]?.date
+
+              console.log('[SVG MouseDown]', {
+                clientX: e.clientX,
+                svgLeft: svgRect.left,
+                chartX,
+                xPos,
+                xPercent,
+                dataIndex,
+                activeLabel,
+                totalData: chartDataWithZones.length
+              })
+
+              if (activeLabel) {
+                handleMouseDown({ activeLabel, chartX: xPos })
+              }
+            }
+
+            const handleSvgMouseMove = (e) => {
+              const svgRect = e.currentTarget.ownerSVGElement.getBoundingClientRect()
+              const xPos = e.clientX - svgRect.left - chartX
+              const xPercent = xPos / chartWidth
+              const dataIndex = Math.round(xPercent * (chartDataWithZones.length - 1))
+              const activeLabel = chartDataWithZones[dataIndex]?.date
+
+              if (activeLabel) {
+                handleMouseMove({ activeLabel, chartX: xPos })
+              }
+            }
+
+            const handleSvgMouseUp = (e) => {
+              handleMouseUp(e)
+            }
+
+            const handleSvgMouseLeave = (e) => {
+              handleMouseLeave()
+            }
+
+            return (
+              <rect
+                x={chartX}
+                y={chartY}
+                width={chartWidth}
+                height={chartHeight}
+                fill="transparent"
+                pointerEvents="all"
+                onMouseDown={handleSvgMouseDown}
+                onMouseMove={handleSvgMouseMove}
+                onMouseUp={handleSvgMouseUp}
+                onMouseLeave={handleSvgMouseLeave}
+              />
+            )
+          }} />
+
           {(() => {
             console.log('[ReferenceLine]', { syncedMouseDate })
             return syncedMouseDate
