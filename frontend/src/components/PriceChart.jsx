@@ -1402,16 +1402,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           dataPoint[`zone${zoneIndex}Lower`] = zoneLower
           dataPoint[`zone${zoneIndex}Upper`] = zoneUpper
         })
-        // Debug: Log first point's zone data
-        if (index === 0) {
-          console.log('First data point zone data:', {
-            index,
-            channelRange,
-            zoneCount: zoneColors.length,
-            zone0Upper: dataPoint[`zone0Upper`],
-            zone0Lower: dataPoint[`zone0Lower`]
-          })
-        }
       }
     }
 
@@ -1514,8 +1504,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const selectedFirstPrice = firstVisiblePoint.close
 
     if (selectedFirstPrice) {
-      console.log(`[Comparison] Baseline from FIRST VISIBLE point - Date: ${firstVisibleDate}, Price: ${selectedFirstPrice}`)
-
       comparisonStocks.forEach((compStock) => {
         // Build a map of comparison stock prices by date
         const compPriceByDate = {}
@@ -1528,11 +1516,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         // Get baseline comparison price at the SAME date
         const compFirstPrice = compPriceByDate[firstVisibleDate]
         if (!compFirstPrice) {
-          console.warn(`[Comparison] No data for ${compStock.symbol} on baseline date ${firstVisibleDate}`)
           return
         }
-
-        console.log(`[Comparison] ${compStock.symbol} baseline: ${compFirstPrice}`)
 
         // Inject comparison data into each visible point
         visibleChartData = visibleChartData.map((point, index) => {
@@ -2483,15 +2468,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Custom component to render zone lines with labels
   const CustomZoneLines = (props) => {
-    console.log('CustomZoneLines render:', {
-      slopeChannelEnabled,
-      zoneColorsLength: zoneColors.length,
-      zoneColors,
-      slopeChannelInfo: slopeChannelInfo ? 'exists' : 'null'
-    })
-
     if (!slopeChannelEnabled || zoneColors.length === 0) {
-      console.log('CustomZoneLines: Not rendering - slopeChannelEnabled:', slopeChannelEnabled, 'zoneColors.length:', zoneColors.length)
       return null
     }
 
@@ -2500,11 +2477,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const yAxis = yAxisMap?.[0]
 
     if (!xAxis || !yAxis) {
-      console.log('CustomZoneLines: No xAxis or yAxis')
       return null
     }
-
-    console.log('CustomZoneLines: Rendering zones, checking chartDataWithZones:', chartDataWithZones.length, 'points')
 
     // Generate distinct colors for each zone with depth based on volume weight
     const getZoneColor = (index, total, volumeWeight) => {
@@ -2537,16 +2511,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             return { x, y }
           }).filter(p => p !== null)
 
-          console.log(`Zone ${zoneIndex}:`, {
-            totalDataPoints: chartDataWithZones.length,
-            validPoints: points.length,
-            volumeWeight: zone.volumeWeight,
-            firstPoint: points[0],
-            lastPoint: points[points.length - 1]
-          })
-
           if (points.length < 2) {
-            console.log(`Zone ${zoneIndex}: Not enough points (${points.length})`)
             return null
           }
 
