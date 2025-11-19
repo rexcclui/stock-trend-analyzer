@@ -905,10 +905,19 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const mappedStart = adjustIndexToDisplay(channel.startIndex)
         const mappedEnd = adjustIndexToDisplay(channel.endIndex)
 
+        // Display indices run newest-first, so preserve the chronological orientation (oldest→newest)
+        // while also storing a normalized range for rendering checks.
+        const chronologicalStartIndex = mappedStart // Oldest point in the segment (highest display index)
+        const chronologicalEndIndex = mappedEnd     // Newest point in the segment (lowest display index)
+        const renderStartIndex = Math.min(mappedStart, mappedEnd)
+        const renderEndIndex = Math.max(mappedStart, mappedEnd)
+
         return {
           ...channel,
-          startIndex: Math.min(mappedStart, mappedEnd),
-          endIndex: Math.max(mappedStart, mappedEnd)
+          startIndex: renderStartIndex,
+          endIndex: renderEndIndex,
+          chronologicalStartIndex,
+          chronologicalEndIndex
         }
       })
 
@@ -1015,9 +1024,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
         // Only process data within this channel's range
         data.forEach((point, globalIndex) => {
-          if (globalIndex < channel.startIndex || globalIndex >= channel.endIndex) return
+          const rangeStart = Math.min(channel.startIndex, channel.endIndex)
+          const rangeEnd = Math.max(channel.startIndex, channel.endIndex)
+          if (globalIndex < rangeStart || globalIndex >= rangeEnd) return
 
-          const localIndex = globalIndex - channel.startIndex
+          const chronologicalStart = channel.chronologicalStartIndex ?? channel.startIndex
+          const localIndex = Math.abs(chronologicalStart - globalIndex)
           const midValue = channel.slope * localIndex + channel.intercept
           const upperBound = midValue + channel.channelWidth
           const lowerBound = midValue - channel.channelWidth
@@ -1469,7 +1481,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       revAllChannels.forEach((channel, channelIndex) => {
         // Check if this index is within this channel's range
         if (index >= channel.startIndex && index < channel.endIndex) {
-          const localIndex = index - channel.startIndex
+          const chronologicalStart = channel.chronologicalStartIndex ?? channel.startIndex
+          const localIndex = Math.abs(chronologicalStart - index)
           const midValue = channel.slope * localIndex + channel.intercept
           const upperBound = midValue + channel.channelWidth
           const lowerBound = midValue - channel.channelWidth
