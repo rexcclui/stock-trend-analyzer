@@ -112,7 +112,6 @@ function StockAnalyzer() {
         slopeChannelZones: 8,
         slopeChannelDataPercent: 30,
         slopeChannelWidthMultiplier: 2.5,
-        findAllChannelEnabled: false,
         revAllChannelEnabled: false,
         revAllChannelEndIndex: null,
         manualChannelEnabled: false,
@@ -308,20 +307,6 @@ function StockAnalyzer() {
           return {
             ...chart,
             ...params
-          }
-        }
-        return chart
-      })
-    )
-  }
-
-  const toggleFindAllChannel = (chartId) => {
-    setCharts(prevCharts =>
-      prevCharts.map(chart => {
-        if (chart.id === chartId) {
-          return {
-            ...chart,
-            findAllChannelEnabled: !chart.findAllChannelEnabled
           }
         }
         return chart
@@ -1217,18 +1202,6 @@ function StockAnalyzer() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => toggleFindAllChannel(chart.id)}
-                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
-                        chart.findAllChannelEnabled
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
-                      title="All Channels"
-                    >
-                      All Channel
-                    </button>
-                    <button
-                      type="button"
                       onClick={() => toggleRevAllChannel(chart.id)}
                       className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
                         chart.revAllChannelEnabled
@@ -1367,7 +1340,6 @@ function StockAnalyzer() {
                     slopeChannelDataPercent={chart.slopeChannelDataPercent}
                     slopeChannelWidthMultiplier={chart.slopeChannelWidthMultiplier}
                     onSlopeChannelParamsChange={(params) => updateSlopeChannelParams(chart.id, params)}
-                    findAllChannelEnabled={chart.findAllChannelEnabled}
                     revAllChannelEnabled={chart.revAllChannelEnabled}
                     revAllChannelEndIndex={chart.revAllChannelEndIndex}
                     onRevAllChannelEndChange={(value) => updateRevAllChannelEnd(chart.id, value)}
