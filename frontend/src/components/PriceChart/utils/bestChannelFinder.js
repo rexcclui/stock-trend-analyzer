@@ -91,9 +91,10 @@ const countTouchingPoints = (turningPoints, slope, intercept, channelWidth, tole
     const distanceToUpper = Math.abs(tp.value - upperBound)
     const distanceToLower = Math.abs(tp.value - lowerBound)
 
-    // Count touches: maxima touch upper bound, minima touch lower bound
-    const touchesUpper = distanceToUpper <= boundRange * tolerance && tp.type === 'max'
-    const touchesLower = distanceToLower <= boundRange * tolerance && tp.type === 'min'
+    // Count touches: maxima touch upper bound (and must be above midline)
+    // minima touch lower bound (and must be below midline)
+    const touchesUpper = distanceToUpper <= boundRange * tolerance && tp.type === 'max' && tp.value >= predictedY
+    const touchesLower = distanceToLower <= boundRange * tolerance && tp.type === 'min' && tp.value <= predictedY
 
     if (touchesUpper || touchesLower) {
       touchCount++

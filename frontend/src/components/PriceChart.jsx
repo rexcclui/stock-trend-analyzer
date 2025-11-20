@@ -175,11 +175,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             const distanceToUpper = Math.abs(tp.value - upperBound)
             const distanceToLower = Math.abs(tp.value - lowerBound)
 
-            // Upper bound: only count local peaks (max)
-            // Lower bound: only count local dips (min)
-            if (tp.type === 'max' && distanceToUpper <= boundRange * touchTolerance) {
+            // Upper bound: only count local peaks (max) that are above midline
+            // Lower bound: only count local dips (min) that are below midline
+            if (tp.type === 'max' && distanceToUpper <= boundRange * touchTolerance && tp.value >= predictedY) {
               touchCount++
-            } else if (tp.type === 'min' && distanceToLower <= boundRange * touchTolerance) {
+            } else if (tp.type === 'min' && distanceToLower <= boundRange * touchTolerance && tp.value <= predictedY) {
               touchCount++
             }
           })
@@ -445,11 +445,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const distanceToUpper = Math.abs(tp.value - upperBound)
         const distanceToLower = Math.abs(tp.value - lowerBound)
 
-        // Upper bound: only count local peaks (max)
-        // Lower bound: only count local dips (min)
-        if (tp.type === 'max' && distanceToUpper <= boundRange * touchTolerance) {
+        // Upper bound: only count local peaks (max) that are above midline
+        // Lower bound: only count local dips (min) that are below midline
+        if (tp.type === 'max' && distanceToUpper <= boundRange * touchTolerance && tp.value >= predictedY) {
           touchCount++
-        } else if (tp.type === 'min' && distanceToLower <= boundRange * touchTolerance) {
+        } else if (tp.type === 'min' && distanceToLower <= boundRange * touchTolerance && tp.value <= predictedY) {
           touchCount++
         }
       })
@@ -1854,14 +1854,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const distanceToUpper = Math.abs(tp.value - upperBound)
         const distanceToLower = Math.abs(tp.value - lowerBound)
 
-        // Upper bound: only count local peaks (max)
-        if (tp.type === 'max' && distanceToUpper <= boundRange * touchTolerance) {
+        // Upper bound: only count local peaks (max) that are above midline
+        if (tp.type === 'max' && distanceToUpper <= boundRange * touchTolerance && tp.value >= predictedY) {
           touchCount++
           hasUpperTouch = true
           hasTurningPointTouch = true
         }
-        // Lower bound: only count local dips (min)
-        else if (tp.type === 'min' && distanceToLower <= boundRange * touchTolerance) {
+        // Lower bound: only count local dips (min) that are below midline
+        else if (tp.type === 'min' && distanceToLower <= boundRange * touchTolerance && tp.value <= predictedY) {
           touchCount++
           hasLowerTouch = true
           hasTurningPointTouch = true
@@ -2154,12 +2154,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const distanceToUpper = Math.abs(tp.value - upperBound)
       const distanceToLower = Math.abs(tp.value - lowerBound)
 
-      // Upper bound: only count local peaks (max)
-      if (tp.type === 'max' && distanceToUpper <= finalBoundRange * touchToleranceCalc) {
+      // Upper bound: only count local peaks (max) that are above midline
+      if (tp.type === 'max' && distanceToUpper <= finalBoundRange * touchToleranceCalc && tp.value >= predictedY) {
         touchCount++
       }
-      // Lower bound: only count local dips (min)
-      else if (tp.type === 'min' && distanceToLower <= finalBoundRange * touchToleranceCalc) {
+      // Lower bound: only count local dips (min) that are below midline
+      else if (tp.type === 'min' && distanceToLower <= finalBoundRange * touchToleranceCalc && tp.value <= predictedY) {
         touchCount++
       }
     })
