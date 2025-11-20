@@ -2141,7 +2141,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     // Find turning points in extended segment
     const turningPointsInSegment = findTurningPoints(displayPrices, startIndex, endIndex)
-    const boundRange = finalChannelWidth * 2
+    const finalBoundRange = finalChannelWidth * 2
     const touchToleranceCalc = 0.05
 
     // Count touches only from turning points with correct type
@@ -2155,11 +2155,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const distanceToLower = Math.abs(tp.value - lowerBound)
 
       // Upper bound: only count local peaks (max)
-      if (tp.type === 'max' && distanceToUpper <= boundRange * touchToleranceCalc) {
+      if (tp.type === 'max' && distanceToUpper <= finalBoundRange * touchToleranceCalc) {
         touchCount++
       }
       // Lower bound: only count local dips (min)
-      else if (tp.type === 'min' && distanceToLower <= boundRange * touchToleranceCalc) {
+      else if (tp.type === 'min' && distanceToLower <= finalBoundRange * touchToleranceCalc) {
         touchCount++
       }
     })
