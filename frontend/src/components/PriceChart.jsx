@@ -3159,24 +3159,47 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
             const lastPoint = points[points.length - 1]
 
-            // Opacity and color intensity based on volume weight
-            const minOpacity = 0.3
-            const maxOpacity = 0.9
-            const opacity = minOpacity + (zone.volumeWeight * (maxOpacity - minOpacity))
+            // Color based on volume weight: cool to warm gradient
+            // Low volume (0-20%): Blue/Cyan
+            // Medium-Low (20-40%): Green/Yellow-Green
+            // Medium (40-60%): Yellow
+            // Medium-High (60-80%): Orange
+            // High (80-100%): Red/Deep Orange
+            let hue, saturation, lightness
 
-            // Parse channel color for warm tones
-            const colorMap = {
-              '#f59e0b': 45,  // Amber
-              '#f97316': 25,  // Orange
-              '#eab308': 50,  // Yellow
-              '#fb923c': 30,  // Light Orange
-              '#fbbf24': 43,  // Light Amber
+            if (zone.volumeWeight < 0.2) {
+              // Low volume - Blue/Cyan
+              hue = 200 - (zone.volumeWeight / 0.2) * 20  // 200 to 180
+              saturation = 70
+              lightness = 55
+            } else if (zone.volumeWeight < 0.4) {
+              // Medium-low - Cyan to Green
+              const t = (zone.volumeWeight - 0.2) / 0.2
+              hue = 180 - t * 60  // 180 to 120 (green)
+              saturation = 65
+              lightness = 50
+            } else if (zone.volumeWeight < 0.6) {
+              // Medium - Green to Yellow
+              const t = (zone.volumeWeight - 0.4) / 0.2
+              hue = 120 - t * 60  // 120 to 60 (yellow)
+              saturation = 75
+              lightness = 50
+            } else if (zone.volumeWeight < 0.8) {
+              // Medium-high - Yellow to Orange
+              const t = (zone.volumeWeight - 0.6) / 0.2
+              hue = 60 - t * 25  // 60 to 35 (orange)
+              saturation = 85
+              lightness = 52
+            } else {
+              // High volume - Orange to Red
+              const t = (zone.volumeWeight - 0.8) / 0.2
+              hue = 35 - t * 25  // 35 to 10 (red)
+              saturation = 90
+              lightness = 50
             }
-            const hue = colorMap[channelColor] || 45
-            const minLightness = 40 // Darker
-            const maxLightness = 70 // Lighter
-            const lightness = maxLightness - (zone.volumeWeight * (maxLightness - minLightness))
-            const color = `hsl(${hue}, 85%, ${lightness}%)`
+
+            const color = `hsl(${hue}, ${saturation}%, ${lightness}%)`
+            const opacity = 0.4 + (zone.volumeWeight * 0.5) // 0.4 to 0.9
 
             return (
               <g key={`best-channel-${channelIndex}-zone-${zoneIndex}`}>
@@ -3206,9 +3229,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   <text
                     x={lastPoint.x - 5}
                     y={lastPoint.y}
-                    fill={`hsl(${hue}, 85%, ${Math.max(25, lightness - (zone.volumeWeight * 30))}%)`}
+                    fill={color}
                     fontSize="11"
-                    fontWeight={zone.volumeWeight > 0.3 ? "800" : "700"}
+                    fontWeight={zone.volumeWeight > 0.5 ? "800" : "700"}
                     textAnchor="end"
                     dominantBaseline="middle"
                   >
