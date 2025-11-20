@@ -405,10 +405,25 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     }
   }
 
+  // Helper function to determine initial lookback window size based on time period
+  const getInitialLookbackForPeriod = (daysStr) => {
+    const daysNum = parseInt(daysStr) || 365
+
+    // 5Y or more = 100
+    if (daysNum >= 1825) return 100
+    // 3Y = 80
+    if (daysNum >= 1095) return 80
+    // 1Y = 40
+    if (daysNum >= 365) return 40
+    // Shorter ranges = 20
+    return 20
+  }
+
   // Find all channels in the data (REVERSED) by starting at the left edge of the visible window
   // and extending channels forward in time (to the right).
   const findAllChannelsReversed = (data) => {
-    if (!data || data.length < 20) return []
+    const minLookback = getInitialLookbackForPeriod(days)
+    if (!data || data.length < minLookback) return []
 
     const findTurningPointsForData = (series) => {
       const turningPoints = []
@@ -439,7 +454,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const turningPoints = findTurningPointsForData(data)
 
     const channels = []
-    const minLookback = 20
     let currentStartIndex = 0
 
     while (currentStartIndex <= data.length - minLookback) {
