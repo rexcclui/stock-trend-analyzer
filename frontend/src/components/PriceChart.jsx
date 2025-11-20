@@ -828,22 +828,38 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     if (bestChannelEnabled && prices.length > 0) {
       const dataLength = Math.min(prices.length, indicators.length)
       const displayPrices = prices.slice(0, dataLength)
+      const totalLength = displayPrices.length
 
-      if (displayPrices.length < 20) {
+      if (totalLength < 20) {
         setBestChannels([])
         setBestChannelsVisibility({})
         return
       }
 
-      // Determine simulation parameters based on data length
-      const dataLen = displayPrices.length
+      // Calculate visible range based on zoomRange
+      const visibleStart = zoomRange?.start ?? 0
+      const visibleEnd = zoomRange?.end === null ? totalLength : Math.min(totalLength, zoomRange.end)
+
+      const startDisplayIndex = Math.max(0, totalLength - visibleEnd)
+      const endDisplayIndex = Math.min(totalLength - 1, totalLength - 1 - visibleStart)
+
+      const visibleSlice = displayPrices.slice(startDisplayIndex, endDisplayIndex + 1)
+
+      if (visibleSlice.length < 20) {
+        setBestChannels([])
+        setBestChannelsVisibility({})
+        return
+      }
+
+      // Determine simulation parameters based on visible data length
+      const dataLen = visibleSlice.length
       const minLength = Math.max(20, Math.floor(dataLen * 0.1))
       const maxLength = Math.floor(dataLen * 0.8)
       const startStep = Math.max(1, Math.floor(dataLen * 0.02))
       const lengthStep = Math.max(1, Math.floor(dataLen * 0.02))
 
-      // Find best channels
-      const foundChannels = findBestChannels(displayPrices, {
+      // Find best channels in the visible range
+      const foundChannels = findBestChannels(visibleSlice, {
         minStartIndex: 0,
         maxStartIndex: Math.max(0, dataLen - minLength),
         minLength,
@@ -855,8 +871,15 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         similarityThreshold: 0.9
       })
 
+      // Adjust indices to global display indices
+      const adjustedChannels = foundChannels.map(channel => ({
+        ...channel,
+        startIndex: channel.startIndex + startDisplayIndex,
+        endIndex: channel.endIndex + startDisplayIndex
+      }))
+
       // Filter overlapping channels to show distinct ones
-      const filteredChannels = filterOverlappingChannels(foundChannels, 0.3)
+      const filteredChannels = filterOverlappingChannels(adjustedChannels, 0.3)
 
       // Limit to top 5 channels
       const topChannels = filteredChannels.slice(0, 5)
@@ -873,7 +896,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       setBestChannels([])
       setBestChannelsVisibility({})
     }
-  }, [bestChannelEnabled, prices, indicators, days])
+  }, [bestChannelEnabled, prices, indicators, days, zoomRange])
 
   // Calculate volume-weighted zone colors
   const calculateZoneColors = (data, channelInfo, numZones) => {
