@@ -125,12 +125,37 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
       // Helper function to find optimal stdev for a given dataset
       const findOptimalStdev = (includedPoints, slope, intercept, stdDev) => {
+        // Extract turning points from included points
+        const dataPoints = includedPoints.map(ip => ip.point)
+        const turningPoints = []
+        const windowSize = 3
+
+        for (let i = windowSize; i < dataPoints.length - windowSize; i++) {
+          const current = dataPoints[i].close
+          let isLocalMax = true
+          let isLocalMin = true
+
+          for (let j = -windowSize; j <= windowSize; j++) {
+            if (j === 0) continue
+            const compare = dataPoints[i + j].close
+            if (compare >= current) isLocalMax = false
+            if (compare <= current) isLocalMin = false
+          }
+
+          if (isLocalMax) {
+            turningPoints.push({ index: includedPoints[i].originalIndex, type: 'max', value: current })
+          } else if (isLocalMin) {
+            turningPoints.push({ index: includedPoints[i].originalIndex, type: 'min', value: current })
+          }
+        }
+
         for (const stdevMult of stdevMultipliers) {
           const channelWidth = stdDev * stdevMult
           let outsideCount = 0
           let touchCount = 0
           const touchTolerance = 0.025
           const n = includedPoints.length
+          const boundRange = channelWidth * 2
 
           includedPoints.forEach(({ point, originalIndex }) => {
             const predictedY = slope * originalIndex + intercept
@@ -140,13 +165,21 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             if (point.close > upperBound || point.close < lowerBound) {
               outsideCount++
             }
+          })
 
-            const distanceToUpper = Math.abs(point.close - upperBound)
-            const distanceToLower = Math.abs(point.close - lowerBound)
-            const boundRange = channelWidth * 2
+          // Count touches only from turning points with correct type
+          turningPoints.forEach(tp => {
+            const predictedY = slope * tp.index + intercept
+            const upperBound = predictedY + channelWidth
+            const lowerBound = predictedY - channelWidth
+            const distanceToUpper = Math.abs(tp.value - upperBound)
+            const distanceToLower = Math.abs(tp.value - lowerBound)
 
-            if (distanceToUpper <= boundRange * touchTolerance ||
-                distanceToLower <= boundRange * touchTolerance) {
+            // Upper bound: only count local peaks (max)
+            // Lower bound: only count local dips (min)
+            if (tp.type === 'max' && distanceToUpper <= boundRange * touchTolerance) {
+              touchCount++
+            } else if (tp.type === 'min' && distanceToLower <= boundRange * touchTolerance) {
               touchCount++
             }
           })
@@ -380,15 +413,43 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     if (touchCount === undefined) {
       touchCount = 0
       const touchTolerance = 0.05
-      recentData.forEach((point, index) => {
-        const predictedY = slope * index + intercept
+      const boundRange = channelWidth * 2
+
+      // Find turning points in recent data
+      const turningPoints = []
+      const windowSize = 3
+      for (let i = windowSize; i < recentData.length - windowSize; i++) {
+        const current = recentData[i].close
+        let isLocalMax = true
+        let isLocalMin = true
+
+        for (let j = -windowSize; j <= windowSize; j++) {
+          if (j === 0) continue
+          const compare = recentData[i + j].close
+          if (compare >= current) isLocalMax = false
+          if (compare <= current) isLocalMin = false
+        }
+
+        if (isLocalMax) {
+          turningPoints.push({ index: i, type: 'max', value: current })
+        } else if (isLocalMin) {
+          turningPoints.push({ index: i, type: 'min', value: current })
+        }
+      }
+
+      // Count touches only from turning points with correct type
+      turningPoints.forEach(tp => {
+        const predictedY = slope * tp.index + intercept
         const upperBound = predictedY + channelWidth
         const lowerBound = predictedY - channelWidth
-        const distanceToUpper = Math.abs(point.close - upperBound)
-        const distanceToLower = Math.abs(point.close - lowerBound)
-        const boundRange = channelWidth * 2
-        if (distanceToUpper <= boundRange * touchTolerance ||
-            distanceToLower <= boundRange * touchTolerance) {
+        const distanceToUpper = Math.abs(tp.value - upperBound)
+        const distanceToLower = Math.abs(tp.value - lowerBound)
+
+        // Upper bound: only count local peaks (max)
+        // Lower bound: only count local dips (min)
+        if (tp.type === 'max' && distanceToUpper <= boundRange * touchTolerance) {
+          touchCount++
+        } else if (tp.type === 'min' && distanceToLower <= boundRange * touchTolerance) {
           touchCount++
         }
       })
@@ -1781,29 +1842,29 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       let hasUpperTouch = false
       let hasLowerTouch = false
       let hasTurningPointTouch = false
+      const boundRange = channelWidth * 2
 
-      dataSegment.forEach((point, index) => {
-        const globalIndex = minIndex + index
-        const predictedY = slope * index + intercept
+      // Only count touches from turning points with correct type
+      turningPoints.forEach(tp => {
+        const localIndex = tp.index - minIndex
+        const predictedY = slope * localIndex + intercept
         const upperBound = predictedY + channelWidth
         const lowerBound = predictedY - channelWidth
 
-        const distanceToUpper = Math.abs(point.close - upperBound)
-        const distanceToLower = Math.abs(point.close - lowerBound)
-        const boundRange = channelWidth * 2
+        const distanceToUpper = Math.abs(tp.value - upperBound)
+        const distanceToLower = Math.abs(tp.value - lowerBound)
 
-        // Check if this is a turning point
-        const isTurningPoint = turningPoints.some(tp => tp.index === globalIndex)
-
-        if (distanceToUpper <= boundRange * touchTolerance) {
+        // Upper bound: only count local peaks (max)
+        if (tp.type === 'max' && distanceToUpper <= boundRange * touchTolerance) {
           touchCount++
           hasUpperTouch = true
-          if (isTurningPoint) hasTurningPointTouch = true
+          hasTurningPointTouch = true
         }
-        if (distanceToLower <= boundRange * touchTolerance) {
+        // Lower bound: only count local dips (min)
+        else if (tp.type === 'min' && distanceToLower <= boundRange * touchTolerance) {
           touchCount++
           hasLowerTouch = true
-          if (isTurningPoint) hasTurningPointTouch = true
+          hasTurningPointTouch = true
         }
       })
 
@@ -2078,23 +2139,33 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     let residualSS = 0
     const meanY = extendedSegment.reduce((sum, p) => sum + p.close, 0) / extendedSegment.length
 
-    extendedSegment.forEach((point, index) => {
-      const predictedY = slope * index + intercept
+    // Find turning points in extended segment
+    const turningPointsInSegment = findTurningPoints(displayPrices, startIndex, endIndex)
+    const boundRange = finalChannelWidth * 2
+    const touchToleranceCalc = 0.05
+
+    // Count touches only from turning points with correct type
+    turningPointsInSegment.forEach(tp => {
+      const localIndex = tp.index - startIndex
+      const predictedY = slope * localIndex + intercept
       const upperBound = predictedY + finalChannelWidth
       const lowerBound = predictedY - finalChannelWidth
 
-      const distanceToUpper = Math.abs(point.close - upperBound)
-      const distanceToLower = Math.abs(point.close - lowerBound)
-      const boundRange = finalChannelWidth * 2
-      const touchToleranceCalc = 0.05
+      const distanceToUpper = Math.abs(tp.value - upperBound)
+      const distanceToLower = Math.abs(tp.value - lowerBound)
 
-      if (distanceToUpper <= boundRange * touchToleranceCalc) {
+      // Upper bound: only count local peaks (max)
+      if (tp.type === 'max' && distanceToUpper <= boundRange * touchToleranceCalc) {
         touchCount++
       }
-      if (distanceToLower <= boundRange * touchToleranceCalc) {
+      // Lower bound: only count local dips (min)
+      else if (tp.type === 'min' && distanceToLower <= boundRange * touchToleranceCalc) {
         touchCount++
       }
+    })
 
+    extendedSegment.forEach((point, index) => {
+      const predictedY = slope * index + intercept
       totalSS += Math.pow(point.close - meanY, 2)
       residualSS += Math.pow(point.close - predictedY, 2)
     })
