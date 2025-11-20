@@ -872,15 +872,22 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       })
 
       // Adjust indices and intercept to global display indices
-      // The regression was calculated with local indices (relative to visibleSlice)
-      // We need to adjust the intercept when shifting the x-axis by startDisplayIndex
-      const adjustedChannels = foundChannels.map(channel => ({
-        ...channel,
-        startIndex: channel.startIndex + startDisplayIndex,
-        endIndex: channel.endIndex + startDisplayIndex,
-        // Adjust intercept: new_intercept = old_intercept - slope * offset
-        intercept: channel.intercept - channel.slope * startDisplayIndex
-      }))
+      // The regression was calculated with x-coordinates starting at channel.startIndex (local to visibleSlice)
+      // When rendering, we use localIndex = globalIndex - channel.startIndex, which starts at 0
+      // So we need to adjust intercept to account for this x-axis shift
+      const adjustedChannels = foundChannels.map(channel => {
+        const localStartIdx = channel.startIndex  // Save the local start index before adjusting
+        return {
+          ...channel,
+          startIndex: localStartIdx + startDisplayIndex,
+          endIndex: channel.endIndex + startDisplayIndex,
+          // Adjust intercept: at x=0 in new coords, we want y-value that was at x=localStartIdx
+          // Original: y = slope * localStartIdx + intercept_old
+          // New: y = slope * 0 + intercept_new
+          // Therefore: intercept_new = intercept_old + slope * localStartIdx
+          intercept: channel.intercept + channel.slope * localStartIdx
+        }
+      })
 
       // Filter overlapping channels to show distinct ones
       const filteredChannels = filterOverlappingChannels(adjustedChannels, 0.3)
