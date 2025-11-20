@@ -1347,6 +1347,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     ? calculateAllChannelZones(displayPrices, revAllChannels, numZonesForChannels)
     : {}
 
+  // Calculate zones for best channels
+  const bestChannelZones = bestChannelEnabled && bestChannels.length > 0
+    ? calculateAllChannelZones(displayPrices, bestChannels, numZonesForChannels)
+    : {}
+
   // Calculate zones for all manual channels
   const allManualChannelZones = manualChannelEnabled && manualChannels.length > 0
     ? manualChannels.map(channel => calculateManualChannelZones(displayPrices, channel))
@@ -1485,6 +1490,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           dataPoint[`bestChannel${channelIndex}Upper`] = upperBound
           dataPoint[`bestChannel${channelIndex}Mid`] = midValue
           dataPoint[`bestChannel${channelIndex}Lower`] = lowerBound
+
+          // Add zone boundaries for this best channel
+          if (bestChannelZones[channelIndex]) {
+            const channelRange = upperBound - lowerBound
+            bestChannelZones[channelIndex].forEach((zone, zoneIndex) => {
+              const zoneLower = lowerBound + channelRange * zone.zoneStart
+              const zoneUpper = lowerBound + channelRange * zone.zoneEnd
+              dataPoint[`bestChannel${channelIndex}Zone${zoneIndex}Lower`] = zoneLower
+              dataPoint[`bestChannel${channelIndex}Zone${zoneIndex}Upper`] = zoneUpper
+            })
+          }
         }
       })
     }
@@ -3094,6 +3110,195 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     )
   }
 
+  // Custom component to render zone lines for best channels
+  const CustomBestChannelZoneLines = (props) => {
+    if (!bestChannelEnabled || bestChannels.length === 0 || Object.keys(bestChannelZones).length === 0) return null
+
+    const { xAxisMap, yAxisMap } = props
+    const xAxis = xAxisMap?.[0]
+    const yAxis = yAxisMap?.[0]
+
+    if (!xAxis || !yAxis) return null
+
+    // Color palette for best channels (warm colors - amber/orange/yellow tones)
+    const channelColors = [
+      '#f59e0b',  // Amber
+      '#f97316',  // Orange
+      '#eab308',  // Yellow
+      '#fb923c',  // Light Orange
+      '#fbbf24',  // Light Amber
+    ]
+
+    return (
+      <g>
+        {bestChannels.map((channel, channelIndex) => {
+          const isVisible = bestChannelsVisibility[channelIndex] !== false
+          if (!isVisible) return null
+
+          const channelColor = channelColors[channelIndex % channelColors.length]
+          const zones = bestChannelZones[channelIndex]
+          if (!zones) return null
+
+          return zones.map((zone, zoneIndex) => {
+            const points = chartDataWithZones.map((point) => {
+              const upper = point[`bestChannel${channelIndex}Zone${zoneIndex}Upper`]
+              if (upper === undefined) return null
+
+              const x = xAxis.scale(point.date)
+              const y = yAxis.scale(upper)
+              return { x, y }
+            }).filter(p => p !== null)
+
+            if (points.length < 2) return null
+
+            // Create path for the zone boundary line
+            let pathData = `M ${points[0].x} ${points[0].y}`
+            for (let i = 1; i < points.length; i++) {
+              pathData += ` L ${points[i].x} ${points[i].y}`
+            }
+
+            const lastPoint = points[points.length - 1]
+
+            // Opacity and color intensity based on volume weight
+            const minOpacity = 0.3
+            const maxOpacity = 0.9
+            const opacity = minOpacity + (zone.volumeWeight * (maxOpacity - minOpacity))
+
+            // Parse channel color for warm tones
+            const colorMap = {
+              '#f59e0b': 45,  // Amber
+              '#f97316': 25,  // Orange
+              '#eab308': 50,  // Yellow
+              '#fb923c': 30,  // Light Orange
+              '#fbbf24': 43,  // Light Amber
+            }
+            const hue = colorMap[channelColor] || 45
+            const minLightness = 40 // Darker
+            const maxLightness = 70 // Lighter
+            const lightness = maxLightness - (zone.volumeWeight * (maxLightness - minLightness))
+            const color = `hsl(${hue}, 85%, ${lightness}%)`
+
+            return (
+              <g key={`best-channel-${channelIndex}-zone-${zoneIndex}`}>
+                {/* Zone boundary line */}
+                <path
+                  d={pathData}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={1.5}
+                  strokeDasharray="2 2"
+                  opacity={opacity}
+                />
+
+                {/* Volume percentage label at the end of the line */}
+                <g>
+                  {/* Background rectangle for better readability */}
+                  <rect
+                    x={lastPoint.x - 30}
+                    y={lastPoint.y - 8}
+                    width={25}
+                    height={16}
+                    fill="rgba(15, 23, 42, 0.85)"
+                    stroke={color}
+                    strokeWidth={0.5}
+                    rx={2}
+                  />
+                  <text
+                    x={lastPoint.x - 5}
+                    y={lastPoint.y}
+                    fill={`hsl(${hue}, 85%, ${Math.max(25, lightness - (zone.volumeWeight * 30))}%)`}
+                    fontSize="11"
+                    fontWeight={zone.volumeWeight > 0.3 ? "800" : "700"}
+                    textAnchor="end"
+                    dominantBaseline="middle"
+                  >
+                    {(zone.volumeWeight * 100).toFixed(1)}%
+                  </text>
+                </g>
+              </g>
+            )
+          })
+        })}
+      </g>
+    )
+  }
+
+  // Custom component to render stdev labels at midpoint of Best Channel lower bounds
+  const CustomBestChannelStdevLabels = (props) => {
+    if (!bestChannelEnabled || bestChannels.length === 0) return null
+
+    const { xAxisMap, yAxisMap } = props
+    const xAxis = xAxisMap?.[0]
+    const yAxis = yAxisMap?.[0]
+
+    if (!xAxis || !yAxis) return null
+
+    // Color palette matching best channels
+    const channelColors = [
+      '#f59e0b',  // Amber
+      '#f97316',  // Orange
+      '#eab308',  // Yellow
+      '#fb923c',  // Light Orange
+      '#fbbf24',  // Light Amber
+    ]
+
+    return (
+      <g>
+        {bestChannels.map((channel, channelIndex) => {
+          const isVisible = bestChannelsVisibility[channelIndex] !== false
+          if (!isVisible) return null
+
+          // Find the midpoint of the channel
+          const midIndex = Math.floor((channel.startIndex + channel.endIndex) / 2)
+          const midPoint = chartDataWithZones[midIndex]
+
+          if (!midPoint) return null
+
+          // Calculate lower bound value at midpoint
+          const localIndex = midIndex - channel.startIndex
+          const midValue = channel.slope * localIndex + channel.intercept
+          const lowerValue = midValue - channel.channelWidth
+
+          const x = xAxis.scale(midPoint.date)
+          const y = yAxis.scale(lowerValue)
+
+          if (x === undefined || y === undefined) return null
+
+          const color = channelColors[channelIndex % channelColors.length]
+          const stdevText = `${channel.stdevMultiplier.toFixed(2)}σ`
+
+          return (
+            <g key={`best-channel-label-${channelIndex}`}>
+              {/* Background rectangle for better readability */}
+              <rect
+                x={x - 20}
+                y={y + 5}
+                width={40}
+                height={16}
+                fill="rgba(15, 23, 42, 0.9)"
+                stroke={color}
+                strokeWidth={1}
+                rx={3}
+              />
+              {/* Stdev label */}
+              <text
+                x={x}
+                y={y + 15}
+                fill={color}
+                fontSize="11"
+                fontWeight="700"
+                textAnchor="middle"
+                dominantBaseline="middle"
+              >
+                {stdevText}
+              </text>
+            </g>
+          )
+        })}
+      </g>
+    )
+  }
+
   // Custom component to render volume profile horizontal bars (supports multiple profiles)
   const CustomVolumeProfile = (props) => {
     if (!volumeProfileEnabled || volumeProfiles.length === 0) return null
@@ -3514,6 +3719,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           {/* Manual Channel Stdev Labels */}
           <Customized component={CustomManualChannelLabels} />
+
+          {/* Best Channel Zones as Parallel Lines */}
+          <Customized component={CustomBestChannelZoneLines} />
+
+          {/* Best Channel Stdev Labels */}
+          <Customized component={CustomBestChannelStdevLabels} />
 
           {/* Volume Profile Horizontal Bars */}
           <Customized component={CustomVolumeProfile} />
