@@ -172,6 +172,24 @@ export const findBestChannels = (data, options = {}) => {
       for (const stdevMult of stdevMultipliers) {
         const channelWidth = stdDev * stdevMult
 
+        // Check if at least 80% of points are within bounds
+        let pointsWithinBounds = 0
+        dataSegment.forEach((point, index) => {
+          const x = startIdx + index
+          const predictedY = slope * x + intercept
+          const upperBound = predictedY + channelWidth
+          const lowerBound = predictedY - channelWidth
+
+          if (point.close >= lowerBound && point.close <= upperBound) {
+            pointsWithinBounds++
+          }
+        })
+
+        const percentWithinBounds = pointsWithinBounds / dataSegment.length
+
+        // Only consider channels where at least 80% of data is within bounds
+        if (percentWithinBounds < 0.8) continue
+
         // Count touching points
         const touchCount = countTouchingPoints(
           segmentTurningPoints,
@@ -192,6 +210,7 @@ export const findBestChannels = (data, options = {}) => {
             stdevMultiplier: stdevMult,
             touchCount,
             turningPointsCount: segmentTurningPoints.length,
+            percentWithinBounds,
             length
           })
 
