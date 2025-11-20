@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
 import { X, ArrowLeftRight, Hand } from 'lucide-react'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, revAllChannelEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, findAllChannelEnabled = false, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, manualChannelEnabled = false, manualChannelDragMode = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -114,7 +114,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       }
 
       const maxOutsidePercent = 0.05 // 5% maximum outside threshold
-      const trendBreakThreshold = 0.5 // Break if >50% of new data is outside
+      const trendBreakThreshold = 0.1 // Break if >10% of the newest data is outside
 
       // Start with minimum lookback and try to extend
       let currentCount = minPoints
@@ -128,7 +128,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const channelWidth = stdDev * stdevMult
           let outsideCount = 0
           let touchCount = 0
-          const touchTolerance = 0.05
+          const touchTolerance = 0.025
           const n = includedPoints.length
 
           includedPoints.forEach(({ point, originalIndex }) => {
@@ -206,7 +206,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // Try to extend the lookback period
       for (let count = currentCount + 1; count <= maxPoints; count++) {
         const previousCount = count - 1
-        const previous90Percent = Math.floor(previousCount * 0.9)
+        const previous80Percent = Math.floor(previousCount * 0.8)
 
         // Get extended data
         testData = data.slice(0, count)
@@ -216,9 +216,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
         if (includedPoints.length < 10) continue
 
-        // Check if new 10% of data (older historical data) fits within current channel
-        const newDataPoints = includedPoints.filter(({ originalIndex }) => originalIndex >= previous90Percent)
+        // Check if new 20% of data (older historical data) fits within current channel
+        const newDataPoints = includedPoints.filter(({ originalIndex }) => originalIndex >= previous80Percent)
         const channelWidth = stdDev * currentStdevMult
+        const boundRange = channelWidth * 2
+        const outsideTolerance = boundRange * 0.05
 
         let pointsOutside = 0
         newDataPoints.forEach(({ point, originalIndex }) => {
@@ -226,7 +228,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const upperBound = predictedY + channelWidth
           const lowerBound = predictedY - channelWidth
 
-          if (point.close > upperBound || point.close < lowerBound) {
+          if (point.close > upperBound + outsideTolerance || point.close < lowerBound - outsideTolerance) {
             pointsOutside++
           }
         })
@@ -407,13 +409,22 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     }
   }
 
+  const getInitialLookbackLength = () => {
+    const daysNum = parseInt(days)
+
+    if (daysNum >= 1825) return 100  // 5Y
+    if (daysNum >= 1095) return 80   // 3Y
+    if (daysNum >= 365) return 40    // 1Y
+    return 20                        // Below 6M or unspecified
+  }
+
   // Find all channels in the data
   const findAllChannels = (data) => {
-    if (!data || data.length < 20) return []
+    const minLookback = getInitialLookbackLength()
+    if (!data || data.length < minLookback) return []
 
     const channels = []
     let currentStartIndex = 0
-    const minLookback = 20
 
     while (currentStartIndex < data.length - minLookback) {
       // Find optimal channel starting from currentStartIndex
@@ -465,7 +476,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         for (const stdevMult of stdevMultipliers) {
           const channelWidth = stdDev * stdevMult
           let touchCount = 0
-          const touchTolerance = 0.05
+          const touchTolerance = 0.025
           let hasUpperTouch = false
           let hasLowerTouch = false
           let pointsWithinBounds = 0
@@ -478,7 +489,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             const distanceToUpper = Math.abs(point.close - upperBound)
             const distanceToLower = Math.abs(point.close - lowerBound)
 
-            // Touch tolerance: 5% of the boundary value itself (looser definition)
+            // Touch tolerance: 2.5% of the boundary value itself (looser definition)
             const upperTolerance = Math.abs(upperBound * touchTolerance)
             const lowerTolerance = Math.abs(lowerBound * touchTolerance)
 
@@ -487,7 +498,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               pointsWithinBounds++
             }
 
-            // Check for boundary touches - within 5% of boundary value
+            // Check for boundary touches - within 2.5% of boundary value
             if (distanceToUpper <= upperTolerance) {
               touchCount++
               hasUpperTouch = true
@@ -503,10 +514,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           // Must meet ALL criteria:
           // 1. At least one touch on upper or lower bound
-          // 2. At least 80% of data points within the channel
+          // 2. At least 90% of data points within the channel
           // 3. More touches than previous best (for tie-breaking)
           if ((hasUpperTouch || hasLowerTouch) &&
-              percentWithinBounds >= 0.8 &&
+              percentWithinBounds >= 0.9 &&
               touchCount > bestTouchCount) {
             bestTouchCount = touchCount
             bestStdevMult = stdevMult
@@ -527,18 +538,19 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       while (lookbackCount < remainingData.length) {
         const previousLookback = lookbackCount
         const previous80Percent = Math.floor(previousLookback * 0.8)
-        const first20Percent = previousLookback - previous80Percent
 
         // Try to extend by adding more data
         lookbackCount++
         const extendedSegment = remainingData.slice(0, lookbackCount)
 
-        // Check if the newly added first 20% of data (going backward) stays within the channel
-        // defined by the previous 80%
+        // Check the newly added first 20% of data (going backward) against the existing channel
+        // bounds that were computed from the prior 80% slice before we refit with the extra data
         const newPoints = extendedSegment.slice(previous80Percent, lookbackCount)
 
         // Use previous channel parameters to check
         const channelWidth = stdDev * optimalStdevMult
+        const boundRange = channelWidth * 2
+        const outsideTolerance = boundRange * 0.05
         let pointsOutside = 0
 
         newPoints.forEach((point, index) => {
@@ -547,13 +559,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const upperBound = predictedY + channelWidth
           const lowerBound = predictedY - channelWidth
 
-          if (point.close > upperBound || point.close < lowerBound) {
+          if (point.close > upperBound + outsideTolerance || point.close < lowerBound - outsideTolerance) {
             pointsOutside++
           }
         })
 
-        // If most of the new 20% points are outside, break the trend
-        if (newPoints.length > 0 && pointsOutside / newPoints.length > 0.5) {
+        // If more than 10% of the new 20% points are outside, break the trend
+        if (newPoints.length > 0 && pointsOutside / newPoints.length > 0.1) {
           channelBroken = true
           breakIndex = currentStartIndex + previousLookback
           lookbackCount = previousLookback
@@ -587,7 +599,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
       // Count touches
       let touchCount = 0
-      const touchTolerance = 0.05
+      const touchTolerance = 0.025
 
       channelSegment.forEach((point, index) => {
         const predictedY = slope * index + intercept
@@ -629,35 +641,58 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return channels
   }
 
-  // Find all channels in the data (REVERSED - start from first visible point and extend forward)
+  // Find all channels in the data (REVERSED) by starting at the left edge of the visible window
+  // and extending channels forward in time (to the right).
   const findAllChannelsReversed = (data) => {
-    if (!data || data.length < 20) return []
+    const minLookback = getInitialLookbackLength()
+    if (!data || data.length < minLookback) return []
+
+    const findTurningPointsForData = (series) => {
+      const turningPoints = []
+      const windowSize = 3
+
+      for (let i = windowSize; i < series.length - windowSize; i++) {
+        const current = series[i].close
+        let isLocalMax = true
+        let isLocalMin = true
+
+        for (let j = -windowSize; j <= windowSize; j++) {
+          if (j === 0) continue
+          const compare = series[i + j].close
+          if (compare >= current) isLocalMax = false
+          if (compare <= current) isLocalMin = false
+        }
+
+        if (isLocalMax) {
+          turningPoints.push({ index: i, type: 'max', value: current })
+        } else if (isLocalMin) {
+          turningPoints.push({ index: i, type: 'min', value: current })
+        }
+      }
+
+      return turningPoints
+    }
+
+    const turningPoints = findTurningPointsForData(data)
 
     const channels = []
-    let currentEndIndex = data.length - 1 // Start from the most recent point (rightmost)
-    const minLookback = 20
+    let currentStartIndex = 0
 
-    while (currentEndIndex >= minLookback - 1) {
-      // Find optimal channel ending at currentEndIndex
-      const currentStartIndex = Math.max(0, currentEndIndex - data.length + 1)
-      const remainingData = data.slice(currentStartIndex, currentEndIndex + 1)
+    while (currentStartIndex <= data.length - minLookback) {
+      const remainingLength = data.length - currentStartIndex
+      if (remainingLength < minLookback) break
 
-      if (remainingData.length < minLookback) break
-
-      // Start with minimum lookback and try to extend backward
       let lookbackCount = minLookback
       let optimalStdevMult = 2.5
       let channelBroken = false
-      let breakIndex = currentEndIndex - lookbackCount
+      let breakIndex = currentStartIndex + lookbackCount
 
-      // First, find the optimal stddev for the initial lookback period
       const findOptimalStdev = (dataSegment) => {
         const stdevMultipliers = []
         for (let mult = 1.0; mult <= 4.0; mult += 0.25) {
           stdevMultipliers.push(mult)
         }
 
-        // Calculate regression
         let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
         const n = dataSegment.length
 
@@ -671,7 +706,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
         const intercept = (sumY - slope * sumX) / n
 
-        // Calculate standard deviation
         const distances = dataSegment.map((point, index) => {
           const predictedY = slope * index + intercept
           return point.close - predictedY
@@ -681,16 +715,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
         const stdDev = Math.sqrt(variance)
 
-        // Find best stdev multiplier based on boundary touches
         let bestTouchCount = 0
         let bestStdevMult = 2.5
+        let bestCoverage = 0
+        let bestCoverageStdevMult = 2.5
+        const turningPointsInSegment = turningPoints.filter(tp => tp.index >= currentStartIndex && tp.index < currentStartIndex + dataSegment.length)
 
         for (const stdevMult of stdevMultipliers) {
           const channelWidth = stdDev * stdevMult
           let touchCount = 0
           const touchTolerance = 0.05
-          let hasUpperTouch = false
-          let hasLowerTouch = false
           let pointsWithinBounds = 0
 
           dataSegment.forEach((point, index) => {
@@ -701,34 +735,36 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             const distanceToUpper = Math.abs(point.close - upperBound)
             const distanceToLower = Math.abs(point.close - lowerBound)
 
-            // Touch tolerance: 5% of the boundary value itself (looser definition)
-            const upperTolerance = Math.abs(upperBound * touchTolerance)
-            const lowerTolerance = Math.abs(lowerBound * touchTolerance)
-
-            // Check if point is within bounds
             if (point.close >= lowerBound && point.close <= upperBound) {
               pointsWithinBounds++
             }
+          })
 
-            // Check for boundary touches - within 5% of boundary value
-            if (distanceToUpper <= upperTolerance) {
+          const boundRange = channelWidth * 2
+          turningPointsInSegment.forEach(tp => {
+            const localIndex = tp.index - currentStartIndex
+            const predictedY = slope * localIndex + intercept
+            const upperBound = predictedY + channelWidth
+            const lowerBound = predictedY - channelWidth
+            const distanceToUpper = Math.abs(tp.value - upperBound)
+            const distanceToLower = Math.abs(tp.value - lowerBound)
+
+            const touchesUpper = distanceToUpper <= boundRange * touchTolerance && tp.type === 'max'
+            const touchesLower = distanceToLower <= boundRange * touchTolerance && tp.type === 'min'
+
+            if (touchesUpper || touchesLower) {
               touchCount++
-              hasUpperTouch = true
-            }
-            if (distanceToLower <= lowerTolerance) {
-              touchCount++
-              hasLowerTouch = true
             }
           })
 
-          // Calculate percentage of points within bounds
           const percentWithinBounds = pointsWithinBounds / dataSegment.length
 
-          // Must meet ALL criteria:
-          // 1. At least one touch on upper or lower bound
-          // 2. At least 80% of data points within the channel
-          // 3. More touches than previous best (for tie-breaking)
-          if ((hasUpperTouch || hasLowerTouch) &&
+          if (percentWithinBounds > bestCoverage) {
+            bestCoverage = percentWithinBounds
+            bestCoverageStdevMult = stdevMult
+          }
+
+          if (touchCount > 0 &&
               percentWithinBounds >= 0.8 &&
               touchCount > bestTouchCount) {
             bestTouchCount = touchCount
@@ -736,67 +772,87 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           }
         }
 
-        return { slope, intercept, stdDev, optimalStdevMult: bestStdevMult }
+        if (bestTouchCount > 0) {
+          return { slope, intercept, stdDev, optimalStdevMult: bestStdevMult }
+        }
+
+        if (turningPointsInSegment.length > 0) {
+          let minMultForTurningPoint = bestStdevMult
+          turningPointsInSegment.forEach(tp => {
+            const localIndex = tp.index - currentStartIndex
+            const predictedY = slope * localIndex + intercept
+            const residual = Math.abs(tp.value - predictedY)
+            const requiredMult = stdDev > 0 ? residual / stdDev : 0
+            if (requiredMult >= 1) {
+              minMultForTurningPoint = Math.max(Math.min(requiredMult, 4), minMultForTurningPoint)
+            }
+          })
+
+          return { slope, intercept, stdDev, optimalStdevMult: minMultForTurningPoint }
+        }
+
+        if (bestCoverage >= 0.8) {
+          return { slope, intercept, stdDev, optimalStdevMult: bestCoverageStdevMult }
+        }
+
+        const absoluteDistances = distances.map(d => Math.abs(d)).sort((a, b) => a - b)
+        const targetIndex = Math.max(Math.floor(absoluteDistances.length * 0.8) - 1, 0)
+        const targetDistance = absoluteDistances[targetIndex]
+        const coverageMultiplier = stdDev > 0 ? targetDistance / stdDev : 0
+        const enforcedStdevMult = Math.max(coverageMultiplier, bestCoverageStdevMult, 1)
+
+        return { slope, intercept, stdDev, optimalStdevMult: enforcedStdevMult }
       }
 
-      // Optimize initial channel (most recent points)
-      let initialSegment = remainingData.slice(-lookbackCount)
-      let channelParams = findOptimalStdev(initialSegment)
+      let currentSegment = data.slice(currentStartIndex, currentStartIndex + lookbackCount)
+      let channelParams = findOptimalStdev(currentSegment)
       let { slope, intercept, stdDev, optimalStdevMult: currentStdevMult } = channelParams
-
       optimalStdevMult = currentStdevMult
 
-      // Try to extend the lookback period backward
-      while (lookbackCount < remainingData.length) {
+      while (currentStartIndex + lookbackCount < data.length) {
         const previousLookback = lookbackCount
         const previous80Percent = Math.floor(previousLookback * 0.8)
-        const first20Percent = previousLookback - previous80Percent
 
-        // Try to extend by adding more data backward
         lookbackCount++
-        const extendedSegment = remainingData.slice(-lookbackCount)
+        const extendedSegment = data.slice(currentStartIndex, currentStartIndex + lookbackCount)
 
-        // Check if the newly added first 20% of data (going backward) stays within the channel
-        const newPointsStartIdx = remainingData.length - lookbackCount
-        const newPointsEndIdx = newPointsStartIdx + (lookbackCount - previous80Percent)
-        const newPoints = remainingData.slice(newPointsStartIdx, newPointsEndIdx)
-
-        // Use previous channel parameters to check
         const channelWidth = stdDev * optimalStdevMult
+        const boundRange = channelWidth * 2
+        const outsideTolerance = boundRange * 0.05
+        // Use the channel bounds from the previous 80% (before refitting) to test the new 20%
+        const newPoints = extendedSegment.slice(previous80Percent)
         let pointsOutside = 0
 
         newPoints.forEach((point, index) => {
-          const globalIndex = index
+          const globalIndex = previous80Percent + index
           const predictedY = slope * globalIndex + intercept
           const upperBound = predictedY + channelWidth
           const lowerBound = predictedY - channelWidth
 
-          if (point.close > upperBound || point.close < lowerBound) {
+          if (point.close > upperBound + outsideTolerance || point.close < lowerBound - outsideTolerance) {
             pointsOutside++
           }
         })
 
-        // If most of the new 20% points are outside, break the trend
-        if (newPoints.length > 0 && pointsOutside / newPoints.length > 0.5) {
+        if (newPoints.length > 0 && pointsOutside / newPoints.length > 0.1) {
           channelBroken = true
-          breakIndex = currentEndIndex - previousLookback
+          breakIndex = currentStartIndex + previousLookback
           lookbackCount = previousLookback
           break
         }
 
-        // Update channel parameters with extended data
         channelParams = findOptimalStdev(extendedSegment)
         slope = channelParams.slope
         intercept = channelParams.intercept
         stdDev = channelParams.stdDev
         optimalStdevMult = channelParams.optimalStdevMult
+        currentSegment = extendedSegment
       }
 
-      // Store this channel
-      const channelSegment = remainingData.slice(-lookbackCount)
+      const channelSegment = data.slice(currentStartIndex, currentStartIndex + lookbackCount)
       const channelWidth = stdDev * optimalStdevMult
+      const channelTurningPoints = turningPoints.filter(tp => tp.index >= currentStartIndex && tp.index < currentStartIndex + lookbackCount)
 
-      // Calculate R²
       const meanY = channelSegment.reduce((sum, p) => sum + p.close, 0) / channelSegment.length
       let ssTotal = 0
       let ssResidual = 0
@@ -809,29 +865,27 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
       const rSquared = 1 - (ssResidual / ssTotal)
 
-      // Count touches
       let touchCount = 0
       const touchTolerance = 0.05
 
-      channelSegment.forEach((point, index) => {
-        const predictedY = slope * index + intercept
+      const boundRange = channelWidth * 2
+      channelTurningPoints.forEach(tp => {
+        const localIndex = tp.index - currentStartIndex
+        const predictedY = slope * localIndex + intercept
         const upperBound = predictedY + channelWidth
         const lowerBound = predictedY - channelWidth
-        const distanceToUpper = Math.abs(point.close - upperBound)
-        const distanceToLower = Math.abs(point.close - lowerBound)
-        const boundRange = channelWidth * 2
+        const distanceToUpper = Math.abs(tp.value - upperBound)
+        const distanceToLower = Math.abs(tp.value - lowerBound)
 
-        if (distanceToUpper <= boundRange * touchTolerance ||
-            distanceToLower <= boundRange * touchTolerance) {
+        if ((tp.type === 'max' && distanceToUpper <= boundRange * touchTolerance) ||
+            (tp.type === 'min' && distanceToLower <= boundRange * touchTolerance)) {
           touchCount++
         }
       })
 
-      const actualStartIndex = currentEndIndex - lookbackCount + 1
-
       channels.push({
-        startIndex: actualStartIndex,
-        endIndex: currentEndIndex + 1,
+        startIndex: currentStartIndex,
+        endIndex: currentStartIndex + lookbackCount - 1,
         slope,
         intercept,
         channelWidth,
@@ -842,13 +896,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         touchCount
       })
 
-      // Move to next segment: start from the break point
       if (channelBroken) {
-        // Next channel ends where this one broke
-        currentEndIndex = breakIndex - 1
+        currentStartIndex = breakIndex
       } else {
-        // Channel extended to the start of data, stop
-        break
+        currentStartIndex = currentStartIndex + lookbackCount
       }
     }
 
@@ -880,20 +931,73 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     if (revAllChannelEnabled && prices.length > 0) {
       const dataLength = Math.min(prices.length, indicators.length)
       const displayPrices = prices.slice(0, dataLength)
-      const foundChannels = findAllChannelsReversed(displayPrices)
-      setRevAllChannels(foundChannels)
+      const totalLength = displayPrices.length
 
-      // Initialize visibility for all channels (all visible by default)
-      const visibility = {}
-      foundChannels.forEach((_, index) => {
-        visibility[index] = true
+      if (totalLength === 0) {
+        setRevAllChannels([])
+        setRevAllChannelsVisibility({})
+        return
+      }
+
+      const visibleStart = zoomRange?.start ?? 0
+      const visibleEnd = zoomRange?.end === null ? totalLength : Math.min(totalLength, zoomRange.end)
+
+      const startDisplayIndex = Math.max(0, totalLength - visibleEnd)
+      const endDisplayIndex = Math.min(totalLength - 1, totalLength - 1 - visibleStart)
+
+      const visibleSlice = displayPrices.slice(startDisplayIndex, endDisplayIndex + 1)
+      const visibleOldestToNewest = visibleSlice.slice().reverse()
+
+      if (visibleOldestToNewest.length < 2) {
+        setRevAllChannels([])
+        setRevAllChannelsVisibility({})
+        return
+      }
+
+      const maxEndIndex = visibleOldestToNewest.length - 1
+      const clampedEndIndex = Math.min(
+        Math.max(revAllChannelEndIndex ?? maxEndIndex, 0),
+        maxEndIndex
+      )
+
+      const channelData = visibleOldestToNewest.slice(0, clampedEndIndex + 1)
+      const foundChannelsLocal = findAllChannelsReversed(channelData)
+
+      const adjustIndexToDisplay = (localIndex) => startDisplayIndex + (visibleOldestToNewest.length - 1 - localIndex)
+
+      const adjustedChannels = foundChannelsLocal.map(channel => {
+        const mappedStart = adjustIndexToDisplay(channel.startIndex)
+        const mappedEnd = adjustIndexToDisplay(channel.endIndex)
+
+        // Display indices run newest-first, so preserve the chronological orientation (oldest→newest)
+        // while also storing a normalized range for rendering checks.
+        const chronologicalStartIndex = mappedStart // Oldest point in the segment (highest display index)
+        const chronologicalEndIndex = mappedEnd     // Newest point in the segment (lowest display index)
+        const renderStartIndex = Math.min(mappedStart, mappedEnd)
+        const renderEndIndex = Math.max(mappedStart, mappedEnd)
+
+        return {
+          ...channel,
+          startIndex: renderStartIndex,
+          endIndex: renderEndIndex,
+          chronologicalStartIndex,
+          chronologicalEndIndex
+        }
       })
-      setRevAllChannelsVisibility(visibility)
+
+      setRevAllChannels(adjustedChannels)
+      setRevAllChannelsVisibility(prev => {
+        const visibility = {}
+        adjustedChannels.forEach((_, index) => {
+          visibility[index] = prev[index] !== false
+        })
+        return visibility
+      })
     } else {
       setRevAllChannels([])
       setRevAllChannelsVisibility({})
     }
-  }, [revAllChannelEnabled, prices, indicators])
+  }, [revAllChannelEnabled, prices, indicators, zoomRange, revAllChannelEndIndex])
 
   // Calculate volume-weighted zone colors
   const calculateZoneColors = (data, channelInfo, numZones) => {
@@ -984,9 +1088,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
         // Only process data within this channel's range
         data.forEach((point, globalIndex) => {
-          if (globalIndex < channel.startIndex || globalIndex >= channel.endIndex) return
+          const rangeStart = Math.min(channel.startIndex, channel.endIndex)
+          const rangeEnd = Math.max(channel.startIndex, channel.endIndex)
+          if (globalIndex < rangeStart || globalIndex >= rangeEnd) return
 
-          const localIndex = globalIndex - channel.startIndex
+          const chronologicalStart = channel.chronologicalStartIndex ?? channel.startIndex
+          const localIndex = Math.abs(chronologicalStart - globalIndex)
           const midValue = channel.slope * localIndex + channel.intercept
           const upperBound = midValue + channel.channelWidth
           const lowerBound = midValue - channel.channelWidth
@@ -1438,7 +1545,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       revAllChannels.forEach((channel, channelIndex) => {
         // Check if this index is within this channel's range
         if (index >= channel.startIndex && index < channel.endIndex) {
-          const localIndex = index - channel.startIndex
+          const chronologicalStart = channel.chronologicalStartIndex ?? channel.startIndex
+          const localIndex = Math.abs(chronologicalStart - index)
           const midValue = channel.slope * localIndex + channel.intercept
           const upperBound = midValue + channel.channelWidth
           const lowerBound = midValue - channel.channelWidth
@@ -1577,6 +1685,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       })
     }
   }
+
+  const revAllVisibleLength = visibleChartData.length
+  const maxRevAllChannelEndIndex = revAllVisibleLength > 0 ? revAllVisibleLength - 1 : 0
+  const effectiveRevAllChannelEndIndex = Math.min(
+    Math.max(revAllChannelEndIndex ?? maxRevAllChannelEndIndex, 0),
+    maxRevAllChannelEndIndex
+  )
+  const revAllChannelEndDate = revAllVisibleLength > 0
+    ? visibleChartData[effectiveRevAllChannelEndIndex]?.date
+    : null
 
   // Handle mouse wheel for zoom
   const handleWheel = (e) => {
@@ -1992,6 +2110,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const { slope, stdDev, optimalStdevMult, channelWidth } = manualChannel
     let { startIndex, endIndex, intercept } = manualChannel
 
+    const boundRange = channelWidth * 2
+    const outsideTolerance = boundRange * 0.05
     const trendBreakThreshold = 0.1 // If >10% of new points are outside, break
 
     // Step 1: Extend forward (from endIndex to end of data) point by point
@@ -2005,30 +2125,30 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // Calculate the total extended range
       const totalExtendedLength = testEndIndex - startIndex + 1
 
-      // Get the LAST 10% of the extended range
-      const windowSize = Math.max(1, Math.floor(totalExtendedLength * 0.1))
+      // Get the LAST 20% of the extended range
+      const windowSize = Math.max(1, Math.floor(totalExtendedLength * 0.2))
       const windowStartIdx = testEndIndex - windowSize + 1
-      const last10PercentPoints = displayPrices.slice(windowStartIdx, testEndIndex + 1)
+      const last20PercentPoints = displayPrices.slice(windowStartIdx, testEndIndex + 1)
 
-      // Check how many of the LAST 10% points fall outside the channel
+      // Check how many of the LAST 20% points fall outside the channel
       let outsideCount = 0
-      for (let i = 0; i < last10PercentPoints.length; i++) {
+      for (let i = 0; i < last20PercentPoints.length; i++) {
         const globalIndex = windowStartIdx + i
         const localIndex = globalIndex - startIndex
         const predictedY = slope * localIndex + intercept
         const upperBound = predictedY + channelWidth
         const lowerBound = predictedY - channelWidth
-        const actualY = last10PercentPoints[i].close
+        const actualY = last20PercentPoints[i].close
 
-        if (actualY > upperBound || actualY < lowerBound) {
+        if (actualY > upperBound + outsideTolerance || actualY < lowerBound - outsideTolerance) {
           outsideCount++
         }
       }
 
-      const outsidePercent = outsideCount / last10PercentPoints.length
+      const outsidePercent = outsideCount / last20PercentPoints.length
 
       if (outsidePercent > trendBreakThreshold) {
-        // >10% of the last 10% points are outside, stop extending forward
+        // >10% of the last 20% points are outside, stop extending forward
         break
       }
 
@@ -2055,30 +2175,30 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // Calculate the total extended range
       const totalExtendedLength = endIndex - testStartIndex + 1
 
-      // Get the FIRST 10% of the extended range
-      const windowSize = Math.max(1, Math.floor(totalExtendedLength * 0.1))
+      // Get the FIRST 20% of the extended range
+      const windowSize = Math.max(1, Math.floor(totalExtendedLength * 0.2))
       const windowEndIdx = testStartIndex + windowSize - 1
-      const first10PercentPoints = displayPrices.slice(testStartIndex, windowEndIdx + 1)
+      const first20PercentPoints = displayPrices.slice(testStartIndex, windowEndIdx + 1)
 
-      // Check how many of the FIRST 10% points fall outside the channel
+      // Check how many of the FIRST 20% points fall outside the channel
       let outsideCount = 0
-      for (let i = 0; i < first10PercentPoints.length; i++) {
+      for (let i = 0; i < first20PercentPoints.length; i++) {
         const globalIndex = testStartIndex + i
         const localIndex = globalIndex - testStartIndex
         const predictedY = slope * localIndex + newIntercept
         const upperBound = predictedY + channelWidth
         const lowerBound = predictedY - channelWidth
-        const actualY = first10PercentPoints[i].close
+        const actualY = first20PercentPoints[i].close
 
-        if (actualY > upperBound || actualY < lowerBound) {
+        if (actualY > upperBound + outsideTolerance || actualY < lowerBound - outsideTolerance) {
           outsideCount++
         }
       }
 
-      const outsidePercent = outsideCount / first10PercentPoints.length
+      const outsidePercent = outsideCount / first20PercentPoints.length
 
       if (outsidePercent > trendBreakThreshold) {
-        // >10% of the first 10% points are outside, stop extending backward
+        // >10% of the first 20% points are outside, stop extending backward
         break
       }
 
@@ -3583,6 +3703,54 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 <div style={{ color: 'rgb(139, 92, 246)', fontWeight: '600' }}>Volume Weighted (bottom 20% ignored)</div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {revAllChannelEnabled && revAllVisibleLength > 1 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '4px',
+            left: 0,
+            right: 0,
+            padding: '0 16px',
+            zIndex: 7,
+            pointerEvents: 'none'
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              width: '100%',
+              background: 'rgba(30, 41, 59, 0.75)',
+              border: '1px solid rgba(148, 163, 184, 0.3)',
+              borderRadius: '8px',
+              padding: '6px 10px',
+              backdropFilter: 'blur(4px)',
+              boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
+              pointerEvents: 'auto'
+            }}
+          >
+            <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>Rev End</span>
+            <input
+              type="range"
+              min={0}
+              max={maxRevAllChannelEndIndex}
+              value={effectiveRevAllChannelEndIndex}
+              onChange={(e) => onRevAllChannelEndChange && onRevAllChannelEndChange(parseInt(e.target.value, 10))}
+              style={{
+                flex: 1,
+                height: '6px',
+                accentColor: '#6366f1',
+                cursor: 'pointer'
+              }}
+            />
+            <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600, minWidth: '80px', textAlign: 'right' }}>
+              {revAllChannelEndDate || '...'}
+            </span>
           </div>
         </div>
       )}

@@ -114,6 +114,7 @@ function StockAnalyzer() {
         slopeChannelWidthMultiplier: 2.5,
         findAllChannelEnabled: false,
         revAllChannelEnabled: false,
+        revAllChannelEndIndex: null,
         manualChannelEnabled: false,
         manualChannelDragMode: false,
         collapsed: false
@@ -334,7 +335,8 @@ function StockAnalyzer() {
         if (chart.id === chartId) {
           return {
             ...chart,
-            revAllChannelEnabled: !chart.revAllChannelEnabled
+            revAllChannelEnabled: !chart.revAllChannelEnabled,
+            revAllChannelEndIndex: null
           }
         }
         return chart
@@ -367,6 +369,16 @@ function StockAnalyzer() {
         }
         return chart
       })
+    )
+  }
+
+  const updateRevAllChannelEnd = (chartId, endIndex) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart =>
+        chart.id === chartId
+          ? { ...chart, revAllChannelEndIndex: endIndex }
+          : chart
+      )
     )
   }
 
@@ -1357,6 +1369,8 @@ function StockAnalyzer() {
                     onSlopeChannelParamsChange={(params) => updateSlopeChannelParams(chart.id, params)}
                     findAllChannelEnabled={chart.findAllChannelEnabled}
                     revAllChannelEnabled={chart.revAllChannelEnabled}
+                    revAllChannelEndIndex={chart.revAllChannelEndIndex}
+                    onRevAllChannelEndChange={(value) => updateRevAllChannelEnd(chart.id, value)}
                     manualChannelEnabled={chart.manualChannelEnabled}
                     manualChannelDragMode={chart.manualChannelDragMode}
                     chartHeight={chartHeight}
