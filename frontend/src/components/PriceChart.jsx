@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
 import { X, ArrowLeftRight, Hand } from 'lucide-react'
+import { findBestChannels, filterOverlappingChannels } from './utils/bestChannelFinder'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, manualChannelEnabled = false, manualChannelDragMode = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -13,6 +14,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // Store reversed all channels
   const [revAllChannels, setRevAllChannels] = useState([])
   const [revAllChannelsVisibility, setRevAllChannelsVisibility] = useState({})
+
+  // Store best channels
+  const [bestChannels, setBestChannels] = useState([])
+  const [bestChannelsVisibility, setBestChannelsVisibility] = useState({})
 
   // Track main trend channel visibility
   const [trendChannelVisible, setTrendChannelVisible] = useState(true)
@@ -757,6 +762,58 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     }
   }, [revAllChannelEnabled, prices, indicators, zoomRange, revAllChannelEndIndex])
 
+  // Effect to calculate best channels when bestChannelEnabled changes
+  useEffect(() => {
+    if (bestChannelEnabled && prices.length > 0) {
+      const dataLength = Math.min(prices.length, indicators.length)
+      const displayPrices = prices.slice(0, dataLength)
+
+      if (displayPrices.length < 20) {
+        setBestChannels([])
+        setBestChannelsVisibility({})
+        return
+      }
+
+      // Determine simulation parameters based on data length
+      const dataLen = displayPrices.length
+      const minLength = Math.max(20, Math.floor(dataLen * 0.1))
+      const maxLength = Math.floor(dataLen * 0.8)
+      const startStep = Math.max(1, Math.floor(dataLen * 0.02))
+      const lengthStep = Math.max(1, Math.floor(dataLen * 0.02))
+
+      // Find best channels
+      const foundChannels = findBestChannels(displayPrices, {
+        minStartIndex: 0,
+        maxStartIndex: Math.max(0, dataLen - minLength),
+        minLength,
+        maxLength,
+        startStep,
+        lengthStep,
+        stdevMultipliers: [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0],
+        touchTolerance: 0.05,
+        similarityThreshold: 0.9
+      })
+
+      // Filter overlapping channels to show distinct ones
+      const filteredChannels = filterOverlappingChannels(foundChannels, 0.3)
+
+      // Limit to top 5 channels
+      const topChannels = filteredChannels.slice(0, 5)
+
+      setBestChannels(topChannels)
+      setBestChannelsVisibility(prev => {
+        const visibility = {}
+        topChannels.forEach((_, index) => {
+          visibility[index] = prev[index] !== false
+        })
+        return visibility
+      })
+    } else {
+      setBestChannels([])
+      setBestChannelsVisibility({})
+    }
+  }, [bestChannelEnabled, prices, indicators])
+
   // Calculate volume-weighted zone colors
   const calculateZoneColors = (data, channelInfo, numZones) => {
     if (!channelInfo || !data) return []
@@ -1317,6 +1374,22 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               dataPoint[`manualChannel${channelIndex}Zone${zoneIndex}Upper`] = zoneUpper
             })
           }
+        }
+      })
+    }
+
+    // Add best channels data
+    if (bestChannelEnabled && bestChannels.length > 0) {
+      bestChannels.forEach((channel, channelIndex) => {
+        if (index >= channel.startIndex && index <= channel.endIndex) {
+          const localIndex = index - channel.startIndex
+          const midValue = channel.slope * localIndex + channel.intercept
+          const upperBound = midValue + channel.channelWidth
+          const lowerBound = midValue - channel.channelWidth
+
+          dataPoint[`bestChannel${channelIndex}Upper`] = upperBound
+          dataPoint[`bestChannel${channelIndex}Mid`] = midValue
+          dataPoint[`bestChannel${channelIndex}Lower`] = lowerBound
         }
       })
     }
@@ -2139,6 +2212,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           // Skip rendering manual channel upper/lower bounds in legend
           if (entry.dataKey && (entry.dataKey.includes('manualChannel') && (entry.dataKey.endsWith('Upper') || entry.dataKey.endsWith('Lower')))) {
+            return null
+          }
+
+          // Skip rendering best channel upper/lower bounds in legend
+          if (entry.dataKey && (entry.dataKey.includes('bestChannel') && (entry.dataKey.endsWith('Upper') || entry.dataKey.endsWith('Lower')))) {
             return null
           }
 
@@ -3544,6 +3622,57 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   strokeDasharray="5 5"
                   opacity={0.7}
                   legendType="none"
+                />
+              </React.Fragment>
+            )
+          })}
+
+          {/* Best Channel Lines */}
+          {bestChannelEnabled && bestChannels.length > 0 && bestChannels.map((channel, index) => {
+            // Color palette for best channels (warm colors - orange/yellow tones)
+            const channelColors = [
+              '#f59e0b',  // Amber
+              '#f97316',  // Orange
+              '#eab308',  // Yellow
+              '#fb923c',  // Light Orange
+              '#fbbf24',  // Light Amber
+            ]
+            const channelColor = channelColors[index % channelColors.length]
+            const isVisible = bestChannelsVisibility[index] !== false
+
+            return (
+              <React.Fragment key={`best-channel-${index}`}>
+                <Line
+                  type="monotone"
+                  dataKey={`bestChannel${index}Upper`}
+                  stroke={channelColor}
+                  strokeWidth={2}
+                  dot={false}
+                  legendType="none"
+                  strokeDasharray="3 3"
+                  opacity={0.7}
+                  hide={!isVisible}
+                />
+                <Line
+                  type="monotone"
+                  dataKey={`bestChannel${index}Mid`}
+                  stroke={channelColor}
+                  strokeWidth={2.5}
+                  dot={false}
+                  name={`Best${index + 1} (${channel.endIndex - channel.startIndex + 1}pts, ${channel.touchCount} touches, σ×${channel.stdevMultiplier.toFixed(2)})`}
+                  strokeDasharray="3 3"
+                  hide={!isVisible}
+                />
+                <Line
+                  type="monotone"
+                  dataKey={`bestChannel${index}Lower`}
+                  stroke={channelColor}
+                  strokeWidth={2}
+                  dot={false}
+                  legendType="none"
+                  strokeDasharray="3 3"
+                  opacity={0.7}
+                  hide={!isVisible}
                 />
               </React.Fragment>
             )

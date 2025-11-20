@@ -116,6 +116,7 @@ function StockAnalyzer() {
         revAllChannelEndIndex: null,
         manualChannelEnabled: false,
         manualChannelDragMode: false,
+        bestChannelEnabled: false,
         collapsed: false
       }
       setCharts(prevCharts => [...prevCharts, newChart])
@@ -336,6 +337,20 @@ function StockAnalyzer() {
           return {
             ...chart,
             manualChannelEnabled: !chart.manualChannelEnabled
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const toggleBestChannel = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            bestChannelEnabled: !chart.bestChannelEnabled
           }
         }
         return chart
@@ -1270,6 +1285,18 @@ function StockAnalyzer() {
                     )}
                     <button
                       type="button"
+                      onClick={() => toggleBestChannel(chart.id)}
+                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
+                        chart.bestChannelEnabled
+                          ? 'bg-amber-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                      }`}
+                      title="Best Channel - Simulates parameters to find channels with most touching points"
+                    >
+                      Best Channel
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => openSmaDialog(chart.id)}
                       className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
                       title="Configure SMA"
@@ -1345,6 +1372,7 @@ function StockAnalyzer() {
                     onRevAllChannelEndChange={(value) => updateRevAllChannelEnd(chart.id, value)}
                     manualChannelEnabled={chart.manualChannelEnabled}
                     manualChannelDragMode={chart.manualChannelDragMode}
+                    bestChannelEnabled={chart.bestChannelEnabled}
                     chartHeight={chartHeight}
                     days={days}
                     zoomRange={globalZoomRange}

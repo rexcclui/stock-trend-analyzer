@@ -1,0 +1,228 @@
+================================================================================
+CHANNEL DETECTION LOGIC - COMPLETE FILE PATHS & LINE NUMBERS
+================================================================================
+
+ABSOLUTE FILE PATHS FOR QUICK REFERENCE:
+
+1. CORE CHANNEL DETECTION LOGIC
+   ===============================
+
+   Main Slope Channel Optimization:
+   /home/user/stock-trend-analyzer/frontend/src/components/PriceChart/utils/slopeChannelOptimizer.js
+   - findBestChannel() ....................... Lines 15-136
+   - calculateSlopeChannel() ................. Lines 147-295
+     * Creates channel data array
+     * Calculates slope, intercept, stdDev, optimalStdevMult
+     * Returns: channelData, slope, intercept, channelWidth, stdDev, 
+       recentDataCount, percentAbove, percentBelow, percentOutside, 
+       optimalStdevMult, touchCount, rSquared
+
+   Channel Utilities:
+   /home/user/stock-trend-analyzer/frontend/src/components/PriceChart/utils/channelUtils.js
+   - findOptimalStdev() ...................... Lines 14-61
+     * Tests stdev multipliers 1.0-4.0 in 0.1 increments
+     * Returns first multiplier where outside% <= 5%
+   - checkTrendBreak() ...................... Lines 131-146
+     * Checks if new data breaks existing channel
+     * Threshold: 50% of points outside = break
+   - generateChannelData() .................. Lines 107-120
+     * Creates upper/mid/lower for each data point
+   - calculateChannelDistribution() ......... Lines 71-96
+     * Calculates percentAbove, percentBelow, percentOutside
+   - calculateChannelZones() ................ Lines 155-169
+     * Divides channel into zones for visualization
+
+   Calculation Utilities:
+   /home/user/stock-trend-analyzer/frontend/src/components/PriceChart/utils/calculations.js
+   - calculateLinearRegression() ............ Lines 33-73
+     * Formula: slope = (n*ΣXY - ΣX*ΣY) / (n*ΣX² - (ΣX)²)
+     * Returns: slope, intercept, stdDev, includedPoints, distances
+   - calculateRSquared() .................... Lines 82-95
+     * Formula: R² = 1 - (SSresidual / SStotal)
+   - calculateVolumeThreshold() ............ Lines 103-112
+     * Returns value at 20th percentile
+   - calculateTouchCount() ................. Lines 155-173
+     * Counts boundary touches within 5% tolerance
+
+
+2. REACT HOOKS & STATE MANAGEMENT
+   ==============================
+
+   Slope Channel Hook:
+   /home/user/stock-trend-analyzer/frontend/src/components/PriceChart/hooks/useSlopeChannel.js
+   - useSlopeChannel() ....................... Lines 14-52
+     * Memoized calculation of slope channel
+     * Calls calculateSlopeChannel()
+     * Calculates zone colors
+
+   Channel State Hook:
+   /home/user/stock-trend-analyzer/frontend/src/components/PriceChart/hooks/useChannelState.js
+   - useChannelState() ....................... Lines 8-51
+     * Manages: optimizedLookbackCount, optimizedStdevMult
+     * Manages: allChannels, revAllChannels, manualChannels
+     * Manages: visibility toggles for all channel types
+
+
+3. UI CONTROLS & CONFIGURATION
+   ============================
+
+   Main Component:
+   /home/user/stock-trend-analyzer/frontend/src/components/StockAnalyzer.jsx
+   
+   Slope Channel Controls:
+   - openSlopeChannelDialog() ............... Line 251
+   - closeSlopeChannelDialog() ............. Line 256
+   - toggleSlopeChannel() .................. Line 261
+   - toggleSlopeChannelVolumeWeighted() ... Line 275
+   - updateSlopeChannelZones() ............ Line 289
+   - updateSlopeChannelParams() ........... Line 303
+   
+   UI Buttons & Dialog:
+   - Slope Channel Settings Button ........ Lines 1196-1201
+   - Rev All Channel Button ............... Lines 1205-1214
+   - Manual Channel Button ................ Lines 1215-1226
+   - Configuration Dialog ................. Lines 1509-1605
+     * Checkbox: slopeChannelEnabled (Line 1534)
+     * Checkbox: slopeChannelVolumeWeighted (Line 1548)
+     * Slider: slopeChannelZones (Line 1569)
+   
+   Rev All Channel Controls:
+   - toggleRevAllChannel() ................. Line 317
+   - updateRevAllChannelEnd() .............. Line 360
+   
+   Manual Channel Controls:
+   - toggleManualChannel() ................. Line 332
+   - toggleManualChannelDragMode() ........ Line 346
+
+
+4. CHART DATA PREPARATION & RENDERING
+   ==================================
+
+   Chart Data Creation:
+   /home/user/stock-trend-analyzer/frontend/src/components/PriceChart.jsx
+   - chartData creation ..................... Lines 1203-1320
+     * Slope channel data injection (Lines 1249-1266)
+     * Rev All channels data injection (Lines 1269-1295)
+     * Manual channels data injection (Lines 1298-1318)
+     * Zone boundaries addition
+
+   Chart Rendering:
+   - Slope Channel Lines ................... Lines 3410-3446
+     * channelUpper: Green, dashed
+     * channelMid: Blue, dashed
+     * channelLower: Red, dashed
+   
+   - Rev All Channels Lines ............... Lines 3448-3501
+     * 8 distinct colors cycling
+     * Each: Upper (dashed, 60%), Mid (solid, 100%), Lower (dashed, 60%)
+   
+   - Manual Channels Lines ................ Lines 3503-3550
+     * Green palette
+     * Similar styling to Rev All
+   
+   - Zone Visualization ................... Lines 3317-3330
+     * CustomZoneLines component (slope channel)
+     * CustomRevAllChannelZoneLines component
+     * CustomManualChannelZoneLines component
+
+
+5. REV ALL CHANNELS DETECTION
+   ==========================
+
+   Main Detection Function:
+   /home/user/stock-trend-analyzer/frontend/src/components/PriceChart.jsx
+   - findAllChannelsReversed() .............. Lines 424-722
+     * Turning point detection ............ Lines 428-452
+     * Main channel finding loop ......... Lines 459-722
+     * Validates: >= 80% within bounds, turning point touches
+   
+   - getInitialLookbackForPeriod() ........ Lines 2470-2477
+     * Period-aware minimum lookback sizes
+     * <= 30d: 15, <= 90d: 30, <= 180d: 50, <= 365d: 80, else 100
+
+
+6. KEY PARAMETERS & THRESHOLDS
+   ============================
+
+   Slope Channel (slopeChannelOptimizer.js):
+   - Line 16: minMultiplier = 1.0
+   - Line 17: maxMultiplier = 4.0
+   - Line 18: step = 0.1
+   - Line 19: maxOutsidePercent = 0.05 (5%)
+   - Line 20: touchTolerance = 0.05
+   - Line 21: maxOutsidePercent = 0.05
+   - Line 22: trendBreakThreshold = 0.5 (50%)
+   - Line 153: volumePercentile = 0.2 (20%)
+   - Line 17: defaultMinPoints = 100
+
+   Rev All Channels (PriceChart.jsx):
+   - Line 470: stdevStep = 0.25
+   - Line 546: pointsWithinBounds threshold = 0.8 (80%)
+   - Line 610: breakDetection = 0.15 (15%)
+   - Line 430: turningPointWindow = 3
+
+   Touch Tolerance (calculations.js):
+   - Line 166: boundRange * touchTolerance = 5%
+
+
+7. COLOR DEFINITIONS
+   ==================
+
+   Slope Channel (PriceChart.jsx):
+   - Line 3416: channelUpper = "#10b981" (Green)
+   - Line 3427: channelMid = "#3b82f6" (Blue)
+   - Line 3437: channelLower = "#ef4444" (Red)
+
+   Rev All Channels (PriceChart.jsx):
+   - Lines 3451-3460: [Blue, Purple, Amber, Green, Cyan, Orange, Pink, Lime]
+
+   Manual Channels (PriceChart.jsx):
+   - Lines 3506-3512: [Green, Emerald, Teal, Lime, Deep Green]
+
+
+8. DATA FLOW SUMMARY
+   =================
+
+   SLOPE CHANNEL:
+   Data Fetched 
+     -> useSlopeChannel Hook (memoized on data/enabled changes)
+     -> calculateSlopeChannel() 
+     -> findBestChannel() determines optimal lookback
+     -> Linear regression: slope, intercept calculated
+     -> Standard deviation of residuals calculated
+     -> findOptimalStdev() finds best multiplier (1.0-4.0)
+     -> checkTrendBreak() validates extension
+     -> channelData array created with upper/mid/lower
+     -> Data added to chartData via map()
+     -> Lines rendered with dataKey "channelUpper/Mid/Lower"
+
+   REV ALL CHANNELS:
+   revAllChannelEnabled toggled
+     -> findAllChannelsReversed() called
+     -> findTurningPointsForData() detects local max/min
+     -> Iterate through data, extend until break detected
+     -> For each valid segment: calculate slope, intercept, optimalStdevMult
+     -> Array of channel objects stored in state
+     -> For each data point, check which channels include it
+     -> Add revAllChannel${i}Upper/Mid/Lower to dataPoint
+     -> Render with dataKey pattern matching
+
+
+9. IMPORTANT DEPENDENCIES
+   =======================
+
+   - react: Hooks (useState, useMemo)
+   - recharts: ComposedChart, Line, Area, ReferenceLine, Customized
+   - Linear algebra: Least squares regression, standard deviation
+   - Statistical: Percentile calculations, R-squared goodness-of-fit
+
+
+10. RELATED DOCUMENTATION
+    ======================
+
+    - CHANNEL_DETECTION_ANALYSIS.md .... Full detailed analysis
+    - CHANNEL_QUICK_REFERENCE.md ...... Quick lookup tables
+    - SLOPE_CHANNEL_DOCUMENTATION.md .. Slope channel specifics
+    - FIND_ALL_CHANNEL_DOCUMENTATION.md .. Rev All channels specifics
+
+================================================================================
