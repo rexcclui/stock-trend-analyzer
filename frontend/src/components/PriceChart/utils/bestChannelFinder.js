@@ -171,24 +171,31 @@ export const findBestChannels = (data, options = {}) => {
       // Try different stdev multipliers
       for (const stdevMult of stdevMultipliers) {
         const channelWidth = stdDev * stdevMult
+        const boundRange = channelWidth * 2
+        const outsideTolerance = boundRange * touchTolerance
 
-        // Check if at least 80% of points are within bounds
-        let pointsWithinBounds = 0
+        // Check if at most 10% of points are outside bounds (allowing 90% inside)
+        // Points within 5% tolerance of bounds are considered inside
+        let pointsOutside = 0
         dataSegment.forEach((point, index) => {
           const x = startIdx + index
           const predictedY = slope * x + intercept
           const upperBound = predictedY + channelWidth
           const lowerBound = predictedY - channelWidth
 
-          if (point.close >= lowerBound && point.close <= upperBound) {
-            pointsWithinBounds++
+          // Point is outside if it's beyond the bounds AND beyond the 5% tolerance
+          const isOutsideUpper = point.close > upperBound && (point.close - upperBound) > outsideTolerance
+          const isOutsideLower = point.close < lowerBound && (lowerBound - point.close) > outsideTolerance
+
+          if (isOutsideUpper || isOutsideLower) {
+            pointsOutside++
           }
         })
 
-        const percentWithinBounds = pointsWithinBounds / dataSegment.length
+        const percentOutside = pointsOutside / dataSegment.length
 
-        // Only consider channels where at least 80% of data is within bounds
-        if (percentWithinBounds < 0.8) continue
+        // Only consider channels where at most 10% of data is outside bounds
+        if (percentOutside > 0.1) continue
 
         // Count touching points
         const touchCount = countTouchingPoints(
@@ -210,7 +217,7 @@ export const findBestChannels = (data, options = {}) => {
             stdevMultiplier: stdevMult,
             touchCount,
             turningPointsCount: segmentTurningPoints.length,
-            percentWithinBounds,
+            percentWithinBounds: 1 - percentOutside,
             length
           })
 
