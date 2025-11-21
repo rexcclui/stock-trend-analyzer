@@ -3328,16 +3328,28 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const isVisible = bestChannelsVisibility[channelIndex] !== false
           if (!isVisible) return null
 
-          // Find the midpoint of the channel
+          // Check if channel overlaps with visible range
+          const visibleStart = zoomRange.start
+          const visibleEnd = zoomRange.end === null ? chartData.length : zoomRange.end
+
+          // Channel must have at least some overlap with visible range
+          if (channel.endIndex < visibleStart || channel.startIndex >= visibleEnd) {
+            return null // Channel completely outside visible range
+          }
+
+          // Find the midpoint of the channel, clamped to visible range
           const midIndex = Math.floor((channel.startIndex + channel.endIndex) / 2)
+          // Clamp midIndex to visible range
+          const clampedMidIndex = Math.max(visibleStart, Math.min(visibleEnd - 1, midIndex))
+
           // chartDataWithZones is visibleChartData (0-based), so adjust global index
-          const midIndexInVisible = midIndex - zoomRange.start
+          const midIndexInVisible = clampedMidIndex - visibleStart
           const midPoint = chartDataWithZones[midIndexInVisible]
 
           if (!midPoint) return null
 
-          // Calculate lower bound value at midpoint (bottom slope)
-          const localIndex = midIndex - channel.startIndex
+          // Calculate lower bound value at the clamped midpoint (bottom slope)
+          const localIndex = clampedMidIndex - channel.startIndex
           const midValue = channel.slope * localIndex + channel.intercept
           const lowerValue = midValue - channel.channelWidth  // Bottom slope of channel
 
