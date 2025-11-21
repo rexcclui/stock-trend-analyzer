@@ -2455,33 +2455,78 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 </button>
               )}
               {isAllChannel && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    // Remove this channel from allChannels array
-                    setAllChannels(prev => prev.filter((_, idx) => idx !== channelIndex))
-                    // Remove from visibility tracking
-                    setAllChannelsVisibility(prev => {
-                      const newVis = { ...prev }
-                      delete newVis[channelIndex]
-                      // Re-index remaining channels
-                      const reindexed = {}
-                      Object.keys(newVis).forEach(key => {
-                        const idx = parseInt(key)
-                        if (idx > channelIndex) {
-                          reindexed[idx - 1] = newVis[key]
-                        } else {
-                          reindexed[idx] = newVis[key]
-                        }
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      // Remove this channel from allChannels array
+                      setAllChannels(prev => prev.filter((_, idx) => idx !== channelIndex))
+                      // Remove from visibility tracking
+                      setAllChannelsVisibility(prev => {
+                        const newVis = { ...prev }
+                        delete newVis[channelIndex]
+                        // Re-index remaining channels
+                        const reindexed = {}
+                        Object.keys(newVis).forEach(key => {
+                          const idx = parseInt(key)
+                          if (idx > channelIndex) {
+                            reindexed[idx - 1] = newVis[key]
+                          } else {
+                            reindexed[idx] = newVis[key]
+                          }
+                        })
+                        return reindexed
                       })
-                      return reindexed
-                    })
-                  }}
-                  className="ml-1 p-0.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded transition-colors"
-                  title="Remove channel"
-                >
-                  <X className="w-3 h-3" />
-                </button>
+                    }}
+                    className="ml-1 p-0.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded transition-colors"
+                    title="Remove channel"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </>
+              )}
+              {isRevAllChannel && revAllChannels[revChannelIndex] && (
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      // Decrease range by 5% on each side
+                      setRevAllChannels(prev => prev.map((channel, idx) => {
+                        if (idx !== revChannelIndex) return channel
+                        const currentLength = channel.endIndex - channel.startIndex + 1
+                        const shrinkAmount = Math.max(1, Math.floor(currentLength * 0.05))
+                        const newStartIndex = channel.startIndex + shrinkAmount
+                        const newEndIndex = channel.endIndex - shrinkAmount
+                        // Ensure minimum length of 10 points
+                        if (newEndIndex - newStartIndex + 1 < 10) return channel
+                        return { ...channel, startIndex: newStartIndex, endIndex: newEndIndex }
+                      }))
+                    }}
+                    className="ml-1 px-1.5 py-0.5 text-xs bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors"
+                    title="Shrink channel range by 5% on each side"
+                  >
+                    −
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      // Increase range by 5% on each side
+                      setRevAllChannels(prev => prev.map((channel, idx) => {
+                        if (idx !== revChannelIndex) return channel
+                        const currentLength = channel.endIndex - channel.startIndex + 1
+                        const expandAmount = Math.max(1, Math.floor(currentLength * 0.05))
+                        const newStartIndex = Math.max(0, channel.startIndex - expandAmount)
+                        const dataLength = Math.min(prices.length, indicators.length)
+                        const newEndIndex = Math.min(dataLength - 1, channel.endIndex + expandAmount)
+                        return { ...channel, startIndex: newStartIndex, endIndex: newEndIndex }
+                      }))
+                    }}
+                    className="ml-1 px-1.5 py-0.5 text-xs bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors"
+                    title="Expand channel range by 5% on each side"
+                  >
+                    +
+                  </button>
+                </>
               )}
               {isTrendLine && slopeChannelEnabled && (
                 <button
