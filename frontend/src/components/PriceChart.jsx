@@ -4072,7 +4072,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   stroke={channelColor}
                   strokeWidth={2.5}
                   dot={false}
-                  name={`Best${index + 1} (${channel.endIndex - channel.startIndex + 1}pts, ${channel.touchCount} touches, σ×${channel.stdevMultiplier.toFixed(2)})`}
+                  name={`Best${index + 1} (${channel.endIndex - channel.startIndex + 1}pts, ${channel.touchCount} touches)`}
                   strokeDasharray="3 3"
                   hide={!isVisible}
                 />
