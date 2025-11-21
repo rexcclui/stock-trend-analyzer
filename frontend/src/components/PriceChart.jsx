@@ -3,7 +3,7 @@ import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 import { X, ArrowLeftRight, Hand } from 'lucide-react'
 import { findBestChannels, filterOverlappingChannels } from './PriceChart/utils/bestChannelFinder'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -487,9 +487,35 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Find all channels in the data (REVERSED) by starting at the left edge of the visible window
   // and extending channels forward in time (to the right).
-  const findAllChannelsReversed = (data) => {
+  const findAllChannelsReversed = (data, volumeFilterEnabled = false) => {
     const minLookback = getInitialLookbackForPeriod(days)
     if (!data || data.length < minLookback) return []
+
+    // Filter data by volume if enabled
+    let validIndices = new Set(data.map((_, idx) => idx)) // Track which indices are valid
+
+    if (volumeFilterEnabled) {
+      // Calculate the 10th percentile volume threshold
+      const volumes = data.map(d => d.volume || 0).filter(v => v > 0)
+      if (volumes.length > 0) {
+        const sortedVolumes = [...volumes].sort((a, b) => a - b)
+        const percentile10Index = Math.floor(sortedVolumes.length * 0.1)
+        const volumeThreshold = sortedVolumes[percentile10Index]
+
+        // Create a set of valid indices (those with volume above threshold)
+        validIndices = new Set()
+        data.forEach((point, idx) => {
+          if ((point.volume || 0) > volumeThreshold) {
+            validIndices.add(idx)
+          }
+        })
+
+        // If too many points filtered out, disable filtering
+        if (validIndices.size < minLookback) {
+          validIndices = new Set(data.map((_, idx) => idx))
+        }
+      }
+    }
 
     const findTurningPointsForData = (series) => {
       const turningPoints = []
@@ -517,7 +543,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return turningPoints
     }
 
-    const turningPoints = findTurningPointsForData(data)
+    const allTurningPoints = findTurningPointsForData(data)
+
+    // Filter turning points to only include valid indices (high-volume)
+    const turningPoints = volumeFilterEnabled
+      ? allTurningPoints.filter(tp => validIndices.has(tp.index))
+      : allTurningPoints
 
     const channels = []
     let currentStartIndex = 0
@@ -538,22 +569,38 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         }
 
         let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
-        const n = dataSegment.length
+        let n = 0
 
         dataSegment.forEach((point, index) => {
+          const absoluteIndex = currentStartIndex + index
+          // Skip points filtered out by volume if enabled
+          if (volumeFilterEnabled && !validIndices.has(absoluteIndex)) {
+            return
+          }
+          n++
           sumX += index
           sumY += point.close
           sumXY += index * point.close
           sumX2 += index * index
         })
 
+        if (n < 2) return null
+
         const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
         const intercept = (sumY - slope * sumX) / n
 
-        const distances = dataSegment.map((point, index) => {
+        const distances = []
+        dataSegment.forEach((point, index) => {
+          const absoluteIndex = currentStartIndex + index
+          // Skip points filtered out by volume if enabled
+          if (volumeFilterEnabled && !validIndices.has(absoluteIndex)) {
+            return
+          }
           const predictedY = slope * index + intercept
-          return point.close - predictedY
+          distances.push(point.close - predictedY)
         })
+
+        if (distances.length === 0) return null
 
         const meanDistance = distances.reduce((a, b) => a + b, 0) / distances.length
         const variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
@@ -570,8 +617,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           let touchCount = 0
           const touchTolerance = 0.05
           let pointsWithinBounds = 0
+          let pointsConsidered = 0
 
           dataSegment.forEach((point, index) => {
+            const absoluteIndex = currentStartIndex + index
+            // Skip points filtered out by volume if enabled
+            if (volumeFilterEnabled && !validIndices.has(absoluteIndex)) {
+              return
+            }
+
+            pointsConsidered++
             const predictedY = slope * index + intercept
             const upperBound = predictedY + channelWidth
             const lowerBound = predictedY - channelWidth
@@ -601,7 +656,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             }
           })
 
-          const percentWithinBounds = pointsWithinBounds / dataSegment.length
+          const percentWithinBounds = pointsConsidered > 0
+            ? pointsWithinBounds / (volumeFilterEnabled ? pointsConsidered : dataSegment.length)
+            : 0
 
           if (percentWithinBounds > bestCoverage) {
             bestCoverage = percentWithinBounds
@@ -922,7 +979,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       )
 
       const channelData = visibleOldestToNewest.slice(0, clampedEndIndex + 1)
-      const foundChannelsLocal = findAllChannelsReversed(channelData)
+      const foundChannelsLocal = findAllChannelsReversed(channelData, revAllChannelVolumeFilterEnabled)
 
       const adjustIndexToDisplay = (localIndex) => startDisplayIndex + (visibleOldestToNewest.length - 1 - localIndex)
 
@@ -958,7 +1015,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       setRevAllChannels([])
       setRevAllChannelsVisibility({})
     }
-  }, [revAllChannelEnabled, prices, indicators, revAllChannelEndIndex, revAllChannelRefreshTrigger])
+  }, [revAllChannelEnabled, prices, indicators, revAllChannelEndIndex, revAllChannelRefreshTrigger, revAllChannelVolumeFilterEnabled])
 
   // Effect to calculate best channels when bestChannelEnabled changes
   useEffect(() => {

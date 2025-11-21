@@ -115,6 +115,7 @@ function StockAnalyzer() {
         revAllChannelEnabled: false,
         revAllChannelEndIndex: null,
         revAllChannelRefreshTrigger: 0,
+        revAllChannelVolumeFilterEnabled: false,
         manualChannelEnabled: false,
         manualChannelDragMode: false,
         bestChannelEnabled: false,
@@ -325,6 +326,21 @@ function StockAnalyzer() {
             ...chart,
             revAllChannelEnabled: !chart.revAllChannelEnabled,
             revAllChannelEndIndex: null
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const toggleRevAllChannelVolumeFilter = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            revAllChannelVolumeFilterEnabled: !chart.revAllChannelVolumeFilterEnabled,
+            revAllChannelRefreshTrigger: (chart.revAllChannelRefreshTrigger || 0) + 1
           }
         }
         return chart
@@ -1244,22 +1260,36 @@ function StockAnalyzer() {
                       All Channel
                     </button>
                     {chart.revAllChannelEnabled && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCharts(prevCharts =>
-                            prevCharts.map(c =>
-                              c.id === chart.id
-                                ? { ...c, revAllChannelRefreshTrigger: (c.revAllChannelRefreshTrigger || 0) + 1 }
-                                : c
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCharts(prevCharts =>
+                              prevCharts.map(c =>
+                                c.id === chart.id
+                                  ? { ...c, revAllChannelRefreshTrigger: (c.revAllChannelRefreshTrigger || 0) + 1 }
+                                  : c
+                              )
                             )
-                          )
-                        }}
-                        className="px-2 py-1 text-sm rounded font-medium transition-colors bg-slate-600 text-slate-200 hover:bg-slate-500"
-                        title="Refresh All Channels"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                      </button>
+                          }}
+                          className="px-2 py-1 text-sm rounded font-medium transition-colors bg-slate-600 text-slate-200 hover:bg-slate-500"
+                          title="Refresh All Channels"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleRevAllChannelVolumeFilter(chart.id)}
+                          className={`px-2 py-1 text-sm rounded transition-colors ${
+                            chart.revAllChannelVolumeFilterEnabled
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                          title="Volume Filter - Ignore data points with bottom 10% of volume"
+                        >
+                          <Filter className="w-4 h-4" />
+                        </button>
+                      </>
                     )}
                     <button
                       type="button"
@@ -1419,6 +1449,7 @@ function StockAnalyzer() {
                     revAllChannelEndIndex={chart.revAllChannelEndIndex}
                     onRevAllChannelEndChange={(value) => updateRevAllChannelEnd(chart.id, value)}
                     revAllChannelRefreshTrigger={chart.revAllChannelRefreshTrigger}
+                    revAllChannelVolumeFilterEnabled={chart.revAllChannelVolumeFilterEnabled}
                     manualChannelEnabled={chart.manualChannelEnabled}
                     manualChannelDragMode={chart.manualChannelDragMode}
                     bestChannelEnabled={chart.bestChannelEnabled}
