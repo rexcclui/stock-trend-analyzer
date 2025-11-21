@@ -825,6 +825,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     }
   }
 
+  const getChannelLocalIndex = (channel, globalIndex) => {
+    const chronologicalStart = channel.chronologicalStartIndex ?? channel.startIndex
+    const chronologicalEnd = channel.chronologicalEndIndex ?? channel.endIndex
+    const direction = chronologicalEnd >= chronologicalStart ? 1 : -1
+
+    return (globalIndex - chronologicalStart) * direction
+  }
+
   // Effect to calculate reversed all channels when revAllChannelEnabled changes
   useEffect(() => {
     if (revAllChannelEnabled && prices.length > 0) {
@@ -1105,8 +1113,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const rangeEnd = Math.max(channel.startIndex, channel.endIndex)
           if (globalIndex < rangeStart || globalIndex >= rangeEnd) return
 
-          const chronologicalStart = channel.chronologicalStartIndex ?? channel.startIndex
-          const localIndex = Math.abs(chronologicalStart - globalIndex)
+          const localIndex = getChannelLocalIndex(channel, globalIndex)
           const midValue = channel.slope * localIndex + channel.intercept
           const upperBound = midValue + channel.channelWidth
           const lowerBound = midValue - channel.channelWidth
@@ -1530,8 +1537,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       revAllChannels.forEach((channel, channelIndex) => {
         // Check if this index is within this channel's range
         if (index >= channel.startIndex && index < channel.endIndex) {
-          const chronologicalStart = channel.chronologicalStartIndex ?? channel.startIndex
-          const localIndex = Math.abs(chronologicalStart - index)
+          const localIndex = getChannelLocalIndex(channel, index)
           const midValue = channel.slope * localIndex + channel.intercept
           const upperBound = midValue + channel.channelWidth
           const lowerBound = midValue - channel.channelWidth
