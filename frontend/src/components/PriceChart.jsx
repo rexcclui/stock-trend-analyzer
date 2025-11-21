@@ -14,6 +14,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // Store reversed all channels
   const [revAllChannels, setRevAllChannels] = useState([])
   const [revAllChannelsVisibility, setRevAllChannelsVisibility] = useState({})
+  // Store the full calculated channels (with fixed slope/stdev) before slider adjustment
+  const [revAllChannelsFull, setRevAllChannelsFull] = useState([])
 
   // Store best channels
   const [bestChannels, setBestChannels] = useState([])
@@ -944,7 +946,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     }
   }
 
-  // Effect to calculate reversed all channels when revAllChannelEnabled changes
+  // Effect to calculate reversed all channels ONCE on full data (not affected by slider)
   useEffect(() => {
     if (revAllChannelEnabled && prices.length > 0) {
       const dataLength = Math.min(prices.length, indicators.length)
@@ -952,8 +954,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const totalLength = displayPrices.length
 
       if (totalLength === 0) {
-        setRevAllChannels([])
-        setRevAllChannelsVisibility({})
+        setRevAllChannelsFull([])
         return
       }
 
@@ -967,19 +968,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const visibleOldestToNewest = visibleSlice.slice().reverse()
 
       if (visibleOldestToNewest.length < 2) {
-        setRevAllChannels([])
-        setRevAllChannelsVisibility({})
+        setRevAllChannelsFull([])
         return
       }
 
-      const maxEndIndex = visibleOldestToNewest.length - 1
-      const clampedEndIndex = Math.min(
-        Math.max(revAllChannelEndIndex ?? maxEndIndex, 0),
-        maxEndIndex
-      )
-
-      const channelData = visibleOldestToNewest.slice(0, clampedEndIndex + 1)
-      const foundChannelsLocal = findAllChannelsReversed(channelData, revAllChannelVolumeFilterEnabled)
+      // Calculate channels on the FULL visible data (not limited by slider)
+      const foundChannelsLocal = findAllChannelsReversed(visibleOldestToNewest, revAllChannelVolumeFilterEnabled)
 
       const adjustIndexToDisplay = (localIndex) => startDisplayIndex + (visibleOldestToNewest.length - 1 - localIndex)
 
@@ -1003,19 +997,77 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         }
       })
 
-      setRevAllChannels(adjustedChannels)
+      setRevAllChannelsFull(adjustedChannels)
+    } else {
+      setRevAllChannelsFull([])
+    }
+  }, [revAllChannelEnabled, prices, indicators, revAllChannelRefreshTrigger, revAllChannelVolumeFilterEnabled, zoomRange?.start, zoomRange?.end])
+
+  // Effect to apply slider-based filtering to channels (does NOT recalculate slope/stdev)
+  useEffect(() => {
+    if (revAllChannelEnabled && revAllChannelsFull.length > 0 && prices.length > 0) {
+      const dataLength = Math.min(prices.length, indicators.length)
+      const displayPrices = prices.slice(0, dataLength)
+      const totalLength = displayPrices.length
+
+      const visibleStart = zoomRange?.start ?? 0
+      const visibleEnd = zoomRange?.end === null ? totalLength : Math.min(totalLength, zoomRange.end)
+
+      const startDisplayIndex = Math.max(0, totalLength - visibleEnd)
+      const endDisplayIndex = Math.min(totalLength - 1, totalLength - 1 - visibleStart)
+
+      const visibleSlice = displayPrices.slice(startDisplayIndex, endDisplayIndex + 1)
+      const visibleOldestToNewest = visibleSlice.slice().reverse()
+
+      if (visibleOldestToNewest.length < 2) {
+        setRevAllChannels([])
+        setRevAllChannelsVisibility({})
+        return
+      }
+
+      const maxEndIndex = visibleOldestToNewest.length - 1
+      const clampedEndIndex = Math.min(
+        Math.max(revAllChannelEndIndex ?? maxEndIndex, 0),
+        maxEndIndex
+      )
+
+      // Calculate the display index corresponding to the slider position
+      const adjustIndexToDisplay = (localIndex) => startDisplayIndex + (visibleOldestToNewest.length - 1 - localIndex)
+      const sliderDisplayIndex = adjustIndexToDisplay(clampedEndIndex)
+
+      // Filter channels based on slider position WITHOUT recalculating their parameters
+      const filteredChannels = revAllChannelsFull.map(channel => {
+        // Truncate channel to slider position if needed
+        // Channels extend from oldest (higher index) to newest (lower index)
+        const truncatedStartIndex = Math.max(channel.startIndex, sliderDisplayIndex)
+        const truncatedEndIndex = channel.endIndex
+
+        // Only include channel if it has some visible range after truncation
+        if (truncatedStartIndex >= truncatedEndIndex) {
+          return null
+        }
+
+        return {
+          ...channel,
+          startIndex: truncatedStartIndex,
+          endIndex: truncatedEndIndex
+          // Keep original slope, intercept, channelWidth - these should NOT change
+        }
+      }).filter(ch => ch !== null)
+
+      setRevAllChannels(filteredChannels)
       setRevAllChannelsVisibility(prev => {
         const visibility = {}
-        adjustedChannels.forEach((_, index) => {
+        filteredChannels.forEach((_, index) => {
           visibility[index] = prev[index] !== false
         })
         return visibility
       })
-    } else {
+    } else if (!revAllChannelEnabled) {
       setRevAllChannels([])
       setRevAllChannelsVisibility({})
     }
-  }, [revAllChannelEnabled, prices, indicators, revAllChannelEndIndex, revAllChannelRefreshTrigger, revAllChannelVolumeFilterEnabled])
+  }, [revAllChannelEnabled, revAllChannelsFull, revAllChannelEndIndex, prices, indicators, zoomRange?.start, zoomRange?.end])
 
   // Effect to calculate best channels when bestChannelEnabled changes
   useEffect(() => {
