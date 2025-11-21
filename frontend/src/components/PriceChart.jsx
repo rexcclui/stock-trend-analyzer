@@ -3330,7 +3330,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           // Find the midpoint of the channel
           const midIndex = Math.floor((channel.startIndex + channel.endIndex) / 2)
-          const midPoint = chartDataWithZones[midIndex]
+          // chartDataWithZones is visibleChartData (0-based), so adjust global index
+          const midIndexInVisible = midIndex - zoomRange.start
+          const midPoint = chartDataWithZones[midIndexInVisible]
 
           if (!midPoint) return null
 
