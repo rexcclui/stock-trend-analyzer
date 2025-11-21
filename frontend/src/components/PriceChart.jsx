@@ -816,26 +816,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // Maintain a minimum visible length of 10 points
     if (clampedEnd - clampedStart + 1 < 10) return channel
 
-    const hasChronologicalBounds = channel.chronologicalStartIndex !== undefined && channel.chronologicalEndIndex !== undefined
-    const isDescending = hasChronologicalBounds
-      ? channel.chronologicalStartIndex > channel.chronologicalEndIndex
-      : false
-
-    const newChronologicalStart = hasChronologicalBounds
-      ? (isDescending ? Math.max(clampedStart, clampedEnd) : Math.min(clampedStart, clampedEnd))
-      : clampedStart
-
-    const newChronologicalEnd = hasChronologicalBounds
-      ? (isDescending ? Math.min(clampedStart, clampedEnd) : Math.max(clampedStart, clampedEnd))
-      : clampedEnd
-
     return {
       ...channel,
       startIndex: clampedStart,
       endIndex: clampedEnd,
-      lookbackCount: clampedEnd - clampedStart + 1,
-      chronologicalStartIndex: newChronologicalStart,
-      chronologicalEndIndex: newChronologicalEnd
+      // Preserve the original chronological anchors so the fitted slope/intercept remain unchanged
+      lookbackCount: clampedEnd - clampedStart + 1
     }
   }
 
