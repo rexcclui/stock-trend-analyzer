@@ -3328,10 +3328,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           if (!midPoint) return null
 
-          // Calculate lower bound value at midpoint
+          // Calculate lower bound value at midpoint (bottom slope)
           const localIndex = midIndex - channel.startIndex
           const midValue = channel.slope * localIndex + channel.intercept
-          const lowerValue = midValue - channel.channelWidth
+          const lowerValue = midValue - channel.channelWidth  // Bottom slope of channel
 
           const x = xAxis.scale(midPoint.date)
           const y = yAxis.scale(lowerValue)
@@ -3346,10 +3346,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           return (
             <g key={`best-channel-label-${channelIndex}`}>
-              {/* Background rectangle for better readability */}
+              {/* Background rectangle for label - positioned under bottom slope */}
               <rect
                 x={x - 30}
-                y={y + 5}
+                y={y + 8}
                 width={60}
                 height={16}
                 fill="rgba(15, 23, 42, 0.9)"
@@ -3357,10 +3357,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 strokeWidth={1}
                 rx={3}
               />
-              {/* Stdev label */}
+              {/* Stdev and percentage label under bottom slope midpoint */}
               <text
                 x={x}
-                y={y + 15}
+                y={y + 18}
                 fill={color}
                 fontSize="11"
                 fontWeight="700"
