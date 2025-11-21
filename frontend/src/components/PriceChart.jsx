@@ -3328,33 +3328,19 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const isVisible = bestChannelsVisibility[channelIndex] !== false
           if (!isVisible) return null
 
-          // Check if channel overlaps with visible range
-          const visibleStart = zoomRange.start
-          const visibleEnd = zoomRange.end === null ? chartData.length : zoomRange.end
+          // Find all points in chartDataWithZones that have this channel's data
+          const pointsWithChannel = chartDataWithZones
+            .map((point, idx) => ({ point, idx }))
+            .filter(({ point }) => point[`bestChannel${channelIndex}Lower`] !== undefined)
 
-          // Channel must have at least some overlap with visible range
-          if (channel.endIndex < visibleStart || channel.startIndex >= visibleEnd) {
-            return null // Channel completely outside visible range
-          }
+          if (pointsWithChannel.length === 0) return null
 
-          // Find the midpoint of the channel, clamped to visible range
-          const midIndex = Math.floor((channel.startIndex + channel.endIndex) / 2)
-          // Clamp midIndex to visible range
-          const clampedMidIndex = Math.max(visibleStart, Math.min(visibleEnd - 1, midIndex))
-
-          // chartDataWithZones is visibleChartData (0-based), so adjust global index
-          const midIndexInVisible = clampedMidIndex - visibleStart
-          const midPoint = chartDataWithZones[midIndexInVisible]
-
-          if (!midPoint) return null
-
-          // Calculate lower bound value at the clamped midpoint (bottom slope)
-          const localIndex = clampedMidIndex - channel.startIndex
-          const midValue = channel.slope * localIndex + channel.intercept
-          const lowerValue = midValue - channel.channelWidth  // Bottom slope of channel
+          // Find the midpoint among visible points with this channel
+          const midIndex = Math.floor(pointsWithChannel.length / 2)
+          const { point: midPoint } = pointsWithChannel[midIndex]
 
           const x = xAxis.scale(midPoint.date)
-          const y = yAxis.scale(lowerValue)
+          const y = yAxis.scale(midPoint[`bestChannel${channelIndex}Lower`])
 
           if (x === undefined || y === undefined) return null
 
