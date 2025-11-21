@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
-import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp, RefreshCw, Volume2 } from 'lucide-react'
+import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp, RefreshCw, Filter } from 'lucide-react'
 import PriceChart from './PriceChart'
 import IndicatorsChart from './IndicatorsChart'
 import SignalsList from './SignalsList'
@@ -1340,7 +1340,7 @@ function StockAnalyzer() {
                         }`}
                         title="Volume Filter - Ignore data points with bottom 10% of volume"
                       >
-                        <Volume2 className="w-4 h-4" />
+                        <Filter className="w-4 h-4" />
                       </button>
                     )}
                     <button
