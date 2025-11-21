@@ -1594,8 +1594,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const endDisplayIndex = Math.min(dataLength - 1, dataLength - 1 - visibleStart)
     const visibleLength = endDisplayIndex - startDisplayIndex + 1
     const clampedEndIndex = Math.min(Math.max(revAllChannelEndIndex, 0), visibleLength - 1)
-    // Convert from oldest-to-newest index to display index (newest-first)
-    revAllChannelCutoffIndex = startDisplayIndex + (visibleLength - 1 - clampedEndIndex)
+    // Slider at 0 = minimal old data (show only newest), slider at max = all old data
+    // In newest-first display: low slider value = low cutoff index, high slider = high cutoff
+    revAllChannelCutoffIndex = startDisplayIndex + clampedEndIndex
   }
 
   const chartData = displayPrices.map((price, index) => {
