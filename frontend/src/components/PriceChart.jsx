@@ -877,6 +877,26 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // So we need to adjust intercept to account for this x-axis shift
       const adjustedChannels = foundChannels.map(channel => {
         const localStartIdx = channel.startIndex  // Save the local start index before adjusting
+
+        // Calculate percentage of points within 5% of regression line
+        const channelSegment = visibleSlice.slice(channel.startIndex, channel.endIndex + 1)
+        let pointsWithin5Percent = 0
+
+        channelSegment.forEach((point, index) => {
+          const x = channel.startIndex + index
+          const predictedY = channel.slope * x + channel.intercept
+          const actualY = point.close
+
+          // Calculate percentage deviation from predicted value
+          const percentDeviation = Math.abs((actualY - predictedY) / predictedY)
+
+          if (percentDeviation <= 0.05) {  // Within 5%
+            pointsWithin5Percent++
+          }
+        })
+
+        const percentInside = (pointsWithin5Percent / channelSegment.length) * 100
+
         return {
           ...channel,
           startIndex: localStartIdx + startDisplayIndex,
@@ -885,7 +905,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           // Original: y = slope * localStartIdx + intercept_old
           // New: y = slope * 0 + intercept_new
           // Therefore: intercept_new = intercept_old + slope * localStartIdx
-          intercept: channel.intercept + channel.slope * localStartIdx
+          intercept: channel.intercept + channel.slope * localStartIdx,
+          percentInside: percentInside  // Add percentage of points within 5% of slope
         }
       })
 
@@ -3319,14 +3340,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           const color = channelColors[channelIndex % channelColors.length]
           const stdevText = `${channel.stdevMultiplier.toFixed(2)}σ`
+          const percentText = channel.percentInside !== undefined
+            ? `${channel.percentInside.toFixed(0)}%`
+            : ''
 
           return (
             <g key={`best-channel-label-${channelIndex}`}>
               {/* Background rectangle for better readability */}
               <rect
-                x={x - 20}
+                x={x - 30}
                 y={y + 5}
-                width={40}
+                width={60}
                 height={16}
                 fill="rgba(15, 23, 42, 0.9)"
                 stroke={color}
@@ -3343,7 +3367,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 textAnchor="middle"
                 dominantBaseline="middle"
               >
-                {stdevText}
+                {stdevText} {percentText}
               </text>
             </g>
           )
