@@ -975,6 +975,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // Calculate channels on the FULL visible data (not limited by slider)
       const foundChannelsLocal = findAllChannelsReversed(visibleOldestToNewest, revAllChannelVolumeFilterEnabled)
 
+      console.log('[AllChannel] Calculated', foundChannelsLocal.length, 'channels with slopes:',
+        foundChannelsLocal.map(ch => ch.slope.toFixed(6)))
+
       const adjustIndexToDisplay = (localIndex) => startDisplayIndex + (visibleOldestToNewest.length - 1 - localIndex)
 
       const adjustedChannels = foundChannelsLocal.map(channel => {
@@ -1599,8 +1602,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     revAllChannelCutoffIndex = startDisplayIndex + clampedEndIndex
   }
 
+  let loggedCutoff = false
   const chartData = displayPrices.map((price, index) => {
     const indicator = indicators[index] || {}
+
+    if (!loggedCutoff && revAllChannelEnabled && revAllChannelCutoffIndex !== null) {
+      console.log('[AllChannel] Cutoff index:', revAllChannelCutoffIndex, 'Total points:', displayPrices.length)
+      loggedCutoff = true
+    }
 
     // Determine high/low volume based on mode using rolling thresholds
     let isHighVolume = false
