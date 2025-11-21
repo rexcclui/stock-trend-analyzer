@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
-import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
 import PriceChart from './PriceChart'
 import IndicatorsChart from './IndicatorsChart'
 import SignalsList from './SignalsList'
@@ -114,6 +114,7 @@ function StockAnalyzer() {
         slopeChannelWidthMultiplier: 2.5,
         revAllChannelEnabled: false,
         revAllChannelEndIndex: null,
+        revAllChannelRefreshTrigger: 0,
         manualChannelEnabled: false,
         manualChannelDragMode: false,
         bestChannelEnabled: false,
@@ -1227,6 +1228,24 @@ function StockAnalyzer() {
                     >
                       Rev All Channel
                     </button>
+                    {chart.revAllChannelEnabled && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCharts(prevCharts =>
+                            prevCharts.map(c =>
+                              c.id === chart.id
+                                ? { ...c, revAllChannelRefreshTrigger: (c.revAllChannelRefreshTrigger || 0) + 1 }
+                                : c
+                            )
+                          )
+                        }}
+                        className="px-2 py-1 text-sm rounded font-medium transition-colors bg-slate-600 text-slate-200 hover:bg-slate-500"
+                        title="Refresh Rev All Channels"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => toggleManualChannel(chart.id)}
@@ -1370,6 +1389,7 @@ function StockAnalyzer() {
                     revAllChannelEnabled={chart.revAllChannelEnabled}
                     revAllChannelEndIndex={chart.revAllChannelEndIndex}
                     onRevAllChannelEndChange={(value) => updateRevAllChannelEnd(chart.id, value)}
+                    revAllChannelRefreshTrigger={chart.revAllChannelRefreshTrigger}
                     manualChannelEnabled={chart.manualChannelEnabled}
                     manualChannelDragMode={chart.manualChannelDragMode}
                     bestChannelEnabled={chart.bestChannelEnabled}
