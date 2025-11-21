@@ -1666,7 +1666,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // Add reversed all channels data if enabled
     if (revAllChannelEnabled && revAllChannels.length > 0) {
       // Check if this data point should have channel data based on slider position
-      const shouldIncludeChannelData = revAllChannelCutoffIndex === null || index >= revAllChannelCutoffIndex
+      // In newest-first order: slider controls oldest end, so we show channels on indices <= cutoff
+      const shouldIncludeChannelData = revAllChannelCutoffIndex === null || index <= revAllChannelCutoffIndex
 
       if (shouldIncludeChannelData) {
         revAllChannels.forEach((channel, channelIndex) => {
