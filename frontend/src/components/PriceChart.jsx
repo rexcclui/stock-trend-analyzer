@@ -750,6 +750,143 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return channels
   }
 
+  // Recalculate a single channel with new data range
+  const recalculateChannelWithNewRange = (originalChannel, newStartIndex, newEndIndex) => {
+    const dataLength = Math.min(prices.length, indicators.length)
+    const displayPrices = prices.slice(0, dataLength)
+
+    // Extract data for new range
+    const dataSegment = displayPrices.slice(newStartIndex, newEndIndex + 1)
+    if (dataSegment.length < 10) return originalChannel // Minimum length check
+
+    // Calculate linear regression
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
+    const n = dataSegment.length
+
+    dataSegment.forEach((point, index) => {
+      sumX += index
+      sumY += point.close
+      sumXY += index * point.close
+      sumX2 += index * index
+    })
+
+    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+    const intercept = (sumY - slope * sumX) / n
+
+    // Calculate standard deviation
+    const distances = dataSegment.map((point, index) => {
+      const predictedY = slope * index + intercept
+      return point.close - predictedY
+    })
+
+    const meanDistance = distances.reduce((a, b) => a + b, 0) / distances.length
+    const variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
+    const stdDev = Math.sqrt(variance)
+
+    // Find turning points in the new range
+    const findTurningPoints = (series) => {
+      const turningPoints = []
+      const windowSize = 3
+
+      for (let i = windowSize; i < series.length - windowSize; i++) {
+        const current = series[i].close
+        let isLocalMax = true
+        let isLocalMin = true
+
+        for (let j = -windowSize; j <= windowSize; j++) {
+          if (j === 0) continue
+          const compare = series[i + j].close
+          if (compare >= current) isLocalMax = false
+          if (compare <= current) isLocalMin = false
+        }
+
+        if (isLocalMax) {
+          turningPoints.push({ index: i, type: 'max', value: current })
+        } else if (isLocalMin) {
+          turningPoints.push({ index: i, type: 'min', value: current })
+        }
+      }
+
+      return turningPoints
+    }
+
+    const turningPoints = findTurningPoints(dataSegment)
+
+    // Find optimal stdev multiplier
+    const stdevMultipliers = []
+    for (let mult = 1.0; mult <= 4.0; mult += 0.25) {
+      stdevMultipliers.push(mult)
+    }
+
+    let bestTouchCount = 0
+    let bestStdevMult = 2.5
+    let bestCoverage = 0
+    let bestCoverageStdevMult = 2.5
+
+    for (const stdevMult of stdevMultipliers) {
+      const channelWidth = stdDev * stdevMult
+      let touchCount = 0
+      const touchTolerance = 0.05
+      let pointsWithinBounds = 0
+
+      dataSegment.forEach((point, index) => {
+        const predictedY = slope * index + intercept
+        const upperBound = predictedY + channelWidth
+        const lowerBound = predictedY - channelWidth
+
+        if (point.close >= lowerBound && point.close <= upperBound) {
+          pointsWithinBounds++
+        }
+      })
+
+      const boundRange = channelWidth * 2
+      turningPoints.forEach(tp => {
+        const predictedY = slope * tp.index + intercept
+        const upperBound = predictedY + channelWidth
+        const lowerBound = predictedY - channelWidth
+        const distanceToUpper = Math.abs(tp.value - upperBound)
+        const distanceToLower = Math.abs(tp.value - lowerBound)
+
+        const touchesUpper = distanceToUpper <= boundRange * touchTolerance && tp.type === 'max'
+        const touchesLower = distanceToLower <= boundRange * touchTolerance && tp.type === 'min'
+
+        if (touchesUpper || touchesLower) {
+          touchCount++
+        }
+      })
+
+      const percentWithinBounds = pointsWithinBounds / dataSegment.length
+
+      if (percentWithinBounds > bestCoverage) {
+        bestCoverage = percentWithinBounds
+        bestCoverageStdevMult = stdevMult
+      }
+
+      if (touchCount > 0 && percentWithinBounds >= 0.8 && touchCount > bestTouchCount) {
+        bestTouchCount = touchCount
+        bestStdevMult = stdevMult
+      }
+    }
+
+    // Use best coverage if no good touches found
+    const optimalStdevMult = bestTouchCount > 0 ? bestStdevMult : (bestCoverage >= 0.8 ? bestCoverageStdevMult : 2.5)
+    const channelWidth = stdDev * optimalStdevMult
+    const touchCount = bestTouchCount
+
+    // Return updated channel with new parameters
+    return {
+      ...originalChannel,
+      startIndex: newStartIndex,
+      endIndex: newEndIndex,
+      slope,
+      intercept,
+      stdDev,
+      channelWidth,
+      optimalStdevMult,
+      touchCount
+    }
+  }
+
   // Effect to calculate reversed all channels when revAllChannelEnabled changes
   useEffect(() => {
     if (revAllChannelEnabled && prices.length > 0) {
@@ -2490,7 +2627,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      // Decrease range by 5% on each side
+                      // Decrease range by 5% on each side and recalculate
                       setRevAllChannels(prev => prev.map((channel, idx) => {
                         if (idx !== revChannelIndex) return channel
                         const currentLength = channel.endIndex - channel.startIndex + 1
@@ -2499,18 +2636,19 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                         const newEndIndex = channel.endIndex - shrinkAmount
                         // Ensure minimum length of 10 points
                         if (newEndIndex - newStartIndex + 1 < 10) return channel
-                        return { ...channel, startIndex: newStartIndex, endIndex: newEndIndex }
+                        // Recalculate channel with new range
+                        return recalculateChannelWithNewRange(channel, newStartIndex, newEndIndex)
                       }))
                     }}
                     className="ml-1 px-1.5 py-0.5 text-xs bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors"
-                    title="Shrink channel range by 5% on each side"
+                    title="Shrink channel range by 5% on each side (recalculates slope & stdev)"
                   >
                     −
                   </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
-                      // Increase range by 5% on each side
+                      // Increase range by 5% on each side and recalculate
                       setRevAllChannels(prev => prev.map((channel, idx) => {
                         if (idx !== revChannelIndex) return channel
                         const currentLength = channel.endIndex - channel.startIndex + 1
@@ -2518,11 +2656,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                         const newStartIndex = Math.max(0, channel.startIndex - expandAmount)
                         const dataLength = Math.min(prices.length, indicators.length)
                         const newEndIndex = Math.min(dataLength - 1, channel.endIndex + expandAmount)
-                        return { ...channel, startIndex: newStartIndex, endIndex: newEndIndex }
+                        // Recalculate channel with new range
+                        return recalculateChannelWithNewRange(channel, newStartIndex, newEndIndex)
                       }))
                     }}
                     className="ml-1 px-1.5 py-0.5 text-xs bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors"
-                    title="Expand channel range by 5% on each side"
+                    title="Expand channel range by 5% on each side (recalculates slope & stdev)"
                   >
                     +
                   </button>
