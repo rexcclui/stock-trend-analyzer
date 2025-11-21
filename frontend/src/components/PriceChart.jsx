@@ -3943,58 +3943,59 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         </div>
       )}
 
-      <div style={{
-        paddingTop: revAllChannelEnabled && revAllVisibleLength > 1 ? '42px' : '0',
-        transition: 'padding-top 0.2s ease'
-      }}>
-        {revAllChannelEnabled && revAllVisibleLength > 1 && (
+      {revAllChannelEnabled && revAllVisibleLength > 1 && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '4px',
+            left: 0,
+            right: 0,
+            padding: '0 16px',
+            zIndex: 7,
+            pointerEvents: 'none'
+          }}
+        >
           <div
             style={{
-              position: 'absolute',
-              top: '4px',
-              left: 0,
-              right: 0,
-              padding: '0 16px',
-              zIndex: 7,
-              pointerEvents: 'none'
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              width: '100%',
+              background: 'rgba(30, 41, 59, 0.75)',
+              border: '1px solid rgba(148, 163, 184, 0.3)',
+              borderRadius: '8px',
+              padding: '6px 10px',
+              backdropFilter: 'blur(4px)',
+              boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
+              pointerEvents: 'auto'
             }}
           >
-            <div
+            <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>Rev End</span>
+            <input
+              type="range"
+              min={0}
+              max={maxRevAllChannelEndIndex}
+              value={effectiveRevAllChannelEndIndex}
+              onChange={(e) => onRevAllChannelEndChange && onRevAllChannelEndChange(parseInt(e.target.value, 10))}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                width: '100%',
-                background: 'rgba(30, 41, 59, 0.75)',
-                border: '1px solid rgba(148, 163, 184, 0.3)',
-                borderRadius: '8px',
-                padding: '6px 10px',
-                backdropFilter: 'blur(4px)',
-                boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
-                pointerEvents: 'auto'
+                flex: 1,
+                height: '6px',
+                accentColor: '#6366f1',
+                cursor: 'pointer'
               }}
-            >
-              <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>Rev End</span>
-              <input
-                type="range"
-                min={0}
-                max={maxRevAllChannelEndIndex}
-                value={effectiveRevAllChannelEndIndex}
-                onChange={(e) => onRevAllChannelEndChange && onRevAllChannelEndChange(parseInt(e.target.value, 10))}
-                style={{
-                  flex: 1,
-                  height: '6px',
-                  accentColor: '#6366f1',
-                  cursor: 'pointer'
-                }}
-              />
-              <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600, minWidth: '80px', textAlign: 'right' }}>
-                {revAllChannelEndDate || '...'}
-              </span>
-            </div>
+            />
+            <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600, minWidth: '80px', textAlign: 'right' }}>
+              {revAllChannelEndDate || '...'}
+            </span>
           </div>
-        )}
+        </div>
+      )}
 
+      <div style={{
+        width: '100%',
+        height: '100%',
+        paddingTop: revAllChannelEnabled && revAllVisibleLength > 1 ? '42px' : '0'
+      }}>
         <ResponsiveContainer>
         <ComposedChart
           data={chartDataWithZones}
