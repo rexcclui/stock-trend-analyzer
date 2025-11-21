@@ -916,8 +916,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         }
       })
 
-      // Filter overlapping channels to show distinct ones
-      const filteredChannels = filterOverlappingChannels(adjustedChannels, 0.3)
+      // Filter overlapping channels to show distinct ones (allow up to 80% overlap)
+      const filteredChannels = filterOverlappingChannels(adjustedChannels, 0.8)
 
       // Limit to top 5 channels
       const topChannels = filteredChannels.slice(0, 5)
