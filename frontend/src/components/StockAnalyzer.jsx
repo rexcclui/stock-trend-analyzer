@@ -122,7 +122,7 @@ function StockAnalyzer() {
         bestChannelVolumeFilterEnabled: false,
         collapsed: false
       }
-      setCharts(prevCharts => [...prevCharts, newChart])
+      setCharts(prevCharts => [newChart, ...prevCharts])
 
       // Auto-zoom to selected period after adding chart
       setTimeout(() => {
