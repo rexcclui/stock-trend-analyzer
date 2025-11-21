@@ -878,24 +878,30 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const adjustedChannels = foundChannels.map(channel => {
         const localStartIdx = channel.startIndex  // Save the local start index before adjusting
 
-        // Calculate percentage of points within 5% of regression line
+        // Calculate percentage of points inside channel bounds
+        // Points within 5% of channel width from bounds are still considered "inside"
         const channelSegment = visibleSlice.slice(channel.startIndex, channel.endIndex + 1)
-        let pointsWithin5Percent = 0
+        const tolerance = channel.channelWidth * 0.05  // 5% of channel width
+        let pointsInside = 0
 
         channelSegment.forEach((point, index) => {
           const x = channel.startIndex + index
           const predictedY = channel.slope * x + channel.intercept
           const actualY = point.close
 
-          // Calculate percentage deviation from predicted value
-          const percentDeviation = Math.abs((actualY - predictedY) / predictedY)
+          // Calculate channel bounds
+          const upperBound = predictedY + channel.channelWidth
+          const lowerBound = predictedY - channel.channelWidth
 
-          if (percentDeviation <= 0.05) {  // Within 5%
-            pointsWithin5Percent++
+          // Point is inside if within bounds plus tolerance
+          const isInside = actualY >= (lowerBound - tolerance) && actualY <= (upperBound + tolerance)
+
+          if (isInside) {
+            pointsInside++
           }
         })
 
-        const percentInside = (pointsWithin5Percent / channelSegment.length) * 100
+        const percentInside = (pointsInside / channelSegment.length) * 100
 
         return {
           ...channel,
@@ -906,7 +912,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           // New: y = slope * 0 + intercept_new
           // Therefore: intercept_new = intercept_old + slope * localStartIdx
           intercept: channel.intercept + channel.slope * localStartIdx,
-          percentInside: percentInside  // Add percentage of points within 5% of slope
+          percentInside: percentInside  // Percentage of points inside channel bounds (with 5% tolerance)
         }
       })
 
