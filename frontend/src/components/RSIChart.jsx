@@ -24,11 +24,30 @@ function RSIChart({ indicators, syncedMouseDate, setSyncedMouseDate, zoomRange, 
     const currentRange = endIndex - zoomRange.start
     const zoomAmount = Math.max(1, Math.floor(currentRange * zoomFactor))
 
+    // Calculate cursor position for cursor-anchored zoom
+    let cursorRatio = 0.5 // Default to center if we can't determine cursor position
+    const chartElement = chartRef.current
+    if (chartElement) {
+      const rect = chartElement.getBoundingClientRect()
+      const mouseX = e.clientX - rect.left
+      const chartWidth = rect.width
+      if (chartWidth > 0) {
+        // Calculate cursor position as ratio (0.0 = left edge, 1.0 = right edge)
+        cursorRatio = Math.max(0, Math.min(1, mouseX / chartWidth))
+      }
+    }
+
     if (delta < 0) {
       // Scroll up - Zoom in (show less data)
       const newRange = Math.max(10, currentRange - zoomAmount)
-      const reduction = currentRange - newRange
-      const newStart = Math.min(chartData.length - newRange, zoomRange.start + Math.floor(reduction / 2))
+
+      // Calculate the data index under cursor before zoom
+      const cursorDataIndex = zoomRange.start + (cursorRatio * currentRange)
+
+      // Calculate new start so cursor stays at same position
+      let newStart = Math.round(cursorDataIndex - (cursorRatio * newRange))
+      newStart = Math.max(0, Math.min(chartData.length - newRange, newStart))
+
       const newEnd = Math.min(chartData.length, newStart + newRange)
       onZoomChange({ start: newStart, end: newEnd })
     } else {
@@ -43,9 +62,20 @@ function RSIChart({ indicators, syncedMouseDate, setSyncedMouseDate, zoomRange, 
         onExtendPeriod()
       } else {
         const newRange = Math.min(chartData.length, currentRange + zoomAmount)
-        const expansion = newRange - currentRange
-        const newStart = Math.max(0, zoomRange.start - Math.floor(expansion / 2))
-        const newEnd = Math.min(chartData.length, newStart + newRange)
+
+        // Calculate the data index under cursor before zoom
+        const cursorDataIndex = zoomRange.start + (cursorRatio * currentRange)
+
+        // Calculate new start so cursor stays at same position
+        let newStart = Math.round(cursorDataIndex - (cursorRatio * newRange))
+        newStart = Math.max(0, newStart)
+
+        let newEnd = Math.min(chartData.length, newStart + newRange)
+
+        // Adjust if we hit the right boundary
+        if (newEnd === chartData.length && newRange < chartData.length) {
+          newStart = chartData.length - newRange
+        }
 
         // If we've reached full view, set end to null
         if (newStart === 0 && newEnd === chartData.length) {
@@ -55,7 +85,7 @@ function RSIChart({ indicators, syncedMouseDate, setSyncedMouseDate, zoomRange, 
         }
       }
     }
-  }, [zoomRange, chartData.length, onZoomChange, onExtendPeriod])
+  }, [zoomRange, chartData.length, onZoomChange, onExtendPeriod, chartRef])
 
   // Add wheel event listener
   useEffect(() => {
