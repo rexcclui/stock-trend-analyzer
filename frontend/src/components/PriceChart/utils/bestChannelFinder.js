@@ -38,31 +38,46 @@ export const findTurningPoints = (data, windowSize = 3) => {
  * Calculate linear regression for a data segment
  * @param {Array} data - Data segment
  * @param {number} startIndex - Start index in original data
+ * @param {Set} validIndices - Optional set of valid indices to include (for volume filtering)
  * @returns {Object} Regression parameters (slope, intercept, stdDev)
  */
-const calculateRegression = (data, startIndex = 0) => {
+const calculateRegression = (data, startIndex = 0, validIndices = null) => {
   if (data.length < 2) return null
 
   let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
-  const n = data.length
+  let n = 0
 
   data.forEach((point, index) => {
     const x = startIndex + index
+    // Skip points filtered out by volume if validIndices is provided
+    if (validIndices && !validIndices.has(x)) {
+      return
+    }
+    n++
     sumX += x
     sumY += point.close
     sumXY += x * point.close
     sumX2 += x * x
   })
 
+  if (n < 2) return null
+
   const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
   const intercept = (sumY - slope * sumX) / n
 
-  // Calculate standard deviation
-  const distances = data.map((point, index) => {
+  // Calculate standard deviation (only for valid points)
+  const distances = []
+  data.forEach((point, index) => {
     const x = startIndex + index
+    // Skip points filtered out by volume if validIndices is provided
+    if (validIndices && !validIndices.has(x)) {
+      return
+    }
     const predictedY = slope * x + intercept
-    return point.close - predictedY
+    distances.push(point.close - predictedY)
   })
+
+  if (distances.length === 0) return null
 
   const meanDistance = distances.reduce((a, b) => a + b, 0) / distances.length
   const variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
@@ -189,7 +204,11 @@ export const findBestChannels = (data, options = {}) => {
       if (endIdx >= data.length) continue
 
       const dataSegment = data.slice(startIdx, endIdx + 1)
-      const regression = calculateRegression(dataSegment, startIdx)
+      const regression = calculateRegression(
+        dataSegment,
+        startIdx,
+        volumeFilterEnabled ? validIndices : null
+      )
 
       if (!regression) continue
 
