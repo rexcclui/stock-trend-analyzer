@@ -1005,60 +1005,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Effect to apply slider-based filtering to channels (does NOT recalculate slope/stdev)
   useEffect(() => {
-    if (revAllChannelEnabled && revAllChannelsFull.length > 0 && prices.length > 0) {
-      const dataLength = Math.min(prices.length, indicators.length)
-      const displayPrices = prices.slice(0, dataLength)
-      const totalLength = displayPrices.length
-
-      const visibleStart = zoomRange?.start ?? 0
-      const visibleEnd = zoomRange?.end === null ? totalLength : Math.min(totalLength, zoomRange.end)
-
-      const startDisplayIndex = Math.max(0, totalLength - visibleEnd)
-      const endDisplayIndex = Math.min(totalLength - 1, totalLength - 1 - visibleStart)
-
-      const visibleSlice = displayPrices.slice(startDisplayIndex, endDisplayIndex + 1)
-      const visibleOldestToNewest = visibleSlice.slice().reverse()
-
-      if (visibleOldestToNewest.length < 2) {
-        setRevAllChannels([])
-        setRevAllChannelsVisibility({})
-        return
-      }
-
-      const maxEndIndex = visibleOldestToNewest.length - 1
-      const clampedEndIndex = Math.min(
-        Math.max(revAllChannelEndIndex ?? maxEndIndex, 0),
-        maxEndIndex
-      )
-
-      // Calculate the display index corresponding to the slider position
-      const adjustIndexToDisplay = (localIndex) => startDisplayIndex + (visibleOldestToNewest.length - 1 - localIndex)
-      const sliderDisplayIndex = adjustIndexToDisplay(clampedEndIndex)
-
-      // Filter channels based on slider position WITHOUT recalculating their parameters
-      const filteredChannels = revAllChannelsFull.map(channel => {
-        // Truncate channel to slider position if needed
-        // Channels extend from oldest (higher index) to newest (lower index)
-        const truncatedStartIndex = Math.max(channel.startIndex, sliderDisplayIndex)
-        const truncatedEndIndex = channel.endIndex
-
-        // Only include channel if it has some visible range after truncation
-        if (truncatedStartIndex >= truncatedEndIndex) {
-          return null
-        }
-
-        return {
-          ...channel,
-          startIndex: truncatedStartIndex,
-          endIndex: truncatedEndIndex
-          // Keep original slope, intercept, channelWidth - these should NOT change
-        }
-      }).filter(ch => ch !== null)
-
-      setRevAllChannels(filteredChannels)
+    if (revAllChannelEnabled && revAllChannelsFull.length > 0) {
+      // Simply pass through the full channels without modification
+      // The slider will be handled by filtering data points during chart rendering
+      setRevAllChannels(revAllChannelsFull)
       setRevAllChannelsVisibility(prev => {
         const visibility = {}
-        filteredChannels.forEach((_, index) => {
+        revAllChannelsFull.forEach((_, index) => {
           visibility[index] = prev[index] !== false
         })
         return visibility
@@ -1067,7 +1020,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       setRevAllChannels([])
       setRevAllChannelsVisibility({})
     }
-  }, [revAllChannelEnabled, revAllChannelsFull, revAllChannelEndIndex, prices, indicators, zoomRange?.start, zoomRange?.end])
+  }, [revAllChannelEnabled, revAllChannelsFull])
 
   // Effect to calculate best channels when bestChannelEnabled changes
   useEffect(() => {
@@ -1631,6 +1584,20 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     ? manualChannels.map(channel => calculateManualChannelZones(displayPrices, channel))
     : []
 
+  // Calculate the slider cutoff index for revAllChannel
+  let revAllChannelCutoffIndex = null
+  if (revAllChannelEnabled && revAllChannelEndIndex !== null) {
+    const dataLength = displayPrices.length
+    const visibleStart = zoomRange?.start ?? 0
+    const visibleEnd = zoomRange?.end === null ? dataLength : Math.min(dataLength, zoomRange.end)
+    const startDisplayIndex = Math.max(0, dataLength - visibleEnd)
+    const endDisplayIndex = Math.min(dataLength - 1, dataLength - 1 - visibleStart)
+    const visibleLength = endDisplayIndex - startDisplayIndex + 1
+    const clampedEndIndex = Math.min(Math.max(revAllChannelEndIndex, 0), visibleLength - 1)
+    // Convert from oldest-to-newest index to display index (newest-first)
+    revAllChannelCutoffIndex = startDisplayIndex + (visibleLength - 1 - clampedEndIndex)
+  }
+
   const chartData = displayPrices.map((price, index) => {
     const indicator = indicators[index] || {}
 
@@ -1698,31 +1665,36 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     // Add reversed all channels data if enabled
     if (revAllChannelEnabled && revAllChannels.length > 0) {
-      revAllChannels.forEach((channel, channelIndex) => {
-        // Check if this index is within this channel's range
-        if (index >= channel.startIndex && index < channel.endIndex) {
-          const chronologicalStart = channel.chronologicalStartIndex ?? channel.startIndex
-          const localIndex = Math.abs(chronologicalStart - index)
-          const midValue = channel.slope * localIndex + channel.intercept
-          const upperBound = midValue + channel.channelWidth
-          const lowerBound = midValue - channel.channelWidth
+      // Check if this data point should have channel data based on slider position
+      const shouldIncludeChannelData = revAllChannelCutoffIndex === null || index >= revAllChannelCutoffIndex
 
-          dataPoint[`revAllChannel${channelIndex}Upper`] = upperBound
-          dataPoint[`revAllChannel${channelIndex}Mid`] = midValue
-          dataPoint[`revAllChannel${channelIndex}Lower`] = lowerBound
+      if (shouldIncludeChannelData) {
+        revAllChannels.forEach((channel, channelIndex) => {
+          // Check if this index is within this channel's range
+          if (index >= channel.startIndex && index < channel.endIndex) {
+            const chronologicalStart = channel.chronologicalStartIndex ?? channel.startIndex
+            const localIndex = Math.abs(chronologicalStart - index)
+            const midValue = channel.slope * localIndex + channel.intercept
+            const upperBound = midValue + channel.channelWidth
+            const lowerBound = midValue - channel.channelWidth
 
-          // Add zone boundaries for this channel
-          if (revAllChannelZones[channelIndex]) {
-            const channelRange = upperBound - lowerBound
-            revAllChannelZones[channelIndex].forEach((zone, zoneIndex) => {
-              const zoneLower = lowerBound + channelRange * zone.zoneStart
-              const zoneUpper = lowerBound + channelRange * zone.zoneEnd
-              dataPoint[`revAllChannel${channelIndex}Zone${zoneIndex}Lower`] = zoneLower
-              dataPoint[`revAllChannel${channelIndex}Zone${zoneIndex}Upper`] = zoneUpper
-            })
+            dataPoint[`revAllChannel${channelIndex}Upper`] = upperBound
+            dataPoint[`revAllChannel${channelIndex}Mid`] = midValue
+            dataPoint[`revAllChannel${channelIndex}Lower`] = lowerBound
+
+            // Add zone boundaries for this channel
+            if (revAllChannelZones[channelIndex]) {
+              const channelRange = upperBound - lowerBound
+              revAllChannelZones[channelIndex].forEach((zone, zoneIndex) => {
+                const zoneLower = lowerBound + channelRange * zone.zoneStart
+                const zoneUpper = lowerBound + channelRange * zone.zoneEnd
+                dataPoint[`revAllChannel${channelIndex}Zone${zoneIndex}Lower`] = zoneLower
+                dataPoint[`revAllChannel${channelIndex}Zone${zoneIndex}Upper`] = zoneUpper
+              })
+            }
           }
-        }
-      })
+        })
+      }
     }
 
     // Add all manual channels data
