@@ -1072,7 +1072,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       setBestChannels([])
       setBestChannelsVisibility({})
     }
-  }, [bestChannelEnabled, prices, indicators, days, zoomRange?.start, zoomRange?.end])
+  }, [bestChannelEnabled, bestChannelVolumeFilterEnabled, prices, indicators, days, zoomRange?.start, zoomRange?.end])
 
   // Calculate volume-weighted zone colors
   const calculateZoneColors = (data, channelInfo, numZones) => {
