@@ -712,7 +712,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
       while (currentStartIndex + lookbackCount < data.length) {
         const previousLookback = lookbackCount
-        const previous80Percent = Math.floor(previousLookback * 0.8)
+        const previous90Percent = Math.floor(previousLookback * 0.9)
 
         lookbackCount++
         const extendedSegment = data.slice(currentStartIndex, currentStartIndex + lookbackCount)
@@ -720,12 +720,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const channelWidth = stdDev * optimalStdevMult
         const boundRange = channelWidth * 2
         const outsideTolerance = boundRange * 0.05
-        // Use the channel bounds from the previous 80% (before refitting) to test the new 20%
-        const newPoints = extendedSegment.slice(previous80Percent)
+        // Use the channel bounds from the previous 90% (before refitting) to test the new 10%
+        const newPoints = extendedSegment.slice(previous90Percent)
         let pointsOutside = 0
 
         newPoints.forEach((point, index) => {
-          const globalIndex = previous80Percent + index
+          const globalIndex = previous90Percent + index
           const predictedY = slope * globalIndex + intercept
           const upperBound = predictedY + channelWidth
           const lowerBound = predictedY - channelWidth
@@ -735,7 +735,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           }
         })
 
-        if (newPoints.length > 0 && pointsOutside / newPoints.length > 0.1) {
+        if (newPoints.length > 0 && pointsOutside / newPoints.length >= 0.08) {
           channelBroken = true
           breakIndex = currentStartIndex + previousLookback
           lookbackCount = previousLookback
