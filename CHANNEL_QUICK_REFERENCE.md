@@ -24,9 +24,9 @@
 
 | Component | File | Lines | Purpose |
 |-----------|------|-------|---------|
-| Slope Channel Settings | `frontend/src/components/StockAnalyzer.jsx` | 1509-1605 | Configuration dialog for slope channel |
-| Slope Channel Button | `frontend/src/components/StockAnalyzer.jsx` | 1196-1201 | Toggle & settings button |
-| Rev All Channel Button | `frontend/src/components/StockAnalyzer.jsx` | 1205-1214 | Toggle Rev All Channels |
+| Last Channel Settings | `frontend/src/components/StockAnalyzer.jsx` | 1509-1605 | Configuration dialog for last channel |
+| Last Channel Button | `frontend/src/components/StockAnalyzer.jsx` | 1196-1201 | Toggle & settings button |
+| All Channel Button | `frontend/src/components/StockAnalyzer.jsx` | 1205-1214 | Toggle All Channels |
 | Manual Channel Button | `frontend/src/components/StockAnalyzer.jsx` | 1215-1226 | Toggle Manual Channel |
 | State Setters | `frontend/src/components/StockAnalyzer.jsx` | 251-358 | Various toggle/update functions |
 
@@ -35,12 +35,12 @@
 | Component | File | Lines | Purpose |
 |-----------|------|-------|---------|
 | Chart Data Creation | `frontend/src/components/PriceChart.jsx` | 1203-1320 | Add channel data to chart dataset |
-| Slope Channel Rendering | `frontend/src/components/PriceChart.jsx` | 3410-3446 | Render slope channel lines |
-| Rev All Channels Rendering | `frontend/src/components/PriceChart.jsx` | 3448-3501 | Render all detected channels |
+| Last Channel Rendering | `frontend/src/components/PriceChart.jsx` | 3410-3446 | Render last channel lines |
+| All Channels Rendering | `frontend/src/components/PriceChart.jsx` | 3448-3501 | Render all detected channels |
 | Manual Channels Rendering | `frontend/src/components/PriceChart.jsx` | 3503-3550 | Render manually drawn channels |
 | Zone Visualization | `frontend/src/components/PriceChart.jsx` | 3317-3330 | Render parallel zones |
 
-### Rev All Channels Detection
+### All Channels Detection
 
 | Function | File | Lines | Purpose |
 |----------|------|-------|---------|
@@ -52,7 +52,7 @@
 
 ## Key Parameters & Thresholds
 
-### Slope Channel
+### Last Channel
 ```javascript
 minMultiplier: 1.0              // Minimum stdev multiplier
 maxMultiplier: 4.0              // Maximum stdev multiplier
@@ -64,7 +64,7 @@ volumePercentile: 0.2           // Bottom 20% volume excluded (if weighted)
 defaultMinPoints: 100           // Default minimum lookback
 ```
 
-### Rev All Channels
+### All Channels
 ```javascript
 pointsWithinBounds: 0.8         // Require 80% coverage
 stdevStep: 0.25                 // Multiplier increment
@@ -85,7 +85,7 @@ minPointsBeforeTurning: 3       // 3-bar window for turning points
 
 ## Return Object Structures
 
-### Slope Channel Info
+### Last Channel Info
 ```javascript
 {
   channelData: Array<{upper, mid, lower}>,  // Values for each point
@@ -103,7 +103,7 @@ minPointsBeforeTurning: 3       // 3-bar window for turning points
 }
 ```
 
-### Rev All Channel
+### All Channel
 ```javascript
 {
   startIndex: number,                        // Oldest point index
@@ -193,7 +193,7 @@ setAllChannels                // Update all channels
 allChannelsVisibility         // Visibility for each
 setAllChannelsVisibility      // Toggle visibility
 
-revAllChannels                // Array of rev all channels
+revAllChannels                // Array of all channels
 setRevAllChannels             // Update
 revAllChannelsVisibility      // Visibility toggle
 setRevAllChannelsVisibility   // Toggle
@@ -256,12 +256,12 @@ revAllChannels.map((ch, i) => (
 
 ## Color Scheme
 
-### Slope Channel
+### Last Channel
 - Upper bound: Green (#10b981)
 - Midline: Blue (#3b82f6)
 - Lower bound: Red (#ef4444)
 
-### Rev All Channels
+### All Channels
 - Cycles through: Blue, Purple, Amber, Green, Cyan, Orange, Pink, Lime
 - Upper/Lower: 60% opacity, dashed
 - Midline: 100% opacity, solid
@@ -297,7 +297,7 @@ const getInitialLookbackForPeriod = (days) => {
 ```
 
 ### To Change Colors
-- Slope Channel: `PriceChart.jsx` Lines 3416, 3427, 3437
+- Last Channel: `PriceChart.jsx` Lines 3416, 3427, 3437
 - Rev All: `PriceChart.jsx` Lines 3451-3460
 - Manual: `PriceChart.jsx` Lines 3506-3512
 

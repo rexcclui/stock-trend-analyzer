@@ -1,8 +1,8 @@
-# Slope Channel Feature Documentation
+# Last Channel Feature Documentation
 
 ## Overview
 
-The Slope Channel feature provides advanced trend analysis by automatically detecting and visualizing price channels using linear regression and statistical analysis. It identifies optimal trend lines that contain the most recent price action within upper and lower boundaries.
+The Last Channel feature provides advanced trend analysis by automatically detecting and visualizing price channels using linear regression and statistical analysis. It identifies optimal trend lines that contain the most recent price action within upper and lower boundaries.
 
 ## Table of Contents
 
@@ -20,9 +20,9 @@ The Slope Channel feature provides advanced trend analysis by automatically dete
 
 ## Quick Start
 
-### Enabling the Slope Channel
+### Enabling the Last Channel
 
-1. Click the **"Slope Channel"** button on the chart toolbar (located to the left of the SMA button)
+1. Click the **"Last Channel"** button on the chart toolbar (located to the left of the SMA button)
 2. In the dialog, check **"Show Best Last Channel"**
 3. (Optional) Check **"Volume Weighted (ignore bottom 20% volume)"** to filter out low-volume data
 4. The channel will automatically calculate and display on the chart
@@ -38,9 +38,9 @@ Enable Channel → Auto-optimizes → View Results → Manual Adjustment (option
 
 ## Feature Description
 
-### What is a Slope Channel?
+### What is a Last Channel?
 
-A slope channel consists of three parallel trend lines:
+A last channel consists of three parallel trend lines:
 - **Upper Boundary**: Resistance level (slope + channel width)
 - **Mid Line (Trend)**: Linear regression best-fit line
 - **Lower Boundary**: Support level (slope - channel width)
@@ -392,7 +392,7 @@ Volume zones visualize where trading activity is concentrated within the channel
 
 ### Zone Configuration
 
-**Default**: 8 zones (configurable in Slope Channel dialog)
+**Default**: 8 zones (configurable in Last Channel dialog)
 
 **Range**: 3 to 10 zones
 
@@ -647,7 +647,7 @@ frontend/src/components/StockAnalyzer.jsx
 - Zone count must be ≥3
 - Volume data must be available
 
-**Check**: Slope Channel dialog → Number of Zones setting
+**Check**: Last Channel dialog → Number of Zones setting
 
 ---
 

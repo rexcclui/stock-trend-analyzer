@@ -1211,10 +1211,10 @@ function StockAnalyzer() {
                       type="button"
                       onClick={() => openSlopeChannelDialog(chart.id)}
                       className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
-                      title="Configure Slope Channel"
+                      title="Configure Last Channel"
                     >
                       <Settings className="w-4 h-4" />
-                      Slope Channel
+                      Last Channel
                     </button>
                     <button
                       type="button"
@@ -1224,9 +1224,9 @@ function StockAnalyzer() {
                           ? 'bg-indigo-600 text-white'
                           : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                       }`}
-                      title="Reversed All Channels"
+                      title="All Channels"
                     >
-                      Rev All Channel
+                      All Channel
                     </button>
                     {chart.revAllChannelEnabled && (
                       <button
@@ -1241,7 +1241,7 @@ function StockAnalyzer() {
                           )
                         }}
                         className="px-2 py-1 text-sm rounded font-medium transition-colors bg-slate-600 text-slate-200 hover:bg-slate-500"
-                        title="Refresh Rev All Channels"
+                        title="Refresh All Channels"
                       >
                         <RefreshCw className="w-4 h-4" />
                       </button>
@@ -1554,12 +1554,12 @@ function StockAnalyzer() {
         </div>
       )}
 
-      {/* Slope Channel Configuration Dialog */}
+      {/* Last Channel Configuration Dialog */}
       {slopeChannelDialogOpen && editingSlopeChannelChartId && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={closeSlopeChannelDialog}>
           <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-slate-100">Configure Slope Channel</h3>
+              <h3 className="text-lg font-semibold text-slate-100">Configure Last Channel</h3>
               <button
                 onClick={closeSlopeChannelDialog}
                 className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"

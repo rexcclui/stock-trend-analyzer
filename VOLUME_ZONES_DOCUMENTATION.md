@@ -7,7 +7,7 @@ Volume zones are visual indicators that show **where trading activity concentrat
 ## Visual Components
 
 ### Zone Structure (Dynamic by Period)
-- Each channel (All Channel and Rev All Channel) is divided into **3 or 5 equal horizontal zones** depending on the time period:
+- Each channel (All Channel and All Channel) is divided into **3 or 5 equal horizontal zones** depending on the time period:
   - **Period < 1 year**: **3 zones** (simpler view for shorter timeframes)
   - **Period ≥ 1 year**: **5 zones** (detailed analysis for longer timeframes)
 - Zones are numbered from bottom to top: Zone 0 (bottom) → Zone 2/4 (top)
@@ -208,7 +208,7 @@ Compare zone percentages across a channel:
 - **Evenly distributed**: Healthy trending channel
 
 ### 4. Multi-Channel Confirmation
-When All Channel and Rev All Channel show similar high-volume zones:
+When All Channel and All Channel show similar high-volume zones:
 - Indicates **confirmed support/resistance** from different time perspectives
 - Higher confidence in level significance
 - Better entry/exit points
@@ -218,7 +218,7 @@ When All Channel and Rev All Channel show similar high-volume zones:
 ### Location in Code
 - **Calculation**: `frontend/src/components/PriceChart.jsx:932-987`
 - **Rendering (All Channel)**: `frontend/src/components/PriceChart.jsx:2634-2764`
-- **Rendering (Rev All Channel)**: `frontend/src/components/PriceChart.jsx:2767-2884`
+- **Rendering (All Channel)**: `frontend/src/components/PriceChart.jsx:2767-2884`
 
 ### Key Configuration
 ```javascript

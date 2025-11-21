@@ -71,7 +71,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     smaCache[period] = calculateSMA(prices, period)
   })
 
-  // Calculate Slope Channel using linear regression
+  // Calculate Last Channel using linear regression
   // If useStoredParams is true and we have stored params, use them; otherwise optimize
   const calculateSlopeChannel = (data, useStoredParams = true, volumeWeighted = false) => {
     if (!data || data.length < 10) return null
@@ -1119,7 +1119,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // Combine data - ensure we use the minimum length to stay in sync with indicators
   const dataLength = Math.min(prices.length, indicators.length)
 
-  // Calculate slope channel ONLY on the data that will be displayed
+  // Calculate last channel ONLY on the data that will be displayed
   // This prevents mismatch when period changes and indicators haven't updated yet
   const displayPrices = prices.slice(0, dataLength)
 
@@ -1430,14 +1430,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       dataPoint[smaKey] = indicator[smaKey] || smaCache[period][index]
     })
 
-    // Add slope channel data if enabled
+    // Add last channel data if enabled
     if (slopeChannelInfo && slopeChannelInfo.channelData[index]) {
       const channel = slopeChannelInfo.channelData[index]
       dataPoint.channelUpper = channel.upper
       dataPoint.channelMid = channel.mid
       dataPoint.channelLower = channel.lower
 
-      // Add zone boundaries for slope channel
+      // Add zone boundaries for last channel
       if (zoneColors.length > 0) {
         const channelRange = channel.upper - channel.lower
         zoneColors.forEach((zone, zoneIndex) => {
@@ -2487,9 +2487,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 <button
                   onClick={(e) => {
                     e.stopPropagation()
-                    // Disable slope channel by calling parent handler
+                    // Disable last channel by calling parent handler
                     if (onSlopeChannelParamsChange) {
-                      // Signal to parent to disable slope channel
+                      // Signal to parent to disable last channel
                       onSlopeChannelParamsChange({ slopeChannelEnabled: false })
                     }
                   }}
@@ -2688,7 +2688,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     )
   }
 
-  // Custom component to render stdev label in middle of lower bound for slope channel
+  // Custom component to render stdev label in middle of lower bound for last channel
   const CustomSlopeChannelLabel = (props) => {
     if (!slopeChannelEnabled || !slopeChannelInfo) return null
 
@@ -2871,7 +2871,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     )
   }
 
-  // Custom component to render stdev labels at midpoint of Rev All Channel lower bounds
+  // Custom component to render stdev labels at midpoint of All Channel lower bounds
   const CustomRevAllChannelStdevLabels = (props) => {
     if (!revAllChannelEnabled || revAllChannels.length === 0) return null
 
@@ -3542,7 +3542,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   return (
     <div ref={chartContainerRef} style={{ width: '100%', height: chartHeight, position: 'relative', cursor: getCursorStyle(), userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', msUserSelect: 'none' }}>
-      {/* Slope Channel Controls Panel */}
+      {/* Last Channel Controls Panel */}
       {slopeChannelEnabled && slopeChannelInfo && onSlopeChannelParamsChange && controlsVisible && (
         <div
           style={{
@@ -3785,16 +3785,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             />
           )}
 
-          {/* Slope Channel Zones as Parallel Lines */}
+          {/* Last Channel Zones as Parallel Lines */}
           <Customized component={CustomZoneLines} />
 
-          {/* Slope Channel Stdev Label */}
+          {/* Last Channel Stdev Label */}
           <Customized component={CustomSlopeChannelLabel} />
 
-          {/* Reversed All Channels Zones as Parallel Lines */}
+          {/* All Channels Zones as Parallel Lines */}
           <Customized component={CustomRevAllChannelZoneLines} />
 
-          {/* Reversed All Channels Stdev Labels at Lower Bound Midpoint */}
+          {/* All Channels Stdev Labels at Lower Bound Midpoint */}
           <Customized component={CustomRevAllChannelStdevLabels} />
 
           {/* Manual Channel Zones as Parallel Lines */}
@@ -3884,7 +3884,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             }} />
           )}
 
-          {/* Slope Channel Lines */}
+          {/* Last Channel Lines */}
           {slopeChannelEnabled && slopeChannelInfo && (
             <>
               <Line
@@ -3922,7 +3922,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             </>
           )}
 
-          {/* Reversed All Channels Lines */}
+          {/* All Channels Lines */}
           {revAllChannelEnabled && revAllChannels.length > 0 && revAllChannels.map((channel, index) => {
             // Define distinct colors for each channel - using single color per channel for consistency
             const channelColors = [

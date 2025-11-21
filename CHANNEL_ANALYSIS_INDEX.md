@@ -94,14 +94,14 @@ See "Summary of Detection Flow" in CHANNEL_DETECTION_ANALYSIS.md
 
 ## Key Concepts
 
-### Slope Channel (Best Last Channel)
+### Last Channel (Best Last Channel)
 - Finds the best-fitting channel using recent data
 - Uses trend-breaking detection to limit lookback
 - Optimizes stdev multiplier between 1.0-4.0
 - Allows volume-weighted filtering
 - Single channel per chart
 
-### Rev All Channels
+### All Channels
 - Detects multiple channels throughout the data
 - Works backwards through price data
 - Identifies turning points (local max/min)
@@ -147,12 +147,12 @@ trendChannelVisible         // Main trend channel visibility
 
 ## Color Scheme
 
-**Slope Channel:**
+**Last Channel:**
 - Upper: Green (#10b981)
 - Mid: Blue (#3b82f6)
 - Lower: Red (#ef4444)
 
-**Rev All Channels:** 8-color rotation
+**All Channels:** 8-color rotation
 - Blue, Purple, Amber, Green, Cyan, Orange, Pink, Lime
 
 **Manual Channels:** Green shades
@@ -162,7 +162,7 @@ trendChannelVisible         // Main trend channel visibility
 
 ## Data Structures
 
-### Slope Channel Output
+### Last Channel Output
 ```javascript
 {
   channelData,           // [{upper, mid, lower}, ...]
@@ -180,7 +180,7 @@ trendChannelVisible         // Main trend channel visibility
 }
 ```
 
-### Rev All Channel Object
+### All Channel Object
 ```javascript
 {
   startIndex,            // Oldest point

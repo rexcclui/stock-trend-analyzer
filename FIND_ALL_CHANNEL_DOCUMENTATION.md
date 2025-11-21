@@ -7,13 +7,13 @@
 4. [User Interface](#user-interface)
 5. [Technical Implementation](#technical-implementation)
 6. [Use Cases & Examples](#use-cases--examples)
-7. [Comparison with Slope Channel](#comparison-with-slope-channel)
+7. [Comparison with Last Channel](#comparison-with-slope-channel)
 
 ---
 
 ## Overview
 
-The **Find All Channel** feature automatically identifies and visualizes multiple trend channels in stock price data. Unlike the single Slope Channel that focuses on the most recent trend, Find All Channel segments the entire data series into up to 5 distinct, non-overlapping trend periods.
+The **Find All Channel** feature automatically identifies and visualizes multiple trend channels in stock price data. Unlike the single Last Channel that focuses on the most recent trend, Find All Channel segments the entire data series into up to 5 distinct, non-overlapping trend periods.
 
 ### Key Features
 
@@ -171,7 +171,7 @@ R² = 1 - (SS_residual / SS_total)
 
 ### Button
 
-**Location:** Above chart, between "Slope Channel" and "SMA" buttons
+**Location:** Above chart, between "Last Channel" and "SMA" buttons
 
 **States:**
 - **Inactive** (Default): Gray background, slate text
@@ -431,11 +431,11 @@ Ch3: 203pts, R²=88.5%            → Strong historical trend
 
 ---
 
-## Comparison with Slope Channel
+## Comparison with Last Channel
 
-### Find All Channel vs Slope Channel
+### Find All Channel vs Last Channel
 
-| Feature | Find All Channel | Slope Channel |
+| Feature | Find All Channel | Last Channel |
 |---------|-----------------|---------------|
 | **Number of Channels** | Up to 5 | 1 |
 | **Coverage** | Entire dataset | Most recent data |
@@ -457,7 +457,7 @@ Ch3: 203pts, R²=88.5%            → Strong historical trend
 - Understanding market evolution
 - Looking for pattern repetition
 
-**Use Slope Channel When:**
+**Use Last Channel When:**
 - Focusing on recent trend only
 - Need fine-tuned control over parameters
 - Want volume distribution analysis
@@ -482,14 +482,14 @@ Ch3: 203pts, R²=88.5%            → Strong historical trend
 
 Long, stable trends may result in fewer channels.
 
-### Q: Can I adjust channel parameters like Slope Channel?
+### Q: Can I adjust channel parameters like Last Channel?
 
 **A:** No, Find All Channel is fully automatic. This ensures:
 - Consistent results across all channels
 - Objective trend identification
 - No user bias in trend detection
 
-For manual control, use the Slope Channel feature.
+For manual control, use the Last Channel feature.
 
 ### Q: Why are some channels very short?
 
@@ -573,7 +573,7 @@ These periods are harder to trade with channel-based strategies.
 - **Multi-Asset Comparison**: Compare channels across multiple stocks
 - **Custom Breaking Threshold**: Adjust the 50% threshold for trend breaks
 - **Confidence Intervals**: Add confidence bands around channel lines
-- **Volume Integration**: Weight channels by volume like Slope Channel zones
+- **Volume Integration**: Weight channels by volume like Last Channel zones
 
 ---
 

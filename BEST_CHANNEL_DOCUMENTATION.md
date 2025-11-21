@@ -419,7 +419,7 @@ bestChannelsVisibility[1] = !bestChannelsVisibility[1]
 - Backtesting channel-based trading strategies
 
 ❌ **Not Ideal For**:
-- Real-time trading decisions (use Slope Channel for most recent trend)
+- Real-time trading decisions (use Last Channel for most recent trend)
 - Very short time frames (<20 points)
 - Extremely volatile periods (channels may not contain price action)
 
@@ -633,7 +633,7 @@ Potential improvements:
    - Filter by minimum/maximum channel length
 
 3. **Visual Enhancements**
-   - Zone shading within channels (like Slope Channel)
+   - Zone shading within channels (like Last Channel)
    - Touch point markers at boundaries
    - Trend strength indicators
 
@@ -713,7 +713,7 @@ The Best Channel feature provides **automated channel discovery** through compre
 - ⚠️ Computation intensive for very long ranges
 - ⚠️ Fixed 30% overlap threshold (not user-configurable)
 
-For real-time trend following, consider using **Slope Channel** instead. For maximum control over channel parameters, use **Manual Channel** mode.
+For real-time trend following, consider using **Last Channel** instead. For maximum control over channel parameters, use **Manual Channel** mode.
 
 ---
 
