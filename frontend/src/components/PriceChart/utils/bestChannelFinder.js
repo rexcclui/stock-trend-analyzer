@@ -117,6 +117,7 @@ const countTouchingPoints = (turningPoints, slope, intercept, channelWidth, tole
  * @param {Array} options.stdevMultipliers - Array of stdev multipliers to try
  * @param {number} options.touchTolerance - Touch tolerance (default 0.05)
  * @param {number} options.similarityThreshold - Threshold for similar touch counts (default 0.9)
+ * @param {boolean} options.volumeFilterEnabled - If true, ignore data points with bottom 10% volume
  * @returns {Array} Array of best channel configurations
  */
 export const findBestChannels = (data, options = {}) => {
@@ -129,15 +130,48 @@ export const findBestChannels = (data, options = {}) => {
     lengthStep = 5,
     stdevMultipliers = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0],
     touchTolerance = 0.05,
-    similarityThreshold = 0.9
+    similarityThreshold = 0.9,
+    volumeFilterEnabled = false
   } = options
 
   if (!data || data.length < minLength) {
     return []
   }
 
-  // Find all turning points once
+  // Filter data by volume if enabled
+  let filteredData = data
+  let validIndices = new Set(data.map((_, idx) => idx)) // Track which indices are valid
+
+  if (volumeFilterEnabled) {
+    // Calculate the 10th percentile volume threshold
+    const volumes = data.map(d => d.volume || 0).filter(v => v > 0)
+    if (volumes.length > 0) {
+      const sortedVolumes = [...volumes].sort((a, b) => a - b)
+      const percentile10Index = Math.floor(sortedVolumes.length * 0.1)
+      const volumeThreshold = sortedVolumes[percentile10Index]
+
+      // Create a set of valid indices (those with volume above threshold)
+      validIndices = new Set()
+      data.forEach((point, idx) => {
+        if ((point.volume || 0) > volumeThreshold) {
+          validIndices.add(idx)
+        }
+      })
+
+      // If too many points filtered out, disable filtering
+      if (validIndices.size < minLength) {
+        validIndices = new Set(data.map((_, idx) => idx))
+      }
+    }
+  }
+
+  // Find all turning points once (using all data, but we'll filter later)
   const allTurningPoints = findTurningPoints(data)
+
+  // Filter turning points to only include valid indices
+  const filteredTurningPoints = volumeFilterEnabled
+    ? allTurningPoints.filter(tp => validIndices.has(tp.index))
+    : allTurningPoints
 
   const candidates = []
   let maxTouchCount = 0
@@ -161,8 +195,8 @@ export const findBestChannels = (data, options = {}) => {
 
       const { slope, intercept, stdDev } = regression
 
-      // Get turning points within this segment
-      const segmentTurningPoints = allTurningPoints.filter(
+      // Get turning points within this segment (filtered by volume if enabled)
+      const segmentTurningPoints = filteredTurningPoints.filter(
         tp => tp.index >= startIdx && tp.index <= endIdx
       )
 
@@ -176,9 +210,18 @@ export const findBestChannels = (data, options = {}) => {
 
         // Check if at most 10% of points are outside bounds (allowing 90% inside)
         // Points within 5% tolerance of bounds are considered inside
+        // When volume filter is enabled, only count points with valid volume
         let pointsOutside = 0
+        let pointsConsidered = 0
         dataSegment.forEach((point, index) => {
           const x = startIdx + index
+
+          // Skip points filtered out by volume if enabled
+          if (volumeFilterEnabled && !validIndices.has(x)) {
+            return
+          }
+
+          pointsConsidered++
           const predictedY = slope * x + intercept
           const upperBound = predictedY + channelWidth
           const lowerBound = predictedY - channelWidth
@@ -192,7 +235,10 @@ export const findBestChannels = (data, options = {}) => {
           }
         })
 
-        const percentOutside = pointsOutside / dataSegment.length
+        // Skip if no points were considered
+        if (pointsConsidered === 0) continue
+
+        const percentOutside = pointsOutside / (volumeFilterEnabled ? pointsConsidered : dataSegment.length)
 
         // Only consider channels where at most 10% of data is outside bounds
         if (percentOutside > 0.1) continue

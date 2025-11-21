@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
-import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
+import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp, RefreshCw, Volume2 } from 'lucide-react'
 import PriceChart from './PriceChart'
 import IndicatorsChart from './IndicatorsChart'
 import SignalsList from './SignalsList'
@@ -118,6 +118,7 @@ function StockAnalyzer() {
         manualChannelEnabled: false,
         manualChannelDragMode: false,
         bestChannelEnabled: false,
+        bestChannelVolumeFilterEnabled: false,
         collapsed: false
       }
       setCharts(prevCharts => [...prevCharts, newChart])
@@ -352,6 +353,20 @@ function StockAnalyzer() {
           return {
             ...chart,
             bestChannelEnabled: !chart.bestChannelEnabled
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const toggleBestChannelVolumeFilter = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            bestChannelVolumeFilterEnabled: !chart.bestChannelVolumeFilterEnabled
           }
         }
         return chart
@@ -1314,6 +1329,20 @@ function StockAnalyzer() {
                     >
                       Best Channel
                     </button>
+                    {chart.bestChannelEnabled && (
+                      <button
+                        type="button"
+                        onClick={() => toggleBestChannelVolumeFilter(chart.id)}
+                        className={`px-2 py-1 text-sm rounded transition-colors ${
+                          chart.bestChannelVolumeFilterEnabled
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                        title="Volume Filter - Ignore data points with bottom 10% of volume"
+                      >
+                        <Volume2 className="w-4 h-4" />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => openSmaDialog(chart.id)}
@@ -1393,6 +1422,7 @@ function StockAnalyzer() {
                     manualChannelEnabled={chart.manualChannelEnabled}
                     manualChannelDragMode={chart.manualChannelDragMode}
                     bestChannelEnabled={chart.bestChannelEnabled}
+                    bestChannelVolumeFilterEnabled={chart.bestChannelVolumeFilterEnabled}
                     chartHeight={chartHeight}
                     days={days}
                     zoomRange={globalZoomRange}
