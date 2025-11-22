@@ -413,6 +413,11 @@ aws s3 website s3://stocktrendanalyzerfrontend --index-document index.html
 6) **Invalidate cache on updates**
    - After new uploads: `aws cloudfront create-invalidation --distribution-id <ID> --paths "/*"`.
 
+7) **Open the deployed frontend**
+   - In the CloudFront console, wait for the distribution status to show **Enabled** with a completed deployment, then copy the **Domain name** (e.g., `d123.cloudfront.net`).
+   - Browse to `https://<your-distribution-domain>` (or your custom domain if configured in Route 53/another DNS provider).
+   - If you temporarily exposed the S3 static website endpoint instead of CloudFront, the URL follows the pattern `http://stocktrendanalyzerfrontend.s3-website-<region>.amazonaws.com`, but prefer CloudFront for HTTPS and caching.
+
 ##### Rough monthly cost (typical small site)
 - **S3 storage/requests**: ~$0.03/GB-month storage, ~$0.005 per 1k PUT, ~$0.0004 per 1k GET (first 12 months often in free tier).
 - **CloudFront data out + requests**: e.g., ~$0.085/GB (US) + ~$0.0075 per 10k HTTP requests; prices vary by region/volume and drop with higher usage.
