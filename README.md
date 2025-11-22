@@ -352,14 +352,78 @@ cd frontend
 npm run build
 
 # Create S3 bucket
-aws s3 mb s3://stock-analyzer-frontend
+aws s3 mb s3://stocktrendanalyzerfrontend
 
 # Upload build
-aws s3 sync dist/ s3://stock-analyzer-frontend --delete
+aws s3 sync dist/ s3://stocktrendanalyzerfrontend --delete
 
 # Configure as website
-aws s3 website s3://stock-analyzer-frontend --index-document index.html
+aws s3 website s3://stocktrendanalyzerfrontend --index-document index.html
 ```
+
+#### Step-by-step: Deploy frontend on AWS (S3 + CloudFront) with cost notes
+1) **Build the site**
+   - `cd frontend && npm run build` → outputs to `dist/`.
+
+2) **Create and harden the S3 bucket (CLI or console)**
+   - CLI: `aws s3 mb s3://stocktrendanalyzerfrontend`
+   - In the AWS console → S3 → your bucket:
+     - **Block public access**: keep all four checkboxes enabled (default) so the bucket is private.
+     - **Default encryption**: enable SSE-S3 (free) to encrypt objects at rest.
+     - **Versioning** (optional): enable if you want rollback for uploaded files.
+     - **CORS**: add a simple rule if you need fonts/assets fetched cross-origin (e.g., `[{"AllowedOrigins":["*"],"AllowedMethods":["GET"],"AllowedHeaders":["*"]}]`).
+   - Because the bucket is private, you’ll serve it through CloudFront using an Origin Access Control (OAC) so only CloudFront can read the objects.
+
+3) **Upload the build**
+   - `aws s3 sync dist/ s3://stocktrendanalyzerfrontend --delete`
+   - Add `--cache-control "public, max-age=31536000, immutable"` for hashed assets if desired.
+
+4) **Provision CloudFront**
+   - In the AWS Console (or `aws cloudfront create-distribution`):
+     - Origin: your S3 bucket.
+     - Origin access: enable OAC (modern) or Origin Access Identity (legacy) and attach the generated bucket policy.
+       - Example OAC bucket policy stub (replace IDs/ARNs):
+         ```json
+         {
+           "Version": "2012-10-17",
+           "Statement": [
+             {
+               "Effect": "Allow",
+               "Principal": {"Service": "cloudfront.amazonaws.com"},
+               "Action": "s3:GetObject",
+               "Resource": "arn:aws:s3:::stocktrendanalyzerfrontend/*",
+               "Condition": {
+                 "StringEquals": {
+                   "AWS:SourceArn": "arn:aws:cloudfront::<account-id>:distribution/<distribution-id>"
+                 }
+               }
+             }
+           ]
+         }
+         ```
+     - Default root object: `index.html`.
+     - Viewer protocol policy: Redirect HTTP to HTTPS.
+   - After creation, note the CloudFront domain (e.g., `d123.cloudfront.net`).
+
+5) **(Optional) Set up a custom domain + HTTPS**
+   - Request a free TLS cert in ACM (us-east-1) for your domain.
+   - Attach the cert to the CloudFront distribution.
+   - In Route 53 (or your DNS), add a CNAME/ALIAS to the CloudFront domain.
+
+6) **Invalidate cache on updates**
+   - After new uploads: `aws cloudfront create-invalidation --distribution-id <ID> --paths "/*"`.
+
+7) **Open the deployed frontend**
+   - In the CloudFront console, wait for the distribution status to show **Enabled** with a completed deployment, then copy the **Domain name** (e.g., `d123.cloudfront.net`).
+   - Browse to `https://<your-distribution-domain>` (or your custom domain if configured in Route 53/another DNS provider).
+   - If you temporarily exposed the S3 static website endpoint instead of CloudFront, the URL follows the pattern `http://stocktrendanalyzerfrontend.s3-website-<region>.amazonaws.com`, but prefer CloudFront for HTTPS and caching.
+
+##### Rough monthly cost (typical small site)
+- **S3 storage/requests**: ~$0.03/GB-month storage, ~$0.005 per 1k PUT, ~$0.0004 per 1k GET (first 12 months often in free tier).
+- **CloudFront data out + requests**: e.g., ~$0.085/GB (US) + ~$0.0075 per 10k HTTP requests; prices vary by region/volume and drop with higher usage.
+- **ACM certificate**: $0 (public certs are free).
+- **Route 53 (optional)**: $0.50 per hosted zone/month + ~$0.40 per million queries.
+- **Example**: 5 GB stored, 50k requests, 50 GB data out in US regions ≈ S3 <$1 + CloudFront ~$4.50 + Route 53 ~$0.50 → around ~$6/month (before taxes/credits).
 
 #### Option 2: Netlify
 ```bash
@@ -383,6 +447,14 @@ npm install -g vercel
 # Deploy
 vercel --prod
 ```
+
+#### Frontend hosting comparison
+
+| Platform | Hosting model | CDN/Edge | HTTPS & domains | Deploy flow | When to choose |
+| --- | --- | --- | --- | --- | --- |
+| **AWS S3 + CloudFront** | Static site in S3, cached and served via CloudFront | Global CDN with fine-grained cache control | Automatic HTTPS via ACM on CloudFront; custom domains and path-based routing supported | `npm run build`, `aws s3 sync dist/ ...`, optional CloudFront cache invalidations | Best when you already use AWS, want tight control over caching, or need to colocate with other AWS services |
+| **Netlify** | Static hosting with serverless add-ons | Built-in CDN | Auto HTTPS and custom domains with simple DNS setup | `npm run build`, `netlify deploy --prod --dir=dist` (or connect repo for CI) | Fastest “click-to-deploy” for static sites and preview URLs; good for minimal AWS involvement |
+| **Vercel** | Static hosting plus edge functions | Edge network (Vercel Edge Network) | Auto HTTPS and custom domains; per-branch previews | `vercel --prod` (or connect repo for CI) | Great for teams that want instant previews and edge-function support without managing AWS |
 
 ### Backend Monitoring
 
