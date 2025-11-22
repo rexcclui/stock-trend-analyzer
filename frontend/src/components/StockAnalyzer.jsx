@@ -1114,7 +1114,7 @@ function StockAnalyzer() {
                           }`}
                         title="Highlight high volume (top 20%) and low volume (bottom 20%)"
                       >
-                        Volume Color
+                        Vol. Col
                       </button>
                       {chart.volumeColorEnabled && (
                         <button
@@ -1137,7 +1137,7 @@ function StockAnalyzer() {
                           }`}
                         title="Show horizontal volume profile"
                       >
-                        Volume Profile
+                        Vol. Prf
                       </button>
                       {chart.volumeProfileEnabled && (
                         <>
@@ -1334,7 +1334,7 @@ function StockAnalyzer() {
                       title="Configure Last Channel"
                     >
                       <Settings className="w-4 h-4" />
-                      Last Channel
+                      Last Ch
                     </button>
                     <button
                       type="button"
@@ -1345,7 +1345,7 @@ function StockAnalyzer() {
                         }`}
                       title="All Channels"
                     >
-                      All Channel
+                      All Ch
                     </button>
                     {chart.revAllChannelEnabled && (
                       <>
@@ -1387,7 +1387,7 @@ function StockAnalyzer() {
                         }`}
                       title="Manual Channel - Draw rectangle to select data range"
                     >
-                      Manual Channel
+                      Man Ch
                     </button>
                     {chart.manualChannelEnabled && (
                       <>
@@ -1464,7 +1464,7 @@ function StockAnalyzer() {
                         }`}
                       title="Market Gap Open - Highlight biggest gaps in SPY"
                     >
-                      Mkt Gap Open
+                      Mkt Gap Opn
                     </button>
                     {chart.mktGapOpenEnabled && (
                       <>
