@@ -361,6 +361,41 @@ aws s3 sync dist/ s3://stock-analyzer-frontend --delete
 aws s3 website s3://stock-analyzer-frontend --index-document index.html
 ```
 
+#### Step-by-step: Deploy frontend on AWS (S3 + CloudFront) with cost notes
+1) **Build the site**
+   - `cd frontend && npm run build` → outputs to `dist/`.
+
+2) **Create a private S3 bucket for static hosting**
+   - `aws s3 mb s3://<your-bucket>`
+   - (Optional, recommended) Block public access and serve via CloudFront Origin Access Control (OAC) instead of a public website endpoint.
+
+3) **Upload the build**
+   - `aws s3 sync dist/ s3://<your-bucket> --delete`
+   - Add `--cache-control "public, max-age=31536000, immutable"` for hashed assets if desired.
+
+4) **Provision CloudFront**
+   - In the AWS Console (or `aws cloudfront create-distribution`):
+     - Origin: your S3 bucket.
+     - Origin access: enable OAC (modern) or Origin Access Identity (legacy) and attach the generated bucket policy.
+     - Default root object: `index.html`.
+     - Viewer protocol policy: Redirect HTTP to HTTPS.
+   - After creation, note the CloudFront domain (e.g., `d123.cloudfront.net`).
+
+5) **(Optional) Set up a custom domain + HTTPS**
+   - Request a free TLS cert in ACM (us-east-1) for your domain.
+   - Attach the cert to the CloudFront distribution.
+   - In Route 53 (or your DNS), add a CNAME/ALIAS to the CloudFront domain.
+
+6) **Invalidate cache on updates**
+   - After new uploads: `aws cloudfront create-invalidation --distribution-id <ID> --paths "/*"`.
+
+##### Rough monthly cost (typical small site)
+- **S3 storage/requests**: ~$0.03/GB-month storage, ~$0.005 per 1k PUT, ~$0.0004 per 1k GET (first 12 months often in free tier).
+- **CloudFront data out + requests**: e.g., ~$0.085/GB (US) + ~$0.0075 per 10k HTTP requests; prices vary by region/volume and drop with higher usage.
+- **ACM certificate**: $0 (public certs are free).
+- **Route 53 (optional)**: $0.50 per hosted zone/month + ~$0.40 per million queries.
+- **Example**: 5 GB stored, 50k requests, 50 GB data out in US regions ≈ S3 <$1 + CloudFront ~$4.50 + Route 53 ~$0.50 → around ~$6/month (before taxes/credits).
+
 #### Option 2: Netlify
 ```bash
 cd frontend
