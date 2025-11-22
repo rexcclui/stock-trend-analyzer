@@ -352,13 +352,13 @@ cd frontend
 npm run build
 
 # Create S3 bucket
-aws s3 mb s3://stock-analyzer-frontend
+aws s3 mb s3://stocktrendanalyzerfrontend
 
 # Upload build
-aws s3 sync dist/ s3://stock-analyzer-frontend --delete
+aws s3 sync dist/ s3://stocktrendanalyzerfrontend --delete
 
 # Configure as website
-aws s3 website s3://stock-analyzer-frontend --index-document index.html
+aws s3 website s3://stocktrendanalyzerfrontend --index-document index.html
 ```
 
 #### Step-by-step: Deploy frontend on AWS (S3 + CloudFront) with cost notes
@@ -366,7 +366,7 @@ aws s3 website s3://stock-analyzer-frontend --index-document index.html
    - `cd frontend && npm run build` → outputs to `dist/`.
 
 2) **Create and harden the S3 bucket (CLI or console)**
-   - CLI: `aws s3 mb s3://<your-bucket>`
+   - CLI: `aws s3 mb s3://stocktrendanalyzerfrontend`
    - In the AWS console → S3 → your bucket:
      - **Block public access**: keep all four checkboxes enabled (default) so the bucket is private.
      - **Default encryption**: enable SSE-S3 (free) to encrypt objects at rest.
@@ -375,7 +375,7 @@ aws s3 website s3://stock-analyzer-frontend --index-document index.html
    - Because the bucket is private, you’ll serve it through CloudFront using an Origin Access Control (OAC) so only CloudFront can read the objects.
 
 3) **Upload the build**
-   - `aws s3 sync dist/ s3://<your-bucket> --delete`
+   - `aws s3 sync dist/ s3://stocktrendanalyzerfrontend --delete`
    - Add `--cache-control "public, max-age=31536000, immutable"` for hashed assets if desired.
 
 4) **Provision CloudFront**
@@ -391,7 +391,7 @@ aws s3 website s3://stock-analyzer-frontend --index-document index.html
                "Effect": "Allow",
                "Principal": {"Service": "cloudfront.amazonaws.com"},
                "Action": "s3:GetObject",
-               "Resource": "arn:aws:s3:::<your-bucket>/*",
+               "Resource": "arn:aws:s3:::stocktrendanalyzerfrontend/*",
                "Condition": {
                  "StringEquals": {
                    "AWS:SourceArn": "arn:aws:cloudfront::<account-id>:distribution/<distribution-id>"
