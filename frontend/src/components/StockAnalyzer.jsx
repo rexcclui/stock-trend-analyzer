@@ -121,6 +121,9 @@ function StockAnalyzer() {
         manualChannelDragMode: false,
         bestChannelEnabled: false,
         bestChannelVolumeFilterEnabled: false,
+        bestStdevEnabled: false,
+        bestStdevVolumeFilterEnabled: false,
+        bestStdevRefreshTrigger: 0,
         mktGapOpenEnabled: false,
         mktGapOpenCount: 5,
         mktGapOpenRefreshTrigger: 0,
@@ -390,6 +393,49 @@ function StockAnalyzer() {
           return {
             ...chart,
             bestChannelVolumeFilterEnabled: !chart.bestChannelVolumeFilterEnabled
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const toggleBestStdev = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            bestStdevEnabled: !chart.bestStdevEnabled
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const toggleBestStdevVolumeFilter = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            bestStdevVolumeFilterEnabled: !chart.bestStdevVolumeFilterEnabled,
+            bestStdevRefreshTrigger: (chart.bestStdevRefreshTrigger || 0) + 1
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const refreshBestStdev = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            bestStdevRefreshTrigger: (chart.bestStdevRefreshTrigger || 0) + 1
           }
         }
         return chart
@@ -1413,6 +1459,40 @@ function StockAnalyzer() {
                     )}
                     <button
                       type="button"
+                      onClick={() => toggleBestStdev(chart.id)}
+                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.bestStdevEnabled
+                        ? 'bg-amber-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                      title="Best Stdev - Find optimal constant stdev for all channels"
+                    >
+                      Best Std
+                    </button>
+                    {chart.bestStdevEnabled && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => refreshBestStdev(chart.id)}
+                          className="px-2 py-1 text-sm rounded font-medium transition-colors bg-slate-600 text-slate-200 hover:bg-slate-500"
+                          title="Refresh Best Stdev Channels"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleBestStdevVolumeFilter(chart.id)}
+                          className={`px-2 py-1 text-sm rounded transition-colors ${chart.bestStdevVolumeFilterEnabled
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            }`}
+                          title="Volume Filter - Ignore data points with bottom 10% of volume"
+                        >
+                          <Filter className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
                       onClick={() => toggleManualChannel(chart.id)}
                       className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.manualChannelEnabled
                         ? 'bg-green-600 text-white'
@@ -1653,6 +1733,9 @@ function StockAnalyzer() {
                     manualChannelDragMode={chart.manualChannelDragMode}
                     bestChannelEnabled={chart.bestChannelEnabled}
                     bestChannelVolumeFilterEnabled={chart.bestChannelVolumeFilterEnabled}
+                    bestStdevEnabled={chart.bestStdevEnabled}
+                    bestStdevVolumeFilterEnabled={chart.bestStdevVolumeFilterEnabled}
+                    bestStdevRefreshTrigger={chart.bestStdevRefreshTrigger}
                     mktGapOpenEnabled={chart.mktGapOpenEnabled}
                     mktGapOpenCount={chart.mktGapOpenCount}
                     mktGapOpenRefreshTrigger={chart.mktGapOpenRefreshTrigger}

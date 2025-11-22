@@ -3,7 +3,7 @@ import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 import { X, ArrowLeftRight, Hand } from 'lucide-react'
 import { findBestChannels, filterOverlappingChannels } from './PriceChart/utils/bestChannelFinder'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -18,6 +18,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // Store best channels
   const [bestChannels, setBestChannels] = useState([])
   const [bestChannelsVisibility, setBestChannelsVisibility] = useState({})
+
+  // Store best stdev channels
+  const [bestStdevChannels, setBestStdevChannels] = useState([])
+  const [bestStdevChannelsVisibility, setBestStdevChannelsVisibility] = useState({})
+  const [bestStdevValue, setBestStdevValue] = useState(null)
 
   // Store market gap open data
   const [mktGapOpenData, setMktGapOpenData] = useState([])
@@ -1144,6 +1149,286 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return (globalIndex - chronologicalStart) * direction
   }
 
+  // Find all channels with constant stdev by simulating different stdev values
+  // and choosing the one that maximizes total touching points across all channels
+  const findAllChannelsWithConstantStdev = (data, volumeFilterEnabled = false) => {
+    const minLookback = getInitialLookbackForPeriod(days)
+    if (!data || data.length < minLookback) return { channels: [], optimalStdev: 2.5 }
+
+    // Filter data by volume if enabled
+    let validIndices = new Set(data.map((_, idx) => idx))
+
+    if (volumeFilterEnabled) {
+      const volumes = data.map(d => d.volume || 0).filter(v => v > 0)
+      if (volumes.length > 0) {
+        const sortedVolumes = [...volumes].sort((a, b) => a - b)
+        const percentile10Index = Math.floor(sortedVolumes.length * 0.1)
+        const volumeThreshold = sortedVolumes[percentile10Index]
+
+        validIndices = new Set()
+        data.forEach((point, idx) => {
+          if ((point.volume || 0) > volumeThreshold) {
+            validIndices.add(idx)
+          }
+        })
+
+        if (validIndices.size < minLookback) {
+          validIndices = new Set(data.map((_, idx) => idx))
+        }
+      }
+    }
+
+    // Find turning points for the entire dataset
+    const findTurningPointsForData = (series) => {
+      const turningPoints = []
+      const windowSize = 3
+
+      for (let i = windowSize; i < series.length - windowSize; i++) {
+        const current = series[i].close
+        let isLocalMax = true
+        let isLocalMin = true
+
+        for (let j = -windowSize; j <= windowSize; j++) {
+          if (j === 0) continue
+          const compare = series[i + j].close
+          if (compare >= current) isLocalMax = false
+          if (compare <= current) isLocalMin = false
+        }
+
+        if (isLocalMax) {
+          turningPoints.push({ index: i, type: 'max', value: current })
+        } else if (isLocalMin) {
+          turningPoints.push({ index: i, type: 'min', value: current })
+        }
+      }
+
+      return turningPoints
+    }
+
+    const allTurningPoints = findTurningPointsForData(data)
+    const turningPoints = volumeFilterEnabled
+      ? allTurningPoints.filter(tp => validIndices.has(tp.index))
+      : allTurningPoints
+
+    // Function to find channels with a given constant stdev multiplier
+    const findChannelsWithStdev = (constantStdevMult) => {
+      const channels = []
+      let currentStartIndex = 0
+
+      while (currentStartIndex <= data.length - minLookback) {
+        const remainingLength = data.length - currentStartIndex
+        if (remainingLength < minLookback) break
+
+        let lookbackCount = minLookback
+        let channelBroken = false
+        let breakIndex = currentStartIndex + lookbackCount
+
+        // Calculate initial channel parameters
+        let currentSegment = data.slice(currentStartIndex, currentStartIndex + lookbackCount)
+
+        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
+        let n = 0
+
+        currentSegment.forEach((point, index) => {
+          const absoluteIndex = currentStartIndex + index
+          if (volumeFilterEnabled && !validIndices.has(absoluteIndex)) {
+            return
+          }
+          n++
+          sumX += index
+          sumY += point.close
+          sumXY += index * point.close
+          sumX2 += index * index
+        })
+
+        if (n < 2) {
+          currentStartIndex++
+          continue
+        }
+
+        let slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+        let intercept = (sumY - slope * sumX) / n
+
+        const distances = []
+        currentSegment.forEach((point, index) => {
+          const absoluteIndex = currentStartIndex + index
+          if (volumeFilterEnabled && !validIndices.has(absoluteIndex)) {
+            return
+          }
+          const predictedY = slope * index + intercept
+          distances.push(point.close - predictedY)
+        })
+
+        if (distances.length === 0) {
+          currentStartIndex++
+          continue
+        }
+
+        const meanDistance = distances.reduce((a, b) => a + b, 0) / distances.length
+        const variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
+        let stdDev = Math.sqrt(variance)
+
+        // Try to extend the lookback period
+        while (currentStartIndex + lookbackCount < data.length) {
+          const previousLookback = lookbackCount
+          const previous90Percent = Math.floor(previousLookback * 0.9)
+
+          lookbackCount++
+          const extendedSegment = data.slice(currentStartIndex, currentStartIndex + lookbackCount)
+
+          const channelWidth = stdDev * constantStdevMult
+          const boundRange = channelWidth * 2
+          const outsideTolerance = boundRange * 0.05
+          const newPoints = extendedSegment.slice(previous90Percent)
+          let pointsOutside = 0
+
+          newPoints.forEach((point, index) => {
+            const globalIndex = previous90Percent + index
+            const predictedY = slope * globalIndex + intercept
+            const upperBound = predictedY + channelWidth
+            const lowerBound = predictedY - channelWidth
+
+            if (point.close > upperBound + outsideTolerance || point.close < lowerBound - outsideTolerance) {
+              pointsOutside++
+            }
+          })
+
+          if (newPoints.length > 0 && pointsOutside / newPoints.length >= 0.08) {
+            channelBroken = true
+            breakIndex = currentStartIndex + previousLookback
+            lookbackCount = previousLookback
+            break
+          }
+
+          // Recalculate channel with extended data
+          sumX = 0
+          sumY = 0
+          sumXY = 0
+          sumX2 = 0
+          n = 0
+
+          extendedSegment.forEach((point, index) => {
+            const absoluteIndex = currentStartIndex + index
+            if (volumeFilterEnabled && !validIndices.has(absoluteIndex)) {
+              return
+            }
+            n++
+            sumX += index
+            sumY += point.close
+            sumXY += index * point.close
+            sumX2 += index * index
+          })
+
+          if (n < 2) break
+
+          slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+          intercept = (sumY - slope * sumX) / n
+
+          const newDistances = []
+          extendedSegment.forEach((point, index) => {
+            const absoluteIndex = currentStartIndex + index
+            if (volumeFilterEnabled && !validIndices.has(absoluteIndex)) {
+              return
+            }
+            const predictedY = slope * index + intercept
+            newDistances.push(point.close - predictedY)
+          })
+
+          if (newDistances.length === 0) break
+
+          const newMeanDistance = newDistances.reduce((a, b) => a + b, 0) / newDistances.length
+          const newVariance = newDistances.reduce((sum, d) => sum + Math.pow(d - newMeanDistance, 2), 0) / newDistances.length
+          stdDev = Math.sqrt(newVariance)
+        }
+
+        const channelSegment = data.slice(currentStartIndex, currentStartIndex + lookbackCount)
+        const channelWidth = stdDev * constantStdevMult
+        const channelTurningPoints = turningPoints.filter(tp => tp.index >= currentStartIndex && tp.index < currentStartIndex + lookbackCount)
+
+        // Calculate R²
+        const meanY = channelSegment.reduce((sum, p) => sum + p.close, 0) / channelSegment.length
+        let ssTotal = 0
+        let ssResidual = 0
+
+        channelSegment.forEach((point, index) => {
+          const predictedY = slope * index + intercept
+          ssTotal += Math.pow(point.close - meanY, 2)
+          ssResidual += Math.pow(point.close - predictedY, 2)
+        })
+
+        const rSquared = 1 - (ssResidual / ssTotal)
+
+        // Count touches to turning points
+        let touchCount = 0
+        const touchTolerance = 0.05
+        const boundRange = channelWidth * 2
+
+        channelTurningPoints.forEach(tp => {
+          const localIndex = tp.index - currentStartIndex
+          const predictedY = slope * localIndex + intercept
+          const upperBound = predictedY + channelWidth
+          const lowerBound = predictedY - channelWidth
+          const distanceToUpper = Math.abs(tp.value - upperBound)
+          const distanceToLower = Math.abs(tp.value - lowerBound)
+
+          // Upper bound: only count local peaks that are above midline
+          if (tp.type === 'max' && distanceToUpper <= boundRange * touchTolerance && tp.value >= predictedY) {
+            touchCount++
+          }
+          // Lower bound: only count local dips that are below midline
+          else if (tp.type === 'min' && distanceToLower <= boundRange * touchTolerance && tp.value <= predictedY) {
+            touchCount++
+          }
+        })
+
+        channels.push({
+          startIndex: currentStartIndex,
+          endIndex: currentStartIndex + lookbackCount - 1,
+          slope,
+          intercept,
+          channelWidth,
+          stdDev,
+          optimalStdevMult: constantStdevMult,
+          lookbackCount,
+          rSquared,
+          touchCount
+        })
+
+        if (channelBroken) {
+          currentStartIndex = breakIndex
+        } else {
+          currentStartIndex = currentStartIndex + lookbackCount
+        }
+      }
+
+      return channels
+    }
+
+    // Simulate different stdev multipliers from 1.2 to 4.0
+    const stdevMultipliers = []
+    for (let mult = 1.2; mult <= 4.0; mult += 0.1) {
+      stdevMultipliers.push(mult)
+    }
+
+    let bestTotalTouches = 0
+    let bestStdevMult = 2.5
+    let bestChannels = []
+
+    // Test each stdev multiplier and find the one with maximum total touches
+    stdevMultipliers.forEach(stdevMult => {
+      const channels = findChannelsWithStdev(stdevMult)
+      const totalTouches = channels.reduce((sum, channel) => sum + channel.touchCount, 0)
+
+      if (totalTouches > bestTotalTouches) {
+        bestTotalTouches = totalTouches
+        bestStdevMult = stdevMult
+        bestChannels = channels
+      }
+    })
+
+    return { channels: bestChannels, optimalStdev: bestStdevMult }
+  }
+
   // Effect to calculate reversed all channels when revAllChannelEnabled changes
   useEffect(() => {
     if (revAllChannelEnabled && prices.length > 0) {
@@ -1330,6 +1615,74 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       setBestChannelsVisibility({})
     }
   }, [bestChannelEnabled, bestChannelVolumeFilterEnabled, prices, indicators, days, zoomRange?.start, zoomRange?.end])
+
+  // Effect to calculate best stdev channels when bestStdevEnabled changes
+  useEffect(() => {
+    if (bestStdevEnabled && prices.length > 0) {
+      const dataLength = Math.min(prices.length, indicators.length)
+      const displayPrices = prices.slice(0, dataLength)
+      const totalLength = displayPrices.length
+
+      if (totalLength === 0) {
+        setBestStdevChannels([])
+        setBestStdevChannelsVisibility({})
+        setBestStdevValue(null)
+        return
+      }
+
+      const visibleStart = zoomRange?.start ?? 0
+      const visibleEnd = zoomRange?.end === null ? totalLength : Math.min(totalLength, zoomRange.end)
+
+      const startDisplayIndex = Math.max(0, totalLength - visibleEnd)
+      const endDisplayIndex = Math.min(totalLength - 1, totalLength - 1 - visibleStart)
+
+      const visibleSlice = displayPrices.slice(startDisplayIndex, endDisplayIndex + 1)
+      const visibleOldestToNewest = visibleSlice.slice().reverse()
+
+      if (visibleOldestToNewest.length < 2) {
+        setBestStdevChannels([])
+        setBestStdevChannelsVisibility({})
+        setBestStdevValue(null)
+        return
+      }
+
+      const { channels: foundChannelsLocal, optimalStdev } = findAllChannelsWithConstantStdev(visibleOldestToNewest, bestStdevVolumeFilterEnabled)
+
+      const adjustIndexToDisplay = (localIndex) => startDisplayIndex + (visibleOldestToNewest.length - 1 - localIndex)
+
+      const adjustedChannels = foundChannelsLocal.map(channel => {
+        const mappedStart = adjustIndexToDisplay(channel.startIndex)
+        const mappedEnd = adjustIndexToDisplay(channel.endIndex)
+
+        const chronologicalStartIndex = mappedStart
+        const chronologicalEndIndex = mappedEnd
+        const renderStartIndex = Math.min(mappedStart, mappedEnd)
+        const renderEndIndex = Math.max(mappedStart, mappedEnd)
+
+        return {
+          ...channel,
+          startIndex: renderStartIndex,
+          endIndex: renderEndIndex,
+          chronologicalStartIndex,
+          chronologicalEndIndex
+        }
+      })
+
+      setBestStdevChannels(adjustedChannels)
+      setBestStdevValue(optimalStdev)
+      setBestStdevChannelsVisibility(prev => {
+        const visibility = {}
+        adjustedChannels.forEach((_, index) => {
+          visibility[index] = prev[index] !== false
+        })
+        return visibility
+      })
+    } else {
+      setBestStdevChannels([])
+      setBestStdevChannelsVisibility({})
+      setBestStdevValue(null)
+    }
+  }, [bestStdevEnabled, prices, indicators, bestStdevRefreshTrigger, bestStdevVolumeFilterEnabled, zoomRange?.start, zoomRange?.end])
 
   // Calculate volume-weighted zone colors
   const calculateZoneColors = (data, channelInfo, numZones) => {
@@ -1921,6 +2274,22 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               dataPoint[`bestChannel${channelIndex}Zone${zoneIndex}Upper`] = zoneUpper
             })
           }
+        }
+      })
+    }
+
+    // Add best stdev channels data
+    if (bestStdevEnabled && bestStdevChannels.length > 0) {
+      bestStdevChannels.forEach((channel, channelIndex) => {
+        if (index >= channel.startIndex && index < channel.endIndex) {
+          const localIndex = getChannelLocalIndex(channel, index)
+          const midValue = channel.slope * localIndex + channel.intercept
+          const upperBound = midValue + channel.channelWidth
+          const lowerBound = midValue - channel.channelWidth
+
+          dataPoint[`bestStdevChannel${channelIndex}Upper`] = upperBound
+          dataPoint[`bestStdevChannel${channelIndex}Mid`] = midValue
+          dataPoint[`bestStdevChannel${channelIndex}Lower`] = lowerBound
         }
       })
     }
@@ -2849,6 +3218,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const isManualChannel = entry.dataKey.startsWith('manualChannel') && entry.dataKey.endsWith('Mid')
           const manualChannelIndex = isManualChannel ? parseInt(entry.dataKey.replace('manualChannel', '').replace('Mid', '')) : null
 
+          // Check if this is a best stdev channel line
+          const isBestStdevChannel = entry.dataKey.startsWith('bestStdevChannel') && entry.dataKey.endsWith('Mid')
+          const bestStdevChannelIndex = isBestStdevChannel ? parseInt(entry.dataKey.replace('bestStdevChannel', '').replace('Mid', '')) : null
+
           // Check if this is the main trend channel
           const isTrendLine = entry.dataKey === 'channelMid'
           const isTrendChannelPart = entry.dataKey === 'channelMid' || entry.dataKey === 'channelUpper' || entry.dataKey === 'channelLower'
@@ -2878,8 +3251,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             return null
           }
 
-          const isVisible = isSma ? smaVisibility[period] : (isAllChannel ? allChannelsVisibility[channelIndex] : (isRevAllChannel ? revAllChannelsVisibility[revChannelIndex] : (isTrendLine ? trendChannelVisible : true)))
-          const isClickable = isSma || isAllChannel || isRevAllChannel || isTrendLine
+          // Skip rendering bestStdevChannel upper/lower bounds in legend
+          if (entry.dataKey && (entry.dataKey.includes('bestStdevChannel') && (entry.dataKey.endsWith('Upper') || entry.dataKey.endsWith('Lower')))) {
+            return null
+          }
+
+          const isVisible = isSma ? smaVisibility[period] : (isAllChannel ? allChannelsVisibility[channelIndex] : (isRevAllChannel ? revAllChannelsVisibility[revChannelIndex] : (isBestStdevChannel ? bestStdevChannelsVisibility[bestStdevChannelIndex] : (isTrendLine ? trendChannelVisible : true))))
+          const isClickable = isSma || isAllChannel || isRevAllChannel || isBestStdevChannel || isTrendLine
 
           return (
             <div
@@ -2899,6 +3277,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                     setRevAllChannelsVisibility(prev => ({
                       ...prev,
                       [revChannelIndex]: !prev[revChannelIndex]
+                    }))
+                  } else if (isBestStdevChannel) {
+                    setBestStdevChannelsVisibility(prev => ({
+                      ...prev,
+                      [bestStdevChannelIndex]: !prev[bestStdevChannelIndex]
                     }))
                   } else if (isTrendLine) {
                     setTrendChannelVisible(!trendChannelVisible)
@@ -4843,6 +5226,57 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                     dot={false}
                     legendType="none"
                     strokeDasharray="3 3"
+                    opacity={0.7}
+                    hide={!isVisible}
+                  />
+                </React.Fragment>
+              )
+            })}
+
+            {/* Best Stdev Channel Lines */}
+            {bestStdevEnabled && bestStdevChannels.length > 0 && bestStdevChannels.map((channel, index) => {
+              // Color palette for best stdev channels (purple/magenta tones)
+              const channelColors = [
+                '#a855f7',  // Purple
+                '#d946ef',  // Fuchsia
+                '#c026d3',  // Magenta
+                '#e879f9',  // Light Purple
+                '#f0abfc',  // Pale Purple
+              ]
+              const channelColor = channelColors[index % channelColors.length]
+              const isVisible = bestStdevChannelsVisibility[index] !== false
+
+              return (
+                <React.Fragment key={`best-stdev-channel-${index}`}>
+                  <Line
+                    type="monotone"
+                    dataKey={`bestStdevChannel${index}Upper`}
+                    stroke={channelColor}
+                    strokeWidth={2}
+                    dot={false}
+                    legendType="none"
+                    strokeDasharray="4 4"
+                    opacity={0.7}
+                    hide={!isVisible}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey={`bestStdevChannel${index}Mid`}
+                    stroke={channelColor}
+                    strokeWidth={2.5}
+                    dot={false}
+                    name={`BStd${index + 1} (${channel.lookbackCount}pts, ${channel.touchCount} touches, ${bestStdevValue?.toFixed(2)}σ)`}
+                    strokeDasharray="4 4"
+                    hide={!isVisible}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey={`bestStdevChannel${index}Lower`}
+                    stroke={channelColor}
+                    strokeWidth={2}
+                    dot={false}
+                    legendType="none"
+                    strokeDasharray="4 4"
                     opacity={0.7}
                     hide={!isVisible}
                   />
