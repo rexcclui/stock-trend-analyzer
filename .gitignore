@@ -21,3 +21,4 @@ build/
 # Env / secrets
 .env
 *.local
+.history/
