@@ -21,6 +21,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Store best stdev channels
   const [bestStdevChannels, setBestStdevChannels] = useState([])
+  const [bestStdevChannelZones, setBestStdevChannelZones] = useState({})
   const [bestStdevChannelsVisibility, setBestStdevChannelsVisibility] = useState({})
   const [bestStdevValue, setBestStdevValue] = useState(null)
 
@@ -1293,7 +1294,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             }
           })
 
-          if (newPoints.length > 0 && pointsOutside / newPoints.length >= 0.08) {
+          if (newPoints.length > 0 && pointsOutside / newPoints.length >= 0.15) {
             channelBroken = true
             breakIndex = currentStartIndex + previousLookback
             lookbackCount = previousLookback
@@ -1668,6 +1669,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         }
       })
 
+      const bestStdevZones = calculateAllChannelZones(displayPrices, adjustedChannels, 5)
+      setBestStdevChannelZones(bestStdevZones)
+
       setBestStdevChannels(adjustedChannels)
       setBestStdevValue(optimalStdev)
       setBestStdevChannelsVisibility(prev => {
@@ -1679,6 +1683,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       })
     } else {
       setBestStdevChannels([])
+      setBestStdevChannelZones({})
       setBestStdevChannelsVisibility({})
       setBestStdevValue(null)
     }
@@ -2290,6 +2295,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           dataPoint[`bestStdevChannel${channelIndex}Upper`] = upperBound
           dataPoint[`bestStdevChannel${channelIndex}Mid`] = midValue
           dataPoint[`bestStdevChannel${channelIndex}Lower`] = lowerBound
+
+          // Add zone boundaries for this best stdev channel
+          if (bestStdevChannelZones[channelIndex]) {
+            const channelRange = upperBound - lowerBound
+            bestStdevChannelZones[channelIndex].forEach((zone, zoneIndex) => {
+              const zoneLower = lowerBound + channelRange * zone.zoneStart
+              const zoneUpper = lowerBound + channelRange * zone.zoneEnd
+              dataPoint[`bestStdevChannel${channelIndex}Zone${zoneIndex}Lower`] = zoneLower
+              dataPoint[`bestStdevChannel${channelIndex}Zone${zoneIndex}Upper`] = zoneUpper
+            })
+          }
         }
       })
     }
@@ -5259,6 +5275,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                     opacity={0.7}
                     hide={!isVisible}
                   />
+                  <Customized
+                    key={`best-stdev-channel-${index}-zones`}
+                    component={<CustomBestStdevZoneLines
+                      bestStdevChannels={bestStdevChannels}
+                      bestStdevChannelsVisibility={bestStdevChannelsVisibility}
+                      bestStdevChannelZones={bestStdevChannelZones}
+                    />}
+                  />
                   <Line
                     type="monotone"
                     dataKey={`bestStdevChannel${index}Mid`}
@@ -5482,8 +5506,118 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           </ComposedChart>
         </ResponsiveContainer>
       </div>
-
     </div>
+  )
+}
+
+// Custom component to render zone lines for best stdev channels
+const CustomBestStdevZoneLines = (props) => {
+  const { xAxisMap, yAxisMap, data, bestStdevChannels, bestStdevChannelsVisibility, bestStdevChannelZones } = props
+  const xAxis = xAxisMap?.[0]
+  const yAxis = yAxisMap?.[0]
+
+  if (!xAxis || !yAxis || !bestStdevChannels || !bestStdevChannelZones) return null
+
+  // Define color palette for best stdev channels (purple/magenta tones)
+  const channelColors = [
+    '#a855f7',  // Purple
+    '#d946ef',  // Fuchsia
+    '#c026d3',  // Magenta
+    '#e879f9',  // Light Purple
+    '#f0abfc',  // Pale Purple
+  ]
+
+  return (
+    <g>
+      {bestStdevChannels.map((channel, channelIndex) => {
+        const isVisible = bestStdevChannelsVisibility[channelIndex] !== false
+        if (!isVisible) return null
+
+        const channelColor = channelColors[channelIndex % channelColors.length]
+        const zones = bestStdevChannelZones[channelIndex]
+        if (!zones) return null
+
+        return zones.map((zone, zoneIndex) => {
+          const points = data.map((point) => {
+            const upper = point[`bestStdevChannel${channelIndex}Zone${zoneIndex}Upper`]
+            if (upper === undefined) return null
+
+            const x = xAxis.scale(point.date)
+            const y = yAxis.scale(upper)
+            return { x, y }
+          }).filter(p => p !== null)
+
+          if (points.length < 2) return null
+
+          // Create path for the zone boundary line
+          let pathData = `M ${points[0].x} ${points[0].y}`
+          for (let i = 1; i < points.length; i++) {
+            pathData += ` L ${points[i].x} ${points[i].y}`
+          }
+
+          // Opacity and color intensity based on volume weight: higher volume = more intense
+          const minOpacity = 0.3
+          const maxOpacity = 0.9
+          const opacity = minOpacity + (zone.volumeWeight * (maxOpacity - minOpacity))
+
+          // Parse the channel color and adjust lightness based on volume weight
+          // Higher volume = deeper/darker color
+          const colorMap = {
+            '#a855f7': 271, // Purple
+            '#d946ef': 300, // Fuchsia
+            '#c026d3': 295, // Magenta
+            '#e879f9': 292, // Light Purple
+            '#f0abfc': 291, // Pale Purple
+          }
+          const hue = colorMap[channelColor] || 271
+          const minLightness = 35 // Darker
+          const maxLightness = 65 // Lighter
+          const lightness = maxLightness - (zone.volumeWeight * (maxLightness - minLightness))
+          const color = `hsl(${hue}, 70%, ${lightness}%)`
+
+          const lastPoint = points[points.length - 1]
+
+          return (
+            <g key={`best-stdev-channel-${channelIndex}-zone-${zoneIndex}`}>
+              {/* Zone boundary line */}
+              <path
+                d={pathData}
+                fill="none"
+                stroke={color}
+                strokeWidth={1.5}
+                opacity={opacity}
+              />
+
+              {/* Volume percentage label at the end of the line */}
+              <g>
+                {/* Background rectangle for better readability */}
+                <rect
+                  x={lastPoint.x - 30}
+                  y={lastPoint.y - 8}
+                  width={25}
+                  height={16}
+                  fill="rgba(15, 23, 42, 0.85)"
+                  stroke={color}
+                  strokeWidth={0.5}
+                  rx={2}
+                />
+                <text
+                  x={lastPoint.x - 5}
+                  y={lastPoint.y}
+                  fill={`hsl(${hue}, 70%, ${Math.max(20, lightness - (zone.volumeWeight * 30))}%)`}
+                  fontSize="11"
+                  fontWeight={zone.volumeWeight > 0.3 ? "800" : "700"}
+                  textAnchor="end"
+                  dominantBaseline="middle"
+                >
+                  {(zone.volumeWeight * 100).toFixed(1)}%
+                </text>
+              </g>
+            </g>
+          )
+        })
+      })}
+    </g>
   )
 }
 
