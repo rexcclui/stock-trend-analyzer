@@ -365,9 +365,14 @@ aws s3 website s3://stock-analyzer-frontend --index-document index.html
 1) **Build the site**
    - `cd frontend && npm run build` → outputs to `dist/`.
 
-2) **Create a private S3 bucket for static hosting**
-   - `aws s3 mb s3://<your-bucket>`
-   - (Optional, recommended) Block public access and serve via CloudFront Origin Access Control (OAC) instead of a public website endpoint.
+2) **Create and harden the S3 bucket (CLI or console)**
+   - CLI: `aws s3 mb s3://<your-bucket>`
+   - In the AWS console → S3 → your bucket:
+     - **Block public access**: keep all four checkboxes enabled (default) so the bucket is private.
+     - **Default encryption**: enable SSE-S3 (free) to encrypt objects at rest.
+     - **Versioning** (optional): enable if you want rollback for uploaded files.
+     - **CORS**: add a simple rule if you need fonts/assets fetched cross-origin (e.g., `[{"AllowedOrigins":["*"],"AllowedMethods":["GET"],"AllowedHeaders":["*"]}]`).
+   - Because the bucket is private, you’ll serve it through CloudFront using an Origin Access Control (OAC) so only CloudFront can read the objects.
 
 3) **Upload the build**
    - `aws s3 sync dist/ s3://<your-bucket> --delete`
@@ -377,6 +382,25 @@ aws s3 website s3://stock-analyzer-frontend --index-document index.html
    - In the AWS Console (or `aws cloudfront create-distribution`):
      - Origin: your S3 bucket.
      - Origin access: enable OAC (modern) or Origin Access Identity (legacy) and attach the generated bucket policy.
+       - Example OAC bucket policy stub (replace IDs/ARNs):
+         ```json
+         {
+           "Version": "2012-10-17",
+           "Statement": [
+             {
+               "Effect": "Allow",
+               "Principal": {"Service": "cloudfront.amazonaws.com"},
+               "Action": "s3:GetObject",
+               "Resource": "arn:aws:s3:::<your-bucket>/*",
+               "Condition": {
+                 "StringEquals": {
+                   "AWS:SourceArn": "arn:aws:cloudfront::<account-id>:distribution/<distribution-id>"
+                 }
+               }
+             }
+           ]
+         }
+         ```
      - Default root object: `index.html`.
      - Viewer protocol policy: Redirect HTTP to HTTPS.
    - After creation, note the CloudFront domain (e.g., `d123.cloudfront.net`).
