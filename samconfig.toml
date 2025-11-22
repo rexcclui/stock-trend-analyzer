@@ -5,7 +5,6 @@ version = 0.1
 [default.deploy.parameters]
 stack_name = "stock-trend-analyzer"
 s3_prefix = "stock-trend-analyzer"
-region = "eu-west-1"
 confirm_changeset = true
 capabilities = "CAPABILITY_IAM"
 parameter_overrides = "FMPApiKey=\"YOUR_API_KEY_HERE\""
