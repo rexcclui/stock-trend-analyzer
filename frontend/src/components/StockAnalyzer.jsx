@@ -124,6 +124,9 @@ function StockAnalyzer() {
         mktGapOpenEnabled: false,
         mktGapOpenCount: 5,
         mktGapOpenRefreshTrigger: 0,
+        resLnEnabled: false,
+        resLnRange: 100,
+        resLnRefreshTrigger: 0,
         collapsed: false
       }
       setCharts(prevCharts => [newChart, ...prevCharts])
@@ -492,6 +495,36 @@ function StockAnalyzer() {
           return {
             ...chart,
             mktGapOpenRefreshTrigger: (chart.mktGapOpenRefreshTrigger || 0) + 1
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const toggleResLn = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart =>
+        chart.id === chartId ? { ...chart, resLnEnabled: !chart.resLnEnabled } : chart
+      )
+    )
+  }
+
+  const updateResLnRange = (chartId, range) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart =>
+        chart.id === chartId ? { ...chart, resLnRange: range } : chart
+      )
+    )
+  }
+
+  const refreshResLn = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            resLnRefreshTrigger: (chart.resLnRefreshTrigger || 0) + 1
           }
         }
         return chart
@@ -1491,6 +1524,56 @@ function StockAnalyzer() {
                     )}
                     <button
                       type="button"
+                      onClick={() => toggleResLn(chart.id)}
+                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.resLnEnabled
+                        ? 'bg-indigo-500 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                      title="Resistance Line - Plot rolling highest volume price level"
+                    >
+                      Res Ln
+                    </button>
+                    {chart.resLnEnabled && (
+                      <>
+                        <div className="flex items-center gap-2 bg-slate-700 rounded px-2 py-1" title={`Lookback Range: ${chart.resLnRange} days`}>
+                          <span className="text-xs text-slate-300">Rng</span>
+                          <input
+                            type="range"
+                            min="10"
+                            max="365"
+                            value={chart.resLnRange}
+                            onChange={(e) => updateResLnRange(chart.id, parseInt(e.target.value))}
+                            className="w-20 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                          />
+                          <span className="text-xs text-slate-300 w-6 text-right">{chart.resLnRange}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => refreshResLn(chart.id)}
+                          className="px-2 py-1 text-sm rounded transition-colors bg-slate-600 text-slate-200 hover:bg-slate-500"
+                          title="Recalculate based on visible data range"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </button>
+                        <div className="flex items-center gap-1 bg-slate-700 rounded px-2 py-1" title="Volume concentration in high-volume zone">
+                          <span className="text-xs text-slate-300">Vol%:</span>
+                          <div className="flex items-center gap-0.5">
+                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#ef4444' }} title="<5% - Minimal"></div>
+                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#fbbf24' }} title="5-8%"></div>
+                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#fb923c' }} title="8-12%"></div>
+                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#f97316' }} title="12-16%"></div>
+                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#eab308' }} title="16-20%"></div>
+                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#a3e635' }} title="20-25%"></div>
+                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#84cc16' }} title="25-30%"></div>
+                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#22c55e' }} title="30-40%"></div>
+                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#60a5fa' }} title="40-50%"></div>
+                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#3b82f6' }} title="50%+"></div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    <button
+                      type="button"
                       onClick={() => openSmaDialog(chart.id)}
                       className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
                       title="Configure SMA"
@@ -1574,6 +1657,9 @@ function StockAnalyzer() {
                     mktGapOpenCount={chart.mktGapOpenCount}
                     mktGapOpenRefreshTrigger={chart.mktGapOpenRefreshTrigger}
                     loadingMktGap={loadingMktGap[chart.id]}
+                    resLnEnabled={chart.resLnEnabled}
+                    resLnRange={chart.resLnRange}
+                    resLnRefreshTrigger={chart.resLnRefreshTrigger}
                     chartHeight={chartHeight}
                     days={days}
                     zoomRange={globalZoomRange}

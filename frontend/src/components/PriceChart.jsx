@@ -3,7 +3,7 @@ import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 import { X, ArrowLeftRight, Hand } from 'lucide-react'
 import { findBestChannels, filterOverlappingChannels } from './PriceChart/utils/bestChannelFinder'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -21,6 +21,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Store market gap open data
   const [mktGapOpenData, setMktGapOpenData] = useState([])
+  const [resLnData, setResLnData] = useState([])
 
   // Track main trend channel visibility
   const [trendChannelVisible, setTrendChannelVisible] = useState(true)
@@ -50,6 +51,232 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     setOptimizedLookbackCount(null)
     setOptimizedStdevMult(null)
   }, [slopeChannelVolumeWeighted])
+
+  // Calculate Resistance Line (Rolling POC)
+  useEffect(() => {
+    if (!resLnEnabled || !prices || prices.length === 0) {
+      setResLnData([])
+      return
+    }
+
+    const calculateResistanceLine = () => {
+      const totalPoints = prices.length
+      const zoomStart = zoomRange.start || 0
+      const zoomEnd = zoomRange.end === null ? totalPoints : zoomRange.end
+      const newestStartIndex = totalPoints - zoomEnd
+      const newestEndIndex = totalPoints - zoomStart
+
+      const visiblePrices = prices.slice(newestStartIndex, newestEndIndex)
+      const result = []
+
+      // Calculate chart range (highest - lowest price in entire visible chart)
+      let chartMinPrice = Infinity
+      let chartMaxPrice = -Infinity
+      visiblePrices.forEach(p => {
+        if (p.low < chartMinPrice) chartMinPrice = p.low
+        if (p.high > chartMaxPrice) chartMaxPrice = p.high
+      })
+      const chartRange = chartMaxPrice - chartMinPrice
+
+      visiblePrices.forEach((point, index) => {
+        const currentPriceIndex = newestStartIndex + index
+
+        // CRITICAL UNDERSTANDING:
+        // - prices array: index 0 = 2025-11-21 (newest), index 1255 = 2020-11-23 (oldest)
+        // - Chart display: LEFT = newest (2025), RIGHT = oldest (2020)
+        // - visiblePrices[0] = 2025-11-21 (leftmost on chart)
+        // - visiblePrices[1255] = 2020-11-23 (rightmost on chart)
+        //
+        // For a point at 2024-01-01 (somewhere in the middle):
+        // - To look BACK 100 days means looking at data from 2023-10-01 to 2023-12-31
+        // - Those OLDER dates have HIGHER indices in the prices array
+        // - So we look FORWARD in the array (higher indices)
+        //
+        // WAIT - this is still wrong! Let me reconsider...
+        //
+        // Actually, if we're at the RIGHTMOST point (2020-11-23, oldest date):
+        // - Looking back 100 days would mean data BEFORE 2020-11-23
+        // - But there IS NO data before 2020-11-23 in our dataset!
+        // - So for rightmost points, we should have NO lookback data
+        //
+        // If we're at the LEFTMOST point (2025-11-21, newest date):
+        // - Looking back 100 days means data from ~2025-08 to 2025-11-20
+        // - Those dates are OLDER (chronologically before 2025-11-21)
+        // - In the prices array, older dates have HIGHER indices
+        // - So we look at indices AFTER currentPriceIndex
+
+        const lookbackStartIndex = currentPriceIndex + 1 // Start after current point
+        const lookbackEndIndex = Math.min(currentPriceIndex + 1 + resLnRange, prices.length)
+        const lookbackData = prices.slice(lookbackStartIndex, lookbackEndIndex)
+
+        // If not enough historical data, use current price
+        if (lookbackData.length < 10) {
+          result.push({ date: point.date, highVolZone: point.close, volumePercent: 0 })
+          return
+        }
+
+        // Calculate volume profile for lookback window
+        // Find the overall price range across all candles in the window (zone range)
+        let minPrice = Infinity
+        let maxPrice = -Infinity
+        lookbackData.forEach(p => {
+          if (p.low < minPrice) minPrice = p.low
+          if (p.high > maxPrice) maxPrice = p.high
+        })
+
+        const zoneRange = maxPrice - minPrice
+
+        if (zoneRange === 0 || chartRange === 0) {
+          result.push({ date: point.date, highVolZone: point.close, volumePercent: 0 })
+          return
+        }
+
+        // Calculate number of zones based on price range ratio
+        // numZones = (zone range / chart range) / 0.05
+        const numZones = Math.max(5, Math.floor((zoneRange / chartRange) / 0.05))
+        const zoneHeight = zoneRange / numZones
+        const volumeZones = new Array(numZones).fill(0)
+
+        // Distribute each candle's volume across the zones it spans (from low to high)
+        lookbackData.forEach(candle => {
+          const volume = candle.volume || 0
+          const candleLow = candle.low
+          const candleHigh = candle.high
+
+          // Find which zones this candle spans
+          let startZone = Math.floor((candleLow - minPrice) / zoneHeight)
+          let endZone = Math.floor((candleHigh - minPrice) / zoneHeight)
+
+          // Clamp to valid range
+          startZone = Math.max(0, Math.min(numZones - 1, startZone))
+          endZone = Math.max(0, Math.min(numZones - 1, endZone))
+
+          // Distribute volume evenly across the zones this candle spans
+          const numZonesSpanned = endZone - startZone + 1
+          const volumePerZone = volume / numZonesSpanned
+
+          for (let z = startZone; z <= endZone; z++) {
+            volumeZones[z] += volumePerZone
+          }
+        })
+
+        // Find the zone with maximum volume
+        let maxVol = -1
+        let maxVolZoneIndex = 0
+        let totalVolume = 0
+
+        volumeZones.forEach((vol, idx) => {
+          totalVolume += vol
+          if (vol > maxVol) {
+            maxVol = vol
+            maxVolZoneIndex = idx
+          }
+        })
+
+        // Calculate the center price of the highest volume zone
+        const pocPrice = minPrice + (maxVolZoneIndex + 0.5) * zoneHeight
+
+        // Calculate volume percentage for this zone
+        const volumePercent = totalVolume > 0 ? (maxVol / totalVolume) * 100 : 0
+
+        // Find second and third volume zones based on current price position
+        let secondVolZone = null
+        let secondVolPercent = 0
+        let thirdVolZone = null
+        let thirdVolPercent = 0
+
+        // Determine if current price is above or below the POC
+        const currentPrice = point.close
+
+        if (currentPrice > pocPrice) {
+          // Current price is ABOVE POC (main line is below current price)
+          // Second zone: highest volume zone ABOVE the POC (further resistance)
+          let secondMaxVol = -1
+          let secondMaxVolZoneIndex = -1
+
+          volumeZones.forEach((vol, idx) => {
+            const zonePrice = minPrice + (idx + 0.5) * zoneHeight
+            if (zonePrice > pocPrice && vol > secondMaxVol) {
+              secondMaxVol = vol
+              secondMaxVolZoneIndex = idx
+            }
+          })
+
+          if (secondMaxVolZoneIndex >= 0) {
+            secondVolZone = minPrice + (secondMaxVolZoneIndex + 0.5) * zoneHeight
+            secondVolPercent = totalVolume > 0 ? (secondMaxVol / totalVolume) * 100 : 0
+          }
+
+          // Third zone: highest volume zone ABOVE current price (resistance on opposite side)
+          let thirdMaxVol = -1
+          let thirdMaxVolZoneIndex = -1
+
+          volumeZones.forEach((vol, idx) => {
+            const zonePrice = minPrice + (idx + 0.5) * zoneHeight
+            if (zonePrice > currentPrice && vol > thirdMaxVol) {
+              thirdMaxVol = vol
+              thirdMaxVolZoneIndex = idx
+            }
+          })
+
+          if (thirdMaxVolZoneIndex >= 0) {
+            thirdVolZone = minPrice + (thirdMaxVolZoneIndex + 0.5) * zoneHeight
+            thirdVolPercent = totalVolume > 0 ? (thirdMaxVol / totalVolume) * 100 : 0
+          }
+        } else {
+          // Current price is BELOW POC (main line is above current price)
+          // Second zone: highest volume zone BELOW the POC (further support)
+          let secondMaxVol = -1
+          let secondMaxVolZoneIndex = -1
+
+          volumeZones.forEach((vol, idx) => {
+            const zonePrice = minPrice + (idx + 0.5) * zoneHeight
+            if (zonePrice < pocPrice && vol > secondMaxVol) {
+              secondMaxVol = vol
+              secondMaxVolZoneIndex = idx
+            }
+          })
+
+          if (secondMaxVolZoneIndex >= 0) {
+            secondVolZone = minPrice + (secondMaxVolZoneIndex + 0.5) * zoneHeight
+            secondVolPercent = totalVolume > 0 ? (secondMaxVol / totalVolume) * 100 : 0
+          }
+
+          // Third zone: highest volume zone BELOW current price (support on opposite side)
+          let thirdMaxVol = -1
+          let thirdMaxVolZoneIndex = -1
+
+          volumeZones.forEach((vol, idx) => {
+            const zonePrice = minPrice + (idx + 0.5) * zoneHeight
+            if (zonePrice < currentPrice && vol > thirdMaxVol) {
+              thirdMaxVol = vol
+              thirdMaxVolZoneIndex = idx
+            }
+          })
+
+          if (thirdMaxVolZoneIndex >= 0) {
+            thirdVolZone = minPrice + (thirdMaxVolZoneIndex + 0.5) * zoneHeight
+            thirdVolPercent = totalVolume > 0 ? (thirdMaxVol / totalVolume) * 100 : 0
+          }
+        }
+
+        result.push({
+          date: point.date,
+          highVolZone: pocPrice,
+          volumePercent: volumePercent,
+          secondVolZone: secondVolZone,
+          secondVolPercent: secondVolPercent,
+          thirdVolZone: thirdVolZone,
+          thirdVolPercent: thirdVolPercent
+        })
+      })
+
+      setResLnData(result)
+    }
+
+    const timer = setTimeout(calculateResistanceLine, 10)
+    return () => clearTimeout(timer)
+  }, [resLnEnabled, resLnRange, prices, zoomRange, days, resLnRefreshTrigger])
 
   // Calculate Market Gap Open data
   useEffect(() => {
@@ -1698,6 +1925,19 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       })
     }
 
+    // Add resistance line data if enabled
+    if (resLnEnabled && resLnData.length > 0) {
+      const resLnPoint = resLnData.find(r => r.date === price.date)
+      if (resLnPoint) {
+        dataPoint.highVolZone = resLnPoint.highVolZone
+        dataPoint.volumePercent = resLnPoint.volumePercent
+        dataPoint.secondVolZone = resLnPoint.secondVolZone
+        dataPoint.secondVolPercent = resLnPoint.secondVolPercent
+        dataPoint.thirdVolZone = resLnPoint.thirdVolZone
+        dataPoint.thirdVolPercent = resLnPoint.thirdVolPercent
+      }
+    }
+
     return dataPoint
   }).reverse() // Show oldest to newest
 
@@ -1923,6 +2163,80 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             }
             return null
           })}
+
+          {/* Show Resistance Line info if enabled */}
+          {resLnEnabled && data.highVolZone && data.volumePercent !== undefined && (
+            <div className="mt-2 pt-2 border-t border-slate-600">
+              <p className="text-sm font-semibold text-slate-200">Volume Zones</p>
+
+              {/* Main high volume zone */}
+              <div className="mt-1">
+                <p className="text-xs text-slate-400">Primary Zone:</p>
+                <p className="text-sm text-slate-300">
+                  Price: ${data.highVolZone.toFixed(2)}
+                </p>
+                <p className="text-sm" style={{
+                  color: data.volumePercent >= 50 ? '#3b82f6' :
+                    data.volumePercent >= 40 ? '#60a5fa' :
+                      data.volumePercent >= 30 ? '#22c55e' :
+                        data.volumePercent >= 25 ? '#84cc16' :
+                          data.volumePercent >= 20 ? '#a3e635' :
+                            data.volumePercent >= 16 ? '#eab308' :
+                              data.volumePercent >= 12 ? '#f97316' :
+                                data.volumePercent >= 8 ? '#fb923c' :
+                                  data.volumePercent >= 5 ? '#fbbf24' : '#ef4444'
+                }}>
+                  Volume: {data.volumePercent.toFixed(1)}%
+                </p>
+              </div>
+
+              {/* Second volume zone */}
+              {data.secondVolZone && (
+                <div className="mt-1">
+                  <p className="text-xs text-slate-400">Secondary Zone:</p>
+                  <p className="text-sm text-slate-300">
+                    Price: ${data.secondVolZone.toFixed(2)}
+                  </p>
+                  <p className="text-sm" style={{
+                    color: data.secondVolPercent >= 50 ? '#3b82f6' :
+                      data.secondVolPercent >= 40 ? '#60a5fa' :
+                        data.secondVolPercent >= 30 ? '#22c55e' :
+                          data.secondVolPercent >= 25 ? '#84cc16' :
+                            data.secondVolPercent >= 20 ? '#a3e635' :
+                              data.secondVolPercent >= 16 ? '#eab308' :
+                                data.secondVolPercent >= 12 ? '#f97316' :
+                                  data.secondVolPercent >= 8 ? '#fb923c' :
+                                    data.secondVolPercent >= 5 ? '#fbbf24' : '#ef4444'
+                  }}>
+                    Volume: {data.secondVolPercent.toFixed(1)}%
+                  </p>
+                </div>
+              )}
+
+              {/* Third volume zone */}
+              {data.thirdVolZone && (
+                <div className="mt-1">
+                  <p className="text-xs text-slate-400">Tertiary Zone:</p>
+                  <p className="text-sm text-slate-300">
+                    Price: ${data.thirdVolZone.toFixed(2)}
+                  </p>
+                  <p className="text-sm" style={{
+                    color: data.thirdVolPercent >= 50 ? '#3b82f6' :
+                      data.thirdVolPercent >= 40 ? '#60a5fa' :
+                        data.thirdVolPercent >= 30 ? '#22c55e' :
+                          data.thirdVolPercent >= 25 ? '#84cc16' :
+                            data.thirdVolPercent >= 20 ? '#a3e635' :
+                              data.thirdVolPercent >= 16 ? '#eab308' :
+                                data.thirdVolPercent >= 12 ? '#f97316' :
+                                  data.thirdVolPercent >= 8 ? '#fb923c' :
+                                    data.thirdVolPercent >= 5 ? '#fbbf24' : '#ef4444'
+                  }}>
+                    Volume: {data.thirdVolPercent.toFixed(1)}%
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )
     }
@@ -2773,6 +3087,253 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Use visible chart data directly (zones are now added during chartData creation)
   const chartDataWithZones = visibleChartData
+
+  // Custom component to render colored resistance line based on volume percentage
+  const CustomResistanceLine = (props) => {
+    if (!resLnEnabled) return null
+
+    const { xAxisMap, yAxisMap } = props
+    const xAxis = xAxisMap?.[0]
+    const yAxis = yAxisMap?.[0]
+
+    if (!xAxis || !yAxis) return null
+
+    // Helper function to get color based on volume percentage
+    // Color scheme: Red (low) > Green (medium) > Blue (high)
+    const getVolumeColor = (volumePercent) => {
+      if (volumePercent >= 50) return '#3b82f6'  // Blue - very high (50%+)
+      if (volumePercent >= 40) return '#60a5fa'  // Light blue - high (40-50%)
+      if (volumePercent >= 30) return '#22c55e'  // Green - medium-high (30-40%)
+      if (volumePercent >= 25) return '#84cc16'  // Lime - medium (25-30%)
+      if (volumePercent >= 20) return '#a3e635'  // Light lime (20-25%)
+      if (volumePercent >= 16) return '#eab308'  // Yellow (16-20%)
+      if (volumePercent >= 12) return '#f97316'  // Orange (12-16%)
+      if (volumePercent >= 8) return '#fb923c'   // Light orange (8-12%)
+      if (volumePercent >= 5) return '#fbbf24'   // Amber (5-8%)
+      return '#ef4444' // Red - minimal (<5%)
+    }
+
+    // Build line segments with different colors
+    const segments = []
+    let currentSegment = null
+
+    chartDataWithZones.forEach((point, index) => {
+      if (!point.highVolZone || point.volumePercent === undefined) return
+
+      const x = xAxis.scale(point.date)
+      const y = yAxis.scale(point.highVolZone)
+      const color = getVolumeColor(point.volumePercent)
+
+      if (!currentSegment || currentSegment.color !== color) {
+        // Start a new segment
+        if (currentSegment) {
+          segments.push(currentSegment)
+        }
+        currentSegment = {
+          color,
+          points: [{ x, y, volumePercent: point.volumePercent }]
+        }
+      } else {
+        // Continue current segment
+        currentSegment.points.push({ x, y, volumePercent: point.volumePercent })
+      }
+    })
+
+    // Push the last segment
+    if (currentSegment) {
+      segments.push(currentSegment)
+    }
+
+    return (
+      <g>
+        {segments.map((segment, segmentIndex) => {
+          if (segment.points.length < 2) return null
+
+          // Create path for this segment
+          let pathData = `M ${segment.points[0].x} ${segment.points[0].y}`
+          for (let i = 1; i < segment.points.length; i++) {
+            pathData += ` L ${segment.points[i].x} ${segment.points[i].y}`
+          }
+
+          return (
+            <path
+              key={`res-ln-segment-${segmentIndex}`}
+              d={pathData}
+              stroke={segment.color}
+              strokeWidth={2}
+              strokeDasharray="5 5"
+              fill="none"
+              opacity={0.9}
+            />
+          )
+        })}
+      </g>
+    )
+  }
+
+  // Custom component to render second volume zone line
+  const CustomSecondVolZoneLine = (props) => {
+    if (!resLnEnabled) return null
+
+    const { xAxisMap, yAxisMap } = props
+    const xAxis = xAxisMap?.[0]
+    const yAxis = yAxisMap?.[0]
+
+    if (!xAxis || !yAxis) return null
+
+    // Helper function to get color (same as main line but with transparency)
+    const getVolumeColor = (volumePercent) => {
+      if (volumePercent >= 50) return '#3b82f6'
+      if (volumePercent >= 40) return '#60a5fa'
+      if (volumePercent >= 30) return '#22c55e'
+      if (volumePercent >= 25) return '#84cc16'
+      if (volumePercent >= 20) return '#a3e635'
+      if (volumePercent >= 16) return '#eab308'
+      if (volumePercent >= 12) return '#f97316'
+      if (volumePercent >= 8) return '#fb923c'
+      if (volumePercent >= 5) return '#fbbf24'
+      return '#ef4444'
+    }
+
+    // Build line segments with different colors
+    const segments = []
+    let currentSegment = null
+
+    chartDataWithZones.forEach((point, index) => {
+      if (!point.secondVolZone || point.secondVolPercent === undefined) return
+
+      const x = xAxis.scale(point.date)
+      const y = yAxis.scale(point.secondVolZone)
+      const color = getVolumeColor(point.secondVolPercent)
+
+      if (!currentSegment || currentSegment.color !== color) {
+        // Start a new segment
+        if (currentSegment) {
+          segments.push(currentSegment)
+        }
+        currentSegment = {
+          color,
+          points: [{ x, y, volumePercent: point.secondVolPercent }]
+        }
+      } else {
+        // Continue current segment
+        currentSegment.points.push({ x, y, volumePercent: point.secondVolPercent })
+      }
+    })
+
+    // Push the last segment
+    if (currentSegment) {
+      segments.push(currentSegment)
+    }
+
+    return (
+      <g>
+        {segments.map((segment, segmentIndex) => {
+          if (segment.points.length < 2) return null
+
+          // Create path for this segment
+          let pathData = `M ${segment.points[0].x} ${segment.points[0].y}`
+          for (let i = 1; i < segment.points.length; i++) {
+            pathData += ` L ${segment.points[i].x} ${segment.points[i].y}`
+          }
+
+          return (
+            <path
+              key={`second-vol-zone-segment-${segmentIndex}`}
+              d={pathData}
+              stroke={segment.color}
+              strokeWidth={1.5}
+              strokeDasharray="3 3"
+              fill="none"
+              opacity={0.6}
+            />
+          )
+        })}
+      </g>
+    )
+  }
+
+  // Custom component to render third volume zone line
+  const CustomThirdVolZoneLine = (props) => {
+    if (!resLnEnabled) return null
+
+    const { xAxisMap, yAxisMap } = props
+    const xAxis = xAxisMap?.[0]
+    const yAxis = yAxisMap?.[0]
+
+    if (!xAxis || !yAxis) return null
+
+    // Helper function to get color (same as main line)
+    const getVolumeColor = (volumePercent) => {
+      if (volumePercent >= 50) return '#3b82f6'
+      if (volumePercent >= 40) return '#60a5fa'
+      if (volumePercent >= 30) return '#22c55e'
+      if (volumePercent >= 25) return '#84cc16'
+      if (volumePercent >= 20) return '#a3e635'
+      if (volumePercent >= 16) return '#eab308'
+      if (volumePercent >= 12) return '#f97316'
+      if (volumePercent >= 8) return '#fb923c'
+      if (volumePercent >= 5) return '#fbbf24'
+      return '#ef4444'
+    }
+
+    // Build line segments with different colors
+    const segments = []
+    let currentSegment = null
+
+    chartDataWithZones.forEach((point, index) => {
+      if (!point.thirdVolZone || point.thirdVolPercent === undefined) return
+
+      const x = xAxis.scale(point.date)
+      const y = yAxis.scale(point.thirdVolZone)
+      const color = getVolumeColor(point.thirdVolPercent)
+
+      if (!currentSegment || currentSegment.color !== color) {
+        // Start a new segment
+        if (currentSegment) {
+          segments.push(currentSegment)
+        }
+        currentSegment = {
+          color,
+          points: [{ x, y, volumePercent: point.thirdVolPercent }]
+        }
+      } else {
+        // Continue current segment
+        currentSegment.points.push({ x, y, volumePercent: point.thirdVolPercent })
+      }
+    })
+
+    // Push the last segment
+    if (currentSegment) {
+      segments.push(currentSegment)
+    }
+
+    return (
+      <g>
+        {segments.map((segment, segmentIndex) => {
+          if (segment.points.length < 2) return null
+
+          // Create path for this segment
+          let pathData = `M ${segment.points[0].x} ${segment.points[0].y}`
+          for (let i = 1; i < segment.points.length; i++) {
+            pathData += ` L ${segment.points[i].x} ${segment.points[i].y}`
+          }
+
+          return (
+            <path
+              key={`third-vol-zone-segment-${segmentIndex}`}
+              d={pathData}
+              stroke={segment.color}
+              strokeWidth={1}
+              strokeDasharray="2 4"
+              fill="none"
+              opacity={0.5}
+            />
+          )
+        })}
+      </g>
+    )
+  }
 
   // Custom component to render zone lines with labels
   const CustomZoneLines = (props) => {
@@ -4475,6 +5036,15 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 />
               )
             })}
+
+            {/* Resistance Line - Color-coded by volume percentage */}
+            <Customized component={CustomResistanceLine} />
+
+            {/* Second Volume Zone Line - Support/Resistance in same direction */}
+            <Customized component={CustomSecondVolZoneLine} />
+
+            {/* Third Volume Zone Line - Support/Resistance in opposite direction */}
+            <Customized component={CustomThirdVolZoneLine} />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
