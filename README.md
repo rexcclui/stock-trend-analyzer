@@ -384,6 +384,14 @@ npm install -g vercel
 vercel --prod
 ```
 
+#### Frontend hosting comparison
+
+| Platform | Hosting model | CDN/Edge | HTTPS & domains | Deploy flow | When to choose |
+| --- | --- | --- | --- | --- | --- |
+| **AWS S3 + CloudFront** | Static site in S3, cached and served via CloudFront | Global CDN with fine-grained cache control | Automatic HTTPS via ACM on CloudFront; custom domains and path-based routing supported | `npm run build`, `aws s3 sync dist/ ...`, optional CloudFront cache invalidations | Best when you already use AWS, want tight control over caching, or need to colocate with other AWS services |
+| **Netlify** | Static hosting with serverless add-ons | Built-in CDN | Auto HTTPS and custom domains with simple DNS setup | `npm run build`, `netlify deploy --prod --dir=dist` (or connect repo for CI) | Fastest “click-to-deploy” for static sites and preview URLs; good for minimal AWS involvement |
+| **Vercel** | Static hosting plus edge functions | Edge network (Vercel Edge Network) | Auto HTTPS and custom domains; per-branch previews | `vercel --prod` (or connect repo for CI) | Great for teams that want instant previews and edge-function support without managing AWS |
+
 ### Backend Monitoring
 
 View Lambda logs:
