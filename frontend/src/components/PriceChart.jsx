@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, Customized } from 'recharts'
+import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, ReferenceDot, Customized } from 'recharts'
 import { X, ArrowLeftRight, Hand } from 'lucide-react'
 import { findBestChannels, filterOverlappingChannels } from './PriceChart/utils/bestChannelFinder'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -18,6 +18,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // Store best channels
   const [bestChannels, setBestChannels] = useState([])
   const [bestChannelsVisibility, setBestChannelsVisibility] = useState({})
+
+  // Store market gap open data
+  const [mktGapOpenData, setMktGapOpenData] = useState([])
 
   // Track main trend channel visibility
   const [trendChannelVisible, setTrendChannelVisible] = useState(true)
@@ -47,6 +50,87 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     setOptimizedLookbackCount(null)
     setOptimizedStdevMult(null)
   }, [slopeChannelVolumeWeighted])
+
+  // Calculate Market Gap Open data
+  useEffect(() => {
+    if (!mktGapOpenEnabled || !spyData || !spyData.prices || spyData.prices.length === 0) {
+      setMktGapOpenData([])
+      return
+    }
+
+    // Determine visible range in Newest-First indices
+    // zoomRange is based on Oldest-First data (chartData)
+    // prices is Newest-First
+    // chartData[i] corresponds to prices[total - 1 - i]
+
+    const totalPoints = prices.length
+    const zoomStart = zoomRange.start || 0
+    const zoomEnd = zoomRange.end === null ? totalPoints : zoomRange.end // exclusive end index in chartData
+
+    // Convert to Newest-First indices
+    // The range [zoomStart, zoomEnd) in chartData corresponds to:
+    // prices indices from (total - zoomEnd) to (total - zoomStart)
+    // Example: Total 100. Zoom [80, 100] (Last 20). 
+    // Newest indices: [100-100, 100-80] = [0, 20].
+
+    const newestStartIndex = totalPoints - zoomEnd
+    const newestEndIndex = totalPoints - zoomStart
+
+    console.log(`[MktGap] DEBUG: Period=${days}, Zoom=[${zoomStart}, ${zoomEnd}], NewestIndices=[${newestStartIndex}, ${newestEndIndex}]`)
+
+    // Get visible dates from the main chart data
+    // prices is NEWEST FIRST, so indices match
+    const visiblePrices = prices.slice(newestStartIndex, newestEndIndex)
+    if (visiblePrices.length === 0) {
+      console.log('[MktGap] No visible prices found')
+      return
+    }
+
+    const visibleDates = new Set(visiblePrices.map(p => p.date))
+    console.log(`[MktGap] Visible dates count: ${visibleDates.size}. First: ${visiblePrices[0].date}, Last: ${visiblePrices[visiblePrices.length - 1].date}`)
+
+    // Filter SPY data to match visible dates
+    // SPY data should also be NEWEST FIRST
+    const spyPrices = spyData.prices
+
+    // Calculate gaps for SPY
+    const gaps = []
+
+    // We need previous close, so we iterate up to length - 1
+    for (let i = 0; i < spyPrices.length - 1; i++) {
+      const currentDay = spyPrices[i]
+      const prevDay = spyPrices[i + 1]
+
+      // Only consider if this date is visible on the main chart
+      if (!visibleDates.has(currentDay.date)) continue
+
+      const gap = Math.abs(currentDay.open - prevDay.close)
+      const changePercentVal = (currentDay.close - prevDay.close) / prevDay.close * 100
+      const changePercent = changePercentVal.toFixed(2)
+      const isGapUp = currentDay.open > prevDay.close
+
+      gaps.push({
+        date: currentDay.date,
+        gap: gap,
+        changePercent: changePercent,
+        isGapUp: isGapUp,
+        symbol: 'SPY' // Hardcoded for now as we use SPY data
+      })
+    }
+
+    console.log(`[MktGap] Found ${gaps.length} gaps within visible range. Top gap: ${gaps.length > 0 ? gaps[0].gap : 'N/A'}`)
+    if (gaps.length > 0) {
+      console.log('[MktGap] Top 3 gaps details:')
+      gaps.slice(0, 3).forEach((g, i) => {
+        console.log(`  ${i + 1}. Date: ${g.date}, Gap: ${g.gap.toFixed(4)}, Change: ${g.changePercent}%, Open: ${spyPrices.find(p => p.date === g.date)?.open}, PrevClose: ${spyPrices.find(p => p.date === g.date)?.close}`) // Note: PrevClose logic in loop was correct, just logging current close for reference
+      })
+    }
+    // Sort by gap size (descending) and take top N
+    const topGaps = gaps.sort((a, b) => b.gap - a.gap).slice(0, mktGapOpenCount)
+
+    setMktGapOpenData(topGaps)
+
+  }, [mktGapOpenEnabled, mktGapOpenCount, mktGapOpenRefreshTrigger, spyData, zoomRange, prices])
 
   // Calculate SMA for a given period
   const calculateSMA = (data, period) => {
@@ -103,182 +187,111 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     } else {
       // Run optimization to find best parameters with trend-breaking logic
       const findBestChannel = (startingLookback = null) => {
-      // If user manually set a lookback, use it as starting point; otherwise use 100
-      const defaultMinPoints = Math.min(100, data.length)
-      const minPoints = startingLookback ? Math.min(startingLookback, data.length) : defaultMinPoints
-      const maxPoints = data.length // Always test up to 100% of available data
+        // If user manually set a lookback, use it as starting point; otherwise use 100
+        const defaultMinPoints = Math.min(100, data.length)
+        const minPoints = startingLookback ? Math.min(startingLookback, data.length) : defaultMinPoints
+        const maxPoints = data.length // Always test up to 100% of available data
 
-      // Test stdev multipliers from 1 to 4 with 0.1 increments for finer control
-      const stdevMultipliers = []
-      for (let mult = 1.0; mult <= 4.0; mult += 0.1) {
-        stdevMultipliers.push(mult)
-      }
-
-      const maxOutsidePercent = 0.05 // 5% maximum outside threshold
-      const trendBreakThreshold = 0.1 // Break if >10% of the newest data is outside
-
-      // Start with minimum lookback and try to extend
-      let currentCount = minPoints
-      let currentStdevMult = 2.5
-      let currentTouchCount = 0
-      let channelBroken = false
-
-      // Helper function to find optimal stdev for a given dataset
-      const findOptimalStdev = (includedPoints, slope, intercept, stdDev) => {
-        // Extract turning points from included points
-        const dataPoints = includedPoints.map(ip => ip.point)
-        const turningPoints = []
-        const windowSize = 3
-
-        for (let i = windowSize; i < dataPoints.length - windowSize; i++) {
-          const current = dataPoints[i].close
-          let isLocalMax = true
-          let isLocalMin = true
-
-          for (let j = -windowSize; j <= windowSize; j++) {
-            if (j === 0) continue
-            const compare = dataPoints[i + j].close
-            if (compare >= current) isLocalMax = false
-            if (compare <= current) isLocalMin = false
-          }
-
-          if (isLocalMax) {
-            turningPoints.push({ index: includedPoints[i].originalIndex, type: 'max', value: current })
-          } else if (isLocalMin) {
-            turningPoints.push({ index: includedPoints[i].originalIndex, type: 'min', value: current })
-          }
+        // Test stdev multipliers from 1 to 4 with 0.1 increments for finer control
+        const stdevMultipliers = []
+        for (let mult = 1.0; mult <= 4.0; mult += 0.1) {
+          stdevMultipliers.push(mult)
         }
 
-        for (const stdevMult of stdevMultipliers) {
-          const channelWidth = stdDev * stdevMult
-          let outsideCount = 0
-          let touchCount = 0
-          const touchTolerance = 0.025
-          const n = includedPoints.length
-          const boundRange = channelWidth * 2
+        const maxOutsidePercent = 0.05 // 5% maximum outside threshold
+        const trendBreakThreshold = 0.1 // Break if >10% of the newest data is outside
 
-          includedPoints.forEach(({ point, originalIndex }) => {
-            const predictedY = slope * originalIndex + intercept
-            const upperBound = predictedY + channelWidth
-            const lowerBound = predictedY - channelWidth
+        // Start with minimum lookback and try to extend
+        let currentCount = minPoints
+        let currentStdevMult = 2.5
+        let currentTouchCount = 0
+        let channelBroken = false
 
-            if (point.close > upperBound || point.close < lowerBound) {
-              outsideCount++
+        // Helper function to find optimal stdev for a given dataset
+        const findOptimalStdev = (includedPoints, slope, intercept, stdDev) => {
+          // Extract turning points from included points
+          const dataPoints = includedPoints.map(ip => ip.point)
+          const turningPoints = []
+          const windowSize = 3
+
+          for (let i = windowSize; i < dataPoints.length - windowSize; i++) {
+            const current = dataPoints[i].close
+            let isLocalMax = true
+            let isLocalMin = true
+
+            for (let j = -windowSize; j <= windowSize; j++) {
+              if (j === 0) continue
+              const compare = dataPoints[i + j].close
+              if (compare >= current) isLocalMax = false
+              if (compare <= current) isLocalMin = false
             }
-          })
 
-          // Count touches only from turning points with correct type
-          turningPoints.forEach(tp => {
-            const predictedY = slope * tp.index + intercept
-            const upperBound = predictedY + channelWidth
-            const lowerBound = predictedY - channelWidth
-            const distanceToUpper = Math.abs(tp.value - upperBound)
-            const distanceToLower = Math.abs(tp.value - lowerBound)
-
-            // Upper bound: only count local peaks (max) that are above midline
-            // Lower bound: only count local dips (min) that are below midline
-            if (tp.type === 'max' && distanceToUpper <= boundRange * touchTolerance && tp.value >= predictedY) {
-              touchCount++
-            } else if (tp.type === 'min' && distanceToLower <= boundRange * touchTolerance && tp.value <= predictedY) {
-              touchCount++
+            if (isLocalMax) {
+              turningPoints.push({ index: includedPoints[i].originalIndex, type: 'max', value: current })
+            } else if (isLocalMin) {
+              turningPoints.push({ index: includedPoints[i].originalIndex, type: 'min', value: current })
             }
-          })
-
-          const outsidePercent = outsideCount / n
-
-          // If this meets criteria, return it (first valid one = minimum stdev)
-          if (outsidePercent <= maxOutsidePercent) {
-            return { stdevMult, touchCount, valid: true }
           }
+
+          for (const stdevMult of stdevMultipliers) {
+            const channelWidth = stdDev * stdevMult
+            let outsideCount = 0
+            let touchCount = 0
+            const touchTolerance = 0.025
+            const n = includedPoints.length
+            const boundRange = channelWidth * 2
+
+            includedPoints.forEach(({ point, originalIndex }) => {
+              const predictedY = slope * originalIndex + intercept
+              const upperBound = predictedY + channelWidth
+              const lowerBound = predictedY - channelWidth
+
+              if (point.close > upperBound || point.close < lowerBound) {
+                outsideCount++
+              }
+            })
+
+            // Count touches only from turning points with correct type
+            turningPoints.forEach(tp => {
+              const predictedY = slope * tp.index + intercept
+              const upperBound = predictedY + channelWidth
+              const lowerBound = predictedY - channelWidth
+              const distanceToUpper = Math.abs(tp.value - upperBound)
+              const distanceToLower = Math.abs(tp.value - lowerBound)
+
+              // Upper bound: only count local peaks (max) that are above midline
+              // Lower bound: only count local dips (min) that are below midline
+              if (tp.type === 'max' && distanceToUpper <= boundRange * touchTolerance && tp.value >= predictedY) {
+                touchCount++
+              } else if (tp.type === 'min' && distanceToLower <= boundRange * touchTolerance && tp.value <= predictedY) {
+                touchCount++
+              }
+            })
+
+            const outsidePercent = outsideCount / n
+
+            // If this meets criteria, return it (first valid one = minimum stdev)
+            if (outsidePercent <= maxOutsidePercent) {
+              return { stdevMult, touchCount, valid: true }
+            }
+          }
+
+          return { stdevMult: 2.5, touchCount: 0, valid: false }
         }
 
-        return { stdevMult: 2.5, touchCount: 0, valid: false }
-      }
-
-      // Start with minimum lookback period
-      let testData = data.slice(0, currentCount)
-      let includedPoints = testData
-        .map((point, index) => ({ point, originalIndex: index }))
-        .filter(({ point }) => shouldIncludePoint(point))
-
-      if (includedPoints.length < 10) {
-        return { count: minPoints, stdevMultiplier: 2.5, touches: 0 }
-      }
-
-      // Calculate initial channel parameters
-      let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
-      let n = includedPoints.length
-
-      includedPoints.forEach(({ point, originalIndex }) => {
-        sumX += originalIndex
-        sumY += point.close
-        sumXY += originalIndex * point.close
-        sumX2 += originalIndex * originalIndex
-      })
-
-      let slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
-      let intercept = (sumY - slope * sumX) / n
-
-      let distances = includedPoints.map(({ point, originalIndex }) => {
-        const predictedY = slope * originalIndex + intercept
-        return point.close - predictedY
-      })
-
-      let meanDistance = distances.reduce((a, b) => a + b, 0) / distances.length
-      let variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
-      let stdDev = Math.sqrt(variance)
-
-      // Find optimal stdev for initial period
-      const initialResult = findOptimalStdev(includedPoints, slope, intercept, stdDev)
-      if (!initialResult.valid) {
-        return { count: minPoints, stdevMultiplier: 2.5, touches: 0 }
-      }
-
-      currentStdevMult = initialResult.stdevMult
-      currentTouchCount = initialResult.touchCount
-
-      // Try to extend the lookback period
-      for (let count = currentCount + 1; count <= maxPoints; count++) {
-        const previousCount = count - 1
-        const previous80Percent = Math.floor(previousCount * 0.8)
-
-        // Get extended data
-        testData = data.slice(0, count)
-        includedPoints = testData
+        // Start with minimum lookback period
+        let testData = data.slice(0, currentCount)
+        let includedPoints = testData
           .map((point, index) => ({ point, originalIndex: index }))
           .filter(({ point }) => shouldIncludePoint(point))
 
-        if (includedPoints.length < 10) continue
-
-        // Check if new 20% of data (older historical data) fits within current channel
-        const newDataPoints = includedPoints.filter(({ originalIndex }) => originalIndex >= previous80Percent)
-        const channelWidth = stdDev * currentStdevMult
-        const boundRange = channelWidth * 2
-        const outsideTolerance = boundRange * 0.05
-
-        let pointsOutside = 0
-        newDataPoints.forEach(({ point, originalIndex }) => {
-          const predictedY = slope * originalIndex + intercept
-          const upperBound = predictedY + channelWidth
-          const lowerBound = predictedY - channelWidth
-
-          if (point.close > upperBound + outsideTolerance || point.close < lowerBound - outsideTolerance) {
-            pointsOutside++
-          }
-        })
-
-        // If most of the new data is outside, break the trend
-        if (newDataPoints.length > 0 && pointsOutside / newDataPoints.length > trendBreakThreshold) {
-          channelBroken = true
-          break
+        if (includedPoints.length < 10) {
+          return { count: minPoints, stdevMultiplier: 2.5, touches: 0 }
         }
 
-        // Recalculate channel with extended data
-        sumX = 0
-        sumY = 0
-        sumXY = 0
-        sumX2 = 0
-        n = includedPoints.length
+        // Calculate initial channel parameters
+        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
+        let n = includedPoints.length
 
         includedPoints.forEach(({ point, originalIndex }) => {
           sumX += originalIndex
@@ -287,33 +300,104 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           sumX2 += originalIndex * originalIndex
         })
 
-        slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
-        intercept = (sumY - slope * sumX) / n
+        let slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+        let intercept = (sumY - slope * sumX) / n
 
-        distances = includedPoints.map(({ point, originalIndex }) => {
+        let distances = includedPoints.map(({ point, originalIndex }) => {
           const predictedY = slope * originalIndex + intercept
           return point.close - predictedY
         })
 
-        meanDistance = distances.reduce((a, b) => a + b, 0) / distances.length
-        variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
-        stdDev = Math.sqrt(variance)
+        let meanDistance = distances.reduce((a, b) => a + b, 0) / distances.length
+        let variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
+        let stdDev = Math.sqrt(variance)
 
-        // Find optimal stdev for extended period
-        const extendedResult = findOptimalStdev(includedPoints, slope, intercept, stdDev)
-        if (!extendedResult.valid) {
-          // Can't find valid channel with extended data, stop here
-          channelBroken = true
-          break
+        // Find optimal stdev for initial period
+        const initialResult = findOptimalStdev(includedPoints, slope, intercept, stdDev)
+        if (!initialResult.valid) {
+          return { count: minPoints, stdevMultiplier: 2.5, touches: 0 }
         }
 
-        // Update current best parameters
-        currentCount = count
-        currentStdevMult = extendedResult.stdevMult
-        currentTouchCount = extendedResult.touchCount
-      }
+        currentStdevMult = initialResult.stdevMult
+        currentTouchCount = initialResult.touchCount
 
-      return { count: currentCount, stdevMultiplier: currentStdevMult, touches: currentTouchCount }
+        // Try to extend the lookback period
+        for (let count = currentCount + 1; count <= maxPoints; count++) {
+          const previousCount = count - 1
+          const previous80Percent = Math.floor(previousCount * 0.8)
+
+          // Get extended data
+          testData = data.slice(0, count)
+          includedPoints = testData
+            .map((point, index) => ({ point, originalIndex: index }))
+            .filter(({ point }) => shouldIncludePoint(point))
+
+          if (includedPoints.length < 10) continue
+
+          // Check if new 20% of data (older historical data) fits within current channel
+          const newDataPoints = includedPoints.filter(({ originalIndex }) => originalIndex >= previous80Percent)
+          const channelWidth = stdDev * currentStdevMult
+          const boundRange = channelWidth * 2
+          const outsideTolerance = boundRange * 0.05
+
+          let pointsOutside = 0
+          newDataPoints.forEach(({ point, originalIndex }) => {
+            const predictedY = slope * originalIndex + intercept
+            const upperBound = predictedY + channelWidth
+            const lowerBound = predictedY - channelWidth
+
+            if (point.close > upperBound + outsideTolerance || point.close < lowerBound - outsideTolerance) {
+              pointsOutside++
+            }
+          })
+
+          // If most of the new data is outside, break the trend
+          if (newDataPoints.length > 0 && pointsOutside / newDataPoints.length > trendBreakThreshold) {
+            channelBroken = true
+            break
+          }
+
+          // Recalculate channel with extended data
+          sumX = 0
+          sumY = 0
+          sumXY = 0
+          sumX2 = 0
+          n = includedPoints.length
+
+          includedPoints.forEach(({ point, originalIndex }) => {
+            sumX += originalIndex
+            sumY += point.close
+            sumXY += originalIndex * point.close
+            sumX2 += originalIndex * originalIndex
+          })
+
+          slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+          intercept = (sumY - slope * sumX) / n
+
+          distances = includedPoints.map(({ point, originalIndex }) => {
+            const predictedY = slope * originalIndex + intercept
+            return point.close - predictedY
+          })
+
+          meanDistance = distances.reduce((a, b) => a + b, 0) / distances.length
+          variance = distances.reduce((sum, d) => sum + Math.pow(d - meanDistance, 2), 0) / distances.length
+          stdDev = Math.sqrt(variance)
+
+          // Find optimal stdev for extended period
+          const extendedResult = findOptimalStdev(includedPoints, slope, intercept, stdDev)
+          if (!extendedResult.valid) {
+            // Can't find valid channel with extended data, stop here
+            channelBroken = true
+            break
+          }
+
+          // Update current best parameters
+          currentCount = count
+          currentStdevMult = extendedResult.stdevMult
+          currentTouchCount = extendedResult.touchCount
+        }
+
+        return { count: currentCount, stdevMultiplier: currentStdevMult, touches: currentTouchCount }
       }
 
       // Find best channel parameters (lookback count and stdev multiplier)
@@ -666,8 +750,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           }
 
           if (touchCount > 0 &&
-              percentWithinBounds >= 0.8 &&
-              touchCount > bestTouchCount) {
+            percentWithinBounds >= 0.8 &&
+            touchCount > bestTouchCount) {
             bestTouchCount = touchCount
             bestStdevMult = stdevMult
           }
@@ -779,7 +863,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const distanceToLower = Math.abs(tp.value - lowerBound)
 
         if ((tp.type === 'max' && distanceToUpper <= boundRange * touchTolerance) ||
-            (tp.type === 'min' && distanceToLower <= boundRange * touchTolerance)) {
+          (tp.type === 'min' && distanceToLower <= boundRange * touchTolerance)) {
           touchCount++
         }
       })
@@ -2287,7 +2371,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const distToLower = Math.abs(actualY - lowerBound) / (upperBound - lowerBound)
 
       if ((tp.type === 'max' && distToUpper <= touchTolerance) ||
-          (tp.type === 'min' && distToLower <= touchTolerance)) {
+        (tp.type === 'min' && distToLower <= touchTolerance)) {
         hasTurningPointTouch = true
         break
       }
@@ -2506,9 +2590,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                     setTrendChannelVisible(!trendChannelVisible)
                   }
                 }}
-                className={`flex items-center gap-2 ${
-                  isClickable ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
-                }`}
+                className={`flex items-center gap-2 ${isClickable ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
+                  }`}
                 disabled={!isClickable}
               >
                 <div
@@ -2631,8 +2714,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   title={controlsVisible ? "Hide controls" : "Show controls"}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="3"/>
-                    <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24"/>
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24" />
                   </svg>
                   {controlsVisible ? 'Hide' : 'Controls'}
                 </button>
@@ -3597,8 +3680,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                       fill={volumeWeight > 0.7
                         ? `hsl(45, 100%, ${85 - (volumeWeight * 25)}%)` // High volume: bright yellow to orange
                         : volumeWeight > 0.4
-                        ? `hsl(0, 0%, ${95 - (volumeWeight * 20)}%)` // Medium volume: white to light gray
-                        : `hsl(200, 30%, ${70 + (volumeWeight * 20)}%)` // Low volume: light blue-gray
+                          ? `hsl(0, 0%, ${95 - (volumeWeight * 20)}%)` // Medium volume: white to light gray
+                          : `hsl(200, 30%, ${70 + (volumeWeight * 20)}%)` // Low volume: light blue-gray
                       }
                       fontSize="11"
                       fontWeight="700"
@@ -3712,7 +3795,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               title="Hide controls"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 6L6 18M6 6l12 12"/>
+                <path d="M18 6L6 18M6 6l12 12" />
               </svg>
             </button>
           </div>
@@ -3879,446 +3962,521 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         paddingTop: revAllChannelEnabled && revAllVisibleLength > 1 ? '42px' : '0'
       }}>
         <ResponsiveContainer>
-        <ComposedChart
-          data={chartDataWithZones}
-          margin={{ top: 5, right: 0, left: 20, bottom: 5 }}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={handleMouseLeave}
-          onMouseDown={handleMouseDown}
-          onMouseUp={handleMouseUp}
-        >
-          <defs>
-            {slopeChannelEnabled && zoneColors.map((zone, index) => (
-              <linearGradient key={`gradient-${index}`} id={`zoneGradient-${index}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={zone.color} stopOpacity={0.4} />
-                <stop offset="100%" stopColor={zone.color} stopOpacity={0.2} />
-              </linearGradient>
-            ))}
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
-          <XAxis
-            dataKey="date"
-            tick={<CustomXAxisTick />}
-            interval={Math.floor(chartDataWithZones.length / 10)}
-            stroke="#475569"
-          />
-          <YAxis domain={['auto', 'auto']} tick={{ fill: '#94a3b8' }} stroke="#475569" />
-          <Tooltip content={<CustomTooltip />} />
-          <Legend content={<CustomLegend />} />
-          {syncedMouseDate && (
-            <ReferenceLine
-              x={syncedMouseDate}
-              stroke="#94a3b8"
-              strokeWidth={1}
-              strokeDasharray="3 3"
+          <ComposedChart
+            data={chartDataWithZones}
+            margin={{ top: 5, right: 0, left: 20, bottom: 5 }}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
+          >
+            <defs>
+              {slopeChannelEnabled && zoneColors.map((zone, index) => (
+                <linearGradient key={`gradient-${index}`} id={`zoneGradient-${index}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={zone.color} stopOpacity={0.4} />
+                  <stop offset="100%" stopColor={zone.color} stopOpacity={0.2} />
+                </linearGradient>
+              ))}
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
+            <XAxis
+              dataKey="date"
+              tick={<CustomXAxisTick />}
+              interval={Math.floor(chartDataWithZones.length / 10)}
+              stroke="#475569"
             />
-          )}
+            <YAxis domain={['auto', 'auto']} tick={{ fill: '#94a3b8' }} stroke="#475569" />
+            <Tooltip content={<CustomTooltip />} />
+            <Legend content={<CustomLegend />} />
+            {syncedMouseDate && (
+              <ReferenceLine
+                x={syncedMouseDate}
+                stroke="#94a3b8"
+                strokeWidth={1}
+                strokeDasharray="3 3"
+              />
+            )}
 
-          {/* Last Channel Zones as Parallel Lines */}
-          <Customized component={CustomZoneLines} />
+            {/* Last Channel Zones as Parallel Lines */}
+            <Customized component={CustomZoneLines} />
 
-          {/* Last Channel Stdev Label */}
-          <Customized component={CustomSlopeChannelLabel} />
+            {/* Last Channel Stdev Label */}
+            <Customized component={CustomSlopeChannelLabel} />
 
-          {/* All Channels Zones as Parallel Lines */}
-          <Customized component={CustomRevAllChannelZoneLines} />
+            {/* All Channels Zones as Parallel Lines */}
+            <Customized component={CustomRevAllChannelZoneLines} />
 
-          {/* All Channels Stdev Labels at Lower Bound Midpoint */}
-          <Customized component={CustomRevAllChannelStdevLabels} />
+            {/* All Channels Stdev Labels at Lower Bound Midpoint */}
+            <Customized component={CustomRevAllChannelStdevLabels} />
 
-          {/* Manual Channel Zones as Parallel Lines */}
-          <Customized component={CustomManualChannelZoneLines} />
+            {/* Manual Channel Zones as Parallel Lines */}
+            <Customized component={CustomManualChannelZoneLines} />
 
-          {/* Manual Channel Stdev Labels */}
-          <Customized component={CustomManualChannelLabels} />
+            {/* Manual Channel Stdev Labels */}
+            <Customized component={CustomManualChannelLabels} />
 
-          {/* Best Channel Zones as Parallel Lines */}
-          <Customized component={CustomBestChannelZoneLines} />
+            {/* Best Channel Zones as Parallel Lines */}
+            <Customized component={CustomBestChannelZoneLines} />
 
-          {/* Best Channel Stdev Labels */}
-          <Customized component={CustomBestChannelStdevLabels} />
+            {/* Best Channel Stdev Labels */}
+            <Customized component={CustomBestChannelStdevLabels} />
 
-          {/* Volume Profile Horizontal Bars */}
-          <Customized component={CustomVolumeProfile} />
+            {/* Volume Profile Horizontal Bars */}
+            <Customized component={CustomVolumeProfile} />
 
-          {/* Manual Channel Selection Rectangle */}
-          {manualChannelEnabled && manualChannelDragMode && isSelecting && selectionStart && selectionEnd && (
-            <Customized component={(props) => {
-              const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
-              if (!xAxisMap || !yAxisMap) return null
+            {/* Manual Channel Selection Rectangle */}
+            {manualChannelEnabled && manualChannelDragMode && isSelecting && selectionStart && selectionEnd && (
+              <Customized component={(props) => {
+                const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
+                if (!xAxisMap || !yAxisMap) return null
 
-              const xAxis = xAxisMap[0]
-              const yAxis = yAxisMap[0]
+                const xAxis = xAxisMap[0]
+                const yAxis = yAxisMap[0]
 
-              if (!xAxis || !yAxis) return null
+                if (!xAxis || !yAxis) return null
 
-              const startX = xAxis.scale(selectionStart)
-              const endX = xAxis.scale(selectionEnd)
+                const startX = xAxis.scale(selectionStart)
+                const endX = xAxis.scale(selectionEnd)
 
-              if (startX === undefined || endX === undefined) return null
+                if (startX === undefined || endX === undefined) return null
 
-              const x = Math.min(startX, endX)
-              const width = Math.abs(endX - startX)
-              const y = offset.top
-              const height = offset.height
+                const x = Math.min(startX, endX)
+                const width = Math.abs(endX - startX)
+                const y = offset.top
+                const height = offset.height
+
+                return (
+                  <rect
+                    x={x}
+                    y={y}
+                    width={width}
+                    height={height}
+                    fill="rgba(34, 197, 94, 0.2)"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                  />
+                )
+              }} />
+            )}
+
+            {/* Volume Profile Manual Selection Rectangle */}
+            {volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && volumeProfileSelectionStart && volumeProfileSelectionEnd && (
+              <Customized component={(props) => {
+                const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
+                if (!xAxisMap || !yAxisMap) return null
+
+                const xAxis = xAxisMap[0]
+                const yAxis = yAxisMap[0]
+
+                if (!xAxis || !yAxis) return null
+
+                const startX = xAxis.scale(volumeProfileSelectionStart)
+                const endX = xAxis.scale(volumeProfileSelectionEnd)
+
+                if (startX === undefined || endX === undefined) return null
+
+                const x = Math.min(startX, endX)
+                const width = Math.abs(endX - startX)
+                const y = offset.top
+                const height = offset.height
+
+                return (
+                  <rect
+                    x={x}
+                    y={y}
+                    width={width}
+                    height={height}
+                    fill="rgba(147, 51, 234, 0.2)"
+                    stroke="#9333ea"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                  />
+                )
+              }} />
+            )}
+
+            {/* Last Channel Lines */}
+            {slopeChannelEnabled && slopeChannelInfo && (
+              <>
+                <Line
+                  type="monotone"
+                  dataKey="channelUpper"
+                  stroke="#10b981"
+                  strokeWidth={1.5}
+                  dot={false}
+                  name={`Upper (+${slopeChannelInfo.optimalStdevMult.toFixed(2)}σ)`}
+                  strokeDasharray="3 3"
+                  legendType="none"
+                  hide={!trendChannelVisible}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="channelMid"
+                  stroke="#3b82f6"
+                  strokeWidth={1.5}
+                  dot={false}
+                  name={`Trend${slopeChannelVolumeWeighted ? ' (Vol-Weighted)' : ''} (${slopeChannelInfo.recentDataCount}pts, ${slopeChannelInfo.touchCount} touches, R²=${(slopeChannelInfo.rSquared * 100).toFixed(1)}%)`}
+                  strokeDasharray="3 3"
+                  hide={!trendChannelVisible}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="channelLower"
+                  stroke="#ef4444"
+                  strokeWidth={1.5}
+                  dot={false}
+                  name={`Lower (-${slopeChannelInfo.optimalStdevMult.toFixed(2)}σ)`}
+                  strokeDasharray="3 3"
+                  legendType="none"
+                  hide={!trendChannelVisible}
+                />
+              </>
+            )}
+
+            {/* All Channels Lines */}
+            {revAllChannelEnabled && revAllChannels.length > 0 && revAllChannels.map((channel, index) => {
+              // Define distinct colors for each channel - using single color per channel for consistency
+              const channelColors = [
+                '#3b82f6',  // Blue
+                '#8b5cf6',  // Purple
+                '#f59e0b',  // Amber
+                '#10b981',  // Green
+                '#06b6d4',  // Cyan
+                '#f97316',  // Orange
+                '#ec4899',  // Pink
+                '#84cc16',  // Lime
+              ]
+              const channelColor = channelColors[index % channelColors.length]
+              const isVisible = revAllChannelsVisibility[index] !== false
 
               return (
-                <rect
-                  x={x}
-                  y={y}
-                  width={width}
-                  height={height}
-                  fill="rgba(34, 197, 94, 0.2)"
+                <React.Fragment key={`rev-channel-${index}`}>
+                  <Line
+                    type="monotone"
+                    dataKey={`revAllChannel${index}Upper`}
+                    stroke={channelColor}
+                    strokeWidth={1.5}
+                    dot={false}
+                    legendType="none"
+                    strokeDasharray="5 5"
+                    opacity={0.6}
+                    hide={!isVisible}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey={`revAllChannel${index}Mid`}
+                    stroke={channelColor}
+                    strokeWidth={2}
+                    dot={false}
+                    name={`Rev${index + 1}`}
+                    strokeDasharray="5 5"
+                    opacity={1.0}
+                    hide={!isVisible}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey={`revAllChannel${index}Lower`}
+                    stroke={channelColor}
+                    strokeWidth={1.5}
+                    dot={false}
+                    legendType="none"
+                    strokeDasharray="5 5"
+                    opacity={0.6}
+                    hide={!isVisible}
+                  />
+                </React.Fragment>
+              )
+            })}
+
+            {/* Manual Channel Lines */}
+            {manualChannelEnabled && manualChannels.length > 0 && manualChannels.map((channel, index) => {
+              // Color palette for manual channels (various green shades)
+              const channelColors = [
+                '#22c55e',  // Green
+                '#10b981',  // Emerald
+                '#14b8a6',  // Teal
+                '#84cc16',  // Lime
+                '#059669',  // Deep green
+              ]
+              const channelColor = channelColors[index % channelColors.length]
+
+              return (
+                <React.Fragment key={`manual-channel-${index}`}>
+                  <Line
+                    type="monotone"
+                    dataKey={`manualChannel${index}Upper`}
+                    stroke={channelColor}
+                    strokeWidth={2}
+                    dot={false}
+                    name={`Manual ${index + 1} Upper (+${channel.optimalStdevMult.toFixed(2)}σ)`}
+                    strokeDasharray="5 5"
+                    opacity={0.7}
+                    legendType="none"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey={`manualChannel${index}Mid`}
+                    stroke={channelColor}
+                    strokeWidth={2.5}
+                    dot={false}
+                    name={`Manual Channel ${index + 1} (${channel.endIndex - channel.startIndex + 1}pts, ${channel.touchCount} touches, R²=${(channel.rSquared * 100).toFixed(1)}%)`}
+                    strokeDasharray="5 5"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey={`manualChannel${index}Lower`}
+                    stroke={channelColor}
+                    strokeWidth={2}
+                    dot={false}
+                    name={`Manual ${index + 1} Lower (-${channel.optimalStdevMult.toFixed(2)}σ)`}
+                    strokeDasharray="5 5"
+                    opacity={0.7}
+                    legendType="none"
+                  />
+                </React.Fragment>
+              )
+            })}
+
+            {/* Best Channel Lines */}
+            {bestChannelEnabled && bestChannels.length > 0 && bestChannels.map((channel, index) => {
+              // Color palette for best channels (warm colors - orange/yellow tones)
+              const channelColors = [
+                '#f59e0b',  // Amber
+                '#f97316',  // Orange
+                '#eab308',  // Yellow
+                '#fb923c',  // Light Orange
+                '#fbbf24',  // Light Amber
+              ]
+              const channelColor = channelColors[index % channelColors.length]
+              const isVisible = bestChannelsVisibility[index] !== false
+
+              return (
+                <React.Fragment key={`best-channel-${index}`}>
+                  <Line
+                    type="monotone"
+                    dataKey={`bestChannel${index}Upper`}
+                    stroke={channelColor}
+                    strokeWidth={2}
+                    dot={false}
+                    legendType="none"
+                    strokeDasharray="3 3"
+                    opacity={0.7}
+                    hide={!isVisible}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey={`bestChannel${index}Mid`}
+                    stroke={channelColor}
+                    strokeWidth={2.5}
+                    dot={false}
+                    name={`Best${index + 1} (${channel.endIndex - channel.startIndex + 1}pts, ${channel.touchCount} touches)`}
+                    strokeDasharray="3 3"
+                    hide={!isVisible}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey={`bestChannel${index}Lower`}
+                    stroke={channelColor}
+                    strokeWidth={2}
+                    dot={false}
+                    legendType="none"
+                    strokeDasharray="3 3"
+                    opacity={0.7}
+                    hide={!isVisible}
+                  />
+                </React.Fragment>
+              )
+            })}
+
+            <Line
+              type="monotone"
+              dataKey="close"
+              stroke="#8b5cf6"
+              strokeWidth={2}
+              dot={false}
+              name="Close Price"
+            />
+            {volumeColorEnabled && (
+              <>
+                <Line
+                  type="monotone"
+                  dataKey="highVolumeClose"
+                  stroke="#ea580c"
+                  strokeWidth={3}
+                  dot={false}
+                  name={volumeColorMode === 'relative-spy' ? "High Volume vs SPY (Top 20%)" : "High Volume (Top 20%)"}
+                  connectNulls={false}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="lowVolumeClose"
+                  stroke="#06b6d4"
+                  strokeWidth={3}
+                  dot={false}
+                  name={volumeColorMode === 'relative-spy' ? "Low Volume vs SPY (Bottom 20%)" : "Low Volume (Bottom 20%)"}
+                  connectNulls={false}
+                />
+              </>
+            )}
+            {performanceComparisonEnabled && comparisonMode === 'color' && (
+              <>
+                <Line
+                  type="monotone"
+                  dataKey="topPerformanceClose"
                   stroke="#22c55e"
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
+                  strokeWidth={3}
+                  dot={false}
+                  name={`Top Performance vs ${performanceComparisonBenchmark} (Top 20%)`}
+                  connectNulls={false}
                 />
-              )
-            }} />
-          )}
+                <Line
+                  type="monotone"
+                  dataKey="bottomPerformanceClose"
+                  stroke="#ef4444"
+                  strokeWidth={3}
+                  dot={false}
+                  name={`Bottom Performance vs ${performanceComparisonBenchmark} (Bottom 20%)`}
+                  connectNulls={false}
+                />
+              </>
+            )}
+            {comparisonMode === 'line' && comparisonStocks && comparisonStocks.map((compStock, index) => {
+              const compPositiveKey = `compPos_${compStock.symbol}`
+              const compNegativeKey = `compNeg_${compStock.symbol}`
 
-          {/* Volume Profile Manual Selection Rectangle */}
-          {volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && volumeProfileSelectionStart && volumeProfileSelectionEnd && (
-            <Customized component={(props) => {
-              const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
-              if (!xAxisMap || !yAxisMap) return null
+              // Base colors for each comparison stock
+              const baseColors = [
+                { light: '#93c5fd', dark: '#1e40af' }, // Blue
+                { light: '#86efac', dark: '#15803d' }, // Green
+                { light: '#fde047', dark: '#a16207' }, // Yellow
+                { light: '#c4b5fd', dark: '#6d28d9' }, // Purple
+                { light: '#f9a8d4', dark: '#be185d' }, // Pink
+                { light: '#5eead4', dark: '#0f766e' }, // Teal
+              ]
 
-              const xAxis = xAxisMap[0]
-              const yAxis = yAxisMap[0]
-
-              if (!xAxis || !yAxis) return null
-
-              const startX = xAxis.scale(volumeProfileSelectionStart)
-              const endX = xAxis.scale(volumeProfileSelectionEnd)
-
-              if (startX === undefined || endX === undefined) return null
-
-              const x = Math.min(startX, endX)
-              const width = Math.abs(endX - startX)
-              const y = offset.top
-              const height = offset.height
+              const colorPair = baseColors[index % baseColors.length]
 
               return (
-                <rect
-                  x={x}
-                  y={y}
-                  width={width}
-                  height={height}
-                  fill="rgba(147, 51, 234, 0.2)"
-                  stroke="#9333ea"
-                  strokeWidth={2}
+                <React.Fragment key={compStock.symbol}>
+                  {/* Deeper/darker color when ABOVE selected stock (outperforming) */}
+                  <Line
+                    type="monotone"
+                    dataKey={compPositiveKey}
+                    stroke={colorPair.dark}
+                    strokeWidth={2.5}
+                    dot={false}
+                    name={`${compStock.symbol} (Above)`}
+                    connectNulls={false}
+                  />
+                  {/* Lighter color when BELOW selected stock (underperforming) */}
+                  <Line
+                    type="monotone"
+                    dataKey={compNegativeKey}
+                    stroke={colorPair.light}
+                    strokeWidth={2.5}
+                    dot={false}
+                    name={`${compStock.symbol} (Below)`}
+                    connectNulls={false}
+                  />
+                </React.Fragment>
+              )
+            })}
+            {smaPeriods.map((period, index) => {
+              const smaKey = `sma${period}`
+              const isVisible = smaVisibility[period]
+
+              return (
+                <Line
+                  key={smaKey}
+                  type="monotone"
+                  dataKey={smaKey}
+                  stroke={getSmaColor(period)}
+                  strokeWidth={1.5}
+                  dot={false}
+                  name={`SMA ${period}`}
                   strokeDasharray="5 5"
+                  hide={!isVisible}
                 />
               )
-            }} />
-          )}
+            })}
 
-          {/* Last Channel Lines */}
-          {slopeChannelEnabled && slopeChannelInfo && (
-            <>
-              <Line
-                type="monotone"
-                dataKey="channelUpper"
-                stroke="#10b981"
-                strokeWidth={1.5}
-                dot={false}
-                name={`Upper (+${slopeChannelInfo.optimalStdevMult.toFixed(2)}σ)`}
-                strokeDasharray="3 3"
-                legendType="none"
-                hide={!trendChannelVisible}
-              />
-              <Line
-                type="monotone"
-                dataKey="channelMid"
-                stroke="#3b82f6"
-                strokeWidth={1.5}
-                dot={false}
-                name={`Trend${slopeChannelVolumeWeighted ? ' (Vol-Weighted)' : ''} (${slopeChannelInfo.recentDataCount}pts, ${slopeChannelInfo.touchCount} touches, R²=${(slopeChannelInfo.rSquared * 100).toFixed(1)}%)`}
-                strokeDasharray="3 3"
-                hide={!trendChannelVisible}
-              />
-              <Line
-                type="monotone"
-                dataKey="channelLower"
-                stroke="#ef4444"
-                strokeWidth={1.5}
-                dot={false}
-                name={`Lower (-${slopeChannelInfo.optimalStdevMult.toFixed(2)}σ)`}
-                strokeDasharray="3 3"
-                legendType="none"
-                hide={!trendChannelVisible}
-              />
-            </>
-          )}
+            {/* Market Gap Open Indicators */}
+            {mktGapOpenEnabled && mktGapOpenData.map((gap, index) => {
+              // Find the corresponding data point in the main chart to position the arrow
+              const pricePoint = prices.find(p => p.date === gap.date)
+              if (!pricePoint) return null
 
-          {/* All Channels Lines */}
-          {revAllChannelEnabled && revAllChannels.length > 0 && revAllChannels.map((channel, index) => {
-            // Define distinct colors for each channel - using single color per channel for consistency
-            const channelColors = [
-              '#3b82f6',  // Blue
-              '#8b5cf6',  // Purple
-              '#f59e0b',  // Amber
-              '#10b981',  // Green
-              '#06b6d4',  // Cyan
-              '#f97316',  // Orange
-              '#ec4899',  // Pink
-              '#84cc16',  // Lime
-            ]
-            const channelColor = channelColors[index % channelColors.length]
-            const isVisible = revAllChannelsVisibility[index] !== false
+              // Gap Up (SPY > 0) -> Down Arrow
+              // Gap Down (SPY < 0) -> Up Arrow
+              // Anchor to CLOSE price so it touches the line
+              const isGapUp = gap.isGapUp
+              const yPos = pricePoint.close
+              const color = isGapUp ? "#ef4444" : "#22c55e" // Red for Gap Up (Down Arrow), Green for Gap Down (Up Arrow)
 
-            return (
-              <React.Fragment key={`rev-channel-${index}`}>
-                <Line
-                  type="monotone"
-                  dataKey={`revAllChannel${index}Upper`}
-                  stroke={channelColor}
-                  strokeWidth={1.5}
-                  dot={false}
-                  legendType="none"
-                  strokeDasharray="5 5"
-                  opacity={0.6}
-                  hide={!isVisible}
+              return (
+                <ReferenceDot
+                  key={`gap-${gap.date}-${index}`}
+                  x={gap.date}
+                  y={yPos}
+                  r={0} // Invisible dot, just for positioning
+                  label={({ viewBox }) => {
+                    const { x, y } = viewBox
+                    // y is the screen coordinate of the price point (High or Low)
+
+                    return (
+                      <g transform={`translate(${x}, ${y})`}>
+                        {isGapUp ? (
+                          // Gap Up: Down Arrow pointing at High (y)
+                          // Text above arrow
+                          <>
+                            <text
+                              x={0}
+                              y={-20}
+                              textAnchor="middle"
+                              fill={color}
+                              fontSize={11}
+                              fontWeight="bold"
+                            >
+                              {gap.symbol} {gap.changePercent}%
+                            </text>
+                            <path
+                              d="M0,-15 L0,0 M-5,-5 L0,0 L5,-5"
+                              stroke={color}
+                              strokeWidth={2}
+                              fill="none"
+                            />
+                          </>
+                        ) : (
+                          // Gap Down: Up Arrow pointing at Low (y)
+                          // Text below arrow
+                          <>
+                            <path
+                              d="M0,15 L0,0 M-5,5 L0,0 L5,5"
+                              stroke={color}
+                              strokeWidth={2}
+                              fill="none"
+                            />
+                            <text
+                              x={0}
+                              y={27}
+                              textAnchor="middle"
+                              fill={color}
+                              fontSize={11}
+                              fontWeight="bold"
+                            >
+                              {gap.symbol} {gap.changePercent}%
+                            </text>
+                          </>
+                        )}
+                      </g>
+                    )
+                  }}
                 />
-                <Line
-                  type="monotone"
-                  dataKey={`revAllChannel${index}Mid`}
-                  stroke={channelColor}
-                  strokeWidth={2}
-                  dot={false}
-                  name={`Rev${index + 1}`}
-                  strokeDasharray="5 5"
-                  opacity={1.0}
-                  hide={!isVisible}
-                />
-                <Line
-                  type="monotone"
-                  dataKey={`revAllChannel${index}Lower`}
-                  stroke={channelColor}
-                  strokeWidth={1.5}
-                  dot={false}
-                  legendType="none"
-                  strokeDasharray="5 5"
-                  opacity={0.6}
-                  hide={!isVisible}
-                />
-              </React.Fragment>
-            )
-          })}
-
-          {/* Manual Channel Lines */}
-          {manualChannelEnabled && manualChannels.length > 0 && manualChannels.map((channel, index) => {
-            // Color palette for manual channels (various green shades)
-            const channelColors = [
-              '#22c55e',  // Green
-              '#10b981',  // Emerald
-              '#14b8a6',  // Teal
-              '#84cc16',  // Lime
-              '#059669',  // Deep green
-            ]
-            const channelColor = channelColors[index % channelColors.length]
-
-            return (
-              <React.Fragment key={`manual-channel-${index}`}>
-                <Line
-                  type="monotone"
-                  dataKey={`manualChannel${index}Upper`}
-                  stroke={channelColor}
-                  strokeWidth={2}
-                  dot={false}
-                  name={`Manual ${index + 1} Upper (+${channel.optimalStdevMult.toFixed(2)}σ)`}
-                  strokeDasharray="5 5"
-                  opacity={0.7}
-                  legendType="none"
-                />
-                <Line
-                  type="monotone"
-                  dataKey={`manualChannel${index}Mid`}
-                  stroke={channelColor}
-                  strokeWidth={2.5}
-                  dot={false}
-                  name={`Manual Channel ${index + 1} (${channel.endIndex - channel.startIndex + 1}pts, ${channel.touchCount} touches, R²=${(channel.rSquared * 100).toFixed(1)}%)`}
-                  strokeDasharray="5 5"
-                />
-                <Line
-                  type="monotone"
-                  dataKey={`manualChannel${index}Lower`}
-                  stroke={channelColor}
-                  strokeWidth={2}
-                  dot={false}
-                  name={`Manual ${index + 1} Lower (-${channel.optimalStdevMult.toFixed(2)}σ)`}
-                  strokeDasharray="5 5"
-                  opacity={0.7}
-                  legendType="none"
-                />
-              </React.Fragment>
-            )
-          })}
-
-          {/* Best Channel Lines */}
-          {bestChannelEnabled && bestChannels.length > 0 && bestChannels.map((channel, index) => {
-            // Color palette for best channels (warm colors - orange/yellow tones)
-            const channelColors = [
-              '#f59e0b',  // Amber
-              '#f97316',  // Orange
-              '#eab308',  // Yellow
-              '#fb923c',  // Light Orange
-              '#fbbf24',  // Light Amber
-            ]
-            const channelColor = channelColors[index % channelColors.length]
-            const isVisible = bestChannelsVisibility[index] !== false
-
-            return (
-              <React.Fragment key={`best-channel-${index}`}>
-                <Line
-                  type="monotone"
-                  dataKey={`bestChannel${index}Upper`}
-                  stroke={channelColor}
-                  strokeWidth={2}
-                  dot={false}
-                  legendType="none"
-                  strokeDasharray="3 3"
-                  opacity={0.7}
-                  hide={!isVisible}
-                />
-                <Line
-                  type="monotone"
-                  dataKey={`bestChannel${index}Mid`}
-                  stroke={channelColor}
-                  strokeWidth={2.5}
-                  dot={false}
-                  name={`Best${index + 1} (${channel.endIndex - channel.startIndex + 1}pts, ${channel.touchCount} touches)`}
-                  strokeDasharray="3 3"
-                  hide={!isVisible}
-                />
-                <Line
-                  type="monotone"
-                  dataKey={`bestChannel${index}Lower`}
-                  stroke={channelColor}
-                  strokeWidth={2}
-                  dot={false}
-                  legendType="none"
-                  strokeDasharray="3 3"
-                  opacity={0.7}
-                  hide={!isVisible}
-                />
-              </React.Fragment>
-            )
-          })}
-
-          <Line
-            type="monotone"
-            dataKey="close"
-            stroke="#8b5cf6"
-            strokeWidth={2}
-            dot={false}
-            name="Close Price"
-          />
-          {volumeColorEnabled && (
-            <>
-              <Line
-                type="monotone"
-                dataKey="highVolumeClose"
-                stroke="#ea580c"
-                strokeWidth={3}
-                dot={false}
-                name={volumeColorMode === 'relative-spy' ? "High Volume vs SPY (Top 20%)" : "High Volume (Top 20%)"}
-                connectNulls={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="lowVolumeClose"
-                stroke="#06b6d4"
-                strokeWidth={3}
-                dot={false}
-                name={volumeColorMode === 'relative-spy' ? "Low Volume vs SPY (Bottom 20%)" : "Low Volume (Bottom 20%)"}
-                connectNulls={false}
-              />
-            </>
-          )}
-          {performanceComparisonEnabled && comparisonMode === 'color' && (
-            <>
-              <Line
-                type="monotone"
-                dataKey="topPerformanceClose"
-                stroke="#22c55e"
-                strokeWidth={3}
-                dot={false}
-                name={`Top Performance vs ${performanceComparisonBenchmark} (Top 20%)`}
-                connectNulls={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="bottomPerformanceClose"
-                stroke="#ef4444"
-                strokeWidth={3}
-                dot={false}
-                name={`Bottom Performance vs ${performanceComparisonBenchmark} (Bottom 20%)`}
-                connectNulls={false}
-              />
-            </>
-          )}
-          {comparisonMode === 'line' && comparisonStocks && comparisonStocks.map((compStock, index) => {
-            const compPositiveKey = `compPos_${compStock.symbol}`
-            const compNegativeKey = `compNeg_${compStock.symbol}`
-
-            // Base colors for each comparison stock
-            const baseColors = [
-              { light: '#93c5fd', dark: '#1e40af' }, // Blue
-              { light: '#86efac', dark: '#15803d' }, // Green
-              { light: '#fde047', dark: '#a16207' }, // Yellow
-              { light: '#c4b5fd', dark: '#6d28d9' }, // Purple
-              { light: '#f9a8d4', dark: '#be185d' }, // Pink
-              { light: '#5eead4', dark: '#0f766e' }, // Teal
-            ]
-
-            const colorPair = baseColors[index % baseColors.length]
-
-            return (
-              <React.Fragment key={compStock.symbol}>
-                {/* Deeper/darker color when ABOVE selected stock (outperforming) */}
-                <Line
-                  type="monotone"
-                  dataKey={compPositiveKey}
-                  stroke={colorPair.dark}
-                  strokeWidth={2.5}
-                  dot={false}
-                  name={`${compStock.symbol} (Above)`}
-                  connectNulls={false}
-                />
-                {/* Lighter color when BELOW selected stock (underperforming) */}
-                <Line
-                  type="monotone"
-                  dataKey={compNegativeKey}
-                  stroke={colorPair.light}
-                  strokeWidth={2.5}
-                  dot={false}
-                  name={`${compStock.symbol} (Below)`}
-                  connectNulls={false}
-                />
-              </React.Fragment>
-            )
-          })}
-          {smaPeriods.map((period, index) => {
-            const smaKey = `sma${period}`
-            const isVisible = smaVisibility[period]
-
-            return (
-              <Line
-                key={smaKey}
-                type="monotone"
-                dataKey={smaKey}
-                stroke={getSmaColor(period)}
-                strokeWidth={1.5}
-                dot={false}
-                name={`SMA ${period}`}
-                strokeDasharray="5 5"
-                hide={!isVisible}
-              />
-            )
-          })}
-        </ComposedChart>
-      </ResponsiveContainer>
+              )
+            })}
+          </ComposedChart>
+        </ResponsiveContainer>
       </div>
 
     </div>

@@ -25,6 +25,7 @@ function StockAnalyzer() {
   const [editingSlopeChannelChartId, setEditingSlopeChannelChartId] = useState(null)
   const [globalZoomRange, setGlobalZoomRange] = useState({ start: 0, end: null })
   const [loadingComparisonStocks, setLoadingComparisonStocks] = useState({}) // Track loading state per chart
+  const [loadingMktGap, setLoadingMktGap] = useState({}) // Track loading state for Mkt Gap data
 
   // Load stock history from localStorage on mount
   useEffect(() => {
@@ -120,6 +121,9 @@ function StockAnalyzer() {
         manualChannelDragMode: false,
         bestChannelEnabled: false,
         bestChannelVolumeFilterEnabled: false,
+        mktGapOpenEnabled: false,
+        mktGapOpenCount: 5,
+        mktGapOpenRefreshTrigger: 0,
         collapsed: false
       }
       setCharts(prevCharts => [newChart, ...prevCharts])
@@ -397,6 +401,97 @@ function StockAnalyzer() {
           return {
             ...chart,
             manualChannelDragMode: !chart.manualChannelDragMode
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const toggleMktGapOpen = async (chartId) => {
+    const chart = charts.find(c => c.id === chartId)
+    if (!chart) return
+
+    const newState = !chart.mktGapOpenEnabled
+
+    setCharts(prevCharts =>
+      prevCharts.map(c => {
+        if (c.id === chartId) {
+          return {
+            ...c,
+            mktGapOpenEnabled: newState
+          }
+        }
+        return c
+      })
+    )
+
+    // If enabling and we don't have SPY data, fetch it
+    if (newState && !chart.spyData) {
+      setLoadingMktGap(prev => ({ ...prev, [chartId]: true }))
+      try {
+        // Check cache first
+        let spyData = apiCache.get('SPY', days)
+
+        if (!spyData) {
+          console.log(`[Cache] ❌ Cache MISS for SPY:${days}, fetching from server...`)
+          const response = await axios.get(`${API_URL}/analyze`, {
+            params: {
+              symbol: 'SPY',
+              days: days
+            }
+          })
+          spyData = response.data
+          apiCache.set('SPY', days, spyData)
+        } else {
+          console.log(`[Cache] ✅ Cache HIT for SPY:${days}`)
+        }
+
+        setCharts(prevCharts =>
+          prevCharts.map(c => {
+            if (c.id === chartId) {
+              return {
+                ...c,
+                spyData: spyData
+              }
+            }
+            return c
+          })
+        )
+      } catch (err) {
+        console.error('Failed to fetch SPY data:', err)
+        setError('Failed to fetch SPY data for Market Gap Open analysis')
+      } finally {
+        setLoadingMktGap(prev => {
+          const newState = { ...prev }
+          delete newState[chartId]
+          return newState
+        })
+      }
+    }
+  }
+
+  const updateMktGapOpenCount = (chartId, count) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            mktGapOpenCount: count
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const refreshMktGapOpen = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            mktGapOpenRefreshTrigger: (chart.mktGapOpenRefreshTrigger || 0) + 1
           }
         }
         return chart
@@ -725,8 +820,8 @@ function StockAnalyzer() {
       // Always fetch maximum data (3650 days) to have full history available
       const maxDays = '3650'
 
-      // Check if any chart needs SPY data (for volume comparison or performance comparison)
-      const needsSpy = charts.some(chart => chart.volumeColorMode === 'relative-spy' || chart.performanceComparisonEnabled)
+      // Check if any chart needs SPY data (for volume comparison, performance comparison, or mkt gap open)
+      const needsSpy = charts.some(chart => chart.volumeColorMode === 'relative-spy' || chart.performanceComparisonEnabled || chart.mktGapOpenEnabled)
       let spyDataForPeriod = null
 
       if (needsSpy) {
@@ -780,8 +875,8 @@ function StockAnalyzer() {
           const updatedData = results.find(r => r.id === chart.id)
           const updates = { data: updatedData.data }
 
-          // Update SPY data if chart is in relative-spy mode or performance comparison mode
-          if ((chart.volumeColorMode === 'relative-spy' || chart.performanceComparisonEnabled) && spyDataForPeriod) {
+          // Update SPY data if chart is in relative-spy mode, performance comparison mode, or mkt gap open mode
+          if ((chart.volumeColorMode === 'relative-spy' || chart.performanceComparisonEnabled || chart.mktGapOpenEnabled) && spyDataForPeriod) {
             updates.spyData = spyDataForPeriod
           }
 
@@ -1013,11 +1108,10 @@ function StockAnalyzer() {
                       <button
                         type="button"
                         onClick={() => toggleVolumeColor(chart.id)}
-                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
-                          chart.volumeColorEnabled
-                            ? 'bg-orange-600 text-white'
-                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
+                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.volumeColorEnabled
+                          ? 'bg-orange-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
                         title="Highlight high volume (top 20%) and low volume (bottom 20%)"
                       >
                         Volume Color
@@ -1037,11 +1131,10 @@ function StockAnalyzer() {
                       <button
                         type="button"
                         onClick={() => toggleVolumeProfile(chart.id)}
-                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
-                          chart.volumeProfileEnabled
-                            ? 'bg-yellow-600 text-white'
-                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
+                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.volumeProfileEnabled
+                          ? 'bg-yellow-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
                         title="Show horizontal volume profile"
                       >
                         Volume Profile
@@ -1059,11 +1152,10 @@ function StockAnalyzer() {
                                 )
                               )
                             }}
-                            className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
-                              chart.volumeProfileMode === 'auto'
-                                ? 'bg-yellow-600 text-white'
-                                : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
-                            }`}
+                            className={`px-2 py-1 text-xs rounded font-medium transition-colors ${chart.volumeProfileMode === 'auto'
+                              ? 'bg-yellow-600 text-white'
+                              : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
+                              }`}
                             title="Auto volume profile - across visible data"
                           >
                             Auto
@@ -1079,11 +1171,10 @@ function StockAnalyzer() {
                                 )
                               )
                             }}
-                            className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
-                              chart.volumeProfileMode === 'manual'
-                                ? 'bg-purple-600 text-white'
-                                : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
-                            }`}
+                            className={`px-2 py-1 text-xs rounded font-medium transition-colors ${chart.volumeProfileMode === 'manual'
+                              ? 'bg-purple-600 text-white'
+                              : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
+                              }`}
                             title="Manual volume profile - draw rectangle to select range"
                           >
                             Man
@@ -1103,11 +1194,10 @@ function StockAnalyzer() {
                             )
                           )
                         }}
-                        className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
-                          chart.comparisonMode === 'color'
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
-                        }`}
+                        className={`px-2 py-1 text-xs rounded font-medium transition-colors ${chart.comparisonMode === 'color'
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
+                          }`}
                         title="Click to toggle: Vs Perf Color ↔ Vs Perf"
                       >
                         {chart.comparisonMode === 'color' ? 'Color' : 'Line'}
@@ -1117,11 +1207,10 @@ function StockAnalyzer() {
                           <button
                             type="button"
                             onClick={() => togglePerformanceComparison(chart.id)}
-                            className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
-                              chart.performanceComparisonEnabled
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                            }`}
+                            className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.performanceComparisonEnabled
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                              }`}
                             title="Highlight top 20% and bottom 20% performance variance vs benchmark"
                           >
                             Vs Perf Color
@@ -1250,11 +1339,10 @@ function StockAnalyzer() {
                     <button
                       type="button"
                       onClick={() => toggleRevAllChannel(chart.id)}
-                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
-                        chart.revAllChannelEnabled
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
+                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.revAllChannelEnabled
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
                       title="All Channels"
                     >
                       All Channel
@@ -1280,11 +1368,10 @@ function StockAnalyzer() {
                         <button
                           type="button"
                           onClick={() => toggleRevAllChannelVolumeFilter(chart.id)}
-                          className={`px-2 py-1 text-sm rounded transition-colors ${
-                            chart.revAllChannelVolumeFilterEnabled
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                          }`}
+                          className={`px-2 py-1 text-sm rounded transition-colors ${chart.revAllChannelVolumeFilterEnabled
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            }`}
                           title="Volume Filter - Ignore data points with bottom 10% of volume"
                         >
                           <Filter className="w-4 h-4" />
@@ -1294,11 +1381,10 @@ function StockAnalyzer() {
                     <button
                       type="button"
                       onClick={() => toggleManualChannel(chart.id)}
-                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
-                        chart.manualChannelEnabled
-                          ? 'bg-green-600 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
+                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.manualChannelEnabled
+                        ? 'bg-green-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
                       title="Manual Channel - Draw rectangle to select data range"
                     >
                       Manual Channel
@@ -1316,11 +1402,10 @@ function StockAnalyzer() {
                               )
                             )
                           }}
-                          className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
-                            !chart.manualChannelDragMode
-                              ? 'bg-green-600 text-white'
-                              : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
-                          }`}
+                          className={`px-2 py-1 text-xs rounded font-medium transition-colors ${!chart.manualChannelDragMode
+                            ? 'bg-green-600 text-white'
+                            : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
+                            }`}
                           title="Auto mode - pan the chart"
                         >
                           Auto
@@ -1336,11 +1421,10 @@ function StockAnalyzer() {
                               )
                             )
                           }}
-                          className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
-                            chart.manualChannelDragMode
-                              ? 'bg-purple-600 text-white'
-                              : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
-                          }`}
+                          className={`px-2 py-1 text-xs rounded font-medium transition-colors ${chart.manualChannelDragMode
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
+                            }`}
                           title="Manual mode - drag to select range for channel"
                         >
                           Man
@@ -1350,11 +1434,10 @@ function StockAnalyzer() {
                     <button
                       type="button"
                       onClick={() => toggleBestChannel(chart.id)}
-                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
-                        chart.bestChannelEnabled
-                          ? 'bg-amber-600 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
+                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.bestChannelEnabled
+                        ? 'bg-amber-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
                       title="Best Channel - Simulates parameters to find channels with most touching points"
                     >
                       Best Channel
@@ -1363,15 +1446,48 @@ function StockAnalyzer() {
                       <button
                         type="button"
                         onClick={() => toggleBestChannelVolumeFilter(chart.id)}
-                        className={`px-2 py-1 text-sm rounded transition-colors ${
-                          chart.bestChannelVolumeFilterEnabled
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
+                        className={`px-2 py-1 text-sm rounded transition-colors ${chart.bestChannelVolumeFilterEnabled
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
                         title="Volume Filter - Ignore data points with bottom 10% of volume"
                       >
                         <Filter className="w-4 h-4" />
                       </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => toggleMktGapOpen(chart.id)}
+                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.mktGapOpenEnabled
+                        ? 'bg-pink-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                      title="Market Gap Open - Highlight biggest gaps in SPY"
+                    >
+                      Mkt Gap Open
+                    </button>
+                    {chart.mktGapOpenEnabled && (
+                      <>
+                        <div className="flex items-center gap-1 bg-slate-700 rounded px-2 py-1">
+                          <span className="text-xs text-slate-300">Top</span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="50"
+                            value={chart.mktGapOpenCount}
+                            onChange={(e) => updateMktGapOpenCount(chart.id, parseInt(e.target.value) || 5)}
+                            className="w-10 bg-slate-600 border border-slate-500 text-slate-100 text-xs rounded px-1 text-center focus:ring-1 focus:ring-pink-500 focus:border-transparent"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => refreshMktGapOpen(chart.id)}
+                          className="px-2 py-1 text-sm rounded transition-colors bg-slate-600 text-slate-200 hover:bg-slate-500"
+                          title="Refresh Market Gap Analysis"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </button>
+                      </>
                     )}
                     <button
                       type="button"
@@ -1385,22 +1501,20 @@ function StockAnalyzer() {
                     <button
                       type="button"
                       onClick={() => updateChartIndicator(chart.id, 'showRSI', !chart.showRSI)}
-                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
-                        chart.showRSI
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
+                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.showRSI
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
                     >
                       RSI
                     </button>
                     <button
                       type="button"
                       onClick={() => updateChartIndicator(chart.id, 'showMACD', !chart.showMACD)}
-                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${
-                        chart.showMACD
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                      }`}
+                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.showMACD
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
                     >
                       MACD
                     </button>
@@ -1408,11 +1522,13 @@ function StockAnalyzer() {
                 </div>
                 {!chart.collapsed && <div className="pr-0 md:pr-14 relative">
                   {/* Loading overlay when fetching comparison stock */}
-                  {loadingComparisonStocks[chart.id] && (
+                  {(loadingComparisonStocks[chart.id] || loadingMktGap[chart.id]) && (
                     <div className="absolute inset-0 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center z-50 rounded">
                       <div className="text-center">
                         <Loader2 className="w-8 h-8 animate-spin text-purple-500 mx-auto mb-2" />
-                        <p className="text-slate-200 font-medium">Loading {loadingComparisonStocks[chart.id]}...</p>
+                        <p className="text-slate-200 font-medium">
+                          {loadingMktGap[chart.id] ? 'Loading SPY Data...' : `Loading ${loadingComparisonStocks[chart.id]}...`}
+                        </p>
                       </div>
                     </div>
                   )}
@@ -1454,6 +1570,10 @@ function StockAnalyzer() {
                     manualChannelDragMode={chart.manualChannelDragMode}
                     bestChannelEnabled={chart.bestChannelEnabled}
                     bestChannelVolumeFilterEnabled={chart.bestChannelVolumeFilterEnabled}
+                    mktGapOpenEnabled={chart.mktGapOpenEnabled}
+                    mktGapOpenCount={chart.mktGapOpenCount}
+                    mktGapOpenRefreshTrigger={chart.mktGapOpenRefreshTrigger}
+                    loadingMktGap={loadingMktGap[chart.id]}
                     chartHeight={chartHeight}
                     days={days}
                     zoomRange={globalZoomRange}
@@ -1471,11 +1591,10 @@ function StockAnalyzer() {
                           type="button"
                           key={range.label}
                           onClick={() => changeTimeRange(range.days)}
-                          className={`px-2 py-1 text-xs font-bold transition-all whitespace-nowrap border-0 ${
-                            days === range.days
-                              ? 'bg-purple-600 text-white'
-                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                          }`}
+                          className={`px-2 py-1 text-xs font-bold transition-all whitespace-nowrap border-0 ${days === range.days
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            }`}
                           style={{ minWidth: '44px' }}
                         >
                           {range.label}
@@ -1494,11 +1613,10 @@ function StockAnalyzer() {
                           type="button"
                           key={range.label}
                           onClick={() => changeTimeRange(range.days)}
-                          className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
-                            days === range.days
-                              ? 'bg-purple-600 text-white'
-                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                          }`}
+                          className={`px-2 py-1 text-xs rounded font-medium transition-colors ${days === range.days
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            }`}
                         >
                           {range.label}
                         </button>
