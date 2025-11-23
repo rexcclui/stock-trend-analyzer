@@ -45,6 +45,8 @@ function StockAnalyzer() {
     localStorage.setItem(STOCK_HISTORY_KEY, JSON.stringify(updatedHistory))
   }
 
+  const parseDaysValue = (value) => value === 'max' ? Number.MAX_SAFE_INTEGER : parseInt(value)
+
   const analyzeStock = async (symbolToAnalyze = null) => {
     // Check if symbolToAnalyze is a string (not an event object)
     const targetSymbol = (typeof symbolToAnalyze === 'string') ? symbolToAnalyze : symbol
@@ -60,8 +62,8 @@ function StockAnalyzer() {
     try {
       const upperSymbol = targetSymbol.toUpperCase()
 
-      // Always fetch maximum data (3650 days) to have full history available
-      const maxDays = '3650'
+      // Always fetch maximum available data from the server
+      const maxDays = 'max'
 
       // Try to get from cache first
       let data = apiCache.get(upperSymbol, maxDays)
@@ -141,22 +143,22 @@ function StockAnalyzer() {
       setTimeout(() => {
         if (data.prices) {
           const totalDataPoints = data.prices.length
-          const daysNum = parseInt(days)
+          const daysNum = parseDaysValue(days)
           let targetDataPoints = totalDataPoints
 
-          if (daysNum <= 7) {
+          if (Number.isFinite(daysNum) && daysNum <= 7) {
             targetDataPoints = Math.min(7, totalDataPoints)
-          } else if (daysNum <= 30) {
+          } else if (Number.isFinite(daysNum) && daysNum <= 30) {
             targetDataPoints = Math.min(22, totalDataPoints)
-          } else if (daysNum <= 90) {
+          } else if (Number.isFinite(daysNum) && daysNum <= 90) {
             targetDataPoints = Math.min(63, totalDataPoints)
-          } else if (daysNum <= 180) {
+          } else if (Number.isFinite(daysNum) && daysNum <= 180) {
             targetDataPoints = Math.min(126, totalDataPoints)
-          } else if (daysNum <= 365) {
+          } else if (Number.isFinite(daysNum) && daysNum <= 365) {
             targetDataPoints = Math.min(252, totalDataPoints)
-          } else if (daysNum <= 1095) {
+          } else if (Number.isFinite(daysNum) && daysNum <= 1095) {
             targetDataPoints = Math.min(756, totalDataPoints)
-          } else if (daysNum <= 1825) {
+          } else if (Number.isFinite(daysNum) && daysNum <= 1825) {
             targetDataPoints = Math.min(1260, totalDataPoints)
           }
 
@@ -846,8 +848,8 @@ function StockAnalyzer() {
     setLoadingComparisonStocks(prev => ({ ...prev, [chartId]: symbol }))
 
     try {
-      // Always fetch maximum data (3650 days) to have full history available
-      const maxDays = '3650'
+      // Always fetch maximum available data from the server
+      const maxDays = 'max'
 
       // Check cache first
       let stockData = apiCache.get(symbol, maxDays)
@@ -933,8 +935,8 @@ function StockAnalyzer() {
 
     // Update all charts with the new time range
     try {
-      // Always fetch maximum data (3650 days) to have full history available
-      const maxDays = '3650'
+      // Always fetch maximum available data from the server
+      const maxDays = 'max'
 
       // Check if any chart needs SPY data (for volume comparison, performance comparison, or mkt gap open)
       const needsSpy = charts.some(chart => chart.volumeColorMode === 'relative-spy' || chart.performanceComparisonEnabled || chart.mktGapOpenEnabled)
@@ -1008,22 +1010,22 @@ function StockAnalyzer() {
 
           // Calculate approximate data points for the selected period
           // Assuming roughly 252 trading days per year
-          const daysNum = parseInt(newDays)
+          const daysNum = parseDaysValue(newDays)
           let targetDataPoints = totalDataPoints // Default to all data
 
-          if (daysNum <= 7) {
+          if (Number.isFinite(daysNum) && daysNum <= 7) {
             targetDataPoints = Math.min(7, totalDataPoints)
-          } else if (daysNum <= 30) {
+          } else if (Number.isFinite(daysNum) && daysNum <= 30) {
             targetDataPoints = Math.min(22, totalDataPoints) // ~22 trading days in a month
-          } else if (daysNum <= 90) {
+          } else if (Number.isFinite(daysNum) && daysNum <= 90) {
             targetDataPoints = Math.min(63, totalDataPoints) // ~63 trading days in 3 months
-          } else if (daysNum <= 180) {
+          } else if (Number.isFinite(daysNum) && daysNum <= 180) {
             targetDataPoints = Math.min(126, totalDataPoints) // ~126 trading days in 6 months
-          } else if (daysNum <= 365) {
+          } else if (Number.isFinite(daysNum) && daysNum <= 365) {
             targetDataPoints = Math.min(252, totalDataPoints) // ~252 trading days in 1 year
-          } else if (daysNum <= 1095) {
+          } else if (Number.isFinite(daysNum) && daysNum <= 1095) {
             targetDataPoints = Math.min(756, totalDataPoints) // ~756 trading days in 3 years
-          } else if (daysNum <= 1825) {
+          } else if (Number.isFinite(daysNum) && daysNum <= 1825) {
             targetDataPoints = Math.min(1260, totalDataPoints) // ~1260 trading days in 5 years
           }
           // else: Max - show all data
@@ -1064,7 +1066,7 @@ function StockAnalyzer() {
     { label: '1Y', days: '365' },
     { label: '3Y', days: '1095' },
     { label: '5Y', days: '1825' },
-    { label: 'Max', days: '3650' }
+    { label: 'Max', days: 'max' }
   ]
 
   const extendTimePeriod = () => {
