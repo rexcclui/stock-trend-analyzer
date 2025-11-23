@@ -2092,16 +2092,34 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     if (globalRange === 0) return []
 
-    // For each data point, calculate cumulative volume profile from start to that point
+    // PERFORMANCE OPTIMIZATION: Sample data points instead of processing every single one
+    // Calculate profile for every Nth point to reduce computational load
+    const sampleInterval = Math.max(1, Math.floor(visibleData.length / 50)) // Max 50 profiles
     const profiles = []
 
+    // Track min/max incrementally for efficiency
+    let runningMin = visibleData[0].close
+    let runningMax = visibleData[0].close
+
     for (let endIdx = 0; endIdx < visibleData.length; endIdx++) {
+      // Only calculate profile at sampled intervals and at the last point
+      if (endIdx % sampleInterval !== 0 && endIdx !== visibleData.length - 1) {
+        // Still update running values for next calculation
+        const currentPrice = visibleData[endIdx].close
+        runningMin = Math.min(runningMin, currentPrice)
+        runningMax = Math.max(runningMax, currentPrice)
+        continue
+      }
+
       const dataUpToPoint = visibleData.slice(0, endIdx + 1)
 
-      // Get price range up to this point
-      const prices = dataUpToPoint.map(p => p.close)
-      const minPrice = Math.min(...prices)
-      const maxPrice = Math.max(...prices)
+      // Update running min/max
+      const currentPrice = visibleData[endIdx].close
+      runningMin = Math.min(runningMin, currentPrice)
+      runningMax = Math.max(runningMax, currentPrice)
+
+      const minPrice = runningMin
+      const maxPrice = runningMax
       const priceRange = maxPrice - minPrice
 
       if (priceRange === 0) {
@@ -2110,8 +2128,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       }
 
       // Calculate number of zones based on the formula: N = range / 0.08
-      // Normalize by global range to keep zones consistent across different price levels
-      const numZones = Math.max(1, Math.round(priceRange / 0.08))
+      const numZones = Math.max(1, Math.min(50, Math.round(priceRange / 0.08))) // Cap at 50 zones
       const zoneHeight = priceRange / numZones
 
       // Initialize zones
