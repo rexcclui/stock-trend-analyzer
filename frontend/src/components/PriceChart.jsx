@@ -2075,7 +2075,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   const volumeProfiles = calculateVolumeProfiles()
 
-  // Calculate Volume Profile V2 - progressive accumulation from left to right
+  // Calculate Volume Profile V2 - 100 date slots with volume distribution per price range
   const calculateVolumeProfileV2 = () => {
     if (!volumeProfileV2Enabled || displayPrices.length === 0) return []
 
@@ -2084,7 +2084,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     if (visibleData.length === 0) return []
 
-    // Calculate global min and max from all visible data
+    // Calculate global min and max from all visible data for consistent price ranges
     const allPrices = visibleData.map(p => p.close)
     const globalMin = Math.min(...allPrices)
     const globalMax = Math.max(...allPrices)
@@ -2092,90 +2092,72 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     if (globalRange === 0) return []
 
-    // PERFORMANCE OPTIMIZATION: Sample data points instead of processing every single one
-    // Calculate profile for every Nth point to reduce computational load
-    const sampleInterval = Math.max(1, Math.floor(visibleData.length / 50)) // Max 50 profiles
-    const profiles = []
+    // Calculate number of price zones: N = range / 0.08
+    const numPriceZones = Math.max(1, Math.min(50, Math.round(globalRange / 0.08)))
+    const priceZoneHeight = globalRange / numPriceZones
 
-    // Track min/max incrementally for efficiency
-    let runningMin = visibleData[0].close
-    let runningMax = visibleData[0].close
+    // Divide visible data into 100 date slots
+    const numDateSlots = 100
+    const slotSize = Math.ceil(visibleData.length / numDateSlots)
+    const slots = []
 
-    for (let endIdx = 0; endIdx < visibleData.length; endIdx++) {
-      // Only calculate profile at sampled intervals and at the last point
-      if (endIdx % sampleInterval !== 0 && endIdx !== visibleData.length - 1) {
-        // Still update running values for next calculation
-        const currentPrice = visibleData[endIdx].close
-        runningMin = Math.min(runningMin, currentPrice)
-        runningMax = Math.max(runningMax, currentPrice)
-        continue
-      }
+    for (let slotIdx = 0; slotIdx < numDateSlots; slotIdx++) {
+      const startIdx = slotIdx * slotSize
+      const endIdx = Math.min(startIdx + slotSize, visibleData.length)
 
-      const dataUpToPoint = visibleData.slice(0, endIdx + 1)
+      if (startIdx >= visibleData.length) break
 
-      // Update running min/max
-      const currentPrice = visibleData[endIdx].close
-      runningMin = Math.min(runningMin, currentPrice)
-      runningMax = Math.max(runningMax, currentPrice)
+      const slotData = visibleData.slice(startIdx, endIdx)
+      if (slotData.length === 0) continue
 
-      const minPrice = runningMin
-      const maxPrice = runningMax
-      const priceRange = maxPrice - minPrice
-
-      if (priceRange === 0) {
-        profiles.push(null)
-        continue
-      }
-
-      // Calculate number of zones based on the formula: N = range / 0.08
-      const numZones = Math.max(1, Math.min(50, Math.round(priceRange / 0.08))) // Cap at 50 zones
-      const zoneHeight = priceRange / numZones
-
-      // Initialize zones
-      const volumeZones = []
-      for (let i = 0; i < numZones; i++) {
-        volumeZones.push({
-          minPrice: minPrice + (i * zoneHeight),
-          maxPrice: minPrice + ((i + 1) * zoneHeight),
+      // Initialize price zones for this date slot
+      const priceZones = []
+      for (let i = 0; i < numPriceZones; i++) {
+        priceZones.push({
+          minPrice: globalMin + (i * priceZoneHeight),
+          maxPrice: globalMin + ((i + 1) * priceZoneHeight),
           volume: 0,
-          volumePercent: 0
+          volumeWeight: 0 // 0 to 1
         })
       }
 
-      // Accumulate volume for each zone
+      // Accumulate volume in each price zone for this date slot
       let totalVolume = 0
-      dataUpToPoint.forEach(price => {
+      slotData.forEach(price => {
         const priceValue = price.close
         const volume = price.volume || 0
         totalVolume += volume
 
-        let zoneIndex = Math.floor((priceValue - minPrice) / zoneHeight)
-        if (zoneIndex >= numZones) zoneIndex = numZones - 1
+        let zoneIndex = Math.floor((priceValue - globalMin) / priceZoneHeight)
+        if (zoneIndex >= numPriceZones) zoneIndex = numPriceZones - 1
         if (zoneIndex < 0) zoneIndex = 0
 
-        volumeZones[zoneIndex].volume += volume
+        priceZones[zoneIndex].volume += volume
       })
 
-      // Calculate percentages and find max volume
+      // Calculate volume weights (0 to 1) for this slot
       let maxZoneVolume = 0
-      volumeZones.forEach(zone => {
-        zone.volumePercent = totalVolume > 0 ? (zone.volume / totalVolume) * 100 : 0
+      priceZones.forEach(zone => {
         if (zone.volume > maxZoneVolume) {
           maxZoneVolume = zone.volume
         }
       })
 
-      profiles.push({
-        dataIndex: endIdx,
-        date: visibleData[endIdx].date,
-        zones: volumeZones,
+      priceZones.forEach(zone => {
+        zone.volumeWeight = maxZoneVolume > 0 ? zone.volume / maxZoneVolume : 0
+      })
+
+      slots.push({
+        slotIndex: slotIdx,
+        startDate: slotData[0].date,
+        endDate: slotData[slotData.length - 1].date,
+        priceZones,
         totalVolume,
-        maxZoneVolume,
-        numZones
+        maxZoneVolume
       })
     }
 
-    return profiles
+    return slots
   }
 
   const volumeProfileV2Data = calculateVolumeProfileV2()
@@ -4867,7 +4849,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     )
   }
 
-  // Custom component to render Volume Profile V2 - progressive accumulation from left to right
+  // Custom component to render Volume Profile V2 - 100 date slots with volume distribution
   const CustomVolumeProfileV2 = (props) => {
     if (!volumeProfileV2Enabled || volumeProfileV2Data.length === 0) return null
 
@@ -4879,63 +4861,50 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return null
     }
 
-    // Get the visible data range
-    const reversedDisplayPrices = [...displayPrices].reverse()
-    const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
-
-    if (visibleData.length === 0) return null
-
-    // Get the X position of the first visible data point (start of range)
-    const startDate = visibleData[0].date
-    const startX = xAxis.scale(startDate)
-
-    if (startX === undefined) return null
-
     return (
       <g>
-        {volumeProfileV2Data.map((profile, profileIdx) => {
-          if (!profile) return null
+        {volumeProfileV2Data.map((slot, slotIdx) => {
+          if (!slot) return null
 
-          const currentDate = profile.date
-          const currentX = xAxis.scale(currentDate)
+          // Get X positions for this date slot
+          const startX = xAxis.scale(slot.startDate)
+          const endX = xAxis.scale(slot.endDate)
 
-          if (currentX === undefined) return null
+          if (startX === undefined || endX === undefined) return null
 
-          // Bar spans from the start of visible range to the current processed point
-          const barX = startX
-          const barWidth = Math.abs(currentX - startX)
+          // Calculate the width of this vertical strip
+          const slotX = startX
+          const slotWidth = Math.abs(endX - startX)
 
           return (
-            <g key={`volume-profile-v2-${profileIdx}`}>
-              {profile.zones.map((zone, zoneIdx) => {
+            <g key={`volume-profile-v2-slot-${slotIdx}`}>
+              {slot.priceZones.map((zone, zoneIdx) => {
+                // Skip zones with no volume
+                if (zone.volumeWeight === 0) return null
+
                 // Calculate y positions based on price range
                 const yTop = yAxis.scale(zone.maxPrice)
                 const yBottom = yAxis.scale(zone.minPrice)
                 const height = Math.abs(yBottom - yTop)
 
-                // Calculate color depth based on volume weight
-                // Higher volume = deeper/darker color
-                const volumeWeight = zone.volume / profile.maxZoneVolume
-
                 // Use the same color scheme as Vol Prf Auto mode (blue/cyan hue)
                 const hue = 200 // Blue/cyan
                 const saturation = 75
                 // Map volume weight to lightness: high volume = darker (30%), low volume = lighter (75%)
-                const lightness = 75 - (volumeWeight * 45) // Range from 75% (light) to 30% (dark)
+                const lightness = 75 - (zone.volumeWeight * 45) // Range from 75% (light) to 30% (dark)
 
                 // Opacity based on volume weight
-                const opacity = 0.3 + (volumeWeight * 0.5) // Range from 0.3 to 0.8
+                const opacity = 0.2 + (zone.volumeWeight * 0.6) // Range from 0.2 to 0.8
 
                 return (
                   <rect
-                    key={`volume-profile-v2-${profileIdx}-zone-${zoneIdx}`}
-                    x={barX}
+                    key={`volume-profile-v2-slot-${slotIdx}-zone-${zoneIdx}`}
+                    x={slotX}
                     y={yTop}
-                    width={barWidth}
+                    width={slotWidth}
                     height={height}
                     fill={`hsl(${hue}, ${saturation}%, ${lightness}%)`}
-                    stroke="rgba(59, 130, 246, 0.3)"
-                    strokeWidth={0.3}
+                    stroke="none"
                     opacity={opacity}
                   />
                 )
