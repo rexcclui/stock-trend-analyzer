@@ -2126,7 +2126,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           minPrice: globalMin + (i * priceZoneHeight),
           maxPrice: globalMin + ((i + 1) * priceZoneHeight),
           volume: 0,
-          volumeWeight: 0 // 0 to 1
+          volumeWeight: 0 // Will be calculated globally later
         })
       }
 
@@ -2144,27 +2144,31 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         priceZones[zoneIndex].volume += volume
       })
 
-      // Calculate volume weights (0 to 1) based on cumulative data
-      let maxZoneVolume = 0
-      priceZones.forEach(zone => {
-        if (zone.volume > maxZoneVolume) {
-          maxZoneVolume = zone.volume
-        }
-      })
-
-      priceZones.forEach(zone => {
-        zone.volumeWeight = maxZoneVolume > 0 ? zone.volume / maxZoneVolume : 0
-      })
-
       slots.push({
         slotIndex: slotIdx,
         startDate: slotData[0].date,
         endDate: slotData[slotData.length - 1].date,
         priceZones,
-        totalVolume,
-        maxZoneVolume
+        totalVolume
       })
     }
+
+    // Calculate global max zone volume across ALL slots
+    let globalMaxZoneVolume = 0
+    slots.forEach(slot => {
+      slot.priceZones.forEach(zone => {
+        if (zone.volume > globalMaxZoneVolume) {
+          globalMaxZoneVolume = zone.volume
+        }
+      })
+    })
+
+    // Now calculate volume weights relative to global maximum
+    slots.forEach(slot => {
+      slot.priceZones.forEach(zone => {
+        zone.volumeWeight = globalMaxZoneVolume > 0 ? zone.volume / globalMaxZoneVolume : 0
+      })
+    })
 
     return slots
   }
