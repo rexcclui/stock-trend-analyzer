@@ -2165,6 +2165,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         priceZones[zoneIndex].volume += volume
       })
 
+      // Calculate volume weights as percentage of total volume in this slot
+      // All zones in a slot will sum to 100%
+      priceZones.forEach(zone => {
+        zone.volumeWeight = totalVolume > 0 ? zone.volume / totalVolume : 0
+      })
+
       slots.push({
         slotIndex: slotIdx,
         startDate: slotData[0].date,
@@ -2173,23 +2179,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         totalVolume
       })
     }
-
-    // Calculate global max zone volume across ALL slots
-    let globalMaxZoneVolume = 0
-    slots.forEach(slot => {
-      slot.priceZones.forEach(zone => {
-        if (zone.volume > globalMaxZoneVolume) {
-          globalMaxZoneVolume = zone.volume
-        }
-      })
-    })
-
-    // Now calculate volume weights relative to global maximum
-    slots.forEach(slot => {
-      slot.priceZones.forEach(zone => {
-        zone.volumeWeight = globalMaxZoneVolume > 0 ? zone.volume / globalMaxZoneVolume : 0
-      })
-    })
 
     return slots
   }
