@@ -6008,20 +6008,22 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
         {/* Volume Profile V2 Color Legend */}
         {volumeProfileV2Enabled && (() => {
-          // Generate color blocks for different volume weight percentages
+          // Generate color blocks for different volume weight percentages (8 levels)
           const legendSteps = [
             { weight: 0, label: '0%' },
-            { weight: 0.2, label: '20%' },
-            { weight: 0.4, label: '40%' },
-            { weight: 0.6, label: '60%' },
-            { weight: 0.8, label: '80%' },
+            { weight: 0.15, label: '15%' },
+            { weight: 0.30, label: '30%' },
+            { weight: 0.45, label: '45%' },
+            { weight: 0.60, label: '60%' },
+            { weight: 0.75, label: '75%' },
+            { weight: 0.90, label: '90%' },
             { weight: 1.0, label: '100%' }
           ]
 
           return (
             <div style={{
               position: 'absolute',
-              bottom: '10px',
+              bottom: '-55px',
               left: '50%',
               transform: 'translateX(-50%)',
               display: 'flex',
@@ -6038,7 +6040,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700, textAlign: 'center' }}>
                 Volume Weight %
               </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                 {legendSteps.map((step, idx) => {
                   const hue = 200
                   const saturation = 75
@@ -6048,8 +6050,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   return (
                     <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
                       <div style={{
-                        width: '32px',
-                        height: '20px',
+                        width: '28px',
+                        height: '18px',
                         background: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
                         opacity: opacity,
                         border: '1px solid rgba(59, 130, 246, 0.5)',
