@@ -4879,9 +4879,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return null
     }
 
-    // Reverse the data to match the chart order (newest first)
+    // Get the visible data range
     const reversedDisplayPrices = [...displayPrices].reverse()
     const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
+
+    if (visibleData.length === 0) return null
+
+    // Get the X position of the first visible data point (start of range)
+    const startDate = visibleData[0].date
+    const startX = xAxis.scale(startDate)
+
+    if (startX === undefined) return null
 
     return (
       <g>
@@ -4891,15 +4899,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const currentDate = profile.date
           const currentX = xAxis.scale(currentDate)
 
-          // Get the next data point to determine the bar width
-          const nextProfile = volumeProfileV2Data[profileIdx + 1]
-          const nextDate = nextProfile ? nextProfile.date : null
-          const nextX = nextDate ? xAxis.scale(nextDate) : offset.left + offset.width
+          if (currentX === undefined) return null
 
-          if (currentX === undefined || nextX === undefined) return null
-
-          const barX = currentX
-          const barWidth = Math.abs(nextX - currentX)
+          // Bar spans from the start of visible range to the current processed point
+          const barX = startX
+          const barWidth = Math.abs(currentX - startX)
 
           return (
             <g key={`volume-profile-v2-${profileIdx}`}>
