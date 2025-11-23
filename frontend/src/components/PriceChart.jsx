@@ -138,8 +138,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         }
 
         // Calculate number of zones based on price range ratio
-        // numZones = (zone range / chart range) / 0.05
-        const numZones = Math.max(5, Math.floor((zoneRange / chartRange) / 0.05))
+        // numZones = (zone range / chart range) / 0.02 (target ~2% of chart height per zone)
+        const numZones = Math.max(7, Math.floor((zoneRange / chartRange) / 0.02))
         const zoneHeight = zoneRange / numZones
         const volumeZones = new Array(numZones).fill(0)
 
@@ -181,14 +181,20 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
         // Calculate the center price of the highest volume zone
         const pocPrice = minPrice + (maxVolZoneIndex + 0.5) * zoneHeight
+        const pocLower = minPrice + maxVolZoneIndex * zoneHeight
+        const pocUpper = minPrice + (maxVolZoneIndex + 1) * zoneHeight
 
         // Calculate volume percentage for this zone
         const volumePercent = totalVolume > 0 ? (maxVol / totalVolume) * 100 : 0
 
         // Find second and third volume zones based on current price position
         let secondVolZone = null
+        let secondVolZoneLower = null
+        let secondVolZoneUpper = null
         let secondVolPercent = 0
         let thirdVolZone = null
+        let thirdVolZoneLower = null
+        let thirdVolZoneUpper = null
         let thirdVolPercent = 0
 
         // Determine if current price is above or below the POC
@@ -210,6 +216,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           if (secondMaxVolZoneIndex >= 0) {
             secondVolZone = minPrice + (secondMaxVolZoneIndex + 0.5) * zoneHeight
+            secondVolZoneLower = minPrice + secondMaxVolZoneIndex * zoneHeight
+            secondVolZoneUpper = minPrice + (secondMaxVolZoneIndex + 1) * zoneHeight
             secondVolPercent = totalVolume > 0 ? (secondMaxVol / totalVolume) * 100 : 0
           }
 
@@ -227,6 +235,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           if (thirdMaxVolZoneIndex >= 0) {
             thirdVolZone = minPrice + (thirdMaxVolZoneIndex + 0.5) * zoneHeight
+            thirdVolZoneLower = minPrice + thirdMaxVolZoneIndex * zoneHeight
+            thirdVolZoneUpper = minPrice + (thirdMaxVolZoneIndex + 1) * zoneHeight
             thirdVolPercent = totalVolume > 0 ? (thirdMaxVol / totalVolume) * 100 : 0
           }
         } else {
@@ -245,6 +255,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           if (secondMaxVolZoneIndex >= 0) {
             secondVolZone = minPrice + (secondMaxVolZoneIndex + 0.5) * zoneHeight
+            secondVolZoneLower = minPrice + secondMaxVolZoneIndex * zoneHeight
+            secondVolZoneUpper = minPrice + (secondMaxVolZoneIndex + 1) * zoneHeight
             secondVolPercent = totalVolume > 0 ? (secondMaxVol / totalVolume) * 100 : 0
           }
 
@@ -262,6 +274,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           if (thirdMaxVolZoneIndex >= 0) {
             thirdVolZone = minPrice + (thirdMaxVolZoneIndex + 0.5) * zoneHeight
+            thirdVolZoneLower = minPrice + thirdMaxVolZoneIndex * zoneHeight
+            thirdVolZoneUpper = minPrice + (thirdMaxVolZoneIndex + 1) * zoneHeight
             thirdVolPercent = totalVolume > 0 ? (thirdMaxVol / totalVolume) * 100 : 0
           }
         }
@@ -269,11 +283,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         result.push({
           date: point.date,
           highVolZone: pocPrice,
-          volumePercent: volumePercent,
-          secondVolZone: secondVolZone,
-          secondVolPercent: secondVolPercent,
-          thirdVolZone: thirdVolZone,
-          thirdVolPercent: thirdVolPercent
+          highVolZoneLower: pocLower,
+          highVolZoneUpper: pocUpper,
+          volumePercent,
+          secondVolZone,
+          secondVolZoneLower,
+          secondVolZoneUpper,
+          secondVolPercent,
+          thirdVolZone,
+          thirdVolZoneLower,
+          thirdVolZoneUpper,
+          thirdVolPercent
         })
       })
 
@@ -2315,10 +2335,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const resLnPoint = resLnData.find(r => r.date === price.date)
       if (resLnPoint) {
         dataPoint.highVolZone = resLnPoint.highVolZone
+        dataPoint.highVolZoneLower = resLnPoint.highVolZoneLower
+        dataPoint.highVolZoneUpper = resLnPoint.highVolZoneUpper
         dataPoint.volumePercent = resLnPoint.volumePercent
+
         dataPoint.secondVolZone = resLnPoint.secondVolZone
+        dataPoint.secondVolZoneLower = resLnPoint.secondVolZoneLower
+        dataPoint.secondVolZoneUpper = resLnPoint.secondVolZoneUpper
         dataPoint.secondVolPercent = resLnPoint.secondVolPercent
+
         dataPoint.thirdVolZone = resLnPoint.thirdVolZone
+        dataPoint.thirdVolZoneLower = resLnPoint.thirdVolZoneLower
+        dataPoint.thirdVolZoneUpper = resLnPoint.thirdVolZoneUpper
         dataPoint.thirdVolPercent = resLnPoint.thirdVolPercent
       }
     }
@@ -3487,7 +3515,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // Use visible chart data directly (zones are now added during chartData creation)
   const chartDataWithZones = visibleChartData
 
-  // Custom component to render colored resistance line based on volume percentage
+  // Custom component to render colored resistance zone based on volume percentage
   const CustomResistanceLine = (props) => {
     if (!resLnEnabled) return null
 
@@ -3512,29 +3540,32 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return '#ef4444' // Red - minimal (<5%)
     }
 
-    // Build line segments with different colors
+    // Build zone segments with different colors
     const segments = []
     let currentSegment = null
 
     chartDataWithZones.forEach((point, index) => {
-      if (!point.highVolZone || point.volumePercent === undefined) return
+      if (!point.highVolZone || point.volumePercent === undefined || point.highVolZoneLower === undefined || point.highVolZoneUpper === undefined) return
 
       const x = xAxis.scale(point.date)
-      const y = yAxis.scale(point.highVolZone)
+      const yLower = yAxis.scale(point.highVolZoneLower)
+      const yUpper = yAxis.scale(point.highVolZoneUpper)
       const color = getVolumeColor(point.volumePercent)
 
       if (!currentSegment || currentSegment.color !== color) {
         // Start a new segment
         if (currentSegment) {
+          // Add current point to finish previous segment for continuity
+          currentSegment.points.push({ x, yLower, yUpper })
           segments.push(currentSegment)
         }
         currentSegment = {
           color,
-          points: [{ x, y, volumePercent: point.volumePercent }]
+          points: [{ x, yLower, yUpper }]
         }
       } else {
         // Continue current segment
-        currentSegment.points.push({ x, y, volumePercent: point.volumePercent })
+        currentSegment.points.push({ x, yLower, yUpper })
       }
     })
 
@@ -3548,21 +3579,33 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         {segments.map((segment, segmentIndex) => {
           if (segment.points.length < 2) return null
 
-          // Create path for this segment
-          let pathData = `M ${segment.points[0].x} ${segment.points[0].y}`
+          // Create path for this segment (filled area)
+          // Move to first point upper
+          let pathData = `M ${segment.points[0].x} ${segment.points[0].yUpper}`
+
+          // Draw line along upper edge
           for (let i = 1; i < segment.points.length; i++) {
-            pathData += ` L ${segment.points[i].x} ${segment.points[i].y}`
+            pathData += ` L ${segment.points[i].x} ${segment.points[i].yUpper}`
           }
+
+          // Draw line down to last point lower
+          pathData += ` L ${segment.points[segment.points.length - 1].x} ${segment.points[segment.points.length - 1].yLower}`
+
+          // Draw line along lower edge (backwards)
+          for (let i = segment.points.length - 2; i >= 0; i--) {
+            pathData += ` L ${segment.points[i].x} ${segment.points[i].yLower}`
+          }
+
+          // Close path
+          pathData += ' Z'
 
           return (
             <path
               key={`res-ln-segment-${segmentIndex}`}
               d={pathData}
-              stroke={segment.color}
-              strokeWidth={2}
-              strokeDasharray="5 5"
-              fill="none"
-              opacity={0.9}
+              fill={segment.color}
+              fillOpacity={0.35}
+              stroke="none"
             />
           )
         })}
@@ -3594,29 +3637,32 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return '#ef4444'
     }
 
-    // Build line segments with different colors
+    // Build zone segments with different colors
     const segments = []
     let currentSegment = null
 
     chartDataWithZones.forEach((point, index) => {
-      if (!point.secondVolZone || point.secondVolPercent === undefined) return
+      if (!point.secondVolZone || point.secondVolPercent === undefined || point.secondVolZoneLower === undefined || point.secondVolZoneUpper === undefined) return
 
       const x = xAxis.scale(point.date)
-      const y = yAxis.scale(point.secondVolZone)
+      const yLower = yAxis.scale(point.secondVolZoneLower)
+      const yUpper = yAxis.scale(point.secondVolZoneUpper)
       const color = getVolumeColor(point.secondVolPercent)
 
       if (!currentSegment || currentSegment.color !== color) {
         // Start a new segment
         if (currentSegment) {
+          // Add current point to finish previous segment for continuity
+          currentSegment.points.push({ x, yLower, yUpper })
           segments.push(currentSegment)
         }
         currentSegment = {
           color,
-          points: [{ x, y, volumePercent: point.secondVolPercent }]
+          points: [{ x, yLower, yUpper }]
         }
       } else {
         // Continue current segment
-        currentSegment.points.push({ x, y, volumePercent: point.secondVolPercent })
+        currentSegment.points.push({ x, yLower, yUpper })
       }
     })
 
@@ -3630,28 +3676,34 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         {segments.map((segment, segmentIndex) => {
           if (segment.points.length < 2) return null
 
-          // Create path for this segment
-          let pathData = `M ${segment.points[0].x} ${segment.points[0].y}`
+          // Create path for this segment (filled area)
+          let pathData = `M ${segment.points[0].x} ${segment.points[0].yUpper}`
+
           for (let i = 1; i < segment.points.length; i++) {
-            pathData += ` L ${segment.points[i].x} ${segment.points[i].y}`
+            pathData += ` L ${segment.points[i].x} ${segment.points[i].yUpper}`
           }
+
+          pathData += ` L ${segment.points[segment.points.length - 1].x} ${segment.points[segment.points.length - 1].yLower}`
+
+          for (let i = segment.points.length - 2; i >= 0; i--) {
+            pathData += ` L ${segment.points[i].x} ${segment.points[i].yLower}`
+          }
+
+          pathData += ' Z'
 
           return (
             <path
               key={`second-vol-zone-segment-${segmentIndex}`}
               d={pathData}
-              stroke={segment.color}
-              strokeWidth={1.5}
-              strokeDasharray="3 3"
-              fill="none"
-              opacity={0.6}
+              fill={segment.color}
+              fillOpacity={0.3}
+              stroke="none"
             />
           )
         })}
       </g>
     )
   }
-
   // Custom component to render third volume zone line
   const CustomThirdVolZoneLine = (props) => {
     if (!resLnEnabled) return null
@@ -3676,29 +3728,32 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return '#ef4444'
     }
 
-    // Build line segments with different colors
+    // Build zone segments with different colors
     const segments = []
     let currentSegment = null
 
     chartDataWithZones.forEach((point, index) => {
-      if (!point.thirdVolZone || point.thirdVolPercent === undefined) return
+      if (!point.thirdVolZone || point.thirdVolPercent === undefined || point.thirdVolZoneLower === undefined || point.thirdVolZoneUpper === undefined) return
 
       const x = xAxis.scale(point.date)
-      const y = yAxis.scale(point.thirdVolZone)
+      const yLower = yAxis.scale(point.thirdVolZoneLower)
+      const yUpper = yAxis.scale(point.thirdVolZoneUpper)
       const color = getVolumeColor(point.thirdVolPercent)
 
       if (!currentSegment || currentSegment.color !== color) {
         // Start a new segment
         if (currentSegment) {
+          // Add current point to finish previous segment for continuity
+          currentSegment.points.push({ x, yLower, yUpper })
           segments.push(currentSegment)
         }
         currentSegment = {
           color,
-          points: [{ x, y, volumePercent: point.thirdVolPercent }]
+          points: [{ x, yLower, yUpper }]
         }
       } else {
         // Continue current segment
-        currentSegment.points.push({ x, y, volumePercent: point.thirdVolPercent })
+        currentSegment.points.push({ x, yLower, yUpper })
       }
     })
 
@@ -3712,21 +3767,28 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         {segments.map((segment, segmentIndex) => {
           if (segment.points.length < 2) return null
 
-          // Create path for this segment
-          let pathData = `M ${segment.points[0].x} ${segment.points[0].y}`
+          // Create path for this segment (filled area)
+          let pathData = `M ${segment.points[0].x} ${segment.points[0].yUpper}`
+
           for (let i = 1; i < segment.points.length; i++) {
-            pathData += ` L ${segment.points[i].x} ${segment.points[i].y}`
+            pathData += ` L ${segment.points[i].x} ${segment.points[i].yUpper}`
           }
+
+          pathData += ` L ${segment.points[segment.points.length - 1].x} ${segment.points[segment.points.length - 1].yLower}`
+
+          for (let i = segment.points.length - 2; i >= 0; i--) {
+            pathData += ` L ${segment.points[i].x} ${segment.points[i].yLower}`
+          }
+
+          pathData += ' Z'
 
           return (
             <path
               key={`third-vol-zone-segment-${segmentIndex}`}
               d={pathData}
-              stroke={segment.color}
-              strokeWidth={1}
-              strokeDasharray="2 4"
-              fill="none"
-              opacity={0.5}
+              fill={segment.color}
+              fillOpacity={0.25}
+              stroke="none"
             />
           )
         })}
