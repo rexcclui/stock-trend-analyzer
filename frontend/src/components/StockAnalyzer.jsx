@@ -103,8 +103,8 @@ function StockAnalyzer() {
         volumeProfileMode: 'auto', // 'auto' or 'manual'
         volumeProfileManualRanges: [], // Array of { startDate, endDate }
         volumeProfileV2Enabled: false,
-        volumeProfileV2StartIndex: null,
-        volumeProfileV2EndIndex: null,
+        volumeProfileV2StartDate: null,
+        volumeProfileV2EndDate: null,
         spyData: null,
         performanceComparisonEnabled: false,
         performanceComparisonBenchmark: 'SPY',
@@ -591,21 +591,21 @@ function StockAnalyzer() {
     )
   }
 
-  const updateVolumeProfileV2Start = (chartId, startIndex) => {
+  const updateVolumeProfileV2Start = (chartId, startDate) => {
     setCharts(prevCharts =>
       prevCharts.map(chart =>
         chart.id === chartId
-          ? { ...chart, volumeProfileV2StartIndex: startIndex }
+          ? { ...chart, volumeProfileV2StartDate: startDate }
           : chart
       )
     )
   }
 
-  const updateVolumeProfileV2End = (chartId, endIndex) => {
+  const updateVolumeProfileV2End = (chartId, endDate) => {
     setCharts(prevCharts =>
       prevCharts.map(chart =>
         chart.id === chartId
-          ? { ...chart, volumeProfileV2EndIndex: endIndex }
+          ? { ...chart, volumeProfileV2EndDate: endDate }
           : chart
       )
     )
@@ -1763,8 +1763,8 @@ function StockAnalyzer() {
                     onVolumeProfileManualRangeChange={(range) => updateVolumeProfileManualRange(chart.id, range)}
                     onVolumeProfileRangeRemove={(rangeIndex) => removeVolumeProfileRange(chart.id, rangeIndex)}
                     volumeProfileV2Enabled={chart.volumeProfileV2Enabled}
-                    volumeProfileV2StartIndex={chart.volumeProfileV2StartIndex}
-                    volumeProfileV2EndIndex={chart.volumeProfileV2EndIndex}
+                    volumeProfileV2StartDate={chart.volumeProfileV2StartDate}
+                    volumeProfileV2EndDate={chart.volumeProfileV2EndDate}
                     onVolumeProfileV2StartChange={(value) => updateVolumeProfileV2Start(chart.id, value)}
                     onVolumeProfileV2EndChange={(value) => updateVolumeProfileV2End(chart.id, value)}
                     spyData={chart.spyData}

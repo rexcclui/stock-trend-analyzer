@@ -3,7 +3,7 @@ import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 import { X, ArrowLeftRight, Hand } from 'lucide-react'
 import { findBestChannels, filterOverlappingChannels } from './PriceChart/utils/bestChannelFinder'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartIndex = null, volumeProfileV2EndIndex = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -2078,7 +2078,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   const volumeProfiles = calculateVolumeProfiles()
 
-  // Calculate Volume Profile V2 - 100 date slots with volume distribution per price range
+  // Calculate Volume Profile V2 - 200 date slots with volume distribution per price range
   const calculateVolumeProfileV2 = () => {
     if (!volumeProfileV2Enabled || displayPrices.length === 0) return []
 
@@ -2087,9 +2087,20 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     if (visibleData.length === 0) return []
 
-    // Apply volumeProfileV2StartIndex and volumeProfileV2EndIndex to limit the data range
-    const effectiveStartIndex = volumeProfileV2StartIndex !== null ? Math.max(0, Math.min(volumeProfileV2StartIndex, visibleData.length)) : 0
-    const effectiveEndIndex = volumeProfileV2EndIndex !== null ? Math.min(volumeProfileV2EndIndex, visibleData.length) : visibleData.length
+    // Convert dates to indices (dates are locked, indices adjust based on visible data)
+    let effectiveStartIndex = 0
+    let effectiveEndIndex = visibleData.length
+
+    if (volumeProfileV2StartDate !== null) {
+      const startIdx = visibleData.findIndex(d => d.date === volumeProfileV2StartDate)
+      if (startIdx !== -1) effectiveStartIndex = startIdx
+    }
+
+    if (volumeProfileV2EndDate !== null) {
+      const endIdx = visibleData.findIndex(d => d.date === volumeProfileV2EndDate)
+      if (endIdx !== -1) effectiveEndIndex = endIdx + 1 // +1 because slice end is exclusive
+    }
+
     const limitedVisibleData = visibleData.slice(effectiveStartIndex, effectiveEndIndex)
 
     if (limitedVisibleData.length === 0) return []
@@ -2106,8 +2117,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const numPriceZones = Math.max(1, Math.min(50, Math.round(globalRange / 0.08)))
     const priceZoneHeight = globalRange / numPriceZones
 
-    // Divide LIMITED data into 100 date slots
-    const numDateSlots = 100
+    // Divide LIMITED data into 200 date slots
+    const numDateSlots = 200
     const slotSize = Math.ceil(limitedVisibleData.length / numDateSlots)
     const slots = []
 
@@ -5248,8 +5259,19 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
         const maxIndex = visibleData.length
 
-        const effectiveStartIndex = volumeProfileV2StartIndex !== null ? Math.max(0, Math.min(volumeProfileV2StartIndex, maxIndex)) : 0
-        const effectiveEndIndex = volumeProfileV2EndIndex !== null ? Math.min(volumeProfileV2EndIndex, maxIndex) : maxIndex
+        // Convert stored dates to current visible indices
+        let effectiveStartIndex = 0
+        let effectiveEndIndex = maxIndex
+
+        if (volumeProfileV2StartDate !== null) {
+          const startIdx = visibleData.findIndex(d => d.date === volumeProfileV2StartDate)
+          if (startIdx !== -1) effectiveStartIndex = startIdx
+        }
+
+        if (volumeProfileV2EndDate !== null) {
+          const endIdx = visibleData.findIndex(d => d.date === volumeProfileV2EndDate)
+          if (endIdx !== -1) effectiveEndIndex = endIdx + 1
+        }
 
         const startDate = visibleData[effectiveStartIndex]?.date || '...'
         const endDate = visibleData[effectiveEndIndex - 1]?.date || '...'
@@ -5317,9 +5339,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   max={maxIndex}
                   value={effectiveStartIndex}
                   onChange={(e) => {
-                    const newStart = parseInt(e.target.value, 10)
-                    if (newStart < effectiveEndIndex) {
-                      onVolumeProfileV2StartChange && onVolumeProfileV2StartChange(newStart)
+                    const newStartIdx = parseInt(e.target.value, 10)
+                    if (newStartIdx < effectiveEndIndex && visibleData[newStartIdx]) {
+                      // Convert index to date and store the date
+                      const newStartDate = visibleData[newStartIdx].date
+                      onVolumeProfileV2StartChange && onVolumeProfileV2StartChange(newStartDate)
                     }
                   }}
                   style={{
@@ -5346,9 +5370,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   max={maxIndex}
                   value={effectiveEndIndex}
                   onChange={(e) => {
-                    const newEnd = parseInt(e.target.value, 10)
-                    if (newEnd > effectiveStartIndex) {
-                      onVolumeProfileV2EndChange && onVolumeProfileV2EndChange(newEnd)
+                    const newEndIdx = parseInt(e.target.value, 10)
+                    if (newEndIdx > effectiveStartIndex && visibleData[newEndIdx - 1]) {
+                      // Convert index to date and store the date
+                      const newEndDate = visibleData[newEndIdx - 1].date
+                      onVolumeProfileV2EndChange && onVolumeProfileV2EndChange(newEndDate)
                     }
                   }}
                   style={{
