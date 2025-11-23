@@ -51,6 +51,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Volume Profile V2 hover state
   const [volV2HoveredBar, setVolV2HoveredBar] = useState(null)
+  const [volV2SliderDragging, setVolV2SliderDragging] = useState(false)
 
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
   // No need to reset here to avoid infinite loop
@@ -5391,6 +5392,28 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             >
               <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>Vol V2 Range</span>
 
+              {/* Date range popup - shown while dragging */}
+              {volV2SliderDragging && (
+                <div style={{
+                  position: 'absolute',
+                  top: '-35px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: 'rgba(15, 23, 42, 0.95)',
+                  border: '1px solid rgba(148, 163, 184, 0.5)',
+                  borderRadius: '6px',
+                  padding: '4px 12px',
+                  fontSize: '11px',
+                  color: '#e2e8f0',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                  zIndex: 10
+                }}>
+                  {startDate} → {endDate}
+                </div>
+              )}
+
               {/* Dual-handle range slider container */}
               <div style={{ flex: 1, position: 'relative', height: '24px', display: 'flex', alignItems: 'center' }}>
                 {/* Background track */}
@@ -5429,6 +5452,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                       onVolumeProfileV2StartChange && onVolumeProfileV2StartChange(newStartDate)
                     }
                   }}
+                  onMouseDown={() => setVolV2SliderDragging(true)}
+                  onMouseUp={() => setVolV2SliderDragging(false)}
+                  onTouchStart={() => setVolV2SliderDragging(true)}
+                  onTouchEnd={() => setVolV2SliderDragging(false)}
                   style={{
                     position: 'absolute',
                     width: '100%',
@@ -5474,8 +5501,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                     WebkitAppearance: 'none',
                     appearance: 'none'
                   }}
-                  onMouseDown={(e) => e.currentTarget.style.zIndex = '5'}
-                  onMouseUp={(e) => e.currentTarget.style.zIndex = '3'}
+                  onMouseDown={(e) => { e.currentTarget.style.zIndex = '5'; setVolV2SliderDragging(true); }}
+                  onMouseUp={(e) => { e.currentTarget.style.zIndex = '3'; setVolV2SliderDragging(false); }}
+                  onTouchStart={() => setVolV2SliderDragging(true)}
+                  onTouchEnd={() => setVolV2SliderDragging(false)}
                 />
 
                 <style>{`
