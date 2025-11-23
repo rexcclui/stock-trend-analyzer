@@ -6007,37 +6007,64 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         </ResponsiveContainer>
 
         {/* Volume Profile V2 Color Legend */}
-        {volumeProfileV2Enabled && (
-          <div style={{
-            position: 'absolute',
-            bottom: '10px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            padding: '8px 16px',
-            background: 'rgba(15, 23, 42, 0.9)',
-            border: '1px solid rgba(148, 163, 184, 0.3)',
-            borderRadius: '8px',
-            backdropFilter: 'blur(4px)',
-            boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
-            zIndex: 10
-          }}>
-            <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>Volume:</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <span style={{ fontSize: '10px', color: '#94a3b8' }}>Low</span>
-              <div style={{
-                width: '150px',
-                height: '14px',
-                background: 'linear-gradient(to right, hsl(200, 75%, 75%), hsl(200, 75%, 30%))',
-                border: '1px solid rgba(59, 130, 246, 0.4)',
-                borderRadius: '3px'
-              }} />
-              <span style={{ fontSize: '10px', color: '#94a3b8' }}>High</span>
+        {volumeProfileV2Enabled && (() => {
+          // Generate color blocks for different volume weight percentages
+          const legendSteps = [
+            { weight: 0, label: '0%' },
+            { weight: 0.2, label: '20%' },
+            { weight: 0.4, label: '40%' },
+            { weight: 0.6, label: '60%' },
+            { weight: 0.8, label: '80%' },
+            { weight: 1.0, label: '100%' }
+          ]
+
+          return (
+            <div style={{
+              position: 'absolute',
+              bottom: '10px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              padding: '10px 16px',
+              background: 'rgba(15, 23, 42, 0.95)',
+              border: '1px solid rgba(148, 163, 184, 0.3)',
+              borderRadius: '8px',
+              backdropFilter: 'blur(4px)',
+              boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
+              zIndex: 10
+            }}>
+              <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700, textAlign: 'center' }}>
+                Volume Weight %
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                {legendSteps.map((step, idx) => {
+                  const hue = 200
+                  const saturation = 75
+                  const lightness = 75 - (step.weight * 45)
+                  const opacity = 0.3 + (step.weight * 0.5)
+
+                  return (
+                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+                      <div style={{
+                        width: '32px',
+                        height: '20px',
+                        background: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+                        opacity: opacity,
+                        border: '1px solid rgba(59, 130, 246, 0.5)',
+                        borderRadius: '3px'
+                      }} />
+                      <span style={{ fontSize: '9px', color: '#94a3b8', fontWeight: 600 }}>
+                        {step.label}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
       </div>
     </div>
   )
