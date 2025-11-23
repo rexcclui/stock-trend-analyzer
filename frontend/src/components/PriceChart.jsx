@@ -2102,15 +2102,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const slots = []
 
     for (let slotIdx = 0; slotIdx < numDateSlots; slotIdx++) {
-      const startIdx = slotIdx * slotSize
-      const endIdx = Math.min(startIdx + slotSize, visibleData.length)
+      const endIdx = Math.min((slotIdx + 1) * slotSize, visibleData.length)
 
-      if (startIdx >= visibleData.length) break
+      if (endIdx === 0) break
 
-      const slotData = visibleData.slice(startIdx, endIdx)
+      // CUMULATIVE: Get all data from START to current slot's end
+      const cumulativeData = visibleData.slice(0, endIdx)
+      const slotData = visibleData.slice(slotIdx * slotSize, endIdx)
+
       if (slotData.length === 0) continue
 
-      // Initialize price zones for this date slot
+      // Initialize price zones for cumulative calculation
       const priceZones = []
       for (let i = 0; i < numPriceZones; i++) {
         priceZones.push({
@@ -2121,9 +2123,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         })
       }
 
-      // Accumulate volume in each price zone for this date slot
+      // Accumulate volume in each price zone from START to current slot
       let totalVolume = 0
-      slotData.forEach(price => {
+      cumulativeData.forEach(price => {
         const priceValue = price.close
         const volume = price.volume || 0
         totalVolume += volume
@@ -2135,7 +2137,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         priceZones[zoneIndex].volume += volume
       })
 
-      // Calculate volume weights (0 to 1) for this slot
+      // Calculate volume weights (0 to 1) based on cumulative data
       let maxZoneVolume = 0
       priceZones.forEach(zone => {
         if (zone.volume > maxZoneVolume) {
@@ -4861,57 +4863,86 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return null
     }
 
+    // Get visible data to create clip path excluding price line area
+    const reversedDisplayPrices = [...displayPrices].reverse()
+    const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
+
+    // Create path for price line to use as clip exclusion
+    const priceLinePath = visibleData.map((price, idx) => {
+      const x = xAxis.scale(price.date)
+      const y = yAxis.scale(price.close)
+      return idx === 0 ? `M ${x},${y}` : `L ${x},${y}`
+    }).join(' ')
+
     return (
       <g>
-        {volumeProfileV2Data.map((slot, slotIdx) => {
-          if (!slot) return null
+        <defs>
+          {/* Define a clip path that excludes a buffer around the price line */}
+          <clipPath id="volPrfV2-clip">
+            <rect x={offset.left} y={offset.top} width={offset.width} height={offset.height} />
+          </clipPath>
 
-          // Get X positions for this date slot
-          const startX = xAxis.scale(slot.startDate)
-          const endX = xAxis.scale(slot.endDate)
+          {/* Mask that creates a buffer zone around the price line */}
+          <mask id="volPrfV2-mask">
+            {/* White rectangle = visible */}
+            <rect x={offset.left} y={offset.top} width={offset.width} height={offset.height} fill="white" />
+            {/* Black stroke along price line = hidden (4px buffer) */}
+            <path d={priceLinePath} stroke="black" strokeWidth="4" fill="none" />
+          </mask>
+        </defs>
 
-          if (startX === undefined || endX === undefined) return null
+        <g clipPath="url(#volPrfV2-clip)" mask="url(#volPrfV2-mask)">
+          {volumeProfileV2Data.map((slot, slotIdx) => {
+            if (!slot) return null
 
-          // Calculate the width of this vertical strip
-          const slotX = startX
-          const slotWidth = Math.abs(endX - startX)
+            // Get X positions for this date slot
+            const startX = xAxis.scale(slot.startDate)
+            const endX = xAxis.scale(slot.endDate)
 
-          return (
-            <g key={`volume-profile-v2-slot-${slotIdx}`}>
-              {slot.priceZones.map((zone, zoneIdx) => {
-                // Skip zones with no volume
-                if (zone.volumeWeight === 0) return null
+            if (startX === undefined || endX === undefined) return null
 
-                // Calculate y positions based on price range
-                const yTop = yAxis.scale(zone.maxPrice)
-                const yBottom = yAxis.scale(zone.minPrice)
-                const height = Math.abs(yBottom - yTop)
+            // Calculate the width of this vertical strip
+            const slotX = startX
+            const slotWidth = Math.abs(endX - startX)
 
-                // Use the same color scheme as Vol Prf Auto mode (blue/cyan hue)
-                const hue = 200 // Blue/cyan
-                const saturation = 75
-                // Map volume weight to lightness: high volume = darker (30%), low volume = lighter (75%)
-                const lightness = 75 - (zone.volumeWeight * 45) // Range from 75% (light) to 30% (dark)
+            return (
+              <g key={`volume-profile-v2-slot-${slotIdx}`}>
+                {slot.priceZones.map((zone, zoneIdx) => {
+                  // Skip zones with no volume
+                  if (zone.volumeWeight === 0) return null
 
-                // Opacity based on volume weight
-                const opacity = 0.2 + (zone.volumeWeight * 0.6) // Range from 0.2 to 0.8
+                  // Calculate y positions based on price range
+                  const yTop = yAxis.scale(zone.maxPrice)
+                  const yBottom = yAxis.scale(zone.minPrice)
+                  const height = Math.abs(yBottom - yTop)
 
-                return (
-                  <rect
-                    key={`volume-profile-v2-slot-${slotIdx}-zone-${zoneIdx}`}
-                    x={slotX}
-                    y={yTop}
-                    width={slotWidth}
-                    height={height}
-                    fill={`hsl(${hue}, ${saturation}%, ${lightness}%)`}
-                    stroke="none"
-                    opacity={opacity}
-                  />
-                )
-              })}
-            </g>
-          )
-        })}
+                  // Use the same color scheme as Vol Prf Auto mode (blue/cyan hue)
+                  const hue = 200 // Blue/cyan
+                  const saturation = 75
+                  // Map volume weight to lightness: high volume = darker (30%), low volume = lighter (75%)
+                  const lightness = 75 - (zone.volumeWeight * 45) // Range from 75% (light) to 30% (dark)
+
+                  // Opacity based on volume weight
+                  const opacity = 0.3 + (zone.volumeWeight * 0.5) // Range from 0.3 to 0.8
+
+                  return (
+                    <rect
+                      key={`volume-profile-v2-slot-${slotIdx}-zone-${zoneIdx}`}
+                      x={slotX}
+                      y={yTop}
+                      width={slotWidth}
+                      height={height}
+                      fill={`hsl(${hue}, ${saturation}%, ${lightness}%)`}
+                      stroke="none"
+                      opacity={opacity}
+                      style={{ pointerEvents: 'none' }}
+                    />
+                  )
+                })}
+              </g>
+            )
+          })}
+        </g>
       </g>
     )
   }
