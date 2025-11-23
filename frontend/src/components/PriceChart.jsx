@@ -3,7 +3,7 @@ import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 import { X, ArrowLeftRight, Hand } from 'lucide-react'
 import { findBestChannels, filterOverlappingChannels } from './PriceChart/utils/bestChannelFinder'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2EndIndex = null, onVolumeProfileV2EndChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -2084,6 +2084,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     if (visibleData.length === 0) return []
 
+    // Apply volumeProfileV2EndIndex to limit the data range
+    const effectiveEndIndex = volumeProfileV2EndIndex !== null ? Math.min(volumeProfileV2EndIndex, visibleData.length) : visibleData.length
+    const limitedVisibleData = visibleData.slice(0, effectiveEndIndex)
+
+    if (limitedVisibleData.length === 0) return []
+
     // Calculate global min and max from all visible data for consistent price ranges
     const allPrices = visibleData.map(p => p.close)
     const globalMin = Math.min(...allPrices)
@@ -2096,19 +2102,19 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const numPriceZones = Math.max(1, Math.min(50, Math.round(globalRange / 0.08)))
     const priceZoneHeight = globalRange / numPriceZones
 
-    // Divide visible data into 100 date slots
+    // Divide LIMITED data into 100 date slots
     const numDateSlots = 100
-    const slotSize = Math.ceil(visibleData.length / numDateSlots)
+    const slotSize = Math.ceil(limitedVisibleData.length / numDateSlots)
     const slots = []
 
     for (let slotIdx = 0; slotIdx < numDateSlots; slotIdx++) {
-      const endIdx = Math.min((slotIdx + 1) * slotSize, visibleData.length)
+      const endIdx = Math.min((slotIdx + 1) * slotSize, limitedVisibleData.length)
 
       if (endIdx === 0) break
 
       // CUMULATIVE: Get all data from START to current slot's end
-      const cumulativeData = visibleData.slice(0, endIdx)
-      const slotData = visibleData.slice(slotIdx * slotSize, endIdx)
+      const cumulativeData = limitedVisibleData.slice(0, endIdx)
+      const slotData = limitedVisibleData.slice(slotIdx * slotSize, endIdx)
 
       if (slotData.length === 0) continue
 
@@ -5163,10 +5169,77 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         </div>
       )}
 
+      {/* Volume Profile V2 End Index Slider */}
+      {volumeProfileV2Enabled && (() => {
+        const reversedDisplayPrices = [...displayPrices].reverse()
+        const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
+        const maxVolProfileV2EndIndex = visibleData.length
+        const effectiveVolProfileV2EndIndex = volumeProfileV2EndIndex !== null ? Math.min(volumeProfileV2EndIndex, maxVolProfileV2EndIndex) : maxVolProfileV2EndIndex
+        const volProfileV2EndDate = visibleData[effectiveVolProfileV2EndIndex - 1]?.date || '...'
+
+        if (maxVolProfileV2EndIndex <= 1) return null
+
+        const topOffset = revAllChannelEnabled && revAllVisibleLength > 1 ? '46px' : '4px'
+
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              top: topOffset,
+              left: 0,
+              right: 0,
+              padding: '0 16px',
+              zIndex: 7,
+              pointerEvents: 'none'
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                width: '100%',
+                background: 'rgba(30, 41, 59, 0.75)',
+                border: '1px solid rgba(148, 163, 184, 0.3)',
+                borderRadius: '8px',
+                padding: '6px 10px',
+                backdropFilter: 'blur(4px)',
+                boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
+                pointerEvents: 'auto'
+              }}
+            >
+              <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>Vol V2 End</span>
+              <input
+                type="range"
+                min={0}
+                max={maxVolProfileV2EndIndex}
+                value={effectiveVolProfileV2EndIndex}
+                onChange={(e) => onVolumeProfileV2EndChange && onVolumeProfileV2EndChange(parseInt(e.target.value, 10))}
+                style={{
+                  flex: 1,
+                  height: '6px',
+                  accentColor: '#06b6d4',
+                  cursor: 'pointer'
+                }}
+              />
+              <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600, minWidth: '80px', textAlign: 'right' }}>
+                {volProfileV2EndDate}
+              </span>
+            </div>
+          </div>
+        )
+      })()}
+
       <div style={{
         width: '100%',
         height: '100%',
-        paddingTop: revAllChannelEnabled && revAllVisibleLength > 1 ? '42px' : '0'
+        paddingTop: (() => {
+          const hasRevSlider = revAllChannelEnabled && revAllVisibleLength > 1
+          const hasVolV2Slider = volumeProfileV2Enabled && displayPrices.length > 0
+          if (hasRevSlider && hasVolV2Slider) return '84px' // Both sliders
+          if (hasRevSlider || hasVolV2Slider) return '42px' // One slider
+          return '0' // No sliders
+        })()
       }}>
         <ResponsiveContainer>
           <ComposedChart
