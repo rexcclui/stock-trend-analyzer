@@ -2085,17 +2085,38 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     if (visibleData.length === 0) return []
 
     // Convert dates to indices (dates are locked, indices adjust based on visible data)
+    // If dates are not found in current data, reset them to null to use full range
     let effectiveStartIndex = 0
     let effectiveEndIndex = visibleData.length
+    let shouldResetStartDate = false
+    let shouldResetEndDate = false
 
     if (volumeProfileV2StartDate !== null) {
       const startIdx = visibleData.findIndex(d => d.date === volumeProfileV2StartDate)
-      if (startIdx !== -1) effectiveStartIndex = startIdx
+      if (startIdx !== -1) {
+        effectiveStartIndex = startIdx
+      } else {
+        // Date not found in current visible data - reset it
+        shouldResetStartDate = true
+      }
     }
 
     if (volumeProfileV2EndDate !== null) {
       const endIdx = visibleData.findIndex(d => d.date === volumeProfileV2EndDate)
-      if (endIdx !== -1) effectiveEndIndex = endIdx + 1 // +1 because slice end is exclusive
+      if (endIdx !== -1) {
+        effectiveEndIndex = endIdx + 1 // +1 because slice end is exclusive
+      } else {
+        // Date not found in current visible data - reset it
+        shouldResetEndDate = true
+      }
+    }
+
+    // Reset dates if they weren't found (this ensures clean state when switching periods)
+    if (shouldResetStartDate && onVolumeProfileV2StartChange) {
+      onVolumeProfileV2StartChange(null)
+    }
+    if (shouldResetEndDate && onVolumeProfileV2EndChange) {
+      onVolumeProfileV2EndChange(null)
     }
 
     const limitedVisibleData = visibleData.slice(effectiveStartIndex, effectiveEndIndex)
@@ -5197,12 +5218,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
         if (volumeProfileV2StartDate !== null) {
           const startIdx = visibleData.findIndex(d => d.date === volumeProfileV2StartDate)
-          if (startIdx !== -1) effectiveStartIndex = startIdx
+          if (startIdx !== -1) {
+            effectiveStartIndex = startIdx
+          }
+          // If not found, use default (0)
         }
 
         if (volumeProfileV2EndDate !== null) {
           const endIdx = visibleData.findIndex(d => d.date === volumeProfileV2EndDate)
-          if (endIdx !== -1) effectiveEndIndex = endIdx + 1
+          if (endIdx !== -1) {
+            effectiveEndIndex = endIdx + 1
+          }
+          // If not found, use default (maxIndex)
         }
 
         const startDate = visibleData[effectiveStartIndex]?.date || '...'
