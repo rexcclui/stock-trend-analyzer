@@ -3,7 +3,7 @@ import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 import { X, ArrowLeftRight, Hand } from 'lucide-react'
 import { findBestChannels, filterOverlappingChannels } from './PriceChart/utils/bestChannelFinder'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -2074,6 +2074,94 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
   const volumeProfiles = calculateVolumeProfiles()
+
+  // Calculate Volume Profile V2 - progressive accumulation from left to right
+  const calculateVolumeProfileV2 = () => {
+    if (!volumeProfileV2Enabled || displayPrices.length === 0) return []
+
+    const reversedDisplayPrices = [...displayPrices].reverse()
+    const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
+
+    if (visibleData.length === 0) return []
+
+    // Calculate global min and max from all visible data
+    const allPrices = visibleData.map(p => p.close)
+    const globalMin = Math.min(...allPrices)
+    const globalMax = Math.max(...allPrices)
+    const globalRange = globalMax - globalMin
+
+    if (globalRange === 0) return []
+
+    // For each data point, calculate cumulative volume profile from start to that point
+    const profiles = []
+
+    for (let endIdx = 0; endIdx < visibleData.length; endIdx++) {
+      const dataUpToPoint = visibleData.slice(0, endIdx + 1)
+
+      // Get price range up to this point
+      const prices = dataUpToPoint.map(p => p.close)
+      const minPrice = Math.min(...prices)
+      const maxPrice = Math.max(...prices)
+      const priceRange = maxPrice - minPrice
+
+      if (priceRange === 0) {
+        profiles.push(null)
+        continue
+      }
+
+      // Calculate number of zones based on the formula: N = range / 0.08
+      // Normalize by global range to keep zones consistent across different price levels
+      const numZones = Math.max(1, Math.round(priceRange / 0.08))
+      const zoneHeight = priceRange / numZones
+
+      // Initialize zones
+      const volumeZones = []
+      for (let i = 0; i < numZones; i++) {
+        volumeZones.push({
+          minPrice: minPrice + (i * zoneHeight),
+          maxPrice: minPrice + ((i + 1) * zoneHeight),
+          volume: 0,
+          volumePercent: 0
+        })
+      }
+
+      // Accumulate volume for each zone
+      let totalVolume = 0
+      dataUpToPoint.forEach(price => {
+        const priceValue = price.close
+        const volume = price.volume || 0
+        totalVolume += volume
+
+        let zoneIndex = Math.floor((priceValue - minPrice) / zoneHeight)
+        if (zoneIndex >= numZones) zoneIndex = numZones - 1
+        if (zoneIndex < 0) zoneIndex = 0
+
+        volumeZones[zoneIndex].volume += volume
+      })
+
+      // Calculate percentages and find max volume
+      let maxZoneVolume = 0
+      volumeZones.forEach(zone => {
+        zone.volumePercent = totalVolume > 0 ? (zone.volume / totalVolume) * 100 : 0
+        if (zone.volume > maxZoneVolume) {
+          maxZoneVolume = zone.volume
+        }
+      })
+
+      profiles.push({
+        dataIndex: endIdx,
+        date: visibleData[endIdx].date,
+        zones: volumeZones,
+        totalVolume,
+        maxZoneVolume,
+        numZones
+      })
+    }
+
+    return profiles
+  }
+
+  const volumeProfileV2Data = calculateVolumeProfileV2()
 
   // Calculate performance variance for each point (configurable rolling period)
   const performanceVariances = (() => {
@@ -4762,6 +4850,82 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     )
   }
 
+  // Custom component to render Volume Profile V2 - progressive accumulation from left to right
+  const CustomVolumeProfileV2 = (props) => {
+    if (!volumeProfileV2Enabled || volumeProfileV2Data.length === 0) return null
+
+    const { xAxisMap, yAxisMap, offset } = props
+    const xAxis = xAxisMap?.[0]
+    const yAxis = yAxisMap?.[0]
+
+    if (!xAxis || !yAxis) {
+      return null
+    }
+
+    // Reverse the data to match the chart order (newest first)
+    const reversedDisplayPrices = [...displayPrices].reverse()
+    const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
+
+    return (
+      <g>
+        {volumeProfileV2Data.map((profile, profileIdx) => {
+          if (!profile) return null
+
+          const currentDate = profile.date
+          const currentX = xAxis.scale(currentDate)
+
+          // Get the next data point to determine the bar width
+          const nextProfile = volumeProfileV2Data[profileIdx + 1]
+          const nextDate = nextProfile ? nextProfile.date : null
+          const nextX = nextDate ? xAxis.scale(nextDate) : offset.left + offset.width
+
+          if (currentX === undefined || nextX === undefined) return null
+
+          const barX = currentX
+          const barWidth = Math.abs(nextX - currentX)
+
+          return (
+            <g key={`volume-profile-v2-${profileIdx}`}>
+              {profile.zones.map((zone, zoneIdx) => {
+                // Calculate y positions based on price range
+                const yTop = yAxis.scale(zone.maxPrice)
+                const yBottom = yAxis.scale(zone.minPrice)
+                const height = Math.abs(yBottom - yTop)
+
+                // Calculate color depth based on volume weight
+                // Higher volume = deeper/darker color
+                const volumeWeight = zone.volume / profile.maxZoneVolume
+
+                // Use the same color scheme as Vol Prf Auto mode (blue/cyan hue)
+                const hue = 200 // Blue/cyan
+                const saturation = 75
+                // Map volume weight to lightness: high volume = darker (30%), low volume = lighter (75%)
+                const lightness = 75 - (volumeWeight * 45) // Range from 75% (light) to 30% (dark)
+
+                // Opacity based on volume weight
+                const opacity = 0.3 + (volumeWeight * 0.5) // Range from 0.3 to 0.8
+
+                return (
+                  <rect
+                    key={`volume-profile-v2-${profileIdx}-zone-${zoneIdx}`}
+                    x={barX}
+                    y={yTop}
+                    width={barWidth}
+                    height={height}
+                    fill={`hsl(${hue}, ${saturation}%, ${lightness}%)`}
+                    stroke="rgba(59, 130, 246, 0.3)"
+                    strokeWidth={0.3}
+                    opacity={opacity}
+                  />
+                )
+              })}
+            </g>
+          )
+        })}
+      </g>
+    )
+  }
+
   // Determine cursor style based on state
   const getCursorStyle = () => {
     if (manualChannelDragMode) return 'crosshair'
@@ -5045,6 +5209,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
             {/* Volume Profile Horizontal Bars */}
             <Customized component={CustomVolumeProfile} />
+
+            {/* Volume Profile V2 - Progressive Horizontal Bars */}
+            <Customized component={CustomVolumeProfileV2} />
 
             {/* Manual Channel Selection Rectangle */}
             {manualChannelEnabled && manualChannelDragMode && isSelecting && selectionStart && selectionEnd && (
@@ -5567,6 +5734,39 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             <Customized component={CustomThirdVolZoneLine} />
           </ComposedChart>
         </ResponsiveContainer>
+
+        {/* Volume Profile V2 Color Legend */}
+        {volumeProfileV2Enabled && (
+          <div style={{
+            position: 'absolute',
+            bottom: '10px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            padding: '8px 16px',
+            background: 'rgba(15, 23, 42, 0.9)',
+            border: '1px solid rgba(148, 163, 184, 0.3)',
+            borderRadius: '8px',
+            backdropFilter: 'blur(4px)',
+            boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
+            zIndex: 10
+          }}>
+            <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>Volume:</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <span style={{ fontSize: '10px', color: '#94a3b8' }}>Low</span>
+              <div style={{
+                width: '150px',
+                height: '14px',
+                background: 'linear-gradient(to right, hsl(200, 75%, 75%), hsl(200, 75%, 30%))',
+                border: '1px solid rgba(59, 130, 246, 0.4)',
+                borderRadius: '3px'
+              }} />
+              <span style={{ fontSize: '10px', color: '#94a3b8' }}>High</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

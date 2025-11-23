@@ -102,6 +102,7 @@ function StockAnalyzer() {
         volumeProfileEnabled: false,
         volumeProfileMode: 'auto', // 'auto' or 'manual'
         volumeProfileManualRanges: [], // Array of { startDate, endDate }
+        volumeProfileV2Enabled: false,
         spyData: null,
         performanceComparisonEnabled: false,
         performanceComparisonBenchmark: 'SPY',
@@ -629,6 +630,20 @@ function StockAnalyzer() {
             volumeProfileMode: nextMode,
             // Clear manual ranges when switching back to auto
             volumeProfileManualRanges: nextMode === 'auto' ? [] : chart.volumeProfileManualRanges
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const toggleVolumeProfileV2 = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            volumeProfileV2Enabled: !chart.volumeProfileV2Enabled
           }
         }
         return chart
@@ -1264,6 +1279,19 @@ function StockAnalyzer() {
                     <div className="flex gap-1 items-center">
                       <button
                         type="button"
+                        onClick={() => toggleVolumeProfileV2(chart.id)}
+                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.volumeProfileV2Enabled
+                          ? 'bg-cyan-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        title="Show volume profile v2 - progressive accumulation from left to right"
+                      >
+                        Vol Prf v2
+                      </button>
+                    </div>
+                    <div className="flex gap-1 items-center">
+                      <button
+                        type="button"
                         onClick={() => {
                           setCharts(prevCharts =>
                             prevCharts.map(c =>
@@ -1712,6 +1740,7 @@ function StockAnalyzer() {
                     volumeProfileManualRanges={chart.volumeProfileManualRanges}
                     onVolumeProfileManualRangeChange={(range) => updateVolumeProfileManualRange(chart.id, range)}
                     onVolumeProfileRangeRemove={(rangeIndex) => removeVolumeProfileRange(chart.id, rangeIndex)}
+                    volumeProfileV2Enabled={chart.volumeProfileV2Enabled}
                     spyData={chart.spyData}
                     performanceComparisonEnabled={chart.performanceComparisonEnabled}
                     performanceComparisonBenchmark={chart.performanceComparisonBenchmark}
