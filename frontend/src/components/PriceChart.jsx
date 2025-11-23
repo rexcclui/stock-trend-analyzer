@@ -49,6 +49,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const [panStartX, setPanStartX] = useState(null)
   const [panStartZoom, setPanStartZoom] = useState(null)
 
+  // Volume Profile V2 hover state
+  const [volV2HoveredBar, setVolV2HoveredBar] = useState(null)
+
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
   // No need to reset here to avoid infinite loop
 
@@ -4932,6 +4935,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   // Opacity based on volume weight
                   const opacity = 0.3 + (zone.volumeWeight * 0.5) // Range from 0.3 to 0.8
 
+                  const isHovered = volV2HoveredBar?.slotIdx === slotIdx && volV2HoveredBar?.zoneIdx === zoneIdx
+
                   return (
                     <rect
                       key={`volume-profile-v2-slot-${slotIdx}-zone-${zoneIdx}`}
@@ -4940,9 +4945,24 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                       width={slotWidth}
                       height={height}
                       fill={`hsl(${hue}, ${saturation}%, ${lightness}%)`}
-                      stroke="none"
-                      opacity={opacity}
-                      style={{ pointerEvents: 'none' }}
+                      stroke={isHovered ? '#06b6d4' : 'none'}
+                      strokeWidth={isHovered ? 2 : 0}
+                      opacity={isHovered ? Math.min(opacity + 0.2, 1) : opacity}
+                      style={{ pointerEvents: 'all', cursor: 'crosshair' }}
+                      onMouseEnter={() => {
+                        setVolV2HoveredBar({
+                          slotIdx,
+                          zoneIdx,
+                          volumeWeight: zone.volumeWeight,
+                          minPrice: zone.minPrice,
+                          maxPrice: zone.maxPrice,
+                          x: slotX + slotWidth / 2,
+                          y: yTop + height / 2
+                        })
+                      }}
+                      onMouseLeave={() => {
+                        setVolV2HoveredBar(null)
+                      }}
                     />
                   )
                 })}
@@ -4950,6 +4970,54 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             )
           })}
         </g>
+
+        {/* Tooltip for hovered bar */}
+        {volV2HoveredBar && (
+          <g>
+            <rect
+              x={volV2HoveredBar.x - 75}
+              y={volV2HoveredBar.y - 45}
+              width={150}
+              height={70}
+              fill="rgba(15, 23, 42, 0.95)"
+              stroke="#06b6d4"
+              strokeWidth={2}
+              rx={6}
+              style={{ pointerEvents: 'none' }}
+            />
+            <text
+              x={volV2HoveredBar.x}
+              y={volV2HoveredBar.y - 25}
+              fill="#06b6d4"
+              fontSize="12"
+              fontWeight="700"
+              textAnchor="middle"
+              style={{ pointerEvents: 'none' }}
+            >
+              Vol Weight: {(volV2HoveredBar.volumeWeight * 100).toFixed(1)}%
+            </text>
+            <text
+              x={volV2HoveredBar.x}
+              y={volV2HoveredBar.y - 8}
+              fill="#cbd5e1"
+              fontSize="11"
+              textAnchor="middle"
+              style={{ pointerEvents: 'none' }}
+            >
+              Price Range:
+            </text>
+            <text
+              x={volV2HoveredBar.x}
+              y={volV2HoveredBar.y + 8}
+              fill="#94a3b8"
+              fontSize="10"
+              textAnchor="middle"
+              style={{ pointerEvents: 'none' }}
+            >
+              ${volV2HoveredBar.minPrice.toFixed(2)} - ${volV2HoveredBar.maxPrice.toFixed(2)}
+            </text>
+          </g>
+        )}
       </g>
     )
   }
