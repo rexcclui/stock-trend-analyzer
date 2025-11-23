@@ -2117,8 +2117,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const numPriceZones = Math.max(1, Math.min(50, Math.round(globalRange / 0.08)))
     const priceZoneHeight = globalRange / numPriceZones
 
-    // Divide LIMITED data into 200 date slots
-    const numDateSlots = 200
+    // Divide LIMITED data into date slots (max 200, or fewer if less data available)
+    const numDateSlots = Math.min(200, limitedVisibleData.length)
     const slotSize = Math.ceil(limitedVisibleData.length / numDateSlots)
     const slots = []
 
