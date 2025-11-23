@@ -3,7 +3,7 @@ import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 import { X, ArrowLeftRight, Hand } from 'lucide-react'
 import { findBestChannels, filterOverlappingChannels } from './PriceChart/utils/bestChannelFinder'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2EndIndex = null, onVolumeProfileV2EndChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartIndex = null, volumeProfileV2EndIndex = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
 
@@ -2084,9 +2084,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     if (visibleData.length === 0) return []
 
-    // Apply volumeProfileV2EndIndex to limit the data range
+    // Apply volumeProfileV2StartIndex and volumeProfileV2EndIndex to limit the data range
+    const effectiveStartIndex = volumeProfileV2StartIndex !== null ? Math.max(0, Math.min(volumeProfileV2StartIndex, visibleData.length)) : 0
     const effectiveEndIndex = volumeProfileV2EndIndex !== null ? Math.min(volumeProfileV2EndIndex, visibleData.length) : visibleData.length
-    const limitedVisibleData = visibleData.slice(0, effectiveEndIndex)
+    const limitedVisibleData = visibleData.slice(effectiveStartIndex, effectiveEndIndex)
 
     if (limitedVisibleData.length === 0) return []
 
@@ -5169,64 +5170,118 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         </div>
       )}
 
-      {/* Volume Profile V2 End Index Slider */}
+      {/* Volume Profile V2 Sliders (Start and End) */}
       {volumeProfileV2Enabled && (() => {
         const reversedDisplayPrices = [...displayPrices].reverse()
         const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
-        const maxVolProfileV2EndIndex = visibleData.length
-        const effectiveVolProfileV2EndIndex = volumeProfileV2EndIndex !== null ? Math.min(volumeProfileV2EndIndex, maxVolProfileV2EndIndex) : maxVolProfileV2EndIndex
-        const volProfileV2EndDate = visibleData[effectiveVolProfileV2EndIndex - 1]?.date || '...'
+        const maxIndex = visibleData.length
 
-        if (maxVolProfileV2EndIndex <= 1) return null
+        const effectiveStartIndex = volumeProfileV2StartIndex !== null ? Math.max(0, Math.min(volumeProfileV2StartIndex, maxIndex)) : 0
+        const effectiveEndIndex = volumeProfileV2EndIndex !== null ? Math.min(volumeProfileV2EndIndex, maxIndex) : maxIndex
 
-        const topOffset = revAllChannelEnabled && revAllVisibleLength > 1 ? '46px' : '4px'
+        const startDate = visibleData[effectiveStartIndex]?.date || '...'
+        const endDate = visibleData[effectiveEndIndex - 1]?.date || '...'
+
+        if (maxIndex <= 1) return null
+
+        const baseOffset = revAllChannelEnabled && revAllVisibleLength > 1 ? 46 : 4
 
         return (
-          <div
-            style={{
-              position: 'absolute',
-              top: topOffset,
-              left: 0,
-              right: 0,
-              padding: '0 16px',
-              zIndex: 7,
-              pointerEvents: 'none'
-            }}
-          >
+          <>
+            {/* Start Index Slider */}
             <div
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                width: '100%',
-                background: 'rgba(30, 41, 59, 0.75)',
-                border: '1px solid rgba(148, 163, 184, 0.3)',
-                borderRadius: '8px',
-                padding: '6px 10px',
-                backdropFilter: 'blur(4px)',
-                boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
-                pointerEvents: 'auto'
+                position: 'absolute',
+                top: `${baseOffset}px`,
+                left: 0,
+                right: 0,
+                padding: '0 16px',
+                zIndex: 7,
+                pointerEvents: 'none'
               }}
             >
-              <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>Vol V2 End</span>
-              <input
-                type="range"
-                min={0}
-                max={maxVolProfileV2EndIndex}
-                value={effectiveVolProfileV2EndIndex}
-                onChange={(e) => onVolumeProfileV2EndChange && onVolumeProfileV2EndChange(parseInt(e.target.value, 10))}
+              <div
                 style={{
-                  flex: 1,
-                  height: '6px',
-                  accentColor: '#06b6d4',
-                  cursor: 'pointer'
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  width: '100%',
+                  background: 'rgba(30, 41, 59, 0.75)',
+                  border: '1px solid rgba(148, 163, 184, 0.3)',
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  backdropFilter: 'blur(4px)',
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
+                  pointerEvents: 'auto'
                 }}
-              />
-              <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600, minWidth: '80px', textAlign: 'right' }}>
-                {volProfileV2EndDate}
-              </span>
+              >
+                <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>Vol V2 Start</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={maxIndex}
+                  value={effectiveStartIndex}
+                  onChange={(e) => onVolumeProfileV2StartChange && onVolumeProfileV2StartChange(parseInt(e.target.value, 10))}
+                  style={{
+                    flex: 1,
+                    height: '6px',
+                    accentColor: '#06b6d4',
+                    cursor: 'pointer'
+                  }}
+                />
+                <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600, minWidth: '80px', textAlign: 'right' }}>
+                  {startDate}
+                </span>
+              </div>
             </div>
-          </div>
+
+            {/* End Index Slider */}
+            <div
+              style={{
+                position: 'absolute',
+                top: `${baseOffset + 42}px`,
+                left: 0,
+                right: 0,
+                padding: '0 16px',
+                zIndex: 7,
+                pointerEvents: 'none'
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  width: '100%',
+                  background: 'rgba(30, 41, 59, 0.75)',
+                  border: '1px solid rgba(148, 163, 184, 0.3)',
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  backdropFilter: 'blur(4px)',
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
+                  pointerEvents: 'auto'
+                }}
+              >
+                <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>Vol V2 End</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={maxIndex}
+                  value={effectiveEndIndex}
+                  onChange={(e) => onVolumeProfileV2EndChange && onVolumeProfileV2EndChange(parseInt(e.target.value, 10))}
+                  style={{
+                    flex: 1,
+                    height: '6px',
+                    accentColor: '#06b6d4',
+                    cursor: 'pointer'
+                  }}
+                />
+                <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600, minWidth: '80px', textAlign: 'right' }}>
+                  {endDate}
+                </span>
+              </div>
+            </div>
+          </>
         )
       })()}
 
@@ -5236,8 +5291,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         paddingTop: (() => {
           const hasRevSlider = revAllChannelEnabled && revAllVisibleLength > 1
           const hasVolV2Slider = volumeProfileV2Enabled && displayPrices.length > 0
-          if (hasRevSlider && hasVolV2Slider) return '84px' // Both sliders
-          if (hasRevSlider || hasVolV2Slider) return '42px' // One slider
+          if (hasRevSlider && hasVolV2Slider) return '126px' // Rev slider + 2 Vol V2 sliders
+          if (hasVolV2Slider) return '84px' // 2 Vol V2 sliders
+          if (hasRevSlider) return '42px' // Rev slider only
           return '0' // No sliders
         })()
       }}>

@@ -103,6 +103,7 @@ function StockAnalyzer() {
         volumeProfileMode: 'auto', // 'auto' or 'manual'
         volumeProfileManualRanges: [], // Array of { startDate, endDate }
         volumeProfileV2Enabled: false,
+        volumeProfileV2StartIndex: null,
         volumeProfileV2EndIndex: null,
         spyData: null,
         performanceComparisonEnabled: false,
@@ -585,6 +586,16 @@ function StockAnalyzer() {
       prevCharts.map(chart =>
         chart.id === chartId
           ? { ...chart, revAllChannelEndIndex: endIndex }
+          : chart
+      )
+    )
+  }
+
+  const updateVolumeProfileV2Start = (chartId, startIndex) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart =>
+        chart.id === chartId
+          ? { ...chart, volumeProfileV2StartIndex: startIndex }
           : chart
       )
     )
@@ -1752,7 +1763,9 @@ function StockAnalyzer() {
                     onVolumeProfileManualRangeChange={(range) => updateVolumeProfileManualRange(chart.id, range)}
                     onVolumeProfileRangeRemove={(rangeIndex) => removeVolumeProfileRange(chart.id, rangeIndex)}
                     volumeProfileV2Enabled={chart.volumeProfileV2Enabled}
+                    volumeProfileV2StartIndex={chart.volumeProfileV2StartIndex}
                     volumeProfileV2EndIndex={chart.volumeProfileV2EndIndex}
+                    onVolumeProfileV2StartChange={(value) => updateVolumeProfileV2Start(chart.id, value)}
                     onVolumeProfileV2EndChange={(value) => updateVolumeProfileV2End(chart.id, value)}
                     spyData={chart.spyData}
                     performanceComparisonEnabled={chart.performanceComparisonEnabled}
