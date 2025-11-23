@@ -5170,7 +5170,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         </div>
       )}
 
-      {/* Volume Profile V2 Sliders (Start and End) */}
+      {/* Volume Profile V2 Dual-Handle Range Slider */}
       {volumeProfileV2Enabled && (() => {
         const reversedDisplayPrices = [...displayPrices].reverse()
         const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
@@ -5184,104 +5184,158 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
         if (maxIndex <= 1) return null
 
-        const baseOffset = revAllChannelEnabled && revAllVisibleLength > 1 ? 46 : 4
+        const topOffset = revAllChannelEnabled && revAllVisibleLength > 1 ? '46px' : '4px'
 
         return (
-          <>
-            {/* Start Index Slider */}
+          <div
+            style={{
+              position: 'absolute',
+              top: topOffset,
+              left: 0,
+              right: 0,
+              padding: '0 16px',
+              zIndex: 7,
+              pointerEvents: 'none'
+            }}
+          >
             <div
               style={{
-                position: 'absolute',
-                top: `${baseOffset}px`,
-                left: 0,
-                right: 0,
-                padding: '0 16px',
-                zIndex: 7,
-                pointerEvents: 'none'
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                width: '100%',
+                background: 'rgba(30, 41, 59, 0.75)',
+                border: '1px solid rgba(148, 163, 184, 0.3)',
+                borderRadius: '8px',
+                padding: '6px 10px',
+                backdropFilter: 'blur(4px)',
+                boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
+                pointerEvents: 'auto'
               }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
+              <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>Vol V2 Range</span>
+
+              {/* Dual-handle range slider container */}
+              <div style={{ flex: 1, position: 'relative', height: '24px', display: 'flex', alignItems: 'center' }}>
+                {/* Background track */}
+                <div style={{
+                  position: 'absolute',
                   width: '100%',
-                  background: 'rgba(30, 41, 59, 0.75)',
-                  border: '1px solid rgba(148, 163, 184, 0.3)',
-                  borderRadius: '8px',
-                  padding: '6px 10px',
-                  backdropFilter: 'blur(4px)',
-                  boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
-                  pointerEvents: 'auto'
-                }}
-              >
-                <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>Vol V2 Start</span>
+                  height: '6px',
+                  background: '#475569',
+                  borderRadius: '3px',
+                  zIndex: 1
+                }} />
+
+                {/* Active range highlight */}
+                <div style={{
+                  position: 'absolute',
+                  left: `${(effectiveStartIndex / maxIndex) * 100}%`,
+                  width: `${((effectiveEndIndex - effectiveStartIndex) / maxIndex) * 100}%`,
+                  height: '6px',
+                  background: '#06b6d4',
+                  borderRadius: '3px',
+                  zIndex: 2
+                }} />
+
+                {/* Start handle slider */}
                 <input
                   type="range"
                   min={0}
                   max={maxIndex}
                   value={effectiveStartIndex}
-                  onChange={(e) => onVolumeProfileV2StartChange && onVolumeProfileV2StartChange(parseInt(e.target.value, 10))}
-                  style={{
-                    flex: 1,
-                    height: '6px',
-                    accentColor: '#06b6d4',
-                    cursor: 'pointer'
+                  onChange={(e) => {
+                    const newStart = parseInt(e.target.value, 10)
+                    if (newStart < effectiveEndIndex) {
+                      onVolumeProfileV2StartChange && onVolumeProfileV2StartChange(newStart)
+                    }
                   }}
+                  style={{
+                    position: 'absolute',
+                    width: '100%',
+                    height: '6px',
+                    margin: 0,
+                    padding: 0,
+                    background: 'transparent',
+                    pointerEvents: 'all',
+                    cursor: 'pointer',
+                    zIndex: 4,
+                    WebkitAppearance: 'none',
+                    appearance: 'none'
+                  }}
+                  onMouseDown={(e) => e.currentTarget.style.zIndex = '5'}
+                  onMouseUp={(e) => e.currentTarget.style.zIndex = '4'}
                 />
-                <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600, minWidth: '80px', textAlign: 'right' }}>
-                  {startDate}
-                </span>
-              </div>
-            </div>
 
-            {/* End Index Slider */}
-            <div
-              style={{
-                position: 'absolute',
-                top: `${baseOffset + 42}px`,
-                left: 0,
-                right: 0,
-                padding: '0 16px',
-                zIndex: 7,
-                pointerEvents: 'none'
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  width: '100%',
-                  background: 'rgba(30, 41, 59, 0.75)',
-                  border: '1px solid rgba(148, 163, 184, 0.3)',
-                  borderRadius: '8px',
-                  padding: '6px 10px',
-                  backdropFilter: 'blur(4px)',
-                  boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
-                  pointerEvents: 'auto'
-                }}
-              >
-                <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>Vol V2 End</span>
+                {/* End handle slider */}
                 <input
                   type="range"
                   min={0}
                   max={maxIndex}
                   value={effectiveEndIndex}
-                  onChange={(e) => onVolumeProfileV2EndChange && onVolumeProfileV2EndChange(parseInt(e.target.value, 10))}
-                  style={{
-                    flex: 1,
-                    height: '6px',
-                    accentColor: '#06b6d4',
-                    cursor: 'pointer'
+                  onChange={(e) => {
+                    const newEnd = parseInt(e.target.value, 10)
+                    if (newEnd > effectiveStartIndex) {
+                      onVolumeProfileV2EndChange && onVolumeProfileV2EndChange(newEnd)
+                    }
                   }}
+                  style={{
+                    position: 'absolute',
+                    width: '100%',
+                    height: '6px',
+                    margin: 0,
+                    padding: 0,
+                    background: 'transparent',
+                    pointerEvents: 'all',
+                    cursor: 'pointer',
+                    zIndex: 3,
+                    WebkitAppearance: 'none',
+                    appearance: 'none'
+                  }}
+                  onMouseDown={(e) => e.currentTarget.style.zIndex = '5'}
+                  onMouseUp={(e) => e.currentTarget.style.zIndex = '3'}
                 />
-                <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600, minWidth: '80px', textAlign: 'right' }}>
-                  {endDate}
-                </span>
+
+                <style>{`
+                  input[type="range"]::-webkit-slider-thumb {
+                    -webkit-appearance: none;
+                    appearance: none;
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 50%;
+                    background: #06b6d4;
+                    border: 2px solid #fff;
+                    cursor: pointer;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                  }
+
+                  input[type="range"]::-moz-range-thumb {
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 50%;
+                    background: #06b6d4;
+                    border: 2px solid #fff;
+                    cursor: pointer;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                  }
+
+                  input[type="range"]::-webkit-slider-runnable-track {
+                    background: transparent;
+                    height: 6px;
+                  }
+
+                  input[type="range"]::-moz-range-track {
+                    background: transparent;
+                    height: 6px;
+                  }
+                `}</style>
               </div>
+
+              <span style={{ fontSize: '10px', color: '#94a3b8', minWidth: '160px', textAlign: 'right' }}>
+                {startDate} → {endDate}
+              </span>
             </div>
-          </>
+          </div>
         )
       })()}
 
@@ -5291,9 +5345,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         paddingTop: (() => {
           const hasRevSlider = revAllChannelEnabled && revAllVisibleLength > 1
           const hasVolV2Slider = volumeProfileV2Enabled && displayPrices.length > 0
-          if (hasRevSlider && hasVolV2Slider) return '126px' // Rev slider + 2 Vol V2 sliders
-          if (hasVolV2Slider) return '84px' // 2 Vol V2 sliders
-          if (hasRevSlider) return '42px' // Rev slider only
+          if (hasRevSlider && hasVolV2Slider) return '84px' // Rev slider + Vol V2 slider
+          if (hasRevSlider || hasVolV2Slider) return '42px' // One slider
           return '0' // No sliders
         })()
       }}>
