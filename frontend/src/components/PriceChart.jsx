@@ -2120,14 +2120,27 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     if (globalRange === 0) return []
 
-    // Calculate number of price zones: N = range / 0.08
-    const numPriceZones = Math.max(1, Math.min(50, Math.round(globalRange / 0.08)))
-    const priceZoneHeight = globalRange / numPriceZones
+    // USER REQUEST: Dynamic zone count per slot
+    // numPriceZones is now calculated per slot based on: (cumulativeRange / globalRange) / 0.03
 
-    // Divide LIMITED data into date slots (max 200, or fewer if less data available)
-    const numDateSlots = Math.min(200, limitedVisibleData.length)
+    // Divide LIMITED data into date slots
+    // For small datasets, use fewer slots to ensure each bar is visible (minimum 2 data points per slot)
+    const minSlotSize = 2
+    const maxPossibleSlots = Math.floor(limitedVisibleData.length / minSlotSize)
+    const numDateSlots = Math.min(200, Math.max(1, maxPossibleSlots))
     const slotSize = Math.ceil(limitedVisibleData.length / numDateSlots)
     const slots = []
+
+    // DEBUG: Log why Vol Prf v2 might not be showing
+    console.log('[VolPrfV2] Calculation Debug:', {
+      enabled: volumeProfileV2Enabled,
+      visibleDataLength: visibleData.length,
+      limitedVisibleDataLength: limitedVisibleData.length,
+      globalRange,
+      numDateSlots,
+      slotSize,
+      maxPossibleSlots
+    })
 
     for (let slotIdx = 0; slotIdx < numDateSlots; slotIdx++) {
       const endIdx = Math.min((slotIdx + 1) * slotSize, limitedVisibleData.length)
@@ -2140,14 +2153,28 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
       if (slotData.length === 0) continue
 
-      // Initialize price zones for cumulative calculation
+      // DYNAMIC ZONES: Calculate min/max from cumulative data up to this point
+      const cumulativePrices = cumulativeData.map(p => p.close)
+      const cumulativeMin = Math.min(...cumulativePrices)
+      const cumulativeMax = Math.max(...cumulativePrices)
+      const cumulativeRange = cumulativeMax - cumulativeMin
+
+      if (cumulativeRange === 0) continue
+
+      // DYNAMIC ZONE COUNT: numPriceZones = (cumulativeRange / globalRange) / 0.03
+      // This makes zones proportional to how much of the total range has been seen
+      // Minimum of 3 zones to ensure bars are always visible
+      const numPriceZones = Math.max(3, Math.round((cumulativeRange / globalRange) / 0.03))
+      const priceZoneHeight = cumulativeRange / numPriceZones
+
+      // Initialize price zones based on cumulative range
       const priceZones = []
       for (let i = 0; i < numPriceZones; i++) {
         priceZones.push({
-          minPrice: globalMin + (i * priceZoneHeight),
-          maxPrice: globalMin + ((i + 1) * priceZoneHeight),
+          minPrice: cumulativeMin + (i * priceZoneHeight),
+          maxPrice: cumulativeMin + ((i + 1) * priceZoneHeight),
           volume: 0,
-          volumeWeight: 0 // Will be calculated globally later
+          volumeWeight: 0
         })
       }
 
@@ -2158,15 +2185,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const volume = price.volume || 0
         totalVolume += volume
 
-        let zoneIndex = Math.floor((priceValue - globalMin) / priceZoneHeight)
+        let zoneIndex = Math.floor((priceValue - cumulativeMin) / priceZoneHeight)
         if (zoneIndex >= numPriceZones) zoneIndex = numPriceZones - 1
         if (zoneIndex < 0) zoneIndex = 0
 
         priceZones[zoneIndex].volume += volume
       })
 
-      // Calculate volume weights as percentage of total volume in this slot
-      // All zones in a slot will sum to 100%
+      // Calculate volume weights as percentage of total volume
       priceZones.forEach(zone => {
         zone.volumeWeight = totalVolume > 0 ? zone.volume / totalVolume : 0
       })
@@ -4948,9 +4974,21 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
             // Get X positions for this date slot
             const startX = xAxis.scale(slot.startDate)
-            const endX = xAxis.scale(slot.endDate)
+            let endX = xAxis.scale(slot.endDate)
 
             if (startX === undefined || endX === undefined) return null
+
+            // Make bars touch by extending to the next bar's start position
+            // This eliminates gaps between bars
+            if (slotIdx < volumeProfileV2Data.length - 1) {
+              const nextSlot = volumeProfileV2Data[slotIdx + 1]
+              if (nextSlot) {
+                const nextStartX = xAxis.scale(nextSlot.startDate)
+                if (nextStartX !== undefined) {
+                  endX = nextStartX
+                }
+              }
+            }
 
             // Calculate the width of this vertical strip
             const slotX = startX
@@ -4967,14 +5005,27 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   const yBottom = yAxis.scale(zone.minPrice)
                   const height = Math.abs(yBottom - yTop)
 
-                  // Use the same color scheme as Vol Prf Auto mode (blue/cyan hue)
-                  const hue = 200 // Blue/cyan
-                  const saturation = 75
-                  // Map volume weight to lightness: high volume = darker (30%), low volume = lighter (75%)
-                  const lightness = 75 - (zone.volumeWeight * 45) // Range from 75% (light) to 30% (dark)
+                  // Normalize weight to reach max color at 35% (0.35)
+                  // This makes the gradient much more rapid
+                  const normalizedWeight = Math.min(1, zone.volumeWeight / 0.35)
 
-                  // Opacity based on volume weight
-                  const opacity = 0.3 + (zone.volumeWeight * 0.5) // Range from 0.3 to 0.8
+                  // Map volume weight to Hue: 0 (Red) -> 240 (Blue)
+                  // Using a non-linear power curve to push colors towards blue faster if desired, 
+                  // but linear is usually best for a 2-color gradient. 
+                  // Let's use a slight curve to get past the "muddy" middle colors quickly if needed,
+                  // but standard HSL interpolation works well.
+                  const hue = Math.floor(normalizedWeight * 240) // 0 (Red) -> 240 (Blue)
+
+                  // Saturation: Keep high for vivid colors
+                  const saturation = 90 + (normalizedWeight * 10) // 90% -> 100%
+
+                  // Lightness: Red is usually brighter (50-60%), Dark Blue is darker (30-40%)
+                  // We want "Dark Blue" at top, so lightness should decrease as volume increases
+                  const lightness = 60 - (normalizedWeight * 30) // 60% (Red) -> 30% (Dark Blue)
+
+                  // Opacity: Keep it somewhat transparent at low end, solid at high end
+                  // Using the "rapid" curve from before but slightly relaxed since color helps distinguish now
+                  const opacity = 0.2 + (Math.pow(normalizedWeight, 0.5) * 0.75) // 0.2 -> 0.95
 
                   const isHovered = volV2HoveredBar?.slotIdx === slotIdx && volV2HoveredBar?.zoneIdx === zoneIdx
 
@@ -5317,9 +5368,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             style={{
               position: 'absolute',
               top: topOffset,
-              left: 0,
-              right: 0,
-              padding: '0 16px',
+              left: '60px', // Align with chart left edge (Y-axis width)
+              right: '20px', // Align with chart right edge
               zIndex: 7,
               pointerEvents: 'none'
             }}
@@ -5370,6 +5420,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   min={0}
                   max={maxIndex}
                   value={effectiveStartIndex}
+                  title={`Start: ${startDate}`}
                   onChange={(e) => {
                     const newStartIdx = parseInt(e.target.value, 10)
                     if (newStartIdx < effectiveEndIndex && visibleData[newStartIdx]) {
@@ -5401,6 +5452,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   min={0}
                   max={maxIndex}
                   value={effectiveEndIndex}
+                  title={`End: ${endDate}`}
                   onChange={(e) => {
                     const newEndIdx = parseInt(e.target.value, 10)
                     if (newEndIdx > effectiveStartIndex && visibleData[newEndIdx - 1]) {
@@ -5460,10 +5512,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   }
                 `}</style>
               </div>
-
-              <span style={{ fontSize: '10px', color: '#94a3b8', minWidth: '160px', textAlign: 'right' }}>
-                {startDate} → {endDate}
-              </span>
             </div>
           </div>
         )
@@ -6077,20 +6125,23 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const globalMin = Math.min(...allPrices)
           const globalMax = Math.max(...allPrices)
           const globalRange = globalMax - globalMin
-          const numPriceZones = Math.max(1, Math.min(50, Math.round(globalRange / 0.08)))
+          // Dynamic zone count based on cumulative/global range ratio
+          const numPriceZones = Math.max(1, Math.round((globalRange / globalRange) / 0.03))
 
           // Generate color blocks for specific volume weight breakpoints
           const legendSteps = [
-            { weight: 0.00, label: '<2%' },
-            { weight: 0.02, label: '<4%' },
-            { weight: 0.04, label: '<6%' },
-            { weight: 0.06, label: '<9%' },
-            { weight: 0.09, label: '<12%' },
-            { weight: 0.12, label: '<15%' },
-            { weight: 0.15, label: '<20%' },
-            { weight: 0.20, label: '<30%' },
-            { weight: 0.30, label: '<40%' },
-            { weight: 0.40, label: '40%+' }
+            { weight: 0.02, label: '2%' },
+            { weight: 0.04, label: '4%' },
+            { weight: 0.06, label: '6%' },
+            { weight: 0.08, label: '8%' },
+            { weight: 0.10, label: '10%' },
+            { weight: 0.12, label: '12%' },
+            { weight: 0.15, label: '15%' },
+            { weight: 0.18, label: '18%' },
+            { weight: 0.22, label: '22%' },
+            { weight: 0.26, label: '26%' },
+            { weight: 0.30, label: '30%' },
+            { weight: 0.35, label: '35%+' }
           ]
 
           return (
@@ -6120,10 +6171,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                 {legendSteps.map((step, idx) => {
-                  const hue = 200
-                  const saturation = 75
-                  const lightness = 75 - (step.weight * 45)
-                  const opacity = 0.3 + (step.weight * 0.5)
+                  const normalizedWeight = Math.min(1, step.weight / 0.35)
+                  const hue = Math.floor(normalizedWeight * 240)
+                  const saturation = 90 + (normalizedWeight * 10)
+                  const lightness = 60 - (normalizedWeight * 30)
+                  const opacity = 0.2 + (Math.pow(normalizedWeight, 0.5) * 0.75)
 
                   return (
                     <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
