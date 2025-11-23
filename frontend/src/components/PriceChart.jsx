@@ -2085,38 +2085,24 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     if (visibleData.length === 0) return []
 
     // Convert dates to indices (dates are locked, indices adjust based on visible data)
-    // If dates are not found in current data, reset them to null to use full range
+    // If dates are not found, use full range (don't call setters during render)
     let effectiveStartIndex = 0
     let effectiveEndIndex = visibleData.length
-    let shouldResetStartDate = false
-    let shouldResetEndDate = false
 
     if (volumeProfileV2StartDate !== null) {
       const startIdx = visibleData.findIndex(d => d.date === volumeProfileV2StartDate)
       if (startIdx !== -1) {
         effectiveStartIndex = startIdx
-      } else {
-        // Date not found in current visible data - reset it
-        shouldResetStartDate = true
       }
+      // If not found, keep default (0) and use full range
     }
 
     if (volumeProfileV2EndDate !== null) {
       const endIdx = visibleData.findIndex(d => d.date === volumeProfileV2EndDate)
       if (endIdx !== -1) {
         effectiveEndIndex = endIdx + 1 // +1 because slice end is exclusive
-      } else {
-        // Date not found in current visible data - reset it
-        shouldResetEndDate = true
       }
-    }
-
-    // Reset dates if they weren't found (this ensures clean state when switching periods)
-    if (shouldResetStartDate && onVolumeProfileV2StartChange) {
-      onVolumeProfileV2StartChange(null)
-    }
-    if (shouldResetEndDate && onVolumeProfileV2EndChange) {
-      onVolumeProfileV2EndChange(null)
+      // If not found, keep default (visibleData.length) and use full range
     }
 
     const limitedVisibleData = visibleData.slice(effectiveStartIndex, effectiveEndIndex)
@@ -2206,6 +2192,36 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
   const volumeProfileV2Data = calculateVolumeProfileV2()
+
+  // Reset Vol Prf v2 dates if they're not found in current visible data
+  useEffect(() => {
+    if (!volumeProfileV2Enabled || displayPrices.length === 0) return
+
+    const reversedDisplayPrices = [...displayPrices].reverse()
+    const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
+
+    if (visibleData.length === 0) return
+
+    let shouldResetStart = false
+    let shouldResetEnd = false
+
+    if (volumeProfileV2StartDate !== null) {
+      const startIdx = visibleData.findIndex(d => d.date === volumeProfileV2StartDate)
+      if (startIdx === -1) shouldResetStart = true
+    }
+
+    if (volumeProfileV2EndDate !== null) {
+      const endIdx = visibleData.findIndex(d => d.date === volumeProfileV2EndDate)
+      if (endIdx === -1) shouldResetEnd = true
+    }
+
+    if (shouldResetStart && onVolumeProfileV2StartChange) {
+      onVolumeProfileV2StartChange(null)
+    }
+    if (shouldResetEnd && onVolumeProfileV2EndChange) {
+      onVolumeProfileV2EndChange(null)
+    }
+  }, [volumeProfileV2Enabled, volumeProfileV2StartDate, volumeProfileV2EndDate, displayPrices, zoomRange, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange])
 
   // Calculate performance variance for each point (configurable rolling period)
   const performanceVariances = (() => {
