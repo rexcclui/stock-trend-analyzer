@@ -6002,16 +6002,27 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
         {/* Volume Profile V2 Color Legend */}
         {volumeProfileV2Enabled && (() => {
-          // Generate color blocks for different volume weight percentages (8 levels)
+          // Calculate number of price zones for display
+          const reversedDisplayPrices = [...displayPrices].reverse()
+          const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
+          const allPrices = visibleData.map(p => p.close)
+          const globalMin = Math.min(...allPrices)
+          const globalMax = Math.max(...allPrices)
+          const globalRange = globalMax - globalMin
+          const numPriceZones = Math.max(1, Math.min(50, Math.round(globalRange / 0.08)))
+
+          // Generate color blocks for specific volume weight breakpoints
           const legendSteps = [
-            { weight: 0, label: '0%' },
-            { weight: 0.15, label: '15%' },
-            { weight: 0.30, label: '30%' },
-            { weight: 0.45, label: '45%' },
-            { weight: 0.60, label: '60%' },
-            { weight: 0.75, label: '75%' },
-            { weight: 0.90, label: '90%' },
-            { weight: 1.0, label: '100%' }
+            { weight: 0.00, label: '<2%' },
+            { weight: 0.02, label: '<4%' },
+            { weight: 0.04, label: '<6%' },
+            { weight: 0.06, label: '<9%' },
+            { weight: 0.09, label: '<12%' },
+            { weight: 0.12, label: '<15%' },
+            { weight: 0.15, label: '<20%' },
+            { weight: 0.20, label: '<30%' },
+            { weight: 0.30, label: '<40%' },
+            { weight: 0.40, label: '40%+' }
           ]
 
           return (
@@ -6022,7 +6033,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               transform: 'translateX(-50%)',
               display: 'flex',
               flexDirection: 'column',
-              gap: '8px',
+              gap: '6px',
               padding: '10px 16px',
               background: 'rgba(15, 23, 42, 0.95)',
               border: '1px solid rgba(148, 163, 184, 0.3)',
@@ -6031,10 +6042,15 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
               zIndex: 10
             }}>
-              <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700, textAlign: 'center' }}>
-                Volume Weight %
-              </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>
+                  Volume Weight %
+                </span>
+                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>
+                  {numPriceZones} price zones/bar
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
                 {legendSteps.map((step, idx) => {
                   const hue = 200
                   const saturation = 75
@@ -6042,16 +6058,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   const opacity = 0.3 + (step.weight * 0.5)
 
                   return (
-                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
                       <div style={{
-                        width: '28px',
-                        height: '18px',
+                        width: '24px',
+                        height: '16px',
                         background: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
                         opacity: opacity,
                         border: '1px solid rgba(59, 130, 246, 0.5)',
-                        borderRadius: '3px'
+                        borderRadius: '2px'
                       }} />
-                      <span style={{ fontSize: '9px', color: '#94a3b8', fontWeight: 600 }}>
+                      <span style={{ fontSize: '8px', color: '#94a3b8', fontWeight: 600 }}>
                         {step.label}
                       </span>
                     </div>
