@@ -5204,6 +5204,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               />
             )}
 
+            {/* Volume Profile V2 - Progressive Horizontal Bars (RENDER FIRST - UNDER EVERYTHING) */}
+            <Customized component={CustomVolumeProfileV2} />
+
             {/* Last Channel Zones as Parallel Lines */}
             <Customized component={CustomZoneLines} />
 
@@ -5230,9 +5233,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
             {/* Volume Profile Horizontal Bars */}
             <Customized component={CustomVolumeProfile} />
-
-            {/* Volume Profile V2 - Progressive Horizontal Bars */}
-            <Customized component={CustomVolumeProfileV2} />
 
             {/* Manual Channel Selection Rectangle */}
             {manualChannelEnabled && manualChannelDragMode && isSelecting && selectionStart && selectionEnd && (
