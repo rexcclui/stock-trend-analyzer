@@ -41,7 +41,13 @@ public class BacktestHandler implements RequestHandler<APIGatewayProxyRequestEve
 
             // Fetch stock data
             FinancialModelingPrepClient fmpClient = new FinancialModelingPrepClient(apiKey);
-            List<StockPrice> prices = fmpClient.getHistoricalDataByDays(symbol, Integer.parseInt(days));
+            List<StockPrice> prices;
+
+            if ("max".equalsIgnoreCase(days)) {
+                prices = fmpClient.getFullHistoricalData(symbol);
+            } else {
+                prices = fmpClient.getHistoricalDataByDays(symbol, Integer.parseInt(days));
+            }
 
             if (prices == null || prices.isEmpty()) {
                 return createErrorResponse(404, "No data found for symbol: " + symbol);

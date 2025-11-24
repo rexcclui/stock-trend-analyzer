@@ -87,6 +87,43 @@ public class FinancialModelingPrepClient {
         }
     }
 
+    public List<StockPrice> getFullHistoricalData(String symbol) throws IOException {
+        final int maxRangeKey = -1;
+
+        List<StockPrice> cachedData = cache.get(symbol, maxRangeKey);
+
+        if (cachedData != null) {
+            System.out.println(String.format("[Cache] ✅ Cache HIT for %s:MAX", symbol));
+            cache.logStats();
+            return cachedData;
+        }
+
+        System.out.println(String.format("[Cache] ❌ Cache MISS for %s:MAX, fetching from external API...", symbol));
+
+        String url = String.format("%s/historical-price-full/%s?apikey=%s", BASE_URL, symbol, apiKey);
+
+        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+            HttpGet request = new HttpGet(url);
+            try (CloseableHttpResponse response = httpClient.execute(request)) {
+                String json = EntityUtils.toString(response.getEntity());
+
+                Type type = new TypeToken<Map<String, Object>>(){}.getType();
+                Map<String, Object> data = gson.fromJson(json, type);
+
+                List<Map<String, Object>> historical = (List<Map<String, Object>>) data.get("historical");
+
+                List<StockPrice> prices = historical.stream()
+                    .map(this::mapToStockPrice)
+                    .toList();
+
+                cache.put(symbol, maxRangeKey, prices);
+                cache.logStats();
+
+                return prices;
+            }
+        }
+    }
+
     private StockPrice mapToStockPrice(Map<String, Object> data) {
         StockPrice price = new StockPrice();
         price.setDate((String) data.get("date"));

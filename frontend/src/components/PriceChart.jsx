@@ -40,6 +40,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const [manualChannels, setManualChannels] = useState([]) // Array to store multiple channels
   const chartRef = useRef(null)
 
+  const parseDaysValue = (value) => {
+    if (value === 'max') return Number.MAX_SAFE_INTEGER
+
+    const numeric = parseInt(value)
+    return Number.isFinite(numeric) ? numeric : NaN
+  }
+
+  const parsedDays = parseDaysValue(days)
+  const effectiveDays = Number.isFinite(parsedDays) ? parsedDays : 365
+
   // Volume profile manual selection state
   const [isSelectingVolumeProfile, setIsSelectingVolumeProfile] = useState(false)
   const [volumeProfileSelectionStart, setVolumeProfileSelectionStart] = useState(null)
@@ -824,7 +834,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Helper function to determine initial lookback window size based on time period
   const getInitialLookbackForPeriod = (daysStr) => {
-    const daysNum = parseInt(daysStr) || 365
+    const parsedValue = parseDaysValue(daysStr)
+    const daysNum = Number.isFinite(parsedValue) ? parsedValue : 365
 
     // 5Y or more = 100
     if (daysNum >= 1825) return 100
@@ -1931,7 +1942,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Determine rolling lookback window based on time period
   const getVolumeLookbackWindow = () => {
-    const daysNum = parseInt(days)
+    const daysNum = effectiveDays
     if (daysNum >= 1825) return 180      // 5Y: 6 months
     if (daysNum >= 1095) return 90       // 3Y: 3 months
     if (daysNum >= 365) return 60        // 1Y: 2 months
@@ -2142,17 +2153,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const slotSize = Math.ceil(limitedVisibleData.length / numDateSlots)
     const slots = []
 
-    // DEBUG: Log why Vol Prf v2 might not be showing
-    console.log('[VolPrfV2] Calculation Debug:', {
-      enabled: volumeProfileV2Enabled,
-      visibleDataLength: visibleData.length,
-      limitedVisibleDataLength: limitedVisibleData.length,
-      globalRange,
-      numDateSlots,
-      slotSize,
-      maxPossibleSlots
-    })
-
     for (let slotIdx = 0; slotIdx < numDateSlots; slotIdx++) {
       const endIdx = Math.min((slotIdx + 1) * slotSize, limitedVisibleData.length)
 
@@ -2315,8 +2315,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // Determine number of zones based on period
   // Less than 1 year (365 days): 3 zones for simpler view
   // 1 year or more: 5 zones for detailed analysis
-  const daysNum = parseInt(days) || 365
-  const numZonesForChannels = daysNum < 365 ? 3 : 5
+  const numZonesForChannels = effectiveDays < 365 ? 3 : 5
 
   // Calculate zones for reversed all channels
   const revAllChannelZones = revAllChannelEnabled && revAllChannels.length > 0
@@ -3372,7 +3371,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Pre-calculate which dates represent month/year transitions
   const getTransitionDates = () => {
-    const isLongPeriod = parseInt(days) >= 1095 // 3Y or more
+    const isLongPeriod = effectiveDays >= 1095 // 3Y or more
     const transitions = new Set()
 
     for (let i = 1; i < visibleChartData.length; i++) {
@@ -3396,7 +3395,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
   const transitionDates = getTransitionDates()
-  const isLongPeriod = parseInt(days) >= 1095
+  const isLongPeriod = effectiveDays >= 1095
 
   const CustomXAxisTick = ({ x, y, payload }) => {
     const currentDate = payload.value
