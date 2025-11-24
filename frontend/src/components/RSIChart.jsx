@@ -135,7 +135,7 @@ function RSIChart({ indicators, syncedMouseDate, setSyncedMouseDate, zoomRange, 
             interval={Math.floor(visibleChartData.length / 10)}
             stroke="#475569"
           />
-          <YAxis domain={[0, 100]} tick={{ fill: '#94a3b8' }} stroke="#475569" />
+          <YAxis domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: isMobile ? 10 : 12 }} stroke="#475569" width={isMobile ? 40 : 60} />
           <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', color: '#e2e8f0' }} />
           <Legend wrapperStyle={{ color: '#94a3b8' }} />
           <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="3 3" label={{ value: "Overbought", fill: '#94a3b8' }} />

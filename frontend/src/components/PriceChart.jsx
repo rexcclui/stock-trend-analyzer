@@ -5591,7 +5591,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               interval={Math.floor(chartDataWithZones.length / 10)}
               stroke="#475569"
             />
-            <YAxis domain={['auto', 'auto']} tick={{ fill: '#94a3b8' }} stroke="#475569" />
+            <YAxis domain={['auto', 'auto']} tick={{ fill: '#94a3b8', fontSize: isMobile ? 10 : 12 }} stroke="#475569" width={isMobile ? 40 : 60} />
             <Tooltip content={<CustomTooltip />} />
             <Legend content={<CustomLegend />} />
             {syncedMouseDate && (
