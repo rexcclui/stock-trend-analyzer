@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import axios from 'axios'
-import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp, RefreshCw, Filter } from 'lucide-react'
+import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp, RefreshCw, Filter, Menu } from 'lucide-react'
 import PriceChart from './PriceChart'
 import IndicatorsChart from './IndicatorsChart'
 import SignalsList from './SignalsList'
@@ -26,6 +26,7 @@ function StockAnalyzer() {
   const [globalZoomRange, setGlobalZoomRange] = useState({ start: 0, end: null })
   const [loadingComparisonStocks, setLoadingComparisonStocks] = useState({}) // Track loading state per chart
   const [loadingMktGap, setLoadingMktGap] = useState({}) // Track loading state for Mkt Gap data
+  const [mobileControlsVisible, setMobileControlsVisible] = useState({}) // Track mobile controls visibility per chart
 
   // Load stock history from localStorage on mount
   useEffect(() => {
@@ -1218,8 +1219,42 @@ function StockAnalyzer() {
                 </div>
 
                 <div className="flex items-center justify-between mb-4 pr-24">
-                  <h3 className="text-lg font-semibold text-slate-100">{chart.symbol}</h3>
-                  {!chart.collapsed && <div className="flex gap-2">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-lg font-semibold text-slate-100">{chart.symbol}</h3>
+                    {/* Mobile controls toggle button */}
+                    {!chart.collapsed && (
+                      <button
+                        type="button"
+                        onClick={() => setMobileControlsVisible(prev => ({ ...prev, [chart.id]: !prev[chart.id] }))}
+                        className="md:hidden p-2 bg-slate-700 text-slate-300 rounded-lg hover:bg-slate-600 transition-colors"
+                        title="Toggle chart controls"
+                      >
+                        <Menu className="w-5 h-5" />
+                      </button>
+                    )}
+                  </div>
+                  {!chart.collapsed && <div className={`${
+                    // On mobile: hidden by default, shown as overlay when toggled
+                    // On desktop: always visible
+                    mobileControlsVisible[chart.id]
+                      ? 'fixed md:relative inset-x-0 top-0 md:top-auto z-50 bg-slate-800 md:bg-transparent p-4 md:p-0 border-b md:border-0 border-slate-700 max-h-96 overflow-y-auto'
+                      : 'hidden md:flex'
+                  }`}>
+                    {/* Mobile overlay header with close button */}
+                    {mobileControlsVisible[chart.id] && (
+                      <div className="md:hidden flex items-center justify-between mb-3 pb-2 border-b border-slate-600">
+                        <h4 className="text-sm font-semibold text-slate-200">Chart Controls</h4>
+                        <button
+                          type="button"
+                          onClick={() => setMobileControlsVisible(prev => ({ ...prev, [chart.id]: false }))}
+                          className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+                    )}
+                    {/* Controls in a grid for mobile, flex for desktop */}
+                    <div className="flex md:flex gap-2 flex-wrap">
                     <div className="flex gap-1 items-center">
                       <button
                         type="button"
@@ -1731,6 +1766,7 @@ function StockAnalyzer() {
                     >
                       MACD
                     </button>
+                    </div>
                   </div>}
                 </div>
                 {!chart.collapsed && <div className="pr-0 md:pr-14 relative">
