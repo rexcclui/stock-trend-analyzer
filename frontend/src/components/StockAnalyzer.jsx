@@ -1196,7 +1196,7 @@ function StockAnalyzer() {
           {charts.map((chart) => (
             <div key={chart.id} className="space-y-6">
               {/* Price Chart */}
-              <div className="bg-slate-800 p-6 pr-0 rounded-lg border border-slate-700 relative">
+              <div className="bg-slate-800 p-2 md:p-6 pr-0 rounded-lg border border-slate-700 relative">
                 {/* Collapse and Close buttons */}
                 <div className="absolute top-4 right-4 flex gap-2">
                   <button
@@ -1852,7 +1852,7 @@ function StockAnalyzer() {
 
               {/* Technical Indicators */}
               {!chart.collapsed && (chart.showRSI || chart.showMACD) && (
-                <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
+                <div className="bg-slate-800 p-2 md:p-6 rounded-lg border border-slate-700">
                   <h3 className="text-lg font-semibold mb-4 text-slate-100">Technical Indicators</h3>
                   <IndicatorsChart
                     indicators={chart.data.indicators}
