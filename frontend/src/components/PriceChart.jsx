@@ -6,6 +6,7 @@ import { findBestChannels, filterOverlappingChannels } from './PriceChart/utils/
 function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
 
   // Store ABSOLUTE optimized parameters (not percentages) so they persist across period changes
   const [optimizedLookbackCount, setOptimizedLookbackCount] = useState(null)
@@ -61,6 +62,15 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     setOptimizedLookbackCount(null)
     setOptimizedStdevMult(null)
   }, [slopeChannelVolumeWeighted])
+
+  // Track window resize for mobile detection
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Calculate Resistance Line (Rolling POC)
   useEffect(() => {
@@ -5560,7 +5570,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         <ResponsiveContainer>
           <ComposedChart
             data={chartDataWithZones}
-            margin={{ top: 5, right: 0, left: 20, bottom: 5 }}
+            margin={{ top: 5, right: 0, left: isMobile ? 0 : 20, bottom: 5 }}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
             onMouseDown={handleMouseDown}

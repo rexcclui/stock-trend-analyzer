@@ -1,8 +1,9 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { useRef, useEffect, useCallback } from 'react'
+import { useRef, useEffect, useCallback, useState } from 'react'
 
 function MACDChart({ indicators, syncedMouseDate, setSyncedMouseDate, zoomRange, onZoomChange, onExtendPeriod }) {
   const chartRef = useRef(null)
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
 
   // Ensure data is properly reversed and matches expected format
   const chartData = indicators.slice().reverse().map(ind => ({
@@ -100,6 +101,15 @@ function MACDChart({ indicators, syncedMouseDate, setSyncedMouseDate, zoomRange,
     }
   }, [handleWheel])
 
+  // Track window resize for mobile detection
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   const handleMouseMove = (e) => {
     if (e && e.activeLabel) {
       setSyncedMouseDate(e.activeLabel)
@@ -116,7 +126,7 @@ function MACDChart({ indicators, syncedMouseDate, setSyncedMouseDate, zoomRange,
       <ResponsiveContainer width="100%" height={200}>
         <LineChart
           data={visibleChartData}
-          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+          margin={{ top: 5, right: 30, left: isMobile ? 0 : 20, bottom: 5 }}
           onMouseMove={handleMouseMove}
           onMouseLeave={handleMouseLeave}
         >
