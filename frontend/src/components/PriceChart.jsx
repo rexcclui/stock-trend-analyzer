@@ -2142,17 +2142,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const slotSize = Math.ceil(limitedVisibleData.length / numDateSlots)
     const slots = []
 
-    // DEBUG: Log why Vol Prf v2 might not be showing
-    console.log('[VolPrfV2] Calculation Debug:', {
-      enabled: volumeProfileV2Enabled,
-      visibleDataLength: visibleData.length,
-      limitedVisibleDataLength: limitedVisibleData.length,
-      globalRange,
-      numDateSlots,
-      slotSize,
-      maxPossibleSlots
-    })
-
     for (let slotIdx = 0; slotIdx < numDateSlots; slotIdx++) {
       const endIdx = Math.min((slotIdx + 1) * slotSize, limitedVisibleData.length)
 
