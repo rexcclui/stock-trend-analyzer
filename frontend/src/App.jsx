@@ -8,7 +8,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('analyze')
 
   return (
-    <div className="min-h-screen p-4 md:p-8">
+    <div className="min-h-screen p-0 md:p-8">
       <div className="w-full">
         {/* Header */}
         <div className="text-center mb-8">
@@ -51,7 +51,7 @@ function App() {
           </div>
 
           {/* Tab Content */}
-          <div className="p-6">
+          <div className="p-0 md:p-6">
             {activeTab === 'analyze' && <StockAnalyzer />}
             {activeTab === 'backtest' && <BacktestResults />}
           </div>
