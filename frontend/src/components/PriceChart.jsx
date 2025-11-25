@@ -2210,16 +2210,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       })
     }
 
-    // Detect breakouts: if current price falls into a zone with 8% less volume weight than previous slot
+    // Detect breakouts: track highest volume weight, detect 6% drop from highest
     const breakouts = []
-    for (let i = 1; i < slots.length; i++) {
-      const currentSlot = slots[i]
-      const prevSlot = slots[i - 1]
+    let highestVolumeWeight = 0
+    let highestWeightPrice = null
 
-      if (!currentSlot || !prevSlot) continue
+    for (let i = 0; i < slots.length; i++) {
+      const currentSlot = slots[i]
+      if (!currentSlot) continue
 
       const currentPrice = currentSlot.currentPrice
-      const prevPrice = prevSlot.currentPrice
 
       // Find which zone current price falls into
       const currentZoneIdx = currentSlot.priceZones.findIndex(zone =>
@@ -2229,21 +2229,19 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       if (currentZoneIdx === -1) continue
 
       const currentZone = currentSlot.priceZones[currentZoneIdx]
+      const currentWeight = currentZone.volumeWeight
 
-      // Find corresponding zone in previous slot that overlaps with current price
-      const prevZoneIdx = prevSlot.priceZones.findIndex(zone =>
-        currentPrice >= zone.minPrice && currentPrice <= zone.maxPrice
-      )
+      // Update highest volume weight if current is higher
+      if (currentWeight > highestVolumeWeight) {
+        highestVolumeWeight = currentWeight
+        highestWeightPrice = currentPrice
+      }
 
-      if (prevZoneIdx === -1) continue
-
-      const prevZone = prevSlot.priceZones[prevZoneIdx]
-
-      // Check if volume weight dropped by 8% or more
-      const weightDrop = prevZone.volumeWeight - currentZone.volumeWeight
-      if (weightDrop >= 0.08) {
-        // Determine if up break or down break
-        const isUpBreak = currentPrice > prevPrice
+      // Check if there's a 6% drop from the highest volume weight
+      const weightDrop = highestVolumeWeight - currentWeight
+      if (weightDrop >= 0.06 && highestVolumeWeight > 0) {
+        // Determine if up break or down break by comparing to price at highest weight
+        const isUpBreak = currentPrice > highestWeightPrice
 
         breakouts.push({
           slotIdx: i,
@@ -2251,9 +2249,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           price: currentPrice,
           isUpBreak,
           weightDrop,
-          prevWeight: prevZone.volumeWeight,
-          currentWeight: currentZone.volumeWeight
+          highestWeight: highestVolumeWeight,
+          currentWeight: currentWeight
         })
+
+        // Reset highest volume weight after breakout
+        highestVolumeWeight = currentWeight
+        highestWeightPrice = currentPrice
       }
     }
 
