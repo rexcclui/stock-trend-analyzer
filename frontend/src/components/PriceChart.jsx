@@ -2091,12 +2091,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Calculate Volume Profile V2 - 200 date slots with volume distribution per price range
   const calculateVolumeProfileV2 = () => {
-    if (!volumeProfileV2Enabled || displayPrices.length === 0) return []
+    if (!volumeProfileV2Enabled || displayPrices.length === 0) return { slots: [], breakouts: [] }
 
     const reversedDisplayPrices = [...displayPrices].reverse()
     const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
 
-    if (visibleData.length === 0) return []
+    if (visibleData.length === 0) return { slots: [], breakouts: [] }
 
     // Convert dates to indices (dates are locked, indices adjust based on visible data)
     // If dates are not found, use full range (don't call setters during render)
@@ -2121,7 +2121,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     const limitedVisibleData = visibleData.slice(effectiveStartIndex, effectiveEndIndex)
 
-    if (limitedVisibleData.length === 0) return []
+    if (limitedVisibleData.length === 0) return { slots: [], breakouts: [] }
 
     // Calculate global min and max from all visible data for consistent price ranges
     const allPrices = visibleData.map(p => p.close)
@@ -2129,7 +2129,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const globalMax = Math.max(...allPrices)
     const globalRange = globalMax - globalMin
 
-    if (globalRange === 0) return []
+    if (globalRange === 0) return { slots: [], breakouts: [] }
 
     // USER REQUEST: Dynamic zone count per slot
     // numPriceZones is now calculated per slot based on: (cumulativeRange / globalRange) / 0.03
@@ -2197,19 +2197,72 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         zone.volumeWeight = totalVolume > 0 ? zone.volume / totalVolume : 0
       })
 
+      // Get current price (last price in this slot's data)
+      const currentPrice = slotData[slotData.length - 1].close
+
       slots.push({
         slotIndex: slotIdx,
         startDate: slotData[0].date,
         endDate: slotData[slotData.length - 1].date,
         priceZones,
-        totalVolume
+        totalVolume,
+        currentPrice
       })
     }
 
-    return slots
+    // Detect breakouts: if current price falls into a zone with 8% less volume weight than previous slot
+    const breakouts = []
+    for (let i = 1; i < slots.length; i++) {
+      const currentSlot = slots[i]
+      const prevSlot = slots[i - 1]
+
+      if (!currentSlot || !prevSlot) continue
+
+      const currentPrice = currentSlot.currentPrice
+      const prevPrice = prevSlot.currentPrice
+
+      // Find which zone current price falls into
+      const currentZoneIdx = currentSlot.priceZones.findIndex(zone =>
+        currentPrice >= zone.minPrice && currentPrice <= zone.maxPrice
+      )
+
+      if (currentZoneIdx === -1) continue
+
+      const currentZone = currentSlot.priceZones[currentZoneIdx]
+
+      // Find corresponding zone in previous slot that overlaps with current price
+      const prevZoneIdx = prevSlot.priceZones.findIndex(zone =>
+        currentPrice >= zone.minPrice && currentPrice <= zone.maxPrice
+      )
+
+      if (prevZoneIdx === -1) continue
+
+      const prevZone = prevSlot.priceZones[prevZoneIdx]
+
+      // Check if volume weight dropped by 8% or more
+      const weightDrop = prevZone.volumeWeight - currentZone.volumeWeight
+      if (weightDrop >= 0.08) {
+        // Determine if up break or down break
+        const isUpBreak = currentPrice > prevPrice
+
+        breakouts.push({
+          slotIdx: i,
+          date: currentSlot.endDate,
+          price: currentPrice,
+          isUpBreak,
+          weightDrop,
+          prevWeight: prevZone.volumeWeight,
+          currentWeight: currentZone.volumeWeight
+        })
+      }
+    }
+
+    return { slots, breakouts }
   }
 
-  const volumeProfileV2Data = calculateVolumeProfileV2()
+  const volumeProfileV2Result = calculateVolumeProfileV2()
+  const volumeProfileV2Data = volumeProfileV2Result.slots || []
+  const volumeProfileV2Breakouts = volumeProfileV2Result.breakouts || []
 
   // Reset Vol Prf v2 dates if they're not found in current visible data
   useEffect(() => {
@@ -2705,7 +2758,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     if (active && payload && payload.length) {
       const data = payload[0].payload
       return (
-        <div className="bg-slate-800 p-3 border border-slate-600 rounded shadow-lg">
+        <div className="p-1">
           <p className="font-semibold text-slate-100">{data.date}</p>
           <p className="text-sm text-slate-300">Close: ${data.close?.toFixed(2)}</p>
 
@@ -5089,6 +5142,37 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             </text>
           </g>
         )}
+
+        {/* Breakout arrows - right arrow for up break, left arrow for down break */}
+        {volumeProfileV2Breakouts.map((breakout, idx) => {
+          const slot = volumeProfileV2Data[breakout.slotIdx]
+          if (!slot) return null
+
+          const x = xAxis.scale(breakout.date)
+          const y = yAxis.scale(breakout.price)
+
+          if (x === undefined || y === undefined) return null
+
+          // Right arrow for up break (→), Left arrow for down break (←)
+          const arrowPath = breakout.isUpBreak
+            ? 'M -6,-4 L 2,0 L -6,4 Z' // Right arrow
+            : 'M 6,-4 L -2,0 L 6,4 Z'  // Left arrow
+
+          const arrowColor = breakout.isUpBreak ? '#22c55e' : '#ef4444' // Green for up, red for down
+
+          return (
+            <g key={`breakout-arrow-${idx}`} transform={`translate(${x}, ${y})`}>
+              <path
+                d={arrowPath}
+                fill={arrowColor}
+                stroke="white"
+                strokeWidth={1}
+                opacity={0.9}
+                style={{ pointerEvents: 'none' }}
+              />
+            </g>
+          )
+        })}
       </g>
     )
   }
