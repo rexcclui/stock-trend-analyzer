@@ -5086,7 +5086,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               textAnchor="middle"
               style={{ pointerEvents: 'none' }}
             >
-              Vol Weight: {(volV2HoveredBar.volumeWeight * 100).toFixed(1)}%
+              Vol % {(volV2HoveredBar.volumeWeight * 100).toFixed(1)}%
             </text>
             <text
               x={volV2HoveredBar.x}
@@ -5096,7 +5096,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               textAnchor="middle"
               style={{ pointerEvents: 'none' }}
             >
-              Price Range:
+              Px:
             </text>
             <text
               x={volV2HoveredBar.x}
