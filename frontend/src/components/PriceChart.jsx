@@ -2266,6 +2266,66 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const volumeProfileV2Data = volumeProfileV2Result.slots || []
   const volumeProfileV2Breakouts = volumeProfileV2Result.breakouts || []
 
+  // Calculate P&L based on breakout trading signals
+  const calculateBreakoutPL = () => {
+    if (volumeProfileV2Breakouts.length === 0) return { trades: [], totalPL: 0, winRate: 0 }
+
+    const trades = []
+    let buyPrice = null
+    let buyDate = null
+
+    volumeProfileV2Breakouts.forEach(breakout => {
+      if (breakout.isUpBreak && buyPrice === null) {
+        // Buy signal - enter position
+        buyPrice = breakout.price
+        buyDate = breakout.date
+      } else if (!breakout.isUpBreak && buyPrice !== null) {
+        // Sell signal - exit position
+        const sellPrice = breakout.price
+        const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
+
+        trades.push({
+          buyPrice,
+          buyDate,
+          sellPrice,
+          sellDate: breakout.date,
+          plPercent
+        })
+
+        // Reset for next trade
+        buyPrice = null
+        buyDate = null
+      }
+    })
+
+    // If still holding a position, mark as open
+    if (buyPrice !== null && volumeProfileV2Data.length > 0) {
+      const lastSlot = volumeProfileV2Data[volumeProfileV2Data.length - 1]
+      const currentPrice = lastSlot?.currentPrice
+      if (currentPrice) {
+        const plPercent = ((currentPrice - buyPrice) / buyPrice) * 100
+        trades.push({
+          buyPrice,
+          buyDate,
+          sellPrice: currentPrice,
+          sellDate: lastSlot.endDate,
+          plPercent,
+          isOpen: true
+        })
+      }
+    }
+
+    // Calculate total P&L and win rate
+    const totalPL = trades.reduce((sum, trade) => sum + trade.plPercent, 0)
+    const closedTrades = trades.filter(t => !t.isOpen)
+    const winningTrades = closedTrades.filter(t => t.plPercent > 0).length
+    const winRate = closedTrades.length > 0 ? (winningTrades / closedTrades.length) * 100 : 0
+
+    return { trades, totalPL, winRate, closedTradeCount: closedTrades.length }
+  }
+
+  const breakoutPL = calculateBreakoutPL()
+
   // Reset Vol Prf v2 dates if they're not found in current visible data
   useEffect(() => {
     if (!volumeProfileV2Enabled || displayPrices.length === 0) return
@@ -5175,6 +5235,33 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             </g>
           )
         })}
+
+        {/* P&L Stats Display - show when volume profile v2 is enabled and there are breakouts */}
+        {volumeProfileV2Enabled && breakoutPL.trades.length > 0 && (
+          <g>
+            <text
+              x={xAxis.range()[1] - 10}
+              y={yAxis.range()[0] + 20}
+              fill={breakoutPL.totalPL >= 0 ? '#22c55e' : '#ef4444'}
+              fontSize="14"
+              fontWeight="700"
+              textAnchor="end"
+              style={{ pointerEvents: 'none' }}
+            >
+              Total P&L: {breakoutPL.totalPL >= 0 ? '+' : ''}{breakoutPL.totalPL.toFixed(2)}%
+            </text>
+            <text
+              x={xAxis.range()[1] - 10}
+              y={yAxis.range()[0] + 38}
+              fill="#94a3b8"
+              fontSize="11"
+              textAnchor="end"
+              style={{ pointerEvents: 'none' }}
+            >
+              Trades: {breakoutPL.closedTradeCount} | Win Rate: {breakoutPL.winRate.toFixed(1)}%
+            </text>
+          </g>
+        )}
       </g>
     )
   }
