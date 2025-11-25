@@ -36,50 +36,60 @@ public class FinancialModelingPrepClient {
                 String json = EntityUtils.toString(response.getEntity());
 
                 // Parse the response
-                Type type = new TypeToken<Map<String, Object>>(){}.getType();
+                Type type = new TypeToken<Map<String, Object>>() {
+                }.getType();
                 Map<String, Object> data = gson.fromJson(json, type);
 
                 // Extract historical data
                 List<Map<String, Object>> historical = (List<Map<String, Object>>) data.get("historical");
 
                 return historical.stream()
-                    .map(this::mapToStockPrice)
-                    .toList();
+                        .map(this::mapToStockPrice)
+                        .toList();
             }
         }
     }
 
     public List<StockPrice> getHistoricalDataByDays(String symbol, int days) throws IOException {
-        // Try to get from cache first
-        List<StockPrice> cachedData = cache.get(symbol, days);
+        // Calculate from and to dates
+        java.time.LocalDate fromDate = java.time.LocalDate.now().minusDays(days);
+        java.time.LocalDate toDate = java.time.LocalDate.now();
+        String from = fromDate.toString(); // yyyy-MM-dd format
+        String to = toDate.toString(); // yyyy-MM-dd format
+
+        // Try to get from cache first (use from date as cache key)
+        List<StockPrice> cachedData = cache.get(symbol, from);
 
         if (cachedData != null) {
-            System.out.println(String.format("[Cache] ✅ Cache HIT for %s:%d", symbol, days));
+            System.out.println(String.format("[Cache] ✅ Cache HIT for %s:%s", symbol, from));
             cache.logStats();
             return cachedData;
         }
 
-        System.out.println(String.format("[Cache] ❌ Cache MISS for %s:%d, fetching from external API...", symbol, days));
+        System.out
+                .println(String.format("[Cache] ❌ Cache MISS for %s:%s, fetching from external API...", symbol, from));
 
-        String url = String.format("%s/historical-price-full/%s?timeseries=%d&apikey=%s",
-                BASE_URL, symbol, days, apiKey);
+        // Use from/to parameters instead of timeseries
+        String url = String.format("%s/historical-price-full/%s?from=%s&to=%s&apikey=%s",
+                BASE_URL, symbol, from, to, apiKey);
 
         try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
             HttpGet request = new HttpGet(url);
             try (CloseableHttpResponse response = httpClient.execute(request)) {
                 String json = EntityUtils.toString(response.getEntity());
 
-                Type type = new TypeToken<Map<String, Object>>(){}.getType();
+                Type type = new TypeToken<Map<String, Object>>() {
+                }.getType();
                 Map<String, Object> data = gson.fromJson(json, type);
 
                 List<Map<String, Object>> historical = (List<Map<String, Object>>) data.get("historical");
 
                 List<StockPrice> prices = historical.stream()
-                    .map(this::mapToStockPrice)
-                    .toList();
+                        .map(this::mapToStockPrice)
+                        .toList();
 
-                // Store in cache
-                cache.put(symbol, days, prices);
+                // Store in cache (use from date as cache key)
+                cache.put(symbol, from, prices);
                 cache.logStats();
 
                 return prices;

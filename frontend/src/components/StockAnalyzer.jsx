@@ -932,6 +932,9 @@ function StockAnalyzer() {
     setDays(newDays)
     setError(null)
 
+    // Show loading spinner during data fetch
+    setLoading(true)
+
     // Update all charts with the new time range
     try {
       // Always fetch maximum data (3650 days) to have full history available
@@ -1022,12 +1025,9 @@ function StockAnalyzer() {
             targetDataPoints = Math.min(126, totalDataPoints) // ~126 trading days in 6 months
           } else if (daysNum <= 365) {
             targetDataPoints = Math.min(252, totalDataPoints) // ~252 trading days in 1 year
-          } else if (daysNum <= 1095) {
-            targetDataPoints = Math.min(756, totalDataPoints) // ~756 trading days in 3 years
-          } else if (daysNum <= 1825) {
-            targetDataPoints = Math.min(1260, totalDataPoints) // ~1260 trading days in 5 years
+          } else {
+            targetDataPoints = totalDataPoints
           }
-          // else: Max - show all data
 
           // Set zoom to show only the target period (most recent data)
           if (targetDataPoints < totalDataPoints) {
@@ -1042,6 +1042,8 @@ function StockAnalyzer() {
       }, 100)
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to update charts.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -1239,7 +1241,7 @@ function StockAnalyzer() {
                     mobileControlsVisible[chart.id]
                       ? 'fixed md:relative inset-x-0 top-0 md:top-auto z-50 bg-slate-800 md:bg-transparent p-4 md:p-0 border-b md:border-0 border-slate-700 max-h-96 overflow-y-auto'
                       : 'hidden md:flex'
-                  }`}>
+                    }`}>
                     {/* Mobile overlay header with close button */}
                     {mobileControlsVisible[chart.id] && (
                       <div className="md:hidden flex items-center justify-between mb-3 pb-2 border-b border-slate-600">
@@ -1255,42 +1257,263 @@ function StockAnalyzer() {
                     )}
                     {/* Controls in a grid for mobile, flex for desktop */}
                     <div className="flex md:flex gap-2 flex-wrap">
-                    <div className="flex gap-1 items-center">
-                      <button
-                        type="button"
-                        onClick={() => toggleVolumeColor(chart.id)}
-                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.volumeColorEnabled
-                          ? 'bg-orange-600 text-white'
-                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                          }`}
-                        title="Highlight high volume (top 20%) and low volume (bottom 20%)"
-                      >
-                        Vol. Col
-                      </button>
-                      {chart.volumeColorEnabled && (
+                      <div className="flex gap-1 items-center">
                         <button
                           type="button"
-                          onClick={() => cycleVolumeColorMode(chart.id)}
-                          className="px-2 py-1 text-xs rounded font-medium bg-slate-600 text-slate-200 hover:bg-slate-500 transition-colors"
-                          title="Click to cycle: Absolute Volume → Volume vs SPY"
+                          onClick={() => toggleVolumeColor(chart.id)}
+                          className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.volumeColorEnabled
+                            ? 'bg-orange-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            }`}
+                          title="Highlight high volume (top 20%) and low volume (bottom 20%)"
                         >
-                          {chart.volumeColorMode === 'absolute' ? 'ABS' : 'vs SPY'}
+                          Vol. Col
                         </button>
-                      )}
-                    </div>
-                    <div className="flex gap-1 items-center">
+                        {chart.volumeColorEnabled && (
+                          <button
+                            type="button"
+                            onClick={() => cycleVolumeColorMode(chart.id)}
+                            className="px-2 py-1 text-xs rounded font-medium bg-slate-600 text-slate-200 hover:bg-slate-500 transition-colors"
+                            title="Click to cycle: Absolute Volume → Volume vs SPY"
+                          >
+                            {chart.volumeColorMode === 'absolute' ? 'ABS' : 'vs SPY'}
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex gap-1 items-center">
+                        <button
+                          type="button"
+                          onClick={() => toggleVolumeProfile(chart.id)}
+                          className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.volumeProfileEnabled
+                            ? 'bg-yellow-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            }`}
+                          title="Show horizontal volume profile"
+                        >
+                          Vol. Prf
+                        </button>
+                        {chart.volumeProfileEnabled && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCharts(prevCharts =>
+                                  prevCharts.map(c =>
+                                    c.id === chart.id
+                                      ? { ...c, volumeProfileMode: 'auto' }
+                                      : c
+                                  )
+                                )
+                              }}
+                              className={`px-2 py-1 text-xs rounded font-medium transition-colors ${chart.volumeProfileMode === 'auto'
+                                ? 'bg-yellow-600 text-white'
+                                : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
+                                }`}
+                              title="Auto volume profile - across visible data"
+                            >
+                              Auto
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCharts(prevCharts =>
+                                  prevCharts.map(c =>
+                                    c.id === chart.id
+                                      ? { ...c, volumeProfileMode: 'manual' }
+                                      : c
+                                  )
+                                )
+                              }}
+                              className={`px-2 py-1 text-xs rounded font-medium transition-colors ${chart.volumeProfileMode === 'manual'
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
+                                }`}
+                              title="Manual volume profile - draw rectangle to select range"
+                            >
+                              Man
+                            </button>
+                          </>
+                        )}
+                      </div>
+                      <div className="flex gap-1 items-center">
+                        <button
+                          type="button"
+                          onClick={() => toggleVolumeProfileV2(chart.id)}
+                          className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.volumeProfileV2Enabled
+                            ? 'bg-cyan-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            }`}
+                          title="Show volume profile v2 - progressive accumulation from left to right"
+                        >
+                          Vol Prf v2
+                        </button>
+                      </div>
+                      <div className="flex gap-1 items-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCharts(prevCharts =>
+                              prevCharts.map(c =>
+                                c.id === chart.id
+                                  ? { ...c, comparisonMode: c.comparisonMode === 'color' ? 'line' : 'color' }
+                                  : c
+                              )
+                            )
+                          }}
+                          className={`px-2 py-1 text-xs rounded font-medium transition-colors ${chart.comparisonMode === 'color'
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
+                            }`}
+                          title="Click to toggle: Vs Perf Color ↔ Vs Perf"
+                        >
+                          {chart.comparisonMode === 'color' ? 'Color' : 'Line'}
+                        </button>
+                        {chart.comparisonMode === 'color' && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => togglePerformanceComparison(chart.id)}
+                              className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.performanceComparisonEnabled
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                                }`}
+                              title="Highlight top 20% and bottom 20% performance variance vs benchmark"
+                            >
+                              Vs Perf Color
+                            </button>
+                            {chart.performanceComparisonEnabled && (
+                              <>
+                                <input
+                                  type="text"
+                                  value={chart.performanceComparisonBenchmark}
+                                  onChange={(e) => {
+                                    const newBenchmark = e.target.value.toUpperCase()
+                                    setCharts(prevCharts =>
+                                      prevCharts.map(c =>
+                                        c.id === chart.id
+                                          ? { ...c, performanceComparisonBenchmark: newBenchmark }
+                                          : c
+                                      )
+                                    )
+                                  }}
+                                  onKeyPress={(e) => {
+                                    if (e.key === 'Enter') {
+                                      fetchBenchmarkData(chart.id)
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    fetchBenchmarkData(chart.id)
+                                  }}
+                                  placeholder="SPY"
+                                  className="w-16 px-2 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-100 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                                  title="Benchmark symbol (press Enter or blur to load)"
+                                />
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="range"
+                                    min="1"
+                                    max="365"
+                                    value={chart.performanceComparisonDays}
+                                    onChange={(e) => {
+                                      const value = parseInt(e.target.value)
+                                      setCharts(prevCharts =>
+                                        prevCharts.map(c =>
+                                          c.id === chart.id
+                                            ? { ...c, performanceComparisonDays: value }
+                                            : c
+                                        )
+                                      )
+                                    }}
+                                    className="w-24 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                                    title="Lookback days"
+                                  />
+                                  <span className="text-xs text-slate-300 w-8 text-right">{chart.performanceComparisonDays}d</span>
+                                </div>
+                              </>
+                            )}
+                          </>
+                        )}
+                        {chart.comparisonMode === 'line' && (
+                          <>
+                            <button
+                              type="button"
+                              className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors"
+                              title="Vs Perf - Compare performance relative to first data point"
+                            >
+                              Vs Perf
+                            </button>
+                            <input
+                              type="text"
+                              placeholder="Type symbol, press Enter"
+                              className="w-32 px-2 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-100 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
+                              onKeyPress={(e) => {
+                                console.log(`[Input] Key pressed: ${e.key}, value: ${e.target.value}`)
+                                if (e.key === 'Enter' && e.target.value.trim()) {
+                                  const symbol = e.target.value.toUpperCase().trim()
+                                  console.log(`[Input] Enter pressed, adding symbol: ${symbol}`)
+                                  e.target.value = ''
+                                  addComparisonStock(chart.id, symbol)
+                                }
+                              }}
+                              title="Type symbol and press Enter to add (e.g., SPY)"
+                            />
+                            {chart.comparisonStocks && chart.comparisonStocks.length > 0 && (
+                              <div className="flex gap-1 items-center">
+                                {chart.comparisonStocks.map((stock, index) => {
+                                  // Match the color palette from PriceChart
+                                  const tagColors = [
+                                    'bg-blue-600',   // Blue
+                                    'bg-green-600',  // Green
+                                    'bg-yellow-600', // Yellow
+                                    'bg-purple-600', // Purple
+                                    'bg-pink-600',   // Pink
+                                    'bg-teal-600',   // Teal
+                                  ]
+                                  const tagColor = tagColors[index % tagColors.length]
+
+                                  return (
+                                    <span
+                                      key={index}
+                                      className={`inline-flex items-center gap-1 px-2 py-1 text-xs ${tagColor} text-white rounded`}
+                                    >
+                                      {stock.symbol}
+                                      <button
+                                        type="button"
+                                        onClick={() => removeComparisonStock(chart.id, index)}
+                                        className="hover:text-red-300"
+                                        title="Remove"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </span>
+                                  )
+                                })}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
                       <button
                         type="button"
-                        onClick={() => toggleVolumeProfile(chart.id)}
-                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.volumeProfileEnabled
-                          ? 'bg-yellow-600 text-white'
+                        onClick={() => openSlopeChannelDialog(chart.id)}
+                        className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
+                        title="Configure Last Channel"
+                      >
+                        <Settings className="w-4 h-4" />
+                        Last Ch
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleRevAllChannel(chart.id)}
+                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.revAllChannelEnabled
+                          ? 'bg-indigo-600 text-white'
                           : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                           }`}
-                        title="Show horizontal volume profile"
+                        title="All Channels"
                       >
-                        Vol. Prf
+                        All Ch
                       </button>
-                      {chart.volumeProfileEnabled && (
+                      {chart.revAllChannelEnabled && (
                         <>
                           <button
                             type="button"
@@ -1298,16 +1521,92 @@ function StockAnalyzer() {
                               setCharts(prevCharts =>
                                 prevCharts.map(c =>
                                   c.id === chart.id
-                                    ? { ...c, volumeProfileMode: 'auto' }
+                                    ? { ...c, revAllChannelRefreshTrigger: (c.revAllChannelRefreshTrigger || 0) + 1 }
                                     : c
                                 )
                               )
                             }}
-                            className={`px-2 py-1 text-xs rounded font-medium transition-colors ${chart.volumeProfileMode === 'auto'
-                              ? 'bg-yellow-600 text-white'
+                            className="px-2 py-1 text-sm rounded font-medium transition-colors bg-slate-600 text-slate-200 hover:bg-slate-500"
+                            title="Refresh All Channels"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleRevAllChannelVolumeFilter(chart.id)}
+                            className={`px-2 py-1 text-sm rounded transition-colors ${chart.revAllChannelVolumeFilterEnabled
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                              }`}
+                            title="Volume Filter - Ignore data points with bottom 10% of volume"
+                          >
+                            <Filter className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => toggleBestStdev(chart.id)}
+                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.bestStdevEnabled
+                          ? 'bg-amber-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        title="Best Stdev - Find optimal constant stdev for all channels"
+                      >
+                        Best Std
+                      </button>
+                      {chart.bestStdevEnabled && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => refreshBestStdev(chart.id)}
+                            className="px-2 py-1 text-sm rounded font-medium transition-colors bg-slate-600 text-slate-200 hover:bg-slate-500"
+                            title="Refresh Best Stdev Channels"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleBestStdevVolumeFilter(chart.id)}
+                            className={`px-2 py-1 text-sm rounded transition-colors ${chart.bestStdevVolumeFilterEnabled
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                              }`}
+                            title="Volume Filter - Ignore data points with bottom 10% of volume"
+                          >
+                            <Filter className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => toggleManualChannel(chart.id)}
+                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.manualChannelEnabled
+                          ? 'bg-green-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        title="Manual Channel - Draw rectangle to select data range"
+                      >
+                        Man Ch
+                      </button>
+                      {chart.manualChannelEnabled && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCharts(prevCharts =>
+                                prevCharts.map(c =>
+                                  c.id === chart.id
+                                    ? { ...c, manualChannelDragMode: false }
+                                    : c
+                                )
+                              )
+                            }}
+                            className={`px-2 py-1 text-xs rounded font-medium transition-colors ${!chart.manualChannelDragMode
+                              ? 'bg-green-600 text-white'
                               : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
                               }`}
-                            title="Auto volume profile - across visible data"
+                            title="Auto mode - pan the chart"
                           >
                             Auto
                           </button>
@@ -1317,222 +1616,37 @@ function StockAnalyzer() {
                               setCharts(prevCharts =>
                                 prevCharts.map(c =>
                                   c.id === chart.id
-                                    ? { ...c, volumeProfileMode: 'manual' }
+                                    ? { ...c, manualChannelDragMode: true }
                                     : c
                                 )
                               )
                             }}
-                            className={`px-2 py-1 text-xs rounded font-medium transition-colors ${chart.volumeProfileMode === 'manual'
+                            className={`px-2 py-1 text-xs rounded font-medium transition-colors ${chart.manualChannelDragMode
                               ? 'bg-purple-600 text-white'
                               : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
                               }`}
-                            title="Manual volume profile - draw rectangle to select range"
+                            title="Manual mode - drag to select range for channel"
                           >
                             Man
                           </button>
                         </>
                       )}
-                    </div>
-                    <div className="flex gap-1 items-center">
                       <button
                         type="button"
-                        onClick={() => toggleVolumeProfileV2(chart.id)}
-                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.volumeProfileV2Enabled
-                          ? 'bg-cyan-600 text-white'
+                        onClick={() => toggleBestChannel(chart.id)}
+                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.bestChannelEnabled
+                          ? 'bg-amber-600 text-white'
                           : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                           }`}
-                        title="Show volume profile v2 - progressive accumulation from left to right"
+                        title="Best Channel - Simulates parameters to find channels with most touching points"
                       >
-                        Vol Prf v2
+                        Best Channel
                       </button>
-                    </div>
-                    <div className="flex gap-1 items-center">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCharts(prevCharts =>
-                            prevCharts.map(c =>
-                              c.id === chart.id
-                                ? { ...c, comparisonMode: c.comparisonMode === 'color' ? 'line' : 'color' }
-                                : c
-                            )
-                          )
-                        }}
-                        className={`px-2 py-1 text-xs rounded font-medium transition-colors ${chart.comparisonMode === 'color'
-                          ? 'bg-purple-600 text-white'
-                          : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
-                          }`}
-                        title="Click to toggle: Vs Perf Color ↔ Vs Perf"
-                      >
-                        {chart.comparisonMode === 'color' ? 'Color' : 'Line'}
-                      </button>
-                      {chart.comparisonMode === 'color' && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => togglePerformanceComparison(chart.id)}
-                            className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.performanceComparisonEnabled
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                              }`}
-                            title="Highlight top 20% and bottom 20% performance variance vs benchmark"
-                          >
-                            Vs Perf Color
-                          </button>
-                          {chart.performanceComparisonEnabled && (
-                            <>
-                              <input
-                                type="text"
-                                value={chart.performanceComparisonBenchmark}
-                                onChange={(e) => {
-                                  const newBenchmark = e.target.value.toUpperCase()
-                                  setCharts(prevCharts =>
-                                    prevCharts.map(c =>
-                                      c.id === chart.id
-                                        ? { ...c, performanceComparisonBenchmark: newBenchmark }
-                                        : c
-                                    )
-                                  )
-                                }}
-                                onKeyPress={(e) => {
-                                  if (e.key === 'Enter') {
-                                    fetchBenchmarkData(chart.id)
-                                  }
-                                }}
-                                onBlur={() => {
-                                  fetchBenchmarkData(chart.id)
-                                }}
-                                placeholder="SPY"
-                                className="w-16 px-2 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-100 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                                title="Benchmark symbol (press Enter or blur to load)"
-                              />
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="range"
-                                  min="1"
-                                  max="365"
-                                  value={chart.performanceComparisonDays}
-                                  onChange={(e) => {
-                                    const value = parseInt(e.target.value)
-                                    setCharts(prevCharts =>
-                                      prevCharts.map(c =>
-                                        c.id === chart.id
-                                          ? { ...c, performanceComparisonDays: value }
-                                          : c
-                                      )
-                                    )
-                                  }}
-                                  className="w-24 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                                  title="Lookback days"
-                                />
-                                <span className="text-xs text-slate-300 w-8 text-right">{chart.performanceComparisonDays}d</span>
-                              </div>
-                            </>
-                          )}
-                        </>
-                      )}
-                      {chart.comparisonMode === 'line' && (
-                        <>
-                          <button
-                            type="button"
-                            className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors"
-                            title="Vs Perf - Compare performance relative to first data point"
-                          >
-                            Vs Perf
-                          </button>
-                          <input
-                            type="text"
-                            placeholder="Type symbol, press Enter"
-                            className="w-32 px-2 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-100 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
-                            onKeyPress={(e) => {
-                              console.log(`[Input] Key pressed: ${e.key}, value: ${e.target.value}`)
-                              if (e.key === 'Enter' && e.target.value.trim()) {
-                                const symbol = e.target.value.toUpperCase().trim()
-                                console.log(`[Input] Enter pressed, adding symbol: ${symbol}`)
-                                e.target.value = ''
-                                addComparisonStock(chart.id, symbol)
-                              }
-                            }}
-                            title="Type symbol and press Enter to add (e.g., SPY)"
-                          />
-                          {chart.comparisonStocks && chart.comparisonStocks.length > 0 && (
-                            <div className="flex gap-1 items-center">
-                              {chart.comparisonStocks.map((stock, index) => {
-                                // Match the color palette from PriceChart
-                                const tagColors = [
-                                  'bg-blue-600',   // Blue
-                                  'bg-green-600',  // Green
-                                  'bg-yellow-600', // Yellow
-                                  'bg-purple-600', // Purple
-                                  'bg-pink-600',   // Pink
-                                  'bg-teal-600',   // Teal
-                                ]
-                                const tagColor = tagColors[index % tagColors.length]
-
-                                return (
-                                  <span
-                                    key={index}
-                                    className={`inline-flex items-center gap-1 px-2 py-1 text-xs ${tagColor} text-white rounded`}
-                                  >
-                                    {stock.symbol}
-                                    <button
-                                      type="button"
-                                      onClick={() => removeComparisonStock(chart.id, index)}
-                                      className="hover:text-red-300"
-                                      title="Remove"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  </span>
-                                )
-                              })}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => openSlopeChannelDialog(chart.id)}
-                      className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
-                      title="Configure Last Channel"
-                    >
-                      <Settings className="w-4 h-4" />
-                      Last Ch
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => toggleRevAllChannel(chart.id)}
-                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.revAllChannelEnabled
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                      title="All Channels"
-                    >
-                      All Ch
-                    </button>
-                    {chart.revAllChannelEnabled && (
-                      <>
+                      {chart.bestChannelEnabled && (
                         <button
                           type="button"
-                          onClick={() => {
-                            setCharts(prevCharts =>
-                              prevCharts.map(c =>
-                                c.id === chart.id
-                                  ? { ...c, revAllChannelRefreshTrigger: (c.revAllChannelRefreshTrigger || 0) + 1 }
-                                  : c
-                              )
-                            )
-                          }}
-                          className="px-2 py-1 text-sm rounded font-medium transition-colors bg-slate-600 text-slate-200 hover:bg-slate-500"
-                          title="Refresh All Channels"
-                        >
-                          <RefreshCw className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toggleRevAllChannelVolumeFilter(chart.id)}
-                          className={`px-2 py-1 text-sm rounded transition-colors ${chart.revAllChannelVolumeFilterEnabled
+                          onClick={() => toggleBestChannelVolumeFilter(chart.id)}
+                          className={`px-2 py-1 text-sm rounded transition-colors ${chart.bestChannelVolumeFilterEnabled
                             ? 'bg-blue-600 text-white'
                             : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                             }`}
@@ -1540,232 +1654,120 @@ function StockAnalyzer() {
                         >
                           <Filter className="w-4 h-4" />
                         </button>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => toggleBestStdev(chart.id)}
-                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.bestStdevEnabled
-                        ? 'bg-amber-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                      title="Best Stdev - Find optimal constant stdev for all channels"
-                    >
-                      Best Std
-                    </button>
-                    {chart.bestStdevEnabled && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => refreshBestStdev(chart.id)}
-                          className="px-2 py-1 text-sm rounded font-medium transition-colors bg-slate-600 text-slate-200 hover:bg-slate-500"
-                          title="Refresh Best Stdev Channels"
-                        >
-                          <RefreshCw className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => toggleBestStdevVolumeFilter(chart.id)}
-                          className={`px-2 py-1 text-sm rounded transition-colors ${chart.bestStdevVolumeFilterEnabled
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                            }`}
-                          title="Volume Filter - Ignore data points with bottom 10% of volume"
-                        >
-                          <Filter className="w-4 h-4" />
-                        </button>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => toggleManualChannel(chart.id)}
-                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.manualChannelEnabled
-                        ? 'bg-green-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                      title="Manual Channel - Draw rectangle to select data range"
-                    >
-                      Man Ch
-                    </button>
-                    {chart.manualChannelEnabled && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCharts(prevCharts =>
-                              prevCharts.map(c =>
-                                c.id === chart.id
-                                  ? { ...c, manualChannelDragMode: false }
-                                  : c
-                              )
-                            )
-                          }}
-                          className={`px-2 py-1 text-xs rounded font-medium transition-colors ${!chart.manualChannelDragMode
-                            ? 'bg-green-600 text-white'
-                            : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
-                            }`}
-                          title="Auto mode - pan the chart"
-                        >
-                          Auto
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCharts(prevCharts =>
-                              prevCharts.map(c =>
-                                c.id === chart.id
-                                  ? { ...c, manualChannelDragMode: true }
-                                  : c
-                              )
-                            )
-                          }}
-                          className={`px-2 py-1 text-xs rounded font-medium transition-colors ${chart.manualChannelDragMode
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-slate-600 text-slate-200 hover:bg-slate-500'
-                            }`}
-                          title="Manual mode - drag to select range for channel"
-                        >
-                          Man
-                        </button>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => toggleBestChannel(chart.id)}
-                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.bestChannelEnabled
-                        ? 'bg-amber-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                      title="Best Channel - Simulates parameters to find channels with most touching points"
-                    >
-                      Best Channel
-                    </button>
-                    {chart.bestChannelEnabled && (
+                      )}
                       <button
                         type="button"
-                        onClick={() => toggleBestChannelVolumeFilter(chart.id)}
-                        className={`px-2 py-1 text-sm rounded transition-colors ${chart.bestChannelVolumeFilterEnabled
-                          ? 'bg-blue-600 text-white'
+                        onClick={() => toggleMktGapOpen(chart.id)}
+                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.mktGapOpenEnabled
+                          ? 'bg-pink-600 text-white'
                           : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                           }`}
-                        title="Volume Filter - Ignore data points with bottom 10% of volume"
+                        title="Market Gap Open - Highlight biggest gaps in SPY"
                       >
-                        <Filter className="w-4 h-4" />
+                        Mkt Gap Opn
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => toggleMktGapOpen(chart.id)}
-                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.mktGapOpenEnabled
-                        ? 'bg-pink-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                      title="Market Gap Open - Highlight biggest gaps in SPY"
-                    >
-                      Mkt Gap Opn
-                    </button>
-                    {chart.mktGapOpenEnabled && (
-                      <>
-                        <div className="flex items-center gap-1 bg-slate-700 rounded px-2 py-1">
-                          <span className="text-xs text-slate-300">Top</span>
-                          <input
-                            type="number"
-                            min="1"
-                            max="50"
-                            value={chart.mktGapOpenCount}
-                            onChange={(e) => updateMktGapOpenCount(chart.id, parseInt(e.target.value) || 5)}
-                            className="w-10 bg-slate-600 border border-slate-500 text-slate-100 text-xs rounded px-1 text-center focus:ring-1 focus:ring-pink-500 focus:border-transparent"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => refreshMktGapOpen(chart.id)}
-                          className="px-2 py-1 text-sm rounded transition-colors bg-slate-600 text-slate-200 hover:bg-slate-500"
-                          title="Refresh Market Gap Analysis"
-                        >
-                          <RefreshCw className="w-4 h-4" />
-                        </button>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => toggleResLn(chart.id)}
-                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.resLnEnabled
-                        ? 'bg-indigo-500 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                      title="Resistance Line - Plot rolling highest volume price level"
-                    >
-                      Res Ln
-                    </button>
-                    {chart.resLnEnabled && (
-                      <>
-                        <div className="flex items-center gap-2 bg-slate-700 rounded px-2 py-1" title={`Lookback Range: ${chart.resLnRange} days`}>
-                          <span className="text-xs text-slate-300">Rng</span>
-                          <input
-                            type="range"
-                            min="10"
-                            max="365"
-                            value={chart.resLnRange}
-                            onChange={(e) => updateResLnRange(chart.id, parseInt(e.target.value))}
-                            className="w-20 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                          />
-                          <span className="text-xs text-slate-300 w-6 text-right">{chart.resLnRange}</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => refreshResLn(chart.id)}
-                          className="px-2 py-1 text-sm rounded transition-colors bg-slate-600 text-slate-200 hover:bg-slate-500"
-                          title="Recalculate based on visible data range"
-                        >
-                          <RefreshCw className="w-4 h-4" />
-                        </button>
-                        <div className="flex items-center gap-1 bg-slate-700 rounded px-2 py-1" title="Volume concentration in high-volume zone">
-                          <span className="text-xs text-slate-300">Vol%:</span>
-                          <div className="flex items-center gap-0.5">
-                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#ef4444' }} title="<5% - Minimal"></div>
-                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#fbbf24' }} title="5-8%"></div>
-                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#fb923c' }} title="8-12%"></div>
-                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#f97316' }} title="12-16%"></div>
-                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#eab308' }} title="16-20%"></div>
-                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#a3e635' }} title="20-25%"></div>
-                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#84cc16' }} title="25-30%"></div>
-                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#22c55e' }} title="30-40%"></div>
-                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#60a5fa' }} title="40-50%"></div>
-                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#3b82f6' }} title="50%+"></div>
+                      {chart.mktGapOpenEnabled && (
+                        <>
+                          <div className="flex items-center gap-1 bg-slate-700 rounded px-2 py-1">
+                            <span className="text-xs text-slate-300">Top</span>
+                            <input
+                              type="number"
+                              min="1"
+                              max="50"
+                              value={chart.mktGapOpenCount}
+                              onChange={(e) => updateMktGapOpenCount(chart.id, parseInt(e.target.value) || 5)}
+                              className="w-10 bg-slate-600 border border-slate-500 text-slate-100 text-xs rounded px-1 text-center focus:ring-1 focus:ring-pink-500 focus:border-transparent"
+                            />
                           </div>
-                        </div>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => openSmaDialog(chart.id)}
-                      className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
-                      title="Configure SMA"
-                    >
-                      <Settings className="w-4 h-4" />
-                      SMA
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateChartIndicator(chart.id, 'showRSI', !chart.showRSI)}
-                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.showRSI
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                    >
-                      RSI
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateChartIndicator(chart.id, 'showMACD', !chart.showMACD)}
-                      className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.showMACD
-                        ? 'bg-purple-600 text-white'
-                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                        }`}
-                    >
-                      MACD
-                    </button>
+                          <button
+                            type="button"
+                            onClick={() => refreshMktGapOpen(chart.id)}
+                            className="px-2 py-1 text-sm rounded transition-colors bg-slate-600 text-slate-200 hover:bg-slate-500"
+                            title="Refresh Market Gap Analysis"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => toggleResLn(chart.id)}
+                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.resLnEnabled
+                          ? 'bg-indigo-500 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        title="Resistance Line - Plot rolling highest volume price level"
+                      >
+                        Res Ln
+                      </button>
+                      {chart.resLnEnabled && (
+                        <>
+                          <div className="flex items-center gap-2 bg-slate-700 rounded px-2 py-1" title={`Lookback Range: ${chart.resLnRange} days`}>
+                            <span className="text-xs text-slate-300">Rng</span>
+                            <input
+                              type="range"
+                              min="10"
+                              max="365"
+                              value={chart.resLnRange}
+                              onChange={(e) => updateResLnRange(chart.id, parseInt(e.target.value))}
+                              className="w-20 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                            />
+                            <span className="text-xs text-slate-300 w-6 text-right">{chart.resLnRange}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => refreshResLn(chart.id)}
+                            className="px-2 py-1 text-sm rounded transition-colors bg-slate-600 text-slate-200 hover:bg-slate-500"
+                            title="Recalculate based on visible data range"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </button>
+                          <div className="flex items-center gap-1 bg-slate-700 rounded px-2 py-1" title="Volume concentration in high-volume zone">
+                            <span className="text-xs text-slate-300">Vol%:</span>
+                            <div className="flex items-center gap-0.5">
+                              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#ef4444' }} title="<5% - Minimal"></div>
+                              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#fbbf24' }} title="5-8%"></div>
+                              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#fb923c' }} title="8-12%"></div>
+                              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#f97316' }} title="12-16%"></div>
+                              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#eab308' }} title="16-20%"></div>
+                              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#a3e635' }} title="20-25%"></div>
+                              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#84cc16' }} title="25-30%"></div>
+                              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#22c55e' }} title="30-40%"></div>
+                              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#60a5fa' }} title="40-50%"></div>
+                              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#3b82f6' }} title="50%+"></div>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => openSmaDialog(chart.id)}
+                        className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
+                        title="Configure SMA"
+                      >
+                        <Settings className="w-4 h-4" />
+                        SMA
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateChartIndicator(chart.id, 'showRSI', !chart.showRSI)}
+                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.showRSI
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                      >
+                        RSI
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateChartIndicator(chart.id, 'showMACD', !chart.showMACD)}
+                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.showMACD
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                      >
+                        MACD
+                      </button>
                     </div>
                   </div>}
                 </div>
@@ -1842,6 +1844,12 @@ function StockAnalyzer() {
                   />
                 </div>}
 
+                {/* Loading Spinner */}
+                {loading && (
+                  <div className="fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-70 z-50">
+                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-t-4 border-white"></div>
+                  </div>
+                )}
                 {/* Time Period Selector - Right Side (Desktop) / Bottom (Mobile) */}
                 {!chart.collapsed && (
                   <div className="absolute top-1/2 right-0 -translate-y-1/2 hidden md:block" style={{ zIndex: 5 }}>

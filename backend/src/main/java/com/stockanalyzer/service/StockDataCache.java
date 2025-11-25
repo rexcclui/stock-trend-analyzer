@@ -25,10 +25,10 @@ public class StockDataCache {
     }
 
     /**
-     * Generate cache key from symbol and days
+     * Generate cache key from symbol and key (date string)
      */
-    private String generateKey(String symbol, int days) {
-        return String.format("%s:%d", symbol.toUpperCase(), days);
+    private String generateKey(String symbol, String key) {
+        return String.format("%s:%s", symbol.toUpperCase(), key);
     }
 
     /**
@@ -41,16 +41,16 @@ public class StockDataCache {
     /**
      * Get data from cache if available and not expired
      */
-    public List<StockPrice> get(String symbol, int days) {
-        String key = generateKey(symbol, days);
-        CacheEntry entry = cache.get(key);
+    public List<StockPrice> get(String symbol, String key) {
+        String cacheKey = generateKey(symbol, key);
+        CacheEntry entry = cache.get(cacheKey);
 
         if (entry == null) {
             return null;
         }
 
         if (isExpired(entry.timestamp)) {
-            cache.remove(key);
+            cache.remove(cacheKey);
             return null;
         }
 
@@ -64,15 +64,15 @@ public class StockDataCache {
     /**
      * Store data in cache with LRU eviction
      */
-    public void put(String symbol, int days, List<StockPrice> data) {
-        String key = generateKey(symbol, days);
+    public void put(String symbol, String key, List<StockPrice> data) {
+        String cacheKey = generateKey(symbol, key);
 
         // Evict oldest entry if cache is full and key doesn't exist
-        if (cache.size() >= MAX_CACHE_SIZE && !cache.containsKey(key)) {
+        if (cache.size() >= MAX_CACHE_SIZE && !cache.containsKey(cacheKey)) {
             evictLRU();
         }
 
-        cache.put(key, new CacheEntry(data));
+        cache.put(cacheKey, new CacheEntry(data));
         stats.incrementApiCalls();
     }
 

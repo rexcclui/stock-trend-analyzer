@@ -2142,17 +2142,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const slotSize = Math.ceil(limitedVisibleData.length / numDateSlots)
     const slots = []
 
-    // DEBUG: Log why Vol Prf v2 might not be showing
-    console.log('[VolPrfV2] Calculation Debug:', {
-      enabled: volumeProfileV2Enabled,
-      visibleDataLength: visibleData.length,
-      limitedVisibleDataLength: limitedVisibleData.length,
-      globalRange,
-      numDateSlots,
-      slotSize,
-      maxPossibleSlots
-    })
-
     for (let slotIdx = 0; slotIdx < numDateSlots; slotIdx++) {
       const endIdx = Math.min((slotIdx + 1) * slotSize, limitedVisibleData.length)
 
@@ -5462,10 +5451,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                       onVolumeProfileV2StartChange && onVolumeProfileV2StartChange(newStartDate)
                     }
                   }}
-                  onMouseDown={() => setVolV2SliderDragging(true)}
-                  onMouseUp={() => setVolV2SliderDragging(false)}
-                  onTouchStart={() => setVolV2SliderDragging(true)}
-                  onTouchEnd={() => setVolV2SliderDragging(false)}
                   style={{
                     position: 'absolute',
                     width: '100%',
@@ -5479,8 +5464,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                     WebkitAppearance: 'none',
                     appearance: 'none'
                   }}
-                  onMouseDown={(e) => e.currentTarget.style.zIndex = '5'}
-                  onMouseUp={(e) => e.currentTarget.style.zIndex = '4'}
+                  onMouseDown={() => setVolV2SliderDragging(true)}
+                  onMouseUp={() => setVolV2SliderDragging(false)}
+                  onTouchStart={() => setVolV2SliderDragging(true)}
+                  onTouchEnd={() => setVolV2SliderDragging(false)}
                 />
 
                 {/* End handle slider */}
