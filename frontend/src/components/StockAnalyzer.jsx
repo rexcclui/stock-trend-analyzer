@@ -61,26 +61,27 @@ function StockAnalyzer() {
     try {
       const upperSymbol = targetSymbol.toUpperCase()
 
-      // Always fetch maximum data (3650 days) to have full history available
-      const maxDays = '3650'
+      // Use the currently selected period for fetching
+      // Smart cache will automatically use longer cached periods if available
+      const requestedDays = days
 
-      // Try to get from cache first
-      let data = apiCache.get(upperSymbol, maxDays)
+      // Try to get from cache first (smart loading will check for longer periods)
+      let data = apiCache.get(upperSymbol, requestedDays)
 
       if (data) {
-        console.log(`[Cache] ✅ Cache HIT for ${upperSymbol}:${maxDays}`)
+        console.log(`[Cache] ✅ Cache available for ${upperSymbol}:${requestedDays}`)
       } else {
-        console.log(`[Cache] ❌ Cache MISS for ${upperSymbol}:${maxDays}, fetching from server...`)
+        console.log(`[Cache] ❌ Cache MISS for ${upperSymbol}:${requestedDays}, fetching from server...`)
         const response = await axios.get(`${API_URL}/analyze`, {
           params: {
             symbol: upperSymbol,
-            days: maxDays
+            days: requestedDays
           }
         })
         data = response.data
 
         // Store in cache
-        apiCache.set(upperSymbol, maxDays, data)
+        apiCache.set(upperSymbol, requestedDays, data)
       }
 
       // Log cache statistics
@@ -138,38 +139,9 @@ function StockAnalyzer() {
       }
       setCharts(prevCharts => [newChart, ...prevCharts])
 
-      // Auto-zoom to selected period after adding chart
+      // Show all data since it's already trimmed to the requested period
       setTimeout(() => {
-        if (data.prices) {
-          const totalDataPoints = data.prices.length
-          const daysNum = parseInt(days)
-          let targetDataPoints = totalDataPoints
-
-          if (daysNum <= 7) {
-            targetDataPoints = Math.min(7, totalDataPoints)
-          } else if (daysNum <= 30) {
-            targetDataPoints = Math.min(22, totalDataPoints)
-          } else if (daysNum <= 90) {
-            targetDataPoints = Math.min(63, totalDataPoints)
-          } else if (daysNum <= 180) {
-            targetDataPoints = Math.min(126, totalDataPoints)
-          } else if (daysNum <= 365) {
-            targetDataPoints = Math.min(252, totalDataPoints)
-          } else if (daysNum <= 1095) {
-            targetDataPoints = Math.min(756, totalDataPoints)
-          } else if (daysNum <= 1825) {
-            targetDataPoints = Math.min(1260, totalDataPoints)
-          }
-
-          if (targetDataPoints < totalDataPoints) {
-            // Show most recent data by setting start to show last N data points
-            const startIndex = totalDataPoints - targetDataPoints
-            setGlobalZoomRange({ start: startIndex, end: null })
-          } else {
-            // Show all data if selected period >= total available data
-            setGlobalZoomRange({ start: 0, end: null })
-          }
-        }
+        setGlobalZoomRange({ start: 0, end: null })
       }, 100)
 
       // Clear input if not clicked from history
@@ -937,49 +909,49 @@ function StockAnalyzer() {
 
     // Update all charts with the new time range
     try {
-      // Always fetch maximum data (3650 days) to have full history available
-      const maxDays = '3650'
+      // Use the requested period - smart cache will use longer cached periods if available
+      const requestedDays = newDays
 
       // Check if any chart needs SPY data (for volume comparison, performance comparison, or mkt gap open)
       const needsSpy = charts.some(chart => chart.volumeColorMode === 'relative-spy' || chart.performanceComparisonEnabled || chart.mktGapOpenEnabled)
       let spyDataForPeriod = null
 
       if (needsSpy) {
-        // Fetch SPY data once for all charts that need it
-        spyDataForPeriod = apiCache.get('SPY', maxDays)
+        // Fetch SPY data once for all charts that need it (smart loading will check cache)
+        spyDataForPeriod = apiCache.get('SPY', requestedDays)
         if (!spyDataForPeriod) {
-          console.log(`[Cache] ❌ Cache MISS for SPY:${maxDays}, fetching from server...`)
+          console.log(`[Cache] ❌ Cache MISS for SPY:${requestedDays}, fetching from server...`)
           const response = await axios.get(`${API_URL}/analyze`, {
             params: {
               symbol: 'SPY',
-              days: maxDays
+              days: requestedDays
             }
           })
           spyDataForPeriod = response.data
-          apiCache.set('SPY', maxDays, spyDataForPeriod)
+          apiCache.set('SPY', requestedDays, spyDataForPeriod)
         } else {
-          console.log(`[Cache] ✅ Cache HIT for SPY:${maxDays}`)
+          console.log(`[Cache] ✅ Cache available for SPY:${requestedDays}`)
         }
       }
 
       const updatePromises = charts.map(async (chart) => {
-        // Try to get from cache first - always fetch max data
-        let data = apiCache.get(chart.symbol, maxDays)
+        // Try to get from cache first (smart loading will check for longer periods)
+        let data = apiCache.get(chart.symbol, requestedDays)
 
         if (data) {
-          console.log(`[Cache] ✅ Cache HIT for ${chart.symbol}:${maxDays}`)
+          console.log(`[Cache] ✅ Cache available for ${chart.symbol}:${requestedDays}`)
         } else {
-          console.log(`[Cache] ❌ Cache MISS for ${chart.symbol}:${maxDays}, fetching from server...`)
+          console.log(`[Cache] ❌ Cache MISS for ${chart.symbol}:${requestedDays}, fetching from server...`)
           const response = await axios.get(`${API_URL}/analyze`, {
             params: {
               symbol: chart.symbol,
-              days: maxDays
+              days: requestedDays
             }
           })
           data = response.data
 
           // Store in cache
-          apiCache.set(chart.symbol, maxDays, data)
+          apiCache.set(chart.symbol, requestedDays, data)
         }
 
         return { id: chart.id, data }
@@ -1004,41 +976,11 @@ function StockAnalyzer() {
         })
       )
 
-      // After data is loaded, calculate zoom range based on selected period
+      // After data is loaded, show all data since it's already trimmed to requested period
       // Wait for next tick to ensure charts are updated
       setTimeout(() => {
-        if (results.length > 0 && results[0].data.prices) {
-          const totalDataPoints = results[0].data.prices.length
-
-          // Calculate approximate data points for the selected period
-          // Assuming roughly 252 trading days per year
-          const daysNum = parseInt(newDays)
-          let targetDataPoints = totalDataPoints // Default to all data
-
-          if (daysNum <= 7) {
-            targetDataPoints = Math.min(7, totalDataPoints)
-          } else if (daysNum <= 30) {
-            targetDataPoints = Math.min(22, totalDataPoints) // ~22 trading days in a month
-          } else if (daysNum <= 90) {
-            targetDataPoints = Math.min(63, totalDataPoints) // ~63 trading days in 3 months
-          } else if (daysNum <= 180) {
-            targetDataPoints = Math.min(126, totalDataPoints) // ~126 trading days in 6 months
-          } else if (daysNum <= 365) {
-            targetDataPoints = Math.min(252, totalDataPoints) // ~252 trading days in 1 year
-          } else {
-            targetDataPoints = totalDataPoints
-          }
-
-          // Set zoom to show only the target period (most recent data)
-          if (targetDataPoints < totalDataPoints) {
-            // Show most recent data by setting start to show last N data points
-            const startIndex = totalDataPoints - targetDataPoints
-            setGlobalZoomRange({ start: startIndex, end: null })
-          } else {
-            // Show all data if selected period >= total available data
-            setGlobalZoomRange({ start: 0, end: null })
-          }
-        }
+        // Reset zoom to show all data (data is already trimmed to requested period)
+        setGlobalZoomRange({ start: 0, end: null })
       }, 100)
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to update charts.')

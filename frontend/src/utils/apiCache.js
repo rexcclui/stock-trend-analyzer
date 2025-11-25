@@ -101,30 +101,142 @@ class ApiCache {
   }
 
   /**
+   * Find cached data for the same symbol with longer or equal period
+   * Returns { key, entry, days } if found, null otherwise
+   */
+  findLongerPeriodCache(symbol, requestedDays) {
+    const upperSymbol = symbol.toUpperCase()
+    const requestedDaysNum = parseInt(requestedDays)
+
+    let longestMatch = null
+    let longestDays = 0
+
+    for (const [key, entry] of this.cache.entries()) {
+      // Parse cache key format: "SYMBOL:DAYS"
+      const [cachedSymbol, cachedDaysStr] = key.split(':')
+
+      if (cachedSymbol === upperSymbol) {
+        const cachedDays = parseInt(cachedDaysStr)
+
+        // Check if cached period is longer than or equal to requested
+        // and is the longest we've found so far
+        if (cachedDays >= requestedDaysNum && cachedDays > longestDays) {
+          // Verify entry is not expired
+          if (!this.isExpired(entry.timestamp)) {
+            longestMatch = { key, entry, days: cachedDays }
+            longestDays = cachedDays
+          }
+        }
+      }
+    }
+
+    return longestMatch
+  }
+
+  /**
+   * Trim data to the requested number of days
+   * Assumes data is sorted chronologically (oldest to newest)
+   * Returns the most recent N days of data
+   */
+  trimDataToPeriod(data, requestedDays, cachedDays) {
+    if (!data || !data.prices || data.prices.length === 0) {
+      return data
+    }
+
+    // If requested period equals or exceeds cached period, return as-is
+    if (parseInt(requestedDays) >= parseInt(cachedDays)) {
+      return data
+    }
+
+    // Calculate how many data points to keep based on ratio
+    // This accounts for trading days vs calendar days
+    const ratio = parseInt(requestedDays) / parseInt(cachedDays)
+    const targetPoints = Math.ceil(data.prices.length * ratio)
+
+    // Take the most recent data points
+    const trimmedPrices = data.prices.slice(-targetPoints)
+
+    // Create new data object with trimmed prices
+    // Keep other fields (indicators, signals, etc.) that might exist
+    const trimmedData = {
+      ...data,
+      prices: trimmedPrices
+    }
+
+    // If indicators exist, trim them too
+    if (data.indicators && data.indicators.length > 0) {
+      trimmedData.indicators = data.indicators.slice(-targetPoints)
+    }
+
+    // If signals exist, filter to only include those within trimmed date range
+    if (data.signals && data.signals.length > 0 && trimmedPrices.length > 0) {
+      const oldestDate = trimmedPrices[0].date
+      trimmedData.signals = data.signals.filter(signal => signal.date >= oldestDate)
+    }
+
+    return trimmedData
+  }
+
+  /**
    * Get data from cache if available and not expired
+   * Uses smart loading: checks for longer period caches and trims if needed
    */
   get(symbol, days) {
     const key = this.generateKey(symbol, days)
     const entry = this.cache.get(key)
 
-    if (!entry) {
-      return null
+    // First check exact match
+    if (entry) {
+      if (this.isExpired(entry.timestamp)) {
+        this.cache.delete(key)
+        this.saveToStorage()
+      } else {
+        // Update last accessed time for LRU
+        entry.lastAccessed = Date.now()
+        this.stats.cacheHits++
+
+        // Save updated access time and stats
+        this.saveToStorage()
+
+        console.log(`[Cache] ✅ Exact cache HIT for ${key}`)
+        return entry.data
+      }
     }
 
-    if (this.isExpired(entry.timestamp)) {
-      this.cache.delete(key)
+    // Smart loading: check if we have a longer period cached
+    const longerPeriodMatch = this.findLongerPeriodCache(symbol, days)
+
+    if (longerPeriodMatch) {
+      console.log(`[Cache] 🎯 Smart cache HIT: Found ${longerPeriodMatch.key} for requested ${key}`)
+
+      // Update last accessed time for the source cache
+      longerPeriodMatch.entry.lastAccessed = Date.now()
+      this.stats.cacheHits++
+
+      // Trim the data to the requested period
+      const trimmedData = this.trimDataToPeriod(
+        longerPeriodMatch.entry.data,
+        days,
+        longerPeriodMatch.days
+      )
+
+      // Cache the trimmed data for future requests
+      this.cache.set(key, {
+        data: trimmedData,
+        timestamp: longerPeriodMatch.entry.timestamp, // Use original timestamp
+        lastAccessed: Date.now()
+      })
+
+      console.log(`[Cache] 💾 Cached trimmed data as ${key} (${trimmedData.prices?.length || 0} data points)`)
+
+      // Save to localStorage
       this.saveToStorage()
-      return null
+
+      return trimmedData
     }
 
-    // Update last accessed time for LRU
-    entry.lastAccessed = Date.now()
-    this.stats.cacheHits++
-
-    // Save updated access time and stats
-    this.saveToStorage()
-
-    return entry.data
+    // No cache found
+    return null
   }
 
   /**
