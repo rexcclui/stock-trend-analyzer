@@ -5066,20 +5066,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         {/* Tooltip for hovered bar */}
         {volV2HoveredBar && (
           <g>
-            <rect
-              x={volV2HoveredBar.x - 75}
-              y={volV2HoveredBar.y - 45}
-              width={150}
-              height={70}
-              fill="rgba(15, 23, 42, 0.95)"
-              stroke="#06b6d4"
-              strokeWidth={2}
-              rx={6}
-              style={{ pointerEvents: 'none' }}
-            />
             <text
               x={volV2HoveredBar.x}
-              y={volV2HoveredBar.y - 25}
+              y={volV2HoveredBar.y - 15}
               fill="#06b6d4"
               fontSize="12"
               fontWeight="700"
@@ -5090,23 +5079,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             </text>
             <text
               x={volV2HoveredBar.x}
-              y={volV2HoveredBar.y - 8}
+              y={volV2HoveredBar.y + 5}
               fill="#cbd5e1"
               fontSize="11"
               textAnchor="middle"
               style={{ pointerEvents: 'none' }}
             >
-              Px:
-            </text>
-            <text
-              x={volV2HoveredBar.x}
-              y={volV2HoveredBar.y + 8}
-              fill="#94a3b8"
-              fontSize="10"
-              textAnchor="middle"
-              style={{ pointerEvents: 'none' }}
-            >
-              ${volV2HoveredBar.minPrice.toFixed(2)} - ${volV2HoveredBar.maxPrice.toFixed(2)}
+              Px: ${volV2HoveredBar.minPrice.toFixed(2)} - ${volV2HoveredBar.maxPrice.toFixed(2)}
             </text>
           </g>
         )}
