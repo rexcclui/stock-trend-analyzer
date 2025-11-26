@@ -59,6 +59,44 @@ function decrementSmaValue(value) {
   return snapToValidSmaValue(value - step)
 }
 
+// Helper function to process stock symbol - convert numbers to .HK format
+function processStockSymbol(symbol) {
+  const trimmed = symbol.trim().toUpperCase()
+  if (!trimmed) return null
+
+  // If it already ends with .HK, just pad the number part
+  if (trimmed.endsWith('.HK')) {
+    const numberPart = trimmed.replace('.HK', '')
+    // Check if it's a pure number
+    if (/^\d+$/.test(numberPart)) {
+      const padded = numberPart.padStart(4, '0')
+      return `${padded}.HK`
+    }
+    // If not a pure number (e.g., has letters), return as is
+    return trimmed
+  }
+
+  // Check if it's a pure number (no .HK suffix)
+  if (/^\d+$/.test(trimmed)) {
+    const padded = trimmed.padStart(4, '0')
+    return `${padded}.HK`
+  }
+
+  // Otherwise, return as is (e.g., MS, MSFT, etc.)
+  return trimmed
+}
+
+// Helper function to parse multiple stock symbols from input
+function parseStockSymbols(input) {
+  if (!input || !input.trim()) return []
+
+  // Split by comma or space
+  const symbols = input.split(/[,\s]+/).filter(s => s.trim())
+
+  // Process each symbol
+  return symbols.map(processStockSymbol).filter(s => s !== null)
+}
+
 function StockAnalyzer() {
   const [symbol, setSymbol] = useState('')
   const [days, setDays] = useState('365')
@@ -114,97 +152,126 @@ function StockAnalyzer() {
     setError(null)
 
     try {
-      const upperSymbol = targetSymbol.toUpperCase()
+      // Parse multiple symbols from input
+      const symbols = parseStockSymbols(targetSymbol)
+
+      if (symbols.length === 0) {
+        setError('Please enter valid stock symbol(s)')
+        setLoading(false)
+        return
+      }
+
+      console.log(`[Input] Processing ${symbols.length} symbol(s):`, symbols.join(', '))
 
       // Use the currently selected period for fetching
-      // Smart cache will automatically use longer cached periods if available
       const requestedDays = days
 
-      // Try to get from cache first (smart loading will check for longer periods)
-      let data = apiCache.get(upperSymbol, requestedDays)
+      const newCharts = []
+      const errors = []
 
-      if (data) {
-        console.log(`[Cache] ✅ Cache available for ${upperSymbol}:${requestedDays}`)
-      } else {
-        console.log(`[Cache] ❌ Cache MISS for ${upperSymbol}:${requestedDays}, fetching from server...`)
-        const response = await axios.get(`${API_URL}/analyze`, {
-          params: {
-            symbol: upperSymbol,
-            days: requestedDays
+      // Fetch data for each symbol
+      for (const upperSymbol of symbols) {
+        try {
+          // Try to get from cache first
+          let data = apiCache.get(upperSymbol, requestedDays)
+
+          if (data) {
+            console.log(`[Cache] ✅ Cache available for ${upperSymbol}:${requestedDays}`)
+          } else {
+            console.log(`[Cache] ❌ Cache MISS for ${upperSymbol}:${requestedDays}, fetching from server...`)
+            const response = await axios.get(`${API_URL}/analyze`, {
+              params: {
+                symbol: upperSymbol,
+                days: requestedDays
+              }
+            })
+            data = response.data
+
+            // Store in cache
+            apiCache.set(upperSymbol, requestedDays, data)
           }
-        })
-        data = response.data
 
-        // Store in cache
-        apiCache.set(upperSymbol, requestedDays, data)
+          // Save to history
+          saveToHistory(upperSymbol)
+
+          // Create new chart
+          const newChart = {
+            id: Date.now() + newCharts.length, // Ensure unique IDs
+            symbol: upperSymbol,
+            data: data,
+            showRSI: false,
+            showMACD: false,
+            smaPeriods: [],
+            smaVisibility: {},
+            volumeColorEnabled: false,
+            volumeColorMode: 'absolute',
+            volumeProfileEnabled: false,
+            volumeProfileMode: 'auto',
+            volumeProfileManualRanges: [],
+            volumeProfileV2Enabled: false,
+            volumeProfileV2StartDate: null,
+            volumeProfileV2EndDate: null,
+            spyData: null,
+            performanceComparisonEnabled: false,
+            performanceComparisonBenchmark: 'SPY',
+            performanceComparisonDays: 30,
+            comparisonMode: 'line',
+            comparisonStocks: [],
+            slopeChannelEnabled: false,
+            slopeChannelVolumeWeighted: false,
+            slopeChannelZones: 8,
+            slopeChannelDataPercent: 30,
+            slopeChannelWidthMultiplier: 2.5,
+            revAllChannelEnabled: false,
+            revAllChannelEndIndex: null,
+            revAllChannelRefreshTrigger: 0,
+            revAllChannelVolumeFilterEnabled: false,
+            manualChannelEnabled: false,
+            manualChannelDragMode: false,
+            bestChannelEnabled: false,
+            bestChannelVolumeFilterEnabled: false,
+            bestStdevEnabled: false,
+            bestStdevVolumeFilterEnabled: false,
+            bestStdevRefreshTrigger: 0,
+            mktGapOpenEnabled: false,
+            mktGapOpenCount: 5,
+            mktGapOpenRefreshTrigger: 0,
+            resLnEnabled: false,
+            resLnRange: 100,
+            resLnRefreshTrigger: 0,
+            collapsed: false
+          }
+          newCharts.push(newChart)
+        } catch (err) {
+          console.error(`[Error] Failed to fetch ${upperSymbol}:`, err)
+          errors.push(`${upperSymbol}: ${err.response?.data?.error || 'Failed to fetch'}`)
+        }
       }
 
       // Log cache statistics
       apiCache.logStats()
 
-      // Save to history
-      saveToHistory(upperSymbol)
+      // Add all successfully fetched charts
+      if (newCharts.length > 0) {
+        setCharts(prevCharts => [...newCharts, ...prevCharts])
 
-      // Add new chart to the array
-      const newChart = {
-        id: Date.now(),
-        symbol: upperSymbol,
-        data: data,
-        showRSI: false,
-        showMACD: false,
-        smaPeriods: [],
-        smaVisibility: {},
-        volumeColorEnabled: false,
-        volumeColorMode: 'absolute', // 'absolute' or 'relative-spy'
-        volumeProfileEnabled: false,
-        volumeProfileMode: 'auto', // 'auto' or 'manual'
-        volumeProfileManualRanges: [], // Array of { startDate, endDate }
-        volumeProfileV2Enabled: false,
-        volumeProfileV2StartDate: null,
-        volumeProfileV2EndDate: null,
-        spyData: null,
-        performanceComparisonEnabled: false,
-        performanceComparisonBenchmark: 'SPY',
-        performanceComparisonDays: 30,
-        comparisonMode: 'line', // 'color' or 'line'
-        comparisonStocks: [], // Array of { symbol, data }
-        slopeChannelEnabled: false,
-        slopeChannelVolumeWeighted: false,
-        slopeChannelZones: 8,
-        slopeChannelDataPercent: 30,
-        slopeChannelWidthMultiplier: 2.5,
-        revAllChannelEnabled: false,
-        revAllChannelEndIndex: null,
-        revAllChannelRefreshTrigger: 0,
-        revAllChannelVolumeFilterEnabled: false,
-        manualChannelEnabled: false,
-        manualChannelDragMode: false,
-        bestChannelEnabled: false,
-        bestChannelVolumeFilterEnabled: false,
-        bestStdevEnabled: false,
-        bestStdevVolumeFilterEnabled: false,
-        bestStdevRefreshTrigger: 0,
-        mktGapOpenEnabled: false,
-        mktGapOpenCount: 5,
-        mktGapOpenRefreshTrigger: 0,
-        resLnEnabled: false,
-        resLnRange: 100,
-        resLnRefreshTrigger: 0,
-        collapsed: false
+        // Show all data since it's already trimmed to the requested period
+        setTimeout(() => {
+          setGlobalZoomRange({ start: 0, end: null })
+        }, 100)
       }
-      setCharts(prevCharts => [newChart, ...prevCharts])
 
-      // Show all data since it's already trimmed to the requested period
-      setTimeout(() => {
-        setGlobalZoomRange({ start: 0, end: null })
-      }, 100)
+      // Show errors if any
+      if (errors.length > 0) {
+        setError(`Failed to fetch some symbols: ${errors.join(', ')}`)
+      }
 
       // Clear input if not clicked from history
       if (!symbolToAnalyze) {
         setSymbol('')
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to analyze stock. Please check the symbol and try again.')
+      setError(err.message || 'Failed to analyze stock. Please check the symbol and try again.')
     } finally {
       setLoading(false)
     }
@@ -1175,9 +1242,9 @@ function StockAnalyzer() {
             <input
               type="text"
               value={symbol}
-              onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+              onChange={(e) => setSymbol(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="e.g., AAPL, TSLA, MSFT"
+              placeholder="e.g., MS 2 MSFT (space/comma separated, numbers → .HK)"
               className="w-full px-4 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-slate-400"
             />
           </div>
