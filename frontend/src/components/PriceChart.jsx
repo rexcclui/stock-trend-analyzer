@@ -2395,8 +2395,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return { trades, totalPL, winRate, closedTradeCount: closedTrades.length, sellSignals }
   }
 
-  const breakoutPL = calculateBreakoutPL()
-
   // Reset Vol Prf v2 dates if they're not found in current visible data
   useEffect(() => {
     if (!volumeProfileV2Enabled || displayPrices.length === 0) return
@@ -2705,6 +2703,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     return dataPoint
   }).reverse() // Show oldest to newest
+
+  // Calculate P&L after chartData is created (needs SMA5 values from chartData)
+  const breakoutPL = calculateBreakoutPL()
 
   // Apply zoom range to chart data FIRST
   const endIndex = zoomRange.end === null ? chartData.length : zoomRange.end
