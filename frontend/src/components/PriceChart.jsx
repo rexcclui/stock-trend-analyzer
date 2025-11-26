@@ -2704,6 +2704,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return dataPoint
   }).reverse() // Show oldest to newest
 
+  // Debug: Check if chartData has SMA5 values
+  console.log('chartData sample:', chartData[0])
+  console.log('chartData has sma5?', chartData.some(d => d.sma5 !== undefined && d.sma5 !== null))
+  console.log('smaPeriods:', smaPeriods)
+
   // Calculate P&L after chartData is created (needs SMA5 values from chartData)
   const breakoutPL = calculateBreakoutPL()
 
