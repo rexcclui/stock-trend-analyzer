@@ -286,11 +286,16 @@ function StockAnalyzer() {
           const displayDaysNum = parseInt(displayDays)
           const fetchDaysNum = parseInt(fetchDays)
 
-          if (displayDaysNum < fetchDaysNum) {
+          if (displayDaysNum < fetchDaysNum && newCharts.length > 0) {
             // We fetched more data than we want to display
-            // Show only the most recent displayDays worth of data
-            const startIndex = Math.max(0, fetchDaysNum - displayDaysNum)
-            console.log(`[Initial Zoom] Showing most recent ${displayDaysNum} days from ${fetchDaysNum} days total (start: ${startIndex})`)
+            // Use the first chart's data length to calculate the ratio
+            const actualDataLength = newCharts[0].data.prices.length
+            const displayRatio = displayDaysNum / fetchDaysNum
+
+            // Show only the most recent portion based on the ratio
+            // For example: 1Y/3Y = 0.333, so show the most recent 33.3% of data
+            const startIndex = Math.floor(actualDataLength * (1 - displayRatio))
+            console.log(`[Initial Zoom] Display: ${displayDaysNum} days (${(displayRatio*100).toFixed(1)}%), Fetch: ${fetchDaysNum} days, Data points: ${actualDataLength}, Start: ${startIndex}`)
             setGlobalZoomRange({ start: startIndex, end: null })
           } else {
             // Show all fetched data
@@ -1207,17 +1212,24 @@ function StockAnalyzer() {
       // After data is loaded, set initial zoom to show only the display period (not all fetched data)
       // Wait for next tick to ensure charts are updated
       setTimeout(() => {
-        // Calculate zoom to show only the display period
-        // Assuming the data is daily and ordered from oldest to newest
         const displayDaysNum = parseInt(displayDays)
         const fetchDaysNum = parseInt(fetchDays)
 
-        if (displayDaysNum < fetchDaysNum) {
+        if (displayDaysNum < fetchDaysNum && charts.length > 0) {
           // We fetched more data than we want to display
-          // Show only the most recent displayDays worth of data
-          const startIndex = Math.max(0, fetchDaysNum - displayDaysNum)
-          console.log(`[Initial Zoom] Showing most recent ${displayDaysNum} days from ${fetchDaysNum} days total (start: ${startIndex})`)
-          setGlobalZoomRange({ start: startIndex, end: null })
+          // Use the first chart's actual data length to calculate the ratio
+          const firstChart = charts[0]
+          if (firstChart && firstChart.data && firstChart.data.prices) {
+            const actualDataLength = firstChart.data.prices.length
+            const displayRatio = displayDaysNum / fetchDaysNum
+
+            // Show only the most recent portion based on the ratio
+            const startIndex = Math.floor(actualDataLength * (1 - displayRatio))
+            console.log(`[Initial Zoom] Display: ${displayDaysNum} days (${(displayRatio*100).toFixed(1)}%), Fetch: ${fetchDaysNum} days, Data points: ${actualDataLength}, Start: ${startIndex}`)
+            setGlobalZoomRange({ start: startIndex, end: null })
+          } else {
+            setGlobalZoomRange({ start: 0, end: null })
+          }
         } else {
           // Show all fetched data
           setGlobalZoomRange({ start: 0, end: null })
