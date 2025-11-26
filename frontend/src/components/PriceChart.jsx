@@ -3203,16 +3203,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
       console.log('BEFORE BOUNDS - newStart:', newStart, 'newEnd:', newEnd)
 
-      // Check if panning left would go beyond available data
-      if (newStart < 0 && panAmount < 0 && onExtendPeriod) {
-        // User is trying to pan left to see older data
-        // Request more historical data
-        console.log('REQUESTING MORE DATA - panning left beyond available data')
-        onExtendPeriod()
-        // Don't update zoom yet - wait for new data to load
-        return
-      }
-
       // Ensure we don't pan beyond data bounds while maintaining window size
       if (newStart < 0) {
         newStart = 0
