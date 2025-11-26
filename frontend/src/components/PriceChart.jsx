@@ -5249,7 +5249,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           </g>
         )}
 
-        {/* Buy signals - green right arrows for up breakouts */}
+        {/* Buy signals - blue right arrows for up breakouts */}
         {volumeProfileV2Breakouts.map((breakout, idx) => {
           const x = xAxis.scale(breakout.date)
           const y = yAxis.scale(breakout.price)
@@ -5260,7 +5260,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             <g key={`buy-arrow-${idx}`} transform={`translate(${x}, ${y})`}>
               <path
                 d="M -6,-4 L 2,0 L -6,4 Z"
-                fill="#22c55e"
+                fill="#3b82f6"
                 stroke="white"
                 strokeWidth={1}
                 opacity={0.9}
