@@ -3850,6 +3850,82 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             </div>
           )
         })}
+
+        {/* Volume Profile V2 Color Legend - inline with other legends (desktop only) */}
+        {volumeProfileV2Enabled && !isMobile && (() => {
+          // Calculate number of price zones for display
+          const reversedDisplayPrices = [...displayPrices].reverse()
+          const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
+          const allPrices = visibleData.map(p => p.close)
+          const globalMin = Math.min(...allPrices)
+          const globalMax = Math.max(...allPrices)
+          const globalRange = globalMax - globalMin
+          // Dynamic zone count based on cumulative/global range ratio
+          const numPriceZones = Math.max(1, Math.round((globalRange / globalRange) / 0.03))
+
+          // Generate color blocks for specific volume weight breakpoints
+          const legendSteps = [
+            { weight: 0.02, label: '2%' },
+            { weight: 0.04, label: '4%' },
+            { weight: 0.06, label: '6%' },
+            { weight: 0.08, label: '8%' },
+            { weight: 0.10, label: '10%' },
+            { weight: 0.12, label: '12%' },
+            { weight: 0.15, label: '15%' },
+            { weight: 0.18, label: '18%' },
+            { weight: 0.22, label: '22%' },
+            { weight: 0.26, label: '26%' },
+            { weight: 0.30, label: '30%' },
+            { weight: 0.35, label: '35%+' }
+          ]
+
+          return (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              padding: '8px 12px',
+              background: 'rgba(15, 23, 42, 0.95)',
+              border: '1px solid rgba(148, 163, 184, 0.3)',
+              borderRadius: '8px',
+              backdropFilter: 'blur(4px)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+                <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>
+                  Volume Weight %
+                </span>
+                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>
+                  {numPriceZones} price zones/bar
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                {legendSteps.map((step, idx) => {
+                  const normalizedWeight = Math.min(1, step.weight / 0.35)
+                  const hue = Math.floor(normalizedWeight * 240)
+                  const saturation = 90 + (normalizedWeight * 10)
+                  const lightness = 60 - (normalizedWeight * 30)
+                  const opacity = 0.2 + (Math.pow(normalizedWeight, 0.5) * 0.75)
+
+                  return (
+                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+                      <div style={{
+                        width: '24px',
+                        height: '16px',
+                        background: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+                        opacity: opacity,
+                        border: '1px solid rgba(59, 130, 246, 0.5)',
+                        borderRadius: '2px'
+                      }} />
+                      <span style={{ fontSize: '8px', color: '#94a3b8', fontWeight: 600 }}>
+                        {step.label}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })()}
       </div>
     )
   }
@@ -6375,87 +6451,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             <Customized component={CustomThirdVolZoneLine} />
           </ComposedChart>
         </ResponsiveContainer>
-
-        {/* Volume Profile V2 Color Legend */}
-        {volumeProfileV2Enabled && (() => {
-          // Calculate number of price zones for display
-          const reversedDisplayPrices = [...displayPrices].reverse()
-          const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
-          const allPrices = visibleData.map(p => p.close)
-          const globalMin = Math.min(...allPrices)
-          const globalMax = Math.max(...allPrices)
-          const globalRange = globalMax - globalMin
-          // Dynamic zone count based on cumulative/global range ratio
-          const numPriceZones = Math.max(1, Math.round((globalRange / globalRange) / 0.03))
-
-          // Generate color blocks for specific volume weight breakpoints
-          const legendSteps = [
-            { weight: 0.02, label: '2%' },
-            { weight: 0.04, label: '4%' },
-            { weight: 0.06, label: '6%' },
-            { weight: 0.08, label: '8%' },
-            { weight: 0.10, label: '10%' },
-            { weight: 0.12, label: '12%' },
-            { weight: 0.15, label: '15%' },
-            { weight: 0.18, label: '18%' },
-            { weight: 0.22, label: '22%' },
-            { weight: 0.26, label: '26%' },
-            { weight: 0.30, label: '30%' },
-            { weight: 0.35, label: '35%+' }
-          ]
-
-          return (
-            <div style={{
-              position: 'absolute',
-              bottom: '-55px',
-              right: '0',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px',
-              padding: '10px 16px',
-              background: 'rgba(15, 23, 42, 0.95)',
-              border: '1px solid rgba(148, 163, 184, 0.3)',
-              borderRadius: '8px',
-              backdropFilter: 'blur(4px)',
-              boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
-              zIndex: 10
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>
-                  Volume Weight %
-                </span>
-                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>
-                  {numPriceZones} price zones/bar
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                {legendSteps.map((step, idx) => {
-                  const normalizedWeight = Math.min(1, step.weight / 0.35)
-                  const hue = Math.floor(normalizedWeight * 240)
-                  const saturation = 90 + (normalizedWeight * 10)
-                  const lightness = 60 - (normalizedWeight * 30)
-                  const opacity = 0.2 + (Math.pow(normalizedWeight, 0.5) * 0.75)
-
-                  return (
-                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                      <div style={{
-                        width: '24px',
-                        height: '16px',
-                        background: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
-                        opacity: opacity,
-                        border: '1px solid rgba(59, 130, 246, 0.5)',
-                        borderRadius: '2px'
-                      }} />
-                      <span style={{ fontSize: '8px', color: '#94a3b8', fontWeight: 600 }}>
-                        {step.label}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })()}
       </div>
     </div>
   )
