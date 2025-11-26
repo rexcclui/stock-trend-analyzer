@@ -97,6 +97,30 @@ function parseStockSymbols(input) {
   return symbols.map(processStockSymbol).filter(s => s !== null)
 }
 
+// Helper function to get the fetch period based on display period
+// Always fetch more data than displayed to enable smooth panning
+function getFetchPeriod(displayDays) {
+  const days = parseInt(displayDays)
+
+  // 7D → fetch 3M (90 days)
+  if (days <= 7) return '90'
+
+  // 1M (30) → fetch 6M (180 days)
+  if (days <= 30) return '180'
+
+  // 6M (180) → fetch 3Y (1095 days)
+  if (days <= 180) return '1095'
+
+  // 1Y (365) → fetch 3Y (1095 days)
+  if (days <= 365) return '1095'
+
+  // 3Y (1095) → fetch 5Y (1825 days)
+  if (days <= 1095) return '1825'
+
+  // 5Y (1825) and above → fetch MAX (3650 days for 10Y)
+  return '3650'
+}
+
 function StockAnalyzer() {
   const [symbol, setSymbol] = useState('')
   const [days, setDays] = useState('365')
@@ -163,8 +187,10 @@ function StockAnalyzer() {
 
       console.log(`[Input] Processing ${symbols.length} symbol(s):`, symbols.join(', '))
 
-      // Use the currently selected period for fetching
-      const requestedDays = days
+      // Smart pre-loading: fetch more data than displayed to enable smooth panning
+      const displayDays = days
+      const fetchDays = getFetchPeriod(days)
+      console.log(`[Smart Loading] Display: ${displayDays} days, Fetching: ${fetchDays} days`)
 
       const newCharts = []
       const errors = []
@@ -172,23 +198,23 @@ function StockAnalyzer() {
       // Fetch data for each symbol
       for (const upperSymbol of symbols) {
         try {
-          // Try to get from cache first
-          let data = apiCache.get(upperSymbol, requestedDays)
+          // Try to get from cache first (use fetch period for cache key)
+          let data = apiCache.get(upperSymbol, fetchDays)
 
           if (data) {
-            console.log(`[Cache] ✅ Cache available for ${upperSymbol}:${requestedDays}`)
+            console.log(`[Cache] ✅ Cache available for ${upperSymbol}:${fetchDays}`)
           } else {
-            console.log(`[Cache] ❌ Cache MISS for ${upperSymbol}:${requestedDays}, fetching from server...`)
+            console.log(`[Cache] ❌ Cache MISS for ${upperSymbol}:${fetchDays}, fetching from server...`)
             const response = await axios.get(`${API_URL}/analyze`, {
               params: {
                 symbol: upperSymbol,
-                days: requestedDays
+                days: fetchDays  // Fetch more data than displayed
               }
             })
             data = response.data
 
-            // Store in cache
-            apiCache.set(upperSymbol, requestedDays, data)
+            // Store in cache (use fetch period for cache key)
+            apiCache.set(upperSymbol, fetchDays, data)
           }
 
           // Save to history
@@ -255,9 +281,21 @@ function StockAnalyzer() {
       if (newCharts.length > 0) {
         setCharts(prevCharts => [...newCharts, ...prevCharts])
 
-        // Show all data since it's already trimmed to the requested period
+        // Set initial zoom to show only the display period (not all fetched data)
         setTimeout(() => {
-          setGlobalZoomRange({ start: 0, end: null })
+          const displayDaysNum = parseInt(displayDays)
+          const fetchDaysNum = parseInt(fetchDays)
+
+          if (displayDaysNum < fetchDaysNum) {
+            // We fetched more data than we want to display
+            // Show only the most recent displayDays worth of data
+            const startIndex = Math.max(0, fetchDaysNum - displayDaysNum)
+            console.log(`[Initial Zoom] Showing most recent ${displayDaysNum} days from ${fetchDaysNum} days total (start: ${startIndex})`)
+            setGlobalZoomRange({ start: startIndex, end: null })
+          } else {
+            // Show all fetched data
+            setGlobalZoomRange({ start: 0, end: null })
+          }
         }, 100)
       }
 
@@ -1097,49 +1135,51 @@ function StockAnalyzer() {
 
     // Update all charts with the new time range
     try {
-      // Use the requested period - smart cache will use longer cached periods if available
-      const requestedDays = newDays
+      // Smart pre-loading: fetch more data than displayed
+      const displayDays = newDays
+      const fetchDays = getFetchPeriod(newDays)
+      console.log(`[Smart Loading] Display: ${displayDays} days, Fetching: ${fetchDays} days`)
 
       // Check if any chart needs SPY data (for volume comparison, performance comparison, or mkt gap open)
       const needsSpy = charts.some(chart => chart.volumeColorMode === 'relative-spy' || chart.performanceComparisonEnabled || chart.mktGapOpenEnabled)
       let spyDataForPeriod = null
 
       if (needsSpy) {
-        // Fetch SPY data once for all charts that need it (smart loading will check cache)
-        spyDataForPeriod = apiCache.get('SPY', requestedDays)
+        // Fetch SPY data using smart loading
+        spyDataForPeriod = apiCache.get('SPY', fetchDays)
         if (!spyDataForPeriod) {
-          console.log(`[Cache] ❌ Cache MISS for SPY:${requestedDays}, fetching from server...`)
+          console.log(`[Cache] ❌ Cache MISS for SPY:${fetchDays}, fetching from server...`)
           const response = await axios.get(`${API_URL}/analyze`, {
             params: {
               symbol: 'SPY',
-              days: requestedDays
+              days: fetchDays  // Fetch more data for SPY too
             }
           })
           spyDataForPeriod = response.data
-          apiCache.set('SPY', requestedDays, spyDataForPeriod)
+          apiCache.set('SPY', fetchDays, spyDataForPeriod)
         } else {
-          console.log(`[Cache] ✅ Cache available for SPY:${requestedDays}`)
+          console.log(`[Cache] ✅ Cache available for SPY:${fetchDays}`)
         }
       }
 
       const updatePromises = charts.map(async (chart) => {
-        // Try to get from cache first (smart loading will check for longer periods)
-        let data = apiCache.get(chart.symbol, requestedDays)
+        // Try to get from cache first using fetch period
+        let data = apiCache.get(chart.symbol, fetchDays)
 
         if (data) {
-          console.log(`[Cache] ✅ Cache available for ${chart.symbol}:${requestedDays}`)
+          console.log(`[Cache] ✅ Cache available for ${chart.symbol}:${fetchDays}`)
         } else {
-          console.log(`[Cache] ❌ Cache MISS for ${chart.symbol}:${requestedDays}, fetching from server...`)
+          console.log(`[Cache] ❌ Cache MISS for ${chart.symbol}:${fetchDays}, fetching from server...`)
           const response = await axios.get(`${API_URL}/analyze`, {
             params: {
               symbol: chart.symbol,
-              days: requestedDays
+              days: fetchDays  // Fetch more data than displayed
             }
           })
           data = response.data
 
-          // Store in cache
-          apiCache.set(chart.symbol, requestedDays, data)
+          // Store in cache using fetch period as key
+          apiCache.set(chart.symbol, fetchDays, data)
         }
 
         return { id: chart.id, data }
@@ -1164,11 +1204,24 @@ function StockAnalyzer() {
         })
       )
 
-      // After data is loaded, show all data since it's already trimmed to requested period
+      // After data is loaded, set initial zoom to show only the display period (not all fetched data)
       // Wait for next tick to ensure charts are updated
       setTimeout(() => {
-        // Reset zoom to show all data (data is already trimmed to requested period)
-        setGlobalZoomRange({ start: 0, end: null })
+        // Calculate zoom to show only the display period
+        // Assuming the data is daily and ordered from oldest to newest
+        const displayDaysNum = parseInt(displayDays)
+        const fetchDaysNum = parseInt(fetchDays)
+
+        if (displayDaysNum < fetchDaysNum) {
+          // We fetched more data than we want to display
+          // Show only the most recent displayDays worth of data
+          const startIndex = Math.max(0, fetchDaysNum - displayDaysNum)
+          console.log(`[Initial Zoom] Showing most recent ${displayDaysNum} days from ${fetchDaysNum} days total (start: ${startIndex})`)
+          setGlobalZoomRange({ start: startIndex, end: null })
+        } else {
+          // Show all fetched data
+          setGlobalZoomRange({ start: 0, end: null })
+        }
       }, 100)
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to update charts.')
