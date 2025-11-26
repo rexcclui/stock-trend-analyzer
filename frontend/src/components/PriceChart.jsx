@@ -2270,7 +2270,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     const smaPeriod = Math.min(...smaPeriods) // Use smallest SMA period
     const smaKey = `sma${smaPeriod}`
-    console.log(`Using ${smaKey} for sell signals (available SMAs: ${smaPeriods.join(', ')})`)
 
     const trades = []
     const sellSignals = [] // Track sell signal points for visualization
@@ -2290,9 +2289,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         dateToSMA.set(d.date, d[smaKey])
       }
     })
-
-    console.log(`${smaKey} Map size:`, dateToSMA.size)
-    console.log('Total slots:', volumeProfileV2Data.length)
 
     // Calculate SMA slope helper
     const getSMASlope = (currentDate, prevDate) => {
@@ -2323,31 +2319,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const prevSlot = volumeProfileV2Data[i - 1]
         if (prevSlot) {
           const slope = getSMASlope(currentDate, prevSlot.endDate)
-          const currentSMA = dateToSMA.get(currentDate)
-          const prevSMA = dateToSMA.get(prevSlot.endDate)
-
-          if (i === buySlotIdx + 1) {
-            console.log(`First check after buy (using ${smaKey}):`, {
-              currentDate,
-              prevDate: prevSlot.endDate,
-              currentSMA,
-              prevSMA,
-              slope,
-              hasSMAData: currentSMA !== undefined && prevSMA !== undefined
-            })
-          }
 
           // If SMA is going down (negative slope), SELL
           if (slope !== null && slope < 0) {
             const sellPrice = currentPrice
             const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
-
-            console.log(`SELL SIGNAL DETECTED (${smaKey} slope negative):`, {
-              sellDate: currentDate,
-              sellPrice,
-              slope,
-              plPercent
-            })
 
             trades.push({
               buyPrice,
@@ -2404,17 +2380,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const endPrice = lastTrade.sellPrice
       marketChange = ((endPrice - startPrice) / startPrice) * 100
     }
-
-    console.log('Trading Summary:', {
-      smaUsed: smaKey,
-      totalTrades: trades.length,
-      closedTrades: closedTrades.length,
-      sellSignals: sellSignals.length,
-      buySignals: volumeProfileV2Breakouts.length,
-      tradingPL: totalPL.toFixed(2) + '%',
-      marketChange: marketChange.toFixed(2) + '%',
-      outperformance: (totalPL - marketChange).toFixed(2) + '%'
-    })
 
     return { trades, totalPL, winRate, closedTradeCount: closedTrades.length, sellSignals, smaUsed: smaKey, marketChange }
   }
@@ -2728,12 +2693,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return dataPoint
   }).reverse() // Show oldest to newest
 
-  // Debug: Check if chartData has SMA5 values
-  console.log('chartData sample:', chartData[0])
-  console.log('chartData has sma5?', chartData.some(d => d.sma5 !== undefined && d.sma5 !== null))
-  console.log('smaPeriods:', smaPeriods)
-
-  // Calculate P&L after chartData is created (needs SMA5 values from chartData)
+  // Calculate P&L after chartData is created (needs SMA values from chartData)
   const breakoutPL = calculateBreakoutPL()
 
   // Apply zoom range to chart data FIRST
