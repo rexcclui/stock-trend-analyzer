@@ -3146,7 +3146,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     // Handle chart panning - only when NOT in manual channel drag mode
     if (isPanning && !manualChannelDragMode && e && e.chartX !== undefined && panStartX !== null && panStartZoom !== null) {
-      console.log('PANNING - deltaX:', e.chartX - panStartX)
       const deltaX = e.chartX - panStartX
       const chartWidth = chartContainerRef.current?.offsetWidth || 800
       const totalDataLength = chartData.length
@@ -3156,9 +3155,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const currentRange = (panStartZoom.end || totalDataLength) - panStartZoom.start
       const panAmount = Math.floor(panPercent * currentRange)
 
+      console.log('PAN CALC - deltaX:', deltaX, 'chartWidth:', chartWidth, 'totalDataLength:', totalDataLength, 'currentRange:', currentRange, 'panAmount:', panAmount)
+
       // Apply pan with bounds checking
       let newStart = panStartZoom.start + panAmount
       let newEnd = (panStartZoom.end || totalDataLength) + panAmount
+
+      console.log('BEFORE BOUNDS - newStart:', newStart, 'newEnd:', newEnd)
 
       // Ensure we don't pan beyond data bounds
       if (newStart < 0) {
@@ -3171,7 +3174,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       }
       if (newStart < 0) newStart = 0
 
-      onZoomChange({ start: newStart, end: newEnd === totalDataLength ? null : newEnd })
+      const finalZoom = { start: newStart, end: newEnd === totalDataLength ? null : newEnd }
+      console.log('CALLING onZoomChange with:', finalZoom)
+      onZoomChange(finalZoom)
       return
     } else if (isPanning) {
       console.log('Panning blocked by condition check')
