@@ -2258,9 +2258,19 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const volumeProfileV2Data = volumeProfileV2Result.slots || []
   const volumeProfileV2Breakouts = volumeProfileV2Result.breakouts || []
 
-  // Calculate P&L based on breakout trading signals with SMA5 slope for sell
+  // Calculate P&L based on breakout trading signals with SMA slope for sell
   const calculateBreakoutPL = () => {
-    if (volumeProfileV2Data.length === 0) return { trades: [], totalPL: 0, winRate: 0, sellSignals: [] }
+    if (volumeProfileV2Data.length === 0) return { trades: [], totalPL: 0, winRate: 0, sellSignals: [], smaUsed: null }
+
+    // Check which SMA is enabled (use smallest period available)
+    if (smaPeriods.length === 0) {
+      console.warn('No SMA enabled - cannot generate sell signals. Please enable SMA5 or SMA10.')
+      return { trades: [], totalPL: 0, winRate: 0, sellSignals: [], smaUsed: null }
+    }
+
+    const smaPeriod = Math.min(...smaPeriods) // Use smallest SMA period
+    const smaKey = `sma${smaPeriod}`
+    console.log(`Using ${smaKey} for sell signals (available SMAs: ${smaPeriods.join(', ')})`)
 
     const trades = []
     const sellSignals = [] // Track sell signal points for visualization
@@ -2272,24 +2282,24 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // Create a map of breakout dates for quick lookup
     const breakoutDates = new Set(volumeProfileV2Breakouts.map(b => b.date))
 
-    // Create date to SMA5 map from chartData (which has SMA values)
-    // chartData contains the computed SMA values, displayPrices doesn't
-    const dateToSMA5 = new Map()
+    // Create date to SMA map from chartData (which has SMA values)
+    // Use whichever SMA is enabled (prefer smallest period)
+    const dateToSMA = new Map()
     chartData.forEach(d => {
-      if (d.sma5 !== undefined && d.sma5 !== null) {
-        dateToSMA5.set(d.date, d.sma5)
+      if (d[smaKey] !== undefined && d[smaKey] !== null) {
+        dateToSMA.set(d.date, d[smaKey])
       }
     })
 
-    console.log('SMA5 Map size:', dateToSMA5.size)
+    console.log(`${smaKey} Map size:`, dateToSMA.size)
     console.log('Total slots:', volumeProfileV2Data.length)
 
-    // Calculate SMA5 slope helper
-    const getSMA5Slope = (currentDate, prevDate) => {
-      const currentSMA5 = dateToSMA5.get(currentDate)
-      const prevSMA5 = dateToSMA5.get(prevDate)
-      if (currentSMA5 !== undefined && prevSMA5 !== undefined) {
-        return currentSMA5 - prevSMA5 // Positive = going up, Negative = going down
+    // Calculate SMA slope helper
+    const getSMASlope = (currentDate, prevDate) => {
+      const currentSMA = dateToSMA.get(currentDate)
+      const prevSMA = dateToSMA.get(prevDate)
+      if (currentSMA !== undefined && prevSMA !== undefined) {
+        return currentSMA - prevSMA // Positive = going up, Negative = going down
       }
       return null
     }
@@ -2308,31 +2318,31 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         buyDate = currentDate
         buySlotIdx = i
       }
-      // If holding, check SMA5 slope for SELL signal
+      // If holding, check SMA slope for SELL signal
       else if (isHolding && i > 0) {
         const prevSlot = volumeProfileV2Data[i - 1]
         if (prevSlot) {
-          const slope = getSMA5Slope(currentDate, prevSlot.endDate)
-          const currentSMA5 = dateToSMA5.get(currentDate)
-          const prevSMA5 = dateToSMA5.get(prevSlot.endDate)
+          const slope = getSMASlope(currentDate, prevSlot.endDate)
+          const currentSMA = dateToSMA.get(currentDate)
+          const prevSMA = dateToSMA.get(prevSlot.endDate)
 
           if (i === buySlotIdx + 1) {
-            console.log('First check after buy:', {
+            console.log(`First check after buy (using ${smaKey}):`, {
               currentDate,
               prevDate: prevSlot.endDate,
-              currentSMA5,
-              prevSMA5,
+              currentSMA,
+              prevSMA,
               slope,
-              hasSMA5Data: currentSMA5 !== undefined && prevSMA5 !== undefined
+              hasSMAData: currentSMA !== undefined && prevSMA !== undefined
             })
           }
 
-          // If SMA5 is going down (negative slope), SELL
+          // If SMA is going down (negative slope), SELL
           if (slope !== null && slope < 0) {
             const sellPrice = currentPrice
             const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
 
-            console.log('SELL SIGNAL DETECTED:', {
+            console.log(`SELL SIGNAL DETECTED (${smaKey} slope negative):`, {
               sellDate: currentDate,
               sellPrice,
               slope,
@@ -2386,13 +2396,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const winRate = closedTrades.length > 0 ? (winningTrades / closedTrades.length) * 100 : 0
 
     console.log('Trading Summary:', {
+      smaUsed: smaKey,
       totalTrades: trades.length,
       closedTrades: closedTrades.length,
       sellSignals: sellSignals.length,
       buySignals: volumeProfileV2Breakouts.length
     })
 
-    return { trades, totalPL, winRate, closedTradeCount: closedTrades.length, sellSignals }
+    return { trades, totalPL, winRate, closedTradeCount: closedTrades.length, sellSignals, smaUsed: smaKey }
   }
 
   // Reset Vol Prf v2 dates if they're not found in current visible data
