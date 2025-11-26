@@ -135,7 +135,7 @@ class ApiCache {
 
   /**
    * Trim data to the requested number of days
-   * Assumes data is sorted chronologically (oldest to newest)
+   * Data is sorted reverse chronologically (newest to oldest)
    * Returns the most recent N days of data
    */
   trimDataToPeriod(data, requestedDays, cachedDays) {
@@ -153,8 +153,8 @@ class ApiCache {
     const ratio = parseInt(requestedDays) / parseInt(cachedDays)
     const targetPoints = Math.ceil(data.prices.length * ratio)
 
-    // Take the most recent data points (negative index = from end of array)
-    const trimmedPrices = data.prices.slice(-targetPoints)
+    // Data is sorted newest to oldest, so take the FIRST targetPoints (most recent)
+    const trimmedPrices = data.prices.slice(0, targetPoints)
 
     // Debug: Log the date range to verify we're getting the most recent data
     if (trimmedPrices.length > 0) {
@@ -171,15 +171,16 @@ class ApiCache {
       prices: trimmedPrices
     }
 
-    // If indicators exist, trim them too
+    // If indicators exist, trim them too (also take first N elements)
     if (data.indicators && data.indicators.length > 0) {
-      trimmedData.indicators = data.indicators.slice(-targetPoints)
+      trimmedData.indicators = data.indicators.slice(0, targetPoints)
     }
 
     // If signals exist, filter to only include those within trimmed date range
     if (data.signals && data.signals.length > 0 && trimmedPrices.length > 0) {
-      const oldestDate = trimmedPrices[0].date
-      trimmedData.signals = data.signals.filter(signal => signal.date >= oldestDate)
+      const oldestDate = trimmedPrices[trimmedPrices.length - 1].date
+      const newestDate = trimmedPrices[0].date
+      trimmedData.signals = data.signals.filter(signal => signal.date >= oldestDate && signal.date <= newestDate)
     }
 
     return trimmedData
