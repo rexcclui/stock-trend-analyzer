@@ -2272,17 +2272,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // Create a map of breakout dates for quick lookup
     const breakoutDates = new Set(volumeProfileV2Breakouts.map(b => b.date))
 
-    // Get visible data for SMA5 calculation
-    const reversedDisplayPrices = [...displayPrices].reverse()
-    const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
-
-    // Create date to SMA5 map
+    // Create date to SMA5 map from ALL displayPrices (not just visible range)
+    // This ensures we have SMA5 data for all slot dates
     const dateToSMA5 = new Map()
-    visibleData.forEach(d => {
-      if (d.sma5 !== undefined) {
+    displayPrices.forEach(d => {
+      if (d.sma5 !== undefined && d.sma5 !== null) {
         dateToSMA5.set(d.date, d.sma5)
       }
     })
+
+    console.log('SMA5 Map size:', dateToSMA5.size)
+    console.log('Total slots:', volumeProfileV2Data.length)
 
     // Calculate SMA5 slope helper
     const getSMA5Slope = (currentDate, prevDate) => {
@@ -2313,11 +2313,31 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const prevSlot = volumeProfileV2Data[i - 1]
         if (prevSlot) {
           const slope = getSMA5Slope(currentDate, prevSlot.endDate)
+          const currentSMA5 = dateToSMA5.get(currentDate)
+          const prevSMA5 = dateToSMA5.get(prevSlot.endDate)
+
+          if (i === buySlotIdx + 1) {
+            console.log('First check after buy:', {
+              currentDate,
+              prevDate: prevSlot.endDate,
+              currentSMA5,
+              prevSMA5,
+              slope,
+              hasSMA5Data: currentSMA5 !== undefined && prevSMA5 !== undefined
+            })
+          }
 
           // If SMA5 is going down (negative slope), SELL
           if (slope !== null && slope < 0) {
             const sellPrice = currentPrice
             const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
+
+            console.log('SELL SIGNAL DETECTED:', {
+              sellDate: currentDate,
+              sellPrice,
+              slope,
+              plPercent
+            })
 
             trades.push({
               buyPrice,
@@ -2364,6 +2384,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const closedTrades = trades.filter(t => !t.isOpen)
     const winningTrades = closedTrades.filter(t => t.plPercent > 0).length
     const winRate = closedTrades.length > 0 ? (winningTrades / closedTrades.length) * 100 : 0
+
+    console.log('Trading Summary:', {
+      totalTrades: trades.length,
+      closedTrades: closedTrades.length,
+      sellSignals: sellSignals.length,
+      buySignals: volumeProfileV2Breakouts.length
+    })
 
     return { trades, totalPL, winRate, closedTradeCount: closedTrades.length, sellSignals }
   }
