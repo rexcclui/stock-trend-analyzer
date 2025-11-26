@@ -2210,10 +2210,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       })
     }
 
-    // Detect breakouts: track highest volume weight, detect 6% drop from highest
+    // Detect up breakouts: current zone has <5% weight compared to next lower price zone
     const breakouts = []
-    let highestVolumeWeight = 0
-    let highestWeightPrice = null
 
     for (let i = 0; i < slots.length; i++) {
       const currentSlot = slots[i]
@@ -2231,31 +2229,25 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const currentZone = currentSlot.priceZones[currentZoneIdx]
       const currentWeight = currentZone.volumeWeight
 
-      // Update highest volume weight if current is higher
-      if (currentWeight > highestVolumeWeight) {
-        highestVolumeWeight = currentWeight
-        highestWeightPrice = currentPrice
-      }
+      // Find the next lower price zone (zone below current zone)
+      // Zones are ordered by price, so the zone at currentZoneIdx - 1 is the lower zone
+      if (currentZoneIdx > 0) {
+        const lowerZone = currentSlot.priceZones[currentZoneIdx - 1]
+        const lowerWeight = lowerZone.volumeWeight
 
-      // Check if there's a 6% drop from the highest volume weight
-      const weightDrop = highestVolumeWeight - currentWeight
-      if (weightDrop >= 0.06 && highestVolumeWeight > 0) {
-        // Determine if up break or down break by comparing to price at highest weight
-        const isUpBreak = currentPrice > highestWeightPrice
-
-        breakouts.push({
-          slotIdx: i,
-          date: currentSlot.endDate,
-          price: currentPrice,
-          isUpBreak,
-          weightDrop,
-          highestWeight: highestVolumeWeight,
-          currentWeight: currentWeight
-        })
-
-        // Reset highest volume weight after breakout
-        highestVolumeWeight = currentWeight
-        highestWeightPrice = currentPrice
+        // Check if current zone has less than 5% weight compared to lower zone
+        // This means price is breaking up into a lower volume area
+        if (currentWeight < lowerWeight && lowerWeight - currentWeight >= 0.05) {
+          breakouts.push({
+            slotIdx: i,
+            date: currentSlot.endDate,
+            price: currentPrice,
+            isUpBreak: true,
+            currentWeight: currentWeight,
+            lowerWeight: lowerWeight,
+            weightDiff: lowerWeight - currentWeight
+          })
+        }
       }
     }
 
@@ -2266,53 +2258,105 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const volumeProfileV2Data = volumeProfileV2Result.slots || []
   const volumeProfileV2Breakouts = volumeProfileV2Result.breakouts || []
 
-  // Calculate P&L based on breakout trading signals
+  // Calculate P&L based on breakout trading signals with SMA5 slope for sell
   const calculateBreakoutPL = () => {
-    if (volumeProfileV2Breakouts.length === 0) return { trades: [], totalPL: 0, winRate: 0 }
+    if (volumeProfileV2Data.length === 0) return { trades: [], totalPL: 0, winRate: 0, sellSignals: [] }
 
     const trades = []
+    const sellSignals = [] // Track sell signal points for visualization
+    let isHolding = false
     let buyPrice = null
     let buyDate = null
+    let buySlotIdx = null
 
-    volumeProfileV2Breakouts.forEach(breakout => {
-      if (breakout.isUpBreak && buyPrice === null) {
-        // Buy signal - enter position
-        buyPrice = breakout.price
-        buyDate = breakout.date
-      } else if (!breakout.isUpBreak && buyPrice !== null) {
-        // Sell signal - exit position
-        const sellPrice = breakout.price
-        const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
+    // Create a map of breakout dates for quick lookup
+    const breakoutDates = new Set(volumeProfileV2Breakouts.map(b => b.date))
 
-        trades.push({
-          buyPrice,
-          buyDate,
-          sellPrice,
-          sellDate: breakout.date,
-          plPercent
-        })
+    // Get visible data for SMA5 calculation
+    const reversedDisplayPrices = [...displayPrices].reverse()
+    const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
 
-        // Reset for next trade
-        buyPrice = null
-        buyDate = null
+    // Create date to SMA5 map
+    const dateToSMA5 = new Map()
+    visibleData.forEach(d => {
+      if (d.sma5 !== undefined) {
+        dateToSMA5.set(d.date, d.sma5)
       }
     })
 
-    // If still holding a position, mark as open
-    if (buyPrice !== null && volumeProfileV2Data.length > 0) {
-      const lastSlot = volumeProfileV2Data[volumeProfileV2Data.length - 1]
-      const currentPrice = lastSlot?.currentPrice
-      if (currentPrice) {
-        const plPercent = ((currentPrice - buyPrice) / buyPrice) * 100
-        trades.push({
-          buyPrice,
-          buyDate,
-          sellPrice: currentPrice,
-          sellDate: lastSlot.endDate,
-          plPercent,
-          isOpen: true
-        })
+    // Calculate SMA5 slope helper
+    const getSMA5Slope = (currentDate, prevDate) => {
+      const currentSMA5 = dateToSMA5.get(currentDate)
+      const prevSMA5 = dateToSMA5.get(prevDate)
+      if (currentSMA5 !== undefined && prevSMA5 !== undefined) {
+        return currentSMA5 - prevSMA5 // Positive = going up, Negative = going down
       }
+      return null
+    }
+
+    for (let i = 0; i < volumeProfileV2Data.length; i++) {
+      const slot = volumeProfileV2Data[i]
+      if (!slot) continue
+
+      const currentDate = slot.endDate
+      const currentPrice = slot.currentPrice
+
+      // Check if this is an up breakout date - BUY signal
+      if (breakoutDates.has(currentDate) && !isHolding) {
+        isHolding = true
+        buyPrice = currentPrice
+        buyDate = currentDate
+        buySlotIdx = i
+      }
+      // If holding, check SMA5 slope for SELL signal
+      else if (isHolding && i > 0) {
+        const prevSlot = volumeProfileV2Data[i - 1]
+        if (prevSlot) {
+          const slope = getSMA5Slope(currentDate, prevSlot.endDate)
+
+          // If SMA5 is going down (negative slope), SELL
+          if (slope !== null && slope < 0) {
+            const sellPrice = currentPrice
+            const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
+
+            trades.push({
+              buyPrice,
+              buyDate,
+              sellPrice,
+              sellDate: currentDate,
+              plPercent
+            })
+
+            sellSignals.push({
+              date: currentDate,
+              price: sellPrice,
+              slotIdx: i
+            })
+
+            // Reset state
+            isHolding = false
+            buyPrice = null
+            buyDate = null
+            buySlotIdx = null
+          }
+        }
+      }
+    }
+
+    // If still holding at the end, mark as open position
+    if (isHolding && volumeProfileV2Data.length > 0) {
+      const lastSlot = volumeProfileV2Data[volumeProfileV2Data.length - 1]
+      const currentPrice = lastSlot.currentPrice
+      const plPercent = ((currentPrice - buyPrice) / buyPrice) * 100
+
+      trades.push({
+        buyPrice,
+        buyDate,
+        sellPrice: currentPrice,
+        sellDate: lastSlot.endDate,
+        plPercent,
+        isOpen: true
+      })
     }
 
     // Calculate total P&L and win rate
@@ -2321,7 +2365,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const winningTrades = closedTrades.filter(t => t.plPercent > 0).length
     const winRate = closedTrades.length > 0 ? (winningTrades / closedTrades.length) * 100 : 0
 
-    return { trades, totalPL, winRate, closedTradeCount: closedTrades.length }
+    return { trades, totalPL, winRate, closedTradeCount: closedTrades.length, sellSignals }
   }
 
   const breakoutPL = calculateBreakoutPL()
@@ -5205,28 +5249,39 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           </g>
         )}
 
-        {/* Breakout arrows - right arrow for up break, left arrow for down break */}
+        {/* Buy signals - green right arrows for up breakouts */}
         {volumeProfileV2Breakouts.map((breakout, idx) => {
-          const slot = volumeProfileV2Data[breakout.slotIdx]
-          if (!slot) return null
-
           const x = xAxis.scale(breakout.date)
           const y = yAxis.scale(breakout.price)
 
           if (x === undefined || y === undefined) return null
 
-          // Right arrow for up break (→), Left arrow for down break (←)
-          const arrowPath = breakout.isUpBreak
-            ? 'M -6,-4 L 2,0 L -6,4 Z' // Right arrow
-            : 'M 6,-4 L -2,0 L 6,4 Z'  // Left arrow
+          return (
+            <g key={`buy-arrow-${idx}`} transform={`translate(${x}, ${y})`}>
+              <path
+                d="M -6,-4 L 2,0 L -6,4 Z"
+                fill="#22c55e"
+                stroke="white"
+                strokeWidth={1}
+                opacity={0.9}
+                style={{ pointerEvents: 'none' }}
+              />
+            </g>
+          )
+        })}
 
-          const arrowColor = breakout.isUpBreak ? '#22c55e' : '#ef4444' // Green for up, red for down
+        {/* Sell signals - red left arrows for SMA5 slope down */}
+        {breakoutPL.sellSignals && breakoutPL.sellSignals.map((signal, idx) => {
+          const x = xAxis.scale(signal.date)
+          const y = yAxis.scale(signal.price)
+
+          if (x === undefined || y === undefined) return null
 
           return (
-            <g key={`breakout-arrow-${idx}`} transform={`translate(${x}, ${y})`}>
+            <g key={`sell-arrow-${idx}`} transform={`translate(${x}, ${y})`}>
               <path
-                d={arrowPath}
-                fill={arrowColor}
+                d="M 6,-4 L -2,0 L 6,4 Z"
+                fill="#ef4444"
                 stroke="white"
                 strokeWidth={1}
                 opacity={0.9}
