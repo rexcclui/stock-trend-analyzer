@@ -3195,6 +3195,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
   const handleMouseDown = (e) => {
+    // Debug: Log the entire event object to see what's available
+    console.log('handleMouseDown event:', e)
+    console.log('Event keys:', e ? Object.keys(e) : 'null')
+    console.log('activeCoordinate:', e?.activeCoordinate)
+
     // Volume profile manual selection - highest priority
     if (volumeProfileEnabled && volumeProfileMode === 'manual' && e && e.activeLabel) {
       setIsSelectingVolumeProfile(true)
@@ -3213,10 +3218,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     // Panning - only when neither manual mode is active
     if (e && e.chartX !== undefined) {
+      console.log('Panning started with chartX:', e.chartX)
       setIsPanning(true)
       setPanStartX(e.chartX)
       setPanStartZoom({ ...zoomRange })
       return
+    } else {
+      console.log('Panning NOT started - chartX is:', e?.chartX)
     }
   }
 
