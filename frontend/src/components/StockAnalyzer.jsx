@@ -236,6 +236,7 @@ function StockAnalyzer() {
             volumeProfileV2Enabled: false,
             volumeProfileV2StartDate: null,
             volumeProfileV2EndDate: null,
+            volumeProfileV2RefreshTrigger: 0,
             spyData: null,
             performanceComparisonEnabled: false,
             performanceComparisonBenchmark: 'SPY',
@@ -868,6 +869,20 @@ function StockAnalyzer() {
           return {
             ...chart,
             volumeProfileV2Enabled: !chart.volumeProfileV2Enabled
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const refreshVolumeProfileV2 = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            volumeProfileV2RefreshTrigger: (chart.volumeProfileV2RefreshTrigger || 0) + 1
           }
         }
         return chart
@@ -1538,6 +1553,16 @@ function StockAnalyzer() {
                         >
                           Vol Prf v2
                         </button>
+                        {chart.volumeProfileV2Enabled && (
+                          <button
+                            type="button"
+                            onClick={() => refreshVolumeProfileV2(chart.id)}
+                            className="px-2 py-1 text-sm rounded font-medium transition-colors bg-slate-600 text-slate-200 hover:bg-slate-500"
+                            title="Refresh Vol Prf V2"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                       <div className="flex gap-1 items-center">
                         <button
@@ -2002,6 +2027,7 @@ function StockAnalyzer() {
                     volumeProfileV2Enabled={chart.volumeProfileV2Enabled}
                     volumeProfileV2StartDate={chart.volumeProfileV2StartDate}
                     volumeProfileV2EndDate={chart.volumeProfileV2EndDate}
+                    volumeProfileV2RefreshTrigger={chart.volumeProfileV2RefreshTrigger}
                     onVolumeProfileV2StartChange={(value) => updateVolumeProfileV2Start(chart.id, value)}
                     onVolumeProfileV2EndChange={(value) => updateVolumeProfileV2End(chart.id, value)}
                     spyData={chart.spyData}

@@ -3,7 +3,7 @@ import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 import { X, ArrowLeftRight, Hand } from 'lucide-react'
 import { findBestChannels, filterOverlappingChannels } from './PriceChart/utils/bestChannelFinder'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -53,6 +53,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // Volume Profile V2 hover state
   const [volV2HoveredBar, setVolV2HoveredBar] = useState(null)
   const [volV2SliderDragging, setVolV2SliderDragging] = useState(false)
+
+  // Volume Profile V2 calculated data (only recalculates on manual refresh)
+  const [volumeProfileV2Result, setVolumeProfileV2Result] = useState({ slots: [], breakouts: [] })
 
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
   // No need to reset here to avoid infinite loop
@@ -2254,7 +2257,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return { slots, breakouts }
   }
 
-  const volumeProfileV2Result = calculateVolumeProfileV2()
+  // Use the cached Volume Profile V2 data (only recalculates on manual refresh)
   const volumeProfileV2Data = volumeProfileV2Result.slots || []
   const volumeProfileV2Breakouts = volumeProfileV2Result.breakouts || []
 
@@ -2413,6 +2416,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       onVolumeProfileV2EndChange(null)
     }
   }, [volumeProfileV2Enabled, volumeProfileV2StartDate, volumeProfileV2EndDate, displayPrices, zoomRange, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange])
+
+  // Calculate Volume Profile V2 - only when manually refreshed or feature toggled
+  useEffect(() => {
+    if (!volumeProfileV2Enabled) {
+      setVolumeProfileV2Result({ slots: [], breakouts: [] })
+      return
+    }
+
+    // Recalculate when refresh trigger changes or feature is enabled
+    const result = calculateVolumeProfileV2()
+    setVolumeProfileV2Result(result)
+  }, [volumeProfileV2Enabled, volumeProfileV2RefreshTrigger, volumeProfileV2StartDate, volumeProfileV2EndDate])
 
   // SMA Simulation Logic - find optimal SMA value based on P&L
   useEffect(() => {
