@@ -9,6 +9,16 @@ import { apiCache } from '../utils/apiCache'
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
 
+// Helper function to get the step size for a given SMA value
+function getSmaStepSize(value) {
+  if (value <= 10) return 1
+  if (value <= 20) return 2
+  if (value <= 40) return 3
+  if (value <= 50) return 4
+  if (value <= 100) return 5
+  return 10
+}
+
 // Helper function to snap SMA value to nearest valid increment
 function snapToValidSmaValue(value) {
   // Clamp to min/max range
@@ -35,6 +45,18 @@ function snapToValidSmaValue(value) {
     // Increment 10 from 100 to 200
     return Math.round(value / 10) * 10
   }
+}
+
+// Helper function to increment SMA value by the appropriate step
+function incrementSmaValue(value) {
+  const step = getSmaStepSize(value)
+  return snapToValidSmaValue(value + step)
+}
+
+// Helper function to decrement SMA value by the appropriate step
+function decrementSmaValue(value) {
+  const step = getSmaStepSize(value - 1) // Use step size for the previous range
+  return snapToValidSmaValue(value - step)
 }
 
 function StockAnalyzer() {
@@ -1813,8 +1835,21 @@ function StockAnalyzer() {
                   {!chart.collapsed && chart.smaPeriods && chart.smaPeriods.length > 0 && (
                     <div className="mt-3 px-2 flex flex-wrap gap-2">
                       {chart.smaPeriods.map((period, index) => (
-                        <div key={index} className="flex items-center gap-3 bg-slate-700/50 p-2 rounded w-full md:w-[400px]">
+                        <div key={index} className="flex items-center gap-2 bg-slate-700/50 p-2 rounded w-full md:w-[400px]">
                           <span className="text-sm text-slate-300 w-16">SMA {period}</span>
+                          <button
+                            onClick={() => {
+                              const newValue = decrementSmaValue(period)
+                              const newPeriods = [...chart.smaPeriods]
+                              newPeriods[index] = newValue
+                              updateSmaPeriods(chart.id, newPeriods)
+                            }}
+                            disabled={period <= 3}
+                            className="p-1 text-slate-300 hover:text-white hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="Decrease SMA period"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
                           <input
                             type="range"
                             min="3"
@@ -1829,6 +1864,19 @@ function StockAnalyzer() {
                             }}
                             className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb"
                           />
+                          <button
+                            onClick={() => {
+                              const newValue = incrementSmaValue(period)
+                              const newPeriods = [...chart.smaPeriods]
+                              newPeriods[index] = newValue
+                              updateSmaPeriods(chart.id, newPeriods)
+                            }}
+                            disabled={period >= 200}
+                            className="p-1 text-slate-300 hover:text-white hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="Increase SMA period"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
                           <span className="text-xs text-slate-400 w-8 text-right">{period}</span>
                           <button
                             onClick={() => deleteSma(chart.id, period)}
