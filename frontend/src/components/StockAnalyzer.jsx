@@ -80,6 +80,9 @@ function StockAnalyzer() {
   const smaButtonIntervalRef = useRef(null)
   const smaButtonTimeoutRef = useRef(null)
 
+  // Track SMA simulation state (chartId-index pairs that are simulating)
+  const [simulatingSma, setSimulatingSma] = useState({})
+
   // Load stock history from localStorage on mount
   useEffect(() => {
     const savedHistory = localStorage.getItem(STOCK_HISTORY_KEY)
@@ -234,6 +237,24 @@ function StockAnalyzer() {
     setCharts(prevCharts =>
       prevCharts.map(chart => {
         if (chart.id === chartId) {
+          const newVisibility = {}
+          newPeriods.forEach(period => {
+            newVisibility[period] = chart.smaVisibility?.[period] ?? true
+          })
+          return { ...chart, smaPeriods: newPeriods, smaVisibility: newVisibility }
+        }
+        return chart
+      })
+    )
+  }
+
+  const handleSimulateSma = (chartId, smaIndex, optimalValue) => {
+    console.log(`[Simulate] Optimal SMA value for chart ${chartId}, index ${smaIndex}: ${optimalValue}`)
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          const newPeriods = [...chart.smaPeriods]
+          newPeriods[smaIndex] = optimalValue
           const newVisibility = {}
           newPeriods.forEach(period => {
             newVisibility[period] = chart.smaVisibility?.[period] ?? true
@@ -1891,62 +1912,101 @@ function StockAnalyzer() {
                     zoomRange={globalZoomRange}
                     onZoomChange={updateGlobalZoom}
                     onExtendPeriod={extendTimePeriod}
+                    chartId={chart.id}
+                    simulatingSma={simulatingSma}
+                    onSimulateComplete={(smaIndex, optimalValue) => {
+                      const smaKey = `${chart.id}-${smaIndex}`
+                      setSimulatingSma(prev => {
+                        const newState = { ...prev }
+                        delete newState[smaKey]
+                        return newState
+                      })
+                      if (optimalValue !== null) {
+                        handleSimulateSma(chart.id, smaIndex, optimalValue)
+                      }
+                    }}
                   />
 
                   {/* SMA Slider Controls */}
                   {!chart.collapsed && chart.smaPeriods && chart.smaPeriods.length > 0 && (
                     <div className="mt-3 px-2 flex flex-wrap gap-2">
-                      {chart.smaPeriods.map((period, index) => (
-                        <div key={index} className="flex items-center gap-2 bg-slate-700/50 p-2 rounded w-full md:w-[400px]">
-                          <span className="text-sm text-slate-300 w-16">SMA {period}</span>
-                          <button
-                            onMouseDown={() => startSmaButtonHold(chart.id, index, 'decrement')}
-                            onMouseUp={stopSmaButtonHold}
-                            onMouseLeave={stopSmaButtonHold}
-                            onTouchStart={() => startSmaButtonHold(chart.id, index, 'decrement')}
-                            onTouchEnd={stopSmaButtonHold}
-                            disabled={period <= 3}
-                            className="p-1 text-slate-300 hover:text-white hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                            title="Decrease SMA period (hold to repeat)"
-                          >
-                            <Minus className="w-4 h-4" />
-                          </button>
-                          <input
-                            type="range"
-                            min="3"
-                            max="200"
-                            value={period}
-                            onChange={(e) => {
-                              const rawValue = parseInt(e.target.value)
-                              const snappedValue = snapToValidSmaValue(rawValue)
-                              const newPeriods = [...chart.smaPeriods]
-                              newPeriods[index] = snappedValue
-                              updateSmaPeriods(chart.id, newPeriods)
-                            }}
-                            className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb"
-                          />
-                          <button
-                            onMouseDown={() => startSmaButtonHold(chart.id, index, 'increment')}
-                            onMouseUp={stopSmaButtonHold}
-                            onMouseLeave={stopSmaButtonHold}
-                            onTouchStart={() => startSmaButtonHold(chart.id, index, 'increment')}
-                            onTouchEnd={stopSmaButtonHold}
-                            disabled={period >= 200}
-                            className="p-1 text-slate-300 hover:text-white hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                            title="Increase SMA period (hold to repeat)"
-                          >
-                            <Plus className="w-4 h-4" />
-                          </button>
-                          <span className="text-xs text-slate-400 w-8 text-right">{period}</span>
-                          <button
-                            onClick={() => deleteSma(chart.id, period)}
-                            className="p-1 text-slate-400 hover:text-red-400 hover:bg-slate-600 rounded transition-colors"
-                            title="Remove SMA"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
+                      {chart.smaPeriods.map((period, index) => {
+                        const smaKey = `${chart.id}-${index}`
+                        const isSimulating = simulatingSma[smaKey]
+                        return (
+                          <div key={index} className="flex items-center gap-2 bg-slate-700/50 p-2 rounded w-full md:w-[400px]">
+                            <span className="text-sm text-slate-300 w-16">SMA {period}</span>
+                            <button
+                              onMouseDown={() => startSmaButtonHold(chart.id, index, 'decrement')}
+                              onMouseUp={stopSmaButtonHold}
+                              onMouseLeave={stopSmaButtonHold}
+                              onTouchStart={() => startSmaButtonHold(chart.id, index, 'decrement')}
+                              onTouchEnd={stopSmaButtonHold}
+                              disabled={period <= 3 || isSimulating}
+                              className="p-1 text-slate-300 hover:text-white hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                              title="Decrease SMA period (hold to repeat)"
+                            >
+                              <Minus className="w-4 h-4" />
+                            </button>
+                            <input
+                              type="range"
+                              min="3"
+                              max="200"
+                              value={period}
+                              onChange={(e) => {
+                                const rawValue = parseInt(e.target.value)
+                                const snappedValue = snapToValidSmaValue(rawValue)
+                                const newPeriods = [...chart.smaPeriods]
+                                newPeriods[index] = snappedValue
+                                updateSmaPeriods(chart.id, newPeriods)
+                              }}
+                              disabled={isSimulating}
+                              className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb disabled:opacity-50 disabled:cursor-not-allowed"
+                            />
+                            <button
+                              onMouseDown={() => startSmaButtonHold(chart.id, index, 'increment')}
+                              onMouseUp={stopSmaButtonHold}
+                              onMouseLeave={stopSmaButtonHold}
+                              onTouchStart={() => startSmaButtonHold(chart.id, index, 'increment')}
+                              onTouchEnd={stopSmaButtonHold}
+                              disabled={period >= 200 || isSimulating}
+                              className="p-1 text-slate-300 hover:text-white hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                              title="Increase SMA period (hold to repeat)"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                            <span className="text-xs text-slate-400 w-8 text-right">{period}</span>
+                            {chart.volumeProfileV2Enabled && (
+                              <button
+                                onClick={() => {
+                                  setSimulatingSma(prev => ({ ...prev, [smaKey]: index }))
+                                }}
+                                disabled={isSimulating}
+                                className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
+                                  isSimulating
+                                    ? 'bg-yellow-600 text-white cursor-wait'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                                }`}
+                                title="Simulate optimal SMA value based on P&L"
+                              >
+                                {isSimulating ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  'Sim'
+                                )}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => deleteSma(chart.id, period)}
+                              disabled={isSimulating}
+                              className="p-1 text-slate-400 hover:text-red-400 hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                              title="Remove SMA"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>}

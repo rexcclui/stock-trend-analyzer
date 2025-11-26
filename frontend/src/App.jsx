@@ -18,9 +18,6 @@ function App() {
               Stock Trend Analyzer
             </h1>
           </div>
-          <p className="text-white/80 text-lg">
-            Analyze stock trends, identify buy/sell opportunities, and backtest trading strategies
-          </p>
         </div>
 
         {/* Tab Navigation */}
