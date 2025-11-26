@@ -153,8 +153,16 @@ class ApiCache {
     const ratio = parseInt(requestedDays) / parseInt(cachedDays)
     const targetPoints = Math.ceil(data.prices.length * ratio)
 
-    // Take the most recent data points
+    // Take the most recent data points (negative index = from end of array)
     const trimmedPrices = data.prices.slice(-targetPoints)
+
+    // Debug: Log the date range to verify we're getting the most recent data
+    if (trimmedPrices.length > 0) {
+      console.log(`[Cache] Trimming: ${data.prices.length} → ${trimmedPrices.length} points`)
+      console.log(`[Cache] Original range: ${data.prices[0]?.date} to ${data.prices[data.prices.length - 1]?.date}`)
+      console.log(`[Cache] Trimmed range:  ${trimmedPrices[0]?.date} to ${trimmedPrices[trimmedPrices.length - 1]?.date}`)
+      console.log(`[Cache] ✅ Keeping LATEST ${trimmedPrices.length} points (requested: ${requestedDays} days, cached: ${cachedDays} days)`)
+    }
 
     // Create new data object with trimmed prices
     // Keep other fields (indicators, signals, etc.) that might exist
