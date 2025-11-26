@@ -3141,8 +3141,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       setSyncedMouseDate(e.activeLabel)
     }
 
+    // Debug panning conditions
+    console.log('handleMouseMove - isPanning:', isPanning, 'manualChannelDragMode:', manualChannelDragMode, 'has chartX:', e?.chartX !== undefined, 'panStartX:', panStartX, 'panStartZoom:', panStartZoom)
+
     // Handle chart panning - only when NOT in manual channel drag mode
     if (isPanning && !manualChannelDragMode && e && e.chartX !== undefined && panStartX !== null && panStartZoom !== null) {
+      console.log('PANNING - deltaX:', e.chartX - panStartX)
       const deltaX = e.chartX - panStartX
       const chartWidth = chartContainerRef.current?.offsetWidth || 800
       const totalDataLength = chartData.length
@@ -3169,6 +3173,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
       onZoomChange({ start: newStart, end: newEnd === totalDataLength ? null : newEnd })
       return
+    } else if (isPanning) {
+      console.log('Panning blocked by condition check')
     }
 
     // Handle volume profile manual selection
