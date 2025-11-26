@@ -2395,15 +2395,28 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const winningTrades = closedTrades.filter(t => t.plPercent > 0).length
     const winRate = closedTrades.length > 0 ? (winningTrades / closedTrades.length) * 100 : 0
 
+    // Calculate market buy-and-hold performance for comparison
+    let marketChange = 0
+    if (trades.length > 0) {
+      const firstTrade = trades[0]
+      const lastTrade = trades[trades.length - 1]
+      const startPrice = firstTrade.buyPrice
+      const endPrice = lastTrade.sellPrice
+      marketChange = ((endPrice - startPrice) / startPrice) * 100
+    }
+
     console.log('Trading Summary:', {
       smaUsed: smaKey,
       totalTrades: trades.length,
       closedTrades: closedTrades.length,
       sellSignals: sellSignals.length,
-      buySignals: volumeProfileV2Breakouts.length
+      buySignals: volumeProfileV2Breakouts.length,
+      tradingPL: totalPL.toFixed(2) + '%',
+      marketChange: marketChange.toFixed(2) + '%',
+      outperformance: (totalPL - marketChange).toFixed(2) + '%'
     })
 
-    return { trades, totalPL, winRate, closedTradeCount: closedTrades.length, sellSignals, smaUsed: smaKey }
+    return { trades, totalPL, winRate, closedTradeCount: closedTrades.length, sellSignals, smaUsed: smaKey, marketChange }
   }
 
   // Reset Vol Prf v2 dates if they're not found in current visible data
@@ -5347,7 +5360,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               textAnchor="end"
               style={{ pointerEvents: 'none' }}
             >
-              Total P&L: {breakoutPL.totalPL >= 0 ? '+' : ''}{breakoutPL.totalPL.toFixed(2)}%
+              P&L: {breakoutPL.totalPL >= 0 ? '+' : ''}{breakoutPL.totalPL.toFixed(2)}%
             </text>
             <text
               x={offset.left + offset.width - 10}
@@ -5357,7 +5370,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               textAnchor="end"
               style={{ pointerEvents: 'none' }}
             >
-              Trades: {breakoutPL.closedTradeCount} | Win Rate: {breakoutPL.winRate.toFixed(1)}%
+              Market: {breakoutPL.marketChange >= 0 ? '+' : ''}{breakoutPL.marketChange.toFixed(2)}% | α: {((breakoutPL.totalPL - breakoutPL.marketChange) >= 0 ? '+' : '')}{(breakoutPL.totalPL - breakoutPL.marketChange).toFixed(2)}%
+            </text>
+            <text
+              x={offset.left + offset.width - 10}
+              y={offset.top + 54}
+              fill="#94a3b8"
+              fontSize="10"
+              textAnchor="end"
+              style={{ pointerEvents: 'none' }}
+            >
+              Trades: {breakoutPL.closedTradeCount} | Win: {breakoutPL.winRate.toFixed(1)}%
             </text>
           </g>
         )}
