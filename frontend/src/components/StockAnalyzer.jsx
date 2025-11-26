@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp, RefreshCw, Filter, Menu } from 'lucide-react'
 import PriceChart from './PriceChart'
@@ -75,6 +75,10 @@ function StockAnalyzer() {
   const [loadingComparisonStocks, setLoadingComparisonStocks] = useState({}) // Track loading state per chart
   const [loadingMktGap, setLoadingMktGap] = useState({}) // Track loading state for Mkt Gap data
   const [mobileControlsVisible, setMobileControlsVisible] = useState({}) // Track mobile controls visibility per chart
+
+  // Refs for press-and-hold functionality on SMA increment/decrement buttons
+  const smaButtonIntervalRef = useRef(null)
+  const smaButtonTimeoutRef = useRef(null)
 
   // Load stock history from localStorage on mount
   useEffect(() => {
@@ -274,6 +278,64 @@ function StockAnalyzer() {
         return chart
       })
     )
+  }
+
+  // Helper function to stop SMA button press-and-hold
+  const stopSmaButtonHold = () => {
+    if (smaButtonTimeoutRef.current) {
+      clearTimeout(smaButtonTimeoutRef.current)
+      smaButtonTimeoutRef.current = null
+    }
+    if (smaButtonIntervalRef.current) {
+      clearInterval(smaButtonIntervalRef.current)
+      smaButtonIntervalRef.current = null
+    }
+  }
+
+  // Helper function to start SMA button press-and-hold
+  const startSmaButtonHold = (chartId, index, direction) => {
+    // Clear any existing timers
+    stopSmaButtonHold()
+
+    // Function to update the SMA value
+    const updateSma = () => {
+      setCharts(prevCharts => {
+        const chart = prevCharts.find(c => c.id === chartId)
+        if (!chart || !chart.smaPeriods[index]) return prevCharts
+
+        const currentPeriod = chart.smaPeriods[index]
+        let newValue
+
+        if (direction === 'increment') {
+          if (currentPeriod >= 200) return prevCharts
+          newValue = incrementSmaValue(currentPeriod)
+        } else {
+          if (currentPeriod <= 3) return prevCharts
+          newValue = decrementSmaValue(currentPeriod)
+        }
+
+        return prevCharts.map(c => {
+          if (c.id === chartId) {
+            const newPeriods = [...c.smaPeriods]
+            newPeriods[index] = newValue
+            const newVisibility = {}
+            newPeriods.forEach(period => {
+              newVisibility[period] = c.smaVisibility?.[period] ?? true
+            })
+            return { ...c, smaPeriods: newPeriods, smaVisibility: newVisibility }
+          }
+          return c
+        })
+      })
+    }
+
+    // Execute once immediately
+    updateSma()
+
+    // Start repeating after a delay
+    smaButtonTimeoutRef.current = setTimeout(() => {
+      smaButtonIntervalRef.current = setInterval(updateSma, 100) // Repeat every 100ms
+    }, 300) // Wait 300ms before starting repeat
   }
 
   const openSlopeChannelDialog = (chartId) => {
@@ -1838,15 +1900,14 @@ function StockAnalyzer() {
                         <div key={index} className="flex items-center gap-2 bg-slate-700/50 p-2 rounded w-full md:w-[400px]">
                           <span className="text-sm text-slate-300 w-16">SMA {period}</span>
                           <button
-                            onClick={() => {
-                              const newValue = decrementSmaValue(period)
-                              const newPeriods = [...chart.smaPeriods]
-                              newPeriods[index] = newValue
-                              updateSmaPeriods(chart.id, newPeriods)
-                            }}
+                            onMouseDown={() => startSmaButtonHold(chart.id, index, 'decrement')}
+                            onMouseUp={stopSmaButtonHold}
+                            onMouseLeave={stopSmaButtonHold}
+                            onTouchStart={() => startSmaButtonHold(chart.id, index, 'decrement')}
+                            onTouchEnd={stopSmaButtonHold}
                             disabled={period <= 3}
                             className="p-1 text-slate-300 hover:text-white hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                            title="Decrease SMA period"
+                            title="Decrease SMA period (hold to repeat)"
                           >
                             <Minus className="w-4 h-4" />
                           </button>
@@ -1865,15 +1926,14 @@ function StockAnalyzer() {
                             className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb"
                           />
                           <button
-                            onClick={() => {
-                              const newValue = incrementSmaValue(period)
-                              const newPeriods = [...chart.smaPeriods]
-                              newPeriods[index] = newValue
-                              updateSmaPeriods(chart.id, newPeriods)
-                            }}
+                            onMouseDown={() => startSmaButtonHold(chart.id, index, 'increment')}
+                            onMouseUp={stopSmaButtonHold}
+                            onMouseLeave={stopSmaButtonHold}
+                            onTouchStart={() => startSmaButtonHold(chart.id, index, 'increment')}
+                            onTouchEnd={stopSmaButtonHold}
                             disabled={period >= 200}
                             className="p-1 text-slate-300 hover:text-white hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                            title="Increase SMA period"
+                            title="Increase SMA period (hold to repeat)"
                           >
                             <Plus className="w-4 h-4" />
                           </button>
