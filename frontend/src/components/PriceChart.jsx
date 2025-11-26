@@ -3141,9 +3141,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       setSyncedMouseDate(e.activeLabel)
     }
 
-    // Debug panning conditions
-    console.log('handleMouseMove - isPanning:', isPanning, 'manualChannelDragMode:', manualChannelDragMode, 'has chartX:', e?.chartX !== undefined, 'panStartX:', panStartX, 'panStartZoom:', panStartZoom)
-
     // Handle chart panning - only when NOT in manual channel drag mode
     if (isPanning && !manualChannelDragMode && e && e.chartX !== undefined && panStartX !== null && panStartZoom !== null) {
       const deltaX = e.chartX - panStartX
@@ -3182,7 +3179,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         newStart = Math.max(0, Math.min(totalDataLength - windowSize, newStart + panAmount))
         newEnd = newStart + windowSize
 
-        console.log('PAN from full view - creating window:', { newStart, newEnd, windowSize })
         onZoomChange({ start: newStart, end: newEnd === totalDataLength ? null : newEnd })
 
         // Update panStartZoom to the new window so subsequent moves work correctly
@@ -3195,13 +3191,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const currentRange = (panStartZoom.end || totalDataLength) - panStartZoom.start
       const panAmount = Math.floor(panPercent * currentRange)
 
-      console.log('PAN CALC - deltaX:', deltaX, 'chartWidth:', chartWidth, 'totalDataLength:', totalDataLength, 'currentRange:', currentRange, 'panAmount:', panAmount)
-
       // Keep window size constant and just shift
       let newStart = panStartZoom.start + panAmount
       let newEnd = (panStartZoom.end || totalDataLength) + panAmount
-
-      console.log('BEFORE BOUNDS - newStart:', newStart, 'newEnd:', newEnd)
 
       // Ensure we don't pan beyond data bounds while maintaining window size
       if (newStart < 0) {
@@ -3214,11 +3206,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       }
 
       const finalZoom = { start: newStart, end: newEnd === totalDataLength ? null : newEnd }
-      console.log('CALLING onZoomChange with:', finalZoom)
       onZoomChange(finalZoom)
       return
-    } else if (isPanning) {
-      console.log('Panning blocked by condition check')
     }
 
     // Handle volume profile manual selection
@@ -3245,11 +3234,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
   const handleMouseDown = (e) => {
-    // Debug: Log the entire event object to see what's available
-    console.log('handleMouseDown event:', e)
-    console.log('Event keys:', e ? Object.keys(e) : 'null')
-    console.log('activeCoordinate:', e?.activeCoordinate)
-
     // Volume profile manual selection - highest priority
     if (volumeProfileEnabled && volumeProfileMode === 'manual' && e && e.activeLabel) {
       setIsSelectingVolumeProfile(true)
@@ -3268,13 +3252,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     // Panning - only when neither manual mode is active
     if (e && e.chartX !== undefined) {
-      console.log('Panning started with chartX:', e.chartX)
       setIsPanning(true)
       setPanStartX(e.chartX)
       setPanStartZoom({ ...zoomRange })
       return
-    } else {
-      console.log('Panning NOT started - chartX is:', e?.chartX)
     }
   }
 

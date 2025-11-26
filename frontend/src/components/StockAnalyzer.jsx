@@ -190,7 +190,6 @@ function StockAnalyzer() {
       // Smart pre-loading: fetch more data than displayed to enable smooth panning
       const displayDays = days
       const fetchDays = getFetchPeriod(days)
-      console.log(`[Smart Loading] Display: ${displayDays} days, Fetching: ${fetchDays} days`)
 
       const newCharts = []
       const errors = []
@@ -295,7 +294,6 @@ function StockAnalyzer() {
             // Show only the most recent portion based on the ratio
             // For example: 1Y/3Y = 0.333, so show the most recent 33.3% of data
             const startIndex = Math.floor(actualDataLength * (1 - displayRatio))
-            console.log(`[Initial Zoom] Display: ${displayDaysNum} days (${(displayRatio*100).toFixed(1)}%), Fetch: ${fetchDaysNum} days, Data points: ${actualDataLength}, Start: ${startIndex}`)
             setGlobalZoomRange({ start: startIndex, end: null })
           } else {
             // Show all fetched data
@@ -1143,7 +1141,6 @@ function StockAnalyzer() {
       // Smart pre-loading: fetch more data than displayed
       const displayDays = newDays
       const fetchDays = getFetchPeriod(newDays)
-      console.log(`[Smart Loading] Display: ${displayDays} days, Fetching: ${fetchDays} days`)
 
       // Check if any chart needs SPY data (for volume comparison, performance comparison, or mkt gap open)
       const needsSpy = charts.some(chart => chart.volumeColorMode === 'relative-spy' || chart.performanceComparisonEnabled || chart.mktGapOpenEnabled)
@@ -1225,7 +1222,6 @@ function StockAnalyzer() {
 
             // Show only the most recent portion based on the ratio
             const startIndex = Math.floor(actualDataLength * (1 - displayRatio))
-            console.log(`[Initial Zoom] Display: ${displayDaysNum} days (${(displayRatio*100).toFixed(1)}%), Fetch: ${fetchDaysNum} days, Data points: ${actualDataLength}, Start: ${startIndex}`)
             setGlobalZoomRange({ start: startIndex, end: null })
           } else {
             setGlobalZoomRange({ start: 0, end: null })
