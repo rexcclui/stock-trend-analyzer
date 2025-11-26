@@ -3150,29 +3150,68 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const chartWidth = chartContainerRef.current?.offsetWidth || 800
       const totalDataLength = chartData.length
 
-      // Calculate pan delta as a percentage of visible range
-      const panPercent = -(deltaX / chartWidth) // Negative because we pan opposite to drag direction
+      // Check if we're showing all data
+      const isShowingAllData = panStartZoom.start === 0 && (panStartZoom.end === null || panStartZoom.end === totalDataLength)
+
+      if (isShowingAllData) {
+        // When showing all data, first zoom in to create a window, then pan
+        // Create a window that's 90% of total data
+        const windowSize = Math.floor(totalDataLength * 0.9)
+
+        // Calculate mouse position as ratio of chart width
+        const mouseRatio = (panStartX / chartWidth)
+
+        // Center the window around the mouse position
+        let newStart = Math.floor(mouseRatio * totalDataLength - windowSize / 2)
+        let newEnd = newStart + windowSize
+
+        // Ensure bounds
+        if (newStart < 0) {
+          newStart = 0
+          newEnd = windowSize
+        }
+        if (newEnd > totalDataLength) {
+          newEnd = totalDataLength
+          newStart = totalDataLength - windowSize
+        }
+
+        // Apply the pan to this new window
+        const panPercent = -(deltaX / chartWidth)
+        const panAmount = Math.floor(panPercent * windowSize)
+
+        newStart = Math.max(0, Math.min(totalDataLength - windowSize, newStart + panAmount))
+        newEnd = newStart + windowSize
+
+        console.log('PAN from full view - creating window:', { newStart, newEnd, windowSize })
+        onZoomChange({ start: newStart, end: newEnd === totalDataLength ? null : newEnd })
+
+        // Update panStartZoom to the new window so subsequent moves work correctly
+        setPanStartZoom({ start: newStart, end: newEnd === totalDataLength ? null : newEnd })
+        return
+      }
+
+      // Normal panning when already zoomed in
+      const panPercent = -(deltaX / chartWidth)
       const currentRange = (panStartZoom.end || totalDataLength) - panStartZoom.start
       const panAmount = Math.floor(panPercent * currentRange)
 
       console.log('PAN CALC - deltaX:', deltaX, 'chartWidth:', chartWidth, 'totalDataLength:', totalDataLength, 'currentRange:', currentRange, 'panAmount:', panAmount)
 
-      // Apply pan with bounds checking
+      // Keep window size constant and just shift
       let newStart = panStartZoom.start + panAmount
       let newEnd = (panStartZoom.end || totalDataLength) + panAmount
 
       console.log('BEFORE BOUNDS - newStart:', newStart, 'newEnd:', newEnd)
 
-      // Ensure we don't pan beyond data bounds
+      // Ensure we don't pan beyond data bounds while maintaining window size
       if (newStart < 0) {
-        newEnd -= newStart
         newStart = 0
+        newEnd = Math.min(totalDataLength, panStartZoom.start + currentRange)
       }
       if (newEnd > totalDataLength) {
-        newStart -= (newEnd - totalDataLength)
         newEnd = totalDataLength
+        newStart = Math.max(0, totalDataLength - currentRange)
       }
-      if (newStart < 0) newStart = 0
 
       const finalZoom = { start: newStart, end: newEnd === totalDataLength ? null : newEnd }
       console.log('CALLING onZoomChange with:', finalZoom)
