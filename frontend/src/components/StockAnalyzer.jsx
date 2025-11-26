@@ -19,8 +19,6 @@ function StockAnalyzer() {
   const [stockHistory, setStockHistory] = useState([])
   const [displayColumns, setDisplayColumns] = useState(1)
   const [chartHeight, setChartHeight] = useState(460) // Increased by 15% from 400
-  const [smaDialogOpen, setSmaDialogOpen] = useState(false)
-  const [editingSmaChartId, setEditingSmaChartId] = useState(null)
   const [slopeChannelDialogOpen, setSlopeChannelDialogOpen] = useState(false)
   const [editingSlopeChannelChartId, setEditingSlopeChannelChartId] = useState(null)
   const [globalZoomRange, setGlobalZoomRange] = useState({ start: 0, end: null })
@@ -176,16 +174,6 @@ function StockAnalyzer() {
 
   const updateGlobalZoom = (zoomRange) => {
     setGlobalZoomRange(zoomRange)
-  }
-
-  const openSmaDialog = (chartId) => {
-    setEditingSmaChartId(chartId)
-    setSmaDialogOpen(true)
-  }
-
-  const closeSmaDialog = () => {
-    setSmaDialogOpen(false)
-    setEditingSmaChartId(null)
   }
 
   const updateSmaPeriods = (chartId, newPeriods) => {
@@ -1683,12 +1671,20 @@ function StockAnalyzer() {
                       )}
                       <button
                         type="button"
-                        onClick={() => openSmaDialog(chart.id)}
+                        onClick={() => {
+                          const defaultPeriods = [10, 20, 50, 100, 200]
+                          const currentLength = chart.smaPeriods?.length || 0
+                          if (currentLength < 5) {
+                            const defaultPeriod = defaultPeriods[currentLength] || 30
+                            const newPeriods = [...(chart.smaPeriods || []), defaultPeriod]
+                            updateSmaPeriods(chart.id, newPeriods)
+                          }
+                        }}
                         className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
-                        title="Configure SMA"
+                        title="Add SMA Line"
                       >
-                        <Settings className="w-4 h-4" />
-                        SMA
+                        <Plus className="w-4 h-4" />
+                        Add SMA
                       </button>
                       <button
                         type="button"
@@ -1784,6 +1780,39 @@ function StockAnalyzer() {
                     onZoomChange={updateGlobalZoom}
                     onExtendPeriod={extendTimePeriod}
                   />
+
+                  {/* SMA Slider Controls */}
+                  {!chart.collapsed && chart.smaPeriods && chart.smaPeriods.length > 0 && (
+                    <div className="mt-3 space-y-2 px-2">
+                      {chart.smaPeriods.map((period, index) => (
+                        <div key={index} className="flex items-center gap-3 bg-slate-700/50 p-2 rounded">
+                          <span className="text-sm text-slate-300 w-16">SMA {period}</span>
+                          <input
+                            type="range"
+                            min="5"
+                            max="200"
+                            step="5"
+                            value={period}
+                            onChange={(e) => {
+                              const newValue = parseInt(e.target.value)
+                              const newPeriods = [...chart.smaPeriods]
+                              newPeriods[index] = newValue
+                              updateSmaPeriods(chart.id, newPeriods)
+                            }}
+                            className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb"
+                          />
+                          <span className="text-xs text-slate-400 w-8 text-right">{period}</span>
+                          <button
+                            onClick={() => deleteSma(chart.id, period)}
+                            className="p-1 text-slate-400 hover:text-red-400 hover:bg-slate-600 rounded transition-colors"
+                            title="Remove SMA"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>}
 
                 {/* Loading Spinner */}
@@ -1854,92 +1883,6 @@ function StockAnalyzer() {
               )}
             </div>
           ))}
-        </div>
-      )}
-
-      {/* SMA Configuration Dialog */}
-      {smaDialogOpen && editingSmaChartId && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={closeSmaDialog}>
-          <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-slate-100">Configure SMA Lines</h3>
-              <button
-                onClick={closeSmaDialog}
-                className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {(() => {
-              const chart = charts.find(c => c.id === editingSmaChartId)
-              if (!chart) return null
-
-              const tempPeriods = [...chart.smaPeriods]
-
-              return (
-                <div className="space-y-3">
-                  {tempPeriods.length === 0 ? (
-                    <p className="text-sm text-slate-400 text-center py-2">No SMA lines configured. Click below to add one.</p>
-                  ) : (
-                    tempPeriods.map((period, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={period}
-                          onChange={(e) => {
-                            const value = e.target.value
-                            const parsed = parseInt(value)
-                            if (value === '' || (!isNaN(parsed) && parsed >= 1 && parsed <= 200)) {
-                              const newPeriods = [...tempPeriods]
-                              newPeriods[index] = value === '' ? '' : parsed
-                              updateSmaPeriods(editingSmaChartId, newPeriods)
-                            }
-                          }}
-                          placeholder="Period (1-200)"
-                          className="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        />
-                        <button
-                          onClick={() => {
-                            const newPeriods = tempPeriods.filter((_, i) => i !== index)
-                            updateSmaPeriods(editingSmaChartId, newPeriods)
-                          }}
-                          className="p-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-                          title="Remove SMA"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))
-                  )}
-
-                  {tempPeriods.length < 5 && (
-                    <button
-                      onClick={() => {
-                        const defaultPeriods = [20, 30, 50, 100, 200]
-                        const defaultPeriod = defaultPeriods[tempPeriods.length] || 30
-                        const newPeriods = [...tempPeriods, defaultPeriod]
-                        updateSmaPeriods(editingSmaChartId, newPeriods)
-                      }}
-                      className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Add SMA Line
-                    </button>
-                  )}
-
-                  <div className="pt-3 border-t border-slate-700">
-                    <button
-                      onClick={closeSmaDialog}
-                      className="w-full px-4 py-2 bg-slate-700 text-slate-100 rounded-lg hover:bg-slate-600 transition-colors"
-                    >
-                      Done
-                    </button>
-                  </div>
-                </div>
-              )
-            })()}
-          </div>
         </div>
       )}
 
