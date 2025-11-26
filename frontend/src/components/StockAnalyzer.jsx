@@ -25,6 +25,8 @@ function StockAnalyzer() {
   const [loadingComparisonStocks, setLoadingComparisonStocks] = useState({}) // Track loading state per chart
   const [loadingMktGap, setLoadingMktGap] = useState({}) // Track loading state for Mkt Gap data
   const [mobileControlsVisible, setMobileControlsVisible] = useState({}) // Track mobile controls visibility per chart
+  const [simulationResults, setSimulationResults] = useState({}) // Track simulation results per chart
+  const [simulationRunning, setSimulationRunning] = useState({}) // Track simulation running state per chart
 
   // Load stock history from localStorage on mount
   useEffect(() => {
@@ -882,6 +884,32 @@ function StockAnalyzer() {
     )
   }
 
+  const handleSimulationStart = (chartId) => {
+    setSimulationRunning(prev => ({ ...prev, [chartId]: true }))
+    setSimulationResults(prev => {
+      const newResults = { ...prev }
+      delete newResults[chartId]
+      return newResults
+    })
+  }
+
+  const handleSimulationComplete = (chartId, results) => {
+    setSimulationResults(prev => ({ ...prev, [chartId]: results }))
+    setSimulationRunning(prev => {
+      const newState = { ...prev }
+      delete newState[chartId]
+      return newState
+    })
+  }
+
+  const clearSimulationResults = (chartId) => {
+    setSimulationResults(prev => {
+      const newResults = { ...prev }
+      delete newResults[chartId]
+      return newResults
+    })
+  }
+
   const handleKeyPress = (e) => {
     if (e.key === 'Enter') {
       analyzeStock()
@@ -1686,6 +1714,31 @@ function StockAnalyzer() {
                         <Plus className="w-4 h-4" />
                         Add SMA
                       </button>
+                      {chart.volumeProfileV2Enabled && chart.smaPeriods && chart.smaPeriods.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleSimulationStart(chart.id)}
+                          disabled={simulationRunning[chart.id]}
+                          className={`px-3 py-1 text-sm rounded font-medium transition-colors flex items-center gap-1 ${
+                            simulationRunning[chart.id]
+                              ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                              : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                          }`}
+                          title="Simulate different SMA periods to find optimal P&L"
+                        >
+                          {simulationRunning[chart.id] ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Simulating...
+                            </>
+                          ) : (
+                            <>
+                              <TrendingUp className="w-4 h-4" />
+                              Simulate
+                            </>
+                          )}
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => updateChartIndicator(chart.id, 'showRSI', !chart.showRSI)}
@@ -1779,6 +1832,8 @@ function StockAnalyzer() {
                     zoomRange={globalZoomRange}
                     onZoomChange={updateGlobalZoom}
                     onExtendPeriod={extendTimePeriod}
+                    simulationTrigger={simulationRunning[chart.id]}
+                    onSimulationComplete={(results) => handleSimulationComplete(chart.id, results)}
                   />
 
                   {/* SMA Slider Controls */}
@@ -1823,6 +1878,58 @@ function StockAnalyzer() {
                           </div>
                         )
                       })}
+                    </div>
+                  )}
+
+                  {/* Simulation Results */}
+                  {!chart.collapsed && simulationResults[chart.id] && (
+                    <div className="mt-3 px-2">
+                      <div className="bg-emerald-900/30 border border-emerald-600 rounded-lg p-4 relative">
+                        <button
+                          onClick={() => clearSimulationResults(chart.id)}
+                          className="absolute top-2 right-2 p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+                          title="Close"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        <h4 className="text-sm font-semibold text-emerald-400 mb-3">Simulation Results</h4>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-slate-300">Optimal SMA Period:</span>
+                            <span className="text-lg font-bold text-emerald-400">SMA {simulationResults[chart.id].optimalPeriod}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-slate-300">Optimized P&L:</span>
+                            <span className={`text-lg font-bold ${simulationResults[chart.id].optimalPL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {simulationResults[chart.id].optimalPL >= 0 ? '+' : ''}{simulationResults[chart.id].optimalPL.toFixed(2)}%
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-slate-300">Win Rate:</span>
+                            <span className="text-sm font-medium text-slate-200">{simulationResults[chart.id].optimalWinRate.toFixed(1)}%</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-slate-300">Trades:</span>
+                            <span className="text-sm font-medium text-slate-200">{simulationResults[chart.id].optimalTrades}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-slate-300">Alpha:</span>
+                            <span className={`text-sm font-medium ${simulationResults[chart.id].optimalAlpha >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {simulationResults[chart.id].optimalAlpha >= 0 ? '+' : ''}{simulationResults[chart.id].optimalAlpha.toFixed(2)}%
+                            </span>
+                          </div>
+                          <div className="pt-2 border-t border-emerald-700">
+                            <button
+                              onClick={() => {
+                                updateSmaPeriods(chart.id, [simulationResults[chart.id].optimalPeriod])
+                              }}
+                              className="w-full px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium"
+                            >
+                              Apply Optimal SMA
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>}
