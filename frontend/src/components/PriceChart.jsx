@@ -5295,8 +5295,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         {volumeProfileV2Enabled && breakoutPL.trades.length > 0 && (
           <g>
             <text
-              x={xAxis.range()[1] - 10}
-              y={yAxis.range()[0] + 20}
+              x={offset.left + offset.width - 10}
+              y={offset.top + 20}
               fill={breakoutPL.totalPL >= 0 ? '#22c55e' : '#ef4444'}
               fontSize="14"
               fontWeight="700"
@@ -5306,8 +5306,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               Total P&L: {breakoutPL.totalPL >= 0 ? '+' : ''}{breakoutPL.totalPL.toFixed(2)}%
             </text>
             <text
-              x={xAxis.range()[1] - 10}
-              y={yAxis.range()[0] + 38}
+              x={offset.left + offset.width - 10}
+              y={offset.top + 38}
               fill="#94a3b8"
               fontSize="11"
               textAnchor="end"
