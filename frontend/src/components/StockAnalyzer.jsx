@@ -1783,9 +1783,9 @@ function StockAnalyzer() {
 
                   {/* SMA Slider Controls */}
                   {!chart.collapsed && chart.smaPeriods && chart.smaPeriods.length > 0 && (
-                    <div className="mt-3 space-y-2 px-2">
+                    <div className="mt-3 px-2 flex flex-wrap gap-2">
                       {chart.smaPeriods.map((period, index) => (
-                        <div key={index} className="flex items-center gap-3 bg-slate-700/50 p-2 rounded">
+                        <div key={index} className="flex items-center gap-3 bg-slate-700/50 p-2 rounded w-full md:w-[400px]">
                           <span className="text-sm text-slate-300 w-16">SMA {period}</span>
                           <input
                             type="range"
