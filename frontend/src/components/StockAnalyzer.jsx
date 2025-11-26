@@ -9,6 +9,34 @@ import { apiCache } from '../utils/apiCache'
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
 
+// Helper function to snap SMA value to nearest valid increment
+function snapToValidSmaValue(value) {
+  // Clamp to min/max range
+  if (value < 3) return 3
+  if (value > 200) return 200
+
+  // Define ranges and their increments
+  if (value <= 10) {
+    // Increment 1 between 3 and 10
+    return Math.round(value)
+  } else if (value <= 20) {
+    // Increment 2 from 10 to 20
+    return Math.round(value / 2) * 2
+  } else if (value <= 40) {
+    // Increment 3 from 20 to 40
+    return Math.round(value / 3) * 3
+  } else if (value <= 50) {
+    // Increment 4 from 40 to 50
+    return Math.round(value / 4) * 4
+  } else if (value <= 100) {
+    // Increment 5 from 50 to 100
+    return Math.round(value / 5) * 5
+  } else {
+    // Increment 10 from 100 to 200
+    return Math.round(value / 10) * 10
+  }
+}
+
 function StockAnalyzer() {
   const [symbol, setSymbol] = useState('')
   const [days, setDays] = useState('365')
@@ -1789,14 +1817,14 @@ function StockAnalyzer() {
                           <span className="text-sm text-slate-300 w-16">SMA {period}</span>
                           <input
                             type="range"
-                            min="5"
+                            min="3"
                             max="200"
-                            step="5"
                             value={period}
                             onChange={(e) => {
-                              const newValue = parseInt(e.target.value)
+                              const rawValue = parseInt(e.target.value)
+                              const snappedValue = snapToValidSmaValue(rawValue)
                               const newPeriods = [...chart.smaPeriods]
-                              newPeriods[index] = newValue
+                              newPeriods[index] = snappedValue
                               updateSmaPeriods(chart.id, newPeriods)
                             }}
                             className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb"
