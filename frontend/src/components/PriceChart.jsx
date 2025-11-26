@@ -2272,10 +2272,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // Create a map of breakout dates for quick lookup
     const breakoutDates = new Set(volumeProfileV2Breakouts.map(b => b.date))
 
-    // Create date to SMA5 map from ALL displayPrices (not just visible range)
-    // This ensures we have SMA5 data for all slot dates
+    // Create date to SMA5 map from chartData (which has SMA values)
+    // chartData contains the computed SMA values, displayPrices doesn't
     const dateToSMA5 = new Map()
-    displayPrices.forEach(d => {
+    chartData.forEach(d => {
       if (d.sma5 !== undefined && d.sma5 !== null) {
         dateToSMA5.set(d.date, d.sma5)
       }
