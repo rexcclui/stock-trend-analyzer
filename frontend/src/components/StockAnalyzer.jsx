@@ -1784,33 +1784,45 @@ function StockAnalyzer() {
                   {/* SMA Slider Controls */}
                   {!chart.collapsed && chart.smaPeriods && chart.smaPeriods.length > 0 && (
                     <div className="mt-3 px-2 flex flex-wrap gap-2">
-                      {chart.smaPeriods.map((period, index) => (
-                        <div key={index} className="flex items-center gap-3 bg-slate-700/50 p-2 rounded w-full md:w-[400px]">
-                          <span className="text-sm text-slate-300 w-16">SMA {period}</span>
-                          <input
-                            type="range"
-                            min="5"
-                            max="200"
-                            step="5"
-                            value={period}
-                            onChange={(e) => {
-                              const newValue = parseInt(e.target.value)
-                              const newPeriods = [...chart.smaPeriods]
-                              newPeriods[index] = newValue
-                              updateSmaPeriods(chart.id, newPeriods)
-                            }}
-                            className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb"
-                          />
-                          <span className="text-xs text-slate-400 w-8 text-right">{period}</span>
-                          <button
-                            onClick={() => deleteSma(chart.id, period)}
-                            className="p-1 text-slate-400 hover:text-red-400 hover:bg-slate-600 rounded transition-colors"
-                            title="Remove SMA"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
+                      {chart.smaPeriods.map((period, index) => {
+                        // Helper function to snap value to appropriate increment
+                        const snapToIncrement = (value) => {
+                          if (value <= 10) return Math.round(value) // increment 1
+                          if (value <= 20) return Math.round(value / 2) * 2 // increment 2
+                          if (value <= 50) return Math.round(value / 3) * 3 // increment 3
+                          if (value <= 100) return Math.round(value / 5) * 5 // increment 5
+                          return Math.round(value / 10) * 10 // increment 10
+                        }
+
+                        return (
+                          <div key={index} className="flex items-center gap-3 bg-slate-700/50 p-2 rounded w-full md:w-[400px]">
+                            <span className="text-sm text-slate-300 w-16">SMA {period}</span>
+                            <input
+                              type="range"
+                              min="3"
+                              max="200"
+                              step="1"
+                              value={period}
+                              onChange={(e) => {
+                                const rawValue = parseInt(e.target.value)
+                                const snappedValue = snapToIncrement(rawValue)
+                                const newPeriods = [...chart.smaPeriods]
+                                newPeriods[index] = snappedValue
+                                updateSmaPeriods(chart.id, newPeriods)
+                              }}
+                              className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb"
+                            />
+                            <span className="text-xs text-slate-400 w-8 text-right">{period}</span>
+                            <button
+                              onClick={() => deleteSma(chart.id, period)}
+                              className="p-1 text-slate-400 hover:text-red-400 hover:bg-slate-600 rounded transition-colors"
+                              title="Remove SMA"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )
+                      })}
                     </div>
                   )}
                 </div>}
