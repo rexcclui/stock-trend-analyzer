@@ -3,7 +3,7 @@ import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend
 import { X, ArrowLeftRight, Hand } from 'lucide-react'
 import { findBestChannels, filterOverlappingChannels } from './PriceChart/utils/bestChannelFinder'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -2413,6 +2413,138 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       onVolumeProfileV2EndChange(null)
     }
   }, [volumeProfileV2Enabled, volumeProfileV2StartDate, volumeProfileV2EndDate, displayPrices, zoomRange, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange])
+
+  // SMA Simulation Logic - find optimal SMA value based on P&L
+  useEffect(() => {
+    if (!volumeProfileV2Enabled || !chartId || !onSimulateComplete) return
+
+    // Check if this chart has any SMA being simulated
+    const simulatingKeys = Object.keys(simulatingSma).filter(key => key.startsWith(`${chartId}-`))
+    if (simulatingKeys.length === 0) return
+
+    // Get the SMA index being simulated
+    const simulatingKey = simulatingKeys[0]
+    const smaIndex = simulatingSma[simulatingKey]
+    if (smaIndex === undefined || smaIndex === null || smaIndex === true) return
+
+    console.log(`[Simulate] Starting simulation for chart ${chartId}, SMA index ${smaIndex}`)
+
+    // Run simulation asynchronously
+    setTimeout(() => {
+      let bestPL = -Infinity
+      let bestSmaValue = null
+
+      // Helper to calculate SMA for a given period
+      const calculateSMA = (period) => {
+        const result = []
+        for (let i = 0; i < displayPrices.length; i++) {
+          if (i < period - 1) {
+            result.push(null)
+          } else {
+            const sum = displayPrices.slice(i - period + 1, i + 1).reduce((acc, p) => acc + p.close, 0)
+            result.push(sum / period)
+          }
+        }
+        return result
+      }
+
+      // Helper to calculate P&L for a given SMA period
+      const calculatePLForSMA = (smaPeriod) => {
+        if (volumeProfileV2Data.length === 0) return -Infinity
+
+        const smaValues = calculateSMA(smaPeriod)
+        const dateToSMA = new Map()
+        displayPrices.forEach((p, idx) => {
+          if (smaValues[idx] !== null) {
+            dateToSMA.set(p.date, smaValues[idx])
+          }
+        })
+
+        const getSMASlope = (currentDate, prevDate) => {
+          const currentSMA = dateToSMA.get(currentDate)
+          const prevSMA = dateToSMA.get(prevDate)
+          if (currentSMA !== undefined && prevSMA !== undefined) {
+            return currentSMA - prevSMA
+          }
+          return null
+        }
+
+        const breakoutDates = new Set(volumeProfileV2Breakouts.map(b => b.date))
+        const trades = []
+        let isHolding = false
+        let buyPrice = null
+        let buyDate = null
+
+        for (let i = 0; i < volumeProfileV2Data.length; i++) {
+          const slot = volumeProfileV2Data[i]
+          if (!slot) continue
+
+          const currentDate = slot.endDate
+          const currentPrice = slot.currentPrice
+
+          if (breakoutDates.has(currentDate) && !isHolding) {
+            isHolding = true
+            buyPrice = currentPrice
+            buyDate = currentDate
+          } else if (isHolding && i > 0) {
+            const prevSlot = volumeProfileV2Data[i - 1]
+            if (prevSlot) {
+              const slope = getSMASlope(currentDate, prevSlot.endDate)
+              if (slope !== null && slope < 0) {
+                const sellPrice = currentPrice
+                const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
+                trades.push({ plPercent })
+                isHolding = false
+                buyPrice = null
+                buyDate = null
+              }
+            }
+          }
+        }
+
+        // If still holding, close at end
+        if (isHolding && volumeProfileV2Data.length > 0) {
+          const lastSlot = volumeProfileV2Data[volumeProfileV2Data.length - 1]
+          const currentPrice = lastSlot.currentPrice
+          const plPercent = ((currentPrice - buyPrice) / buyPrice) * 100
+          trades.push({ plPercent, isOpen: true })
+        }
+
+        const totalPL = trades.reduce((sum, trade) => sum + trade.plPercent, 0)
+        return totalPL
+      }
+
+      // Test SMA values with proper increments
+      const testValues = []
+      for (let val = 3; val <= 200;) {
+        testValues.push(val)
+        if (val <= 10) val += 1
+        else if (val <= 20) val += 2
+        else if (val <= 40) val += 3
+        else if (val <= 50) val += 4
+        else if (val <= 100) val += 5
+        else val += 10
+      }
+
+      console.log(`[Simulate] Testing ${testValues.length} SMA values...`)
+
+      for (const smaValue of testValues) {
+        const pl = calculatePLForSMA(smaValue)
+        if (pl > bestPL) {
+          bestPL = pl
+          bestSmaValue = smaValue
+        }
+      }
+
+      console.log(`[Simulate] Best SMA: ${bestSmaValue} with P&L: ${bestPL.toFixed(2)}%`)
+
+      // Call the callback with results
+      if (onSimulateComplete && bestSmaValue !== null) {
+        onSimulateComplete(smaIndex, bestSmaValue)
+      }
+    }, 100) // Small delay to let UI update
+
+  }, [simulatingSma, chartId, volumeProfileV2Enabled, onSimulateComplete, displayPrices, volumeProfileV2Data, volumeProfileV2Breakouts])
 
   // Calculate performance variance for each point (configurable rolling period)
   const performanceVariances = (() => {
