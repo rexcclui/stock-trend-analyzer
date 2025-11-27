@@ -5506,7 +5506,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           <g>
             <text
               x={volV2HoveredBar.x}
-              y={volV2HoveredBar.y - 15}
+              y={volV2HoveredBar.y + 20}
               fill="#06b6d4"
               fontSize="12"
               fontWeight="700"
@@ -5517,7 +5517,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             </text>
             <text
               x={volV2HoveredBar.x}
-              y={volV2HoveredBar.y + 5}
+              y={volV2HoveredBar.y + 35}
               fill="#cbd5e1"
               fontSize="11"
               textAnchor="middle"
