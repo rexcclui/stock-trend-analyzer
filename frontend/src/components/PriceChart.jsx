@@ -2600,19 +2600,28 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   })()
 
   // Calculate thresholds for performance variance (top 20% and bottom 20%)
+  // Use only the visible range to calculate thresholds
   const performanceVarianceThresholds = (() => {
     if (!performanceComparisonEnabled || performanceVariances.length === 0 || comparisonMode !== 'color') return { top20: null, bottom20: null }
 
-    const validVariances = performanceVariances.filter(v => v !== null)
-    if (validVariances.length === 0) return { top20: null, bottom20: null }
+    // Calculate the visible range end index
+    const visibleEndIndex = zoomRange.end === null ? performanceVariances.length : Math.min(zoomRange.end, performanceVariances.length)
+    const visibleStartIndex = Math.max(0, Math.min(zoomRange.start, performanceVariances.length - 1))
 
-    const sorted = [...validVariances].sort((a, b) => a - b)
+    // Only use variances from the visible range
+    const visibleVariances = performanceVariances
+      .slice(visibleStartIndex, visibleEndIndex)
+      .filter(v => v !== null)
+
+    if (visibleVariances.length === 0) return { top20: null, bottom20: null }
+
+    const sorted = [...visibleVariances].sort((a, b) => a - b)
     const idx80 = Math.floor(sorted.length * 0.8)
     const idx20 = Math.floor(sorted.length * 0.2)
 
     return {
-      top20: sorted[idx80],      // Top 20% (highest positive variance)
-      bottom20: sorted[idx20]    // Bottom 20% (most negative variance)
+      top20: sorted[idx80],      // Top 20% (highest positive variance) in visible range
+      bottom20: sorted[idx20]    // Bottom 20% (most negative variance) in visible range
     }
   })()
 
