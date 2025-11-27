@@ -5505,22 +5505,22 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         {volV2HoveredBar && (
           <g>
             <text
-              x={volV2HoveredBar.x}
-              y={volV2HoveredBar.y + 20}
+              x={volV2HoveredBar.x + 15}
+              y={volV2HoveredBar.y - 30}
               fill="#06b6d4"
               fontSize="12"
               fontWeight="700"
-              textAnchor="middle"
+              textAnchor="start"
               style={{ pointerEvents: 'none' }}
             >
               Vol % {(volV2HoveredBar.volumeWeight * 100).toFixed(1)}%
             </text>
             <text
-              x={volV2HoveredBar.x}
-              y={volV2HoveredBar.y + 35}
+              x={volV2HoveredBar.x + 15}
+              y={volV2HoveredBar.y - 15}
               fill="#cbd5e1"
               fontSize="11"
-              textAnchor="middle"
+              textAnchor="start"
               style={{ pointerEvents: 'none' }}
             >
               Px: ${volV2HoveredBar.minPrice.toFixed(2)} - ${volV2HoveredBar.maxPrice.toFixed(2)}
