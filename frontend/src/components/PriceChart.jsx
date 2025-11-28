@@ -29,6 +29,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const [optimizedLookbackCount, setOptimizedLookbackCount] = useState(null)
   const [optimizedStdevMult, setOptimizedStdevMult] = useState(null)
 
+  // Store all channels
+  const [allChannels, setAllChannels] = useState([])
+  const [allChannelsVisibility, setAllChannelsVisibility] = useState({})
+
   // Store reversed all channels
   const [revAllChannels, setRevAllChannels] = useState([])
   const [revAllChannelsVisibility, setRevAllChannelsVisibility] = useState({})
