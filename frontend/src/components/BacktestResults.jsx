@@ -207,7 +207,7 @@ function getLatestBreakout(breakouts) {
   return breakouts[breakouts.length - 1]
 }
 
-function BacktestResults() {
+function BacktestResults({ onStockSelect }) {
   const [symbols, setSymbols] = useState('')
   const [days, setDays] = useState('1825') // Default to 5Y
   const [loading, setLoading] = useState(false)
@@ -426,7 +426,12 @@ function BacktestResults() {
                     const priceChange = ((result.latestPrice - result.latestBreakout.price) / result.latestBreakout.price * 100)
 
                     return (
-                      <tr key={index} className="hover:bg-slate-700">
+                      <tr
+                        key={index}
+                        onClick={() => onStockSelect && onStockSelect(result.symbol)}
+                        className="hover:bg-slate-700 cursor-pointer transition-colors"
+                        title="Click to view in Technical Analysis"
+                      >
                         <td className="px-4 py-3 text-sm font-bold text-blue-400">
                           {result.symbol}
                         </td>

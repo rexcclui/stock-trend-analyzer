@@ -6,6 +6,13 @@ import './App.css'
 
 function App() {
   const [activeTab, setActiveTab] = useState('analyze')
+  const [selectedSymbol, setSelectedSymbol] = useState('')
+
+  // Handle clicking on a stock in backtest results
+  const handleStockSelect = (symbol) => {
+    setSelectedSymbol(symbol)
+    setActiveTab('analyze')
+  }
 
   return (
     <div className="min-h-screen p-0 md:p-8">
@@ -51,10 +58,10 @@ function App() {
           <div className="p-0 md:p-6">
             {/* Keep both components mounted to preserve state when switching tabs */}
             <div style={{ display: activeTab === 'analyze' ? 'block' : 'none' }}>
-              <StockAnalyzer />
+              <StockAnalyzer selectedSymbol={selectedSymbol} />
             </div>
             <div style={{ display: activeTab === 'backtest' ? 'block' : 'none' }}>
-              <BacktestResults />
+              <BacktestResults onStockSelect={handleStockSelect} />
             </div>
           </div>
         </div>
