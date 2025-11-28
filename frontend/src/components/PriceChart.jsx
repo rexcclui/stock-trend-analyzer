@@ -4141,7 +4141,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       </g>
     )
   }
-  }
 
   // Determine cursor style based on state
   const getCursorStyle = () => {
