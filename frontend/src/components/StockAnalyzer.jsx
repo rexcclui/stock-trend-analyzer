@@ -2167,8 +2167,8 @@ function StockAnalyzer() {
 
                 {/* Loading Spinner */}
                 {loading && (
-                  <div className="fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-70 z-50">
-                    <div className="animate-spin rounded-full h-12 w-12 border-4 border-t-4 border-white"></div>
+                  <div className="fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-20 z-50">
+                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-purple-500 border-t-transparent"></div>
                   </div>
                 )}
                 {/* Time Period Selector - Right Side (Desktop) / Bottom (Mobile) */}
