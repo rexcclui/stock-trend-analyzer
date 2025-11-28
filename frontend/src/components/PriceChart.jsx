@@ -79,6 +79,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // Volume Profile V2 calculated data (only recalculates on manual refresh)
   const [volumeProfileV2Result, setVolumeProfileV2Result] = useState({ slots: [], breakouts: [] })
 
+  // Early return if data is not available
+  if (!prices || !indicators || prices.length === 0 || indicators.length === 0) {
+    return <div className="text-slate-400 text-center p-8">Loading chart data...</div>
+  }
+
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
   // No need to reset here to avoid infinite loop
 
@@ -1928,7 +1933,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
   // Combine data - ensure we use the minimum length to stay in sync with indicators
-  const dataLength = Math.min(prices.length, indicators.length)
+  const dataLength = Math.min(prices?.length || 0, indicators?.length || 0)
 
   // Calculate last channel ONLY on the data that will be displayed
   // This prevents mismatch when period changes and indicators haven't updated yet
