@@ -4102,16 +4102,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   const opacity = 0.2 + (Math.pow(normalizedWeight, 0.5) * 0.75)
 
                   return (
-                    <div key={idx} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                      <div style={{
-                        width: '24px',
-                        height: '16px',
-                        background: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
-                        opacity: opacity,
-                        border: '1px solid rgba(59, 130, 246, 0.5)',
-                        borderRadius: '2px'
-                      }} />
-                      <span style={{ fontSize: '8px', color: '#94a3b8', fontWeight: 600 }}>
+                    <div key={idx} style={{
+                      width: '32px',
+                      height: '20px',
+                      background: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+                      opacity: opacity,
+                      border: '1px solid rgba(59, 130, 246, 0.5)',
+                      borderRadius: '2px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      <span style={{ fontSize: '8px', color: '#f1f5f9', fontWeight: 700, textShadow: '0 0 2px rgba(0,0,0,0.8)' }}>
                         {step.label}
                       </span>
                     </div>
