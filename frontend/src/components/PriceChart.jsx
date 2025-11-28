@@ -8,6 +8,7 @@ import {
   CustomZoneLines as ImportedCustomZoneLines,
   CustomSlopeChannelLabel as ImportedCustomSlopeChannelLabel,
   CustomVolumeProfile as ImportedCustomVolumeProfile,
+  CustomLegend as ImportedCustomLegend,
   CustomResistanceLine as ImportedCustomResistanceLine,
   CustomSecondVolZoneLine as ImportedCustomSecondVolZoneLine,
   CustomThirdVolZoneLine as ImportedCustomThirdVolZoneLine,
@@ -3796,352 +3797,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     )
   }
 
-  const CustomLegend = ({ payload }) => {
-    return (
-      <div className="flex justify-center gap-4 mt-2 flex-wrap">
-        {payload.map((entry, index) => {
-          const isSma = entry.dataKey.startsWith('sma')
-          const period = isSma ? parseInt(entry.dataKey.replace('sma', '')) : null
-
-          // Check if this is an all channel line
-          const isAllChannel = entry.dataKey.startsWith('allChannel') && entry.dataKey.endsWith('Mid')
-          const channelIndex = isAllChannel ? parseInt(entry.dataKey.replace('allChannel', '').replace('Mid', '')) : null
-
-          // Check if this is a reversed all channel line
-          const isRevAllChannel = entry.dataKey.startsWith('revAllChannel') && entry.dataKey.endsWith('Mid')
-          const revChannelIndex = isRevAllChannel ? parseInt(entry.dataKey.replace('revAllChannel', '').replace('Mid', '')) : null
-
-          // Check if this is a manual channel line
-          const isManualChannel = entry.dataKey.startsWith('manualChannel') && entry.dataKey.endsWith('Mid')
-          const manualChannelIndex = isManualChannel ? parseInt(entry.dataKey.replace('manualChannel', '').replace('Mid', '')) : null
-
-          // Check if this is a best stdev channel line
-          const isBestStdevChannel = entry.dataKey.startsWith('bestStdevChannel') && entry.dataKey.endsWith('Mid')
-          const bestStdevChannelIndex = isBestStdevChannel ? parseInt(entry.dataKey.replace('bestStdevChannel', '').replace('Mid', '')) : null
-
-          // Check if this is the main trend channel
-          const isTrendLine = entry.dataKey === 'channelMid'
-          const isTrendChannelPart = entry.dataKey === 'channelMid' || entry.dataKey === 'channelUpper' || entry.dataKey === 'channelLower'
-
-          // Skip rendering upper/lower bounds in legend (already hidden via legendType="none", but double check)
-          if (entry.dataKey === 'channelUpper' || entry.dataKey === 'channelLower') {
-            return null
-          }
-
-          // Skip rendering allChannel upper/lower bounds in legend
-          if (entry.dataKey && (entry.dataKey.includes('allChannel') && (entry.dataKey.endsWith('Upper') || entry.dataKey.endsWith('Lower')))) {
-            return null
-          }
-
-          // Skip rendering revAllChannel upper/lower bounds in legend
-          if (entry.dataKey && (entry.dataKey.includes('revAllChannel') && (entry.dataKey.endsWith('Upper') || entry.dataKey.endsWith('Lower')))) {
-            return null
-          }
-
-          // Skip rendering manual channel upper/lower bounds in legend
-          if (entry.dataKey && (entry.dataKey.includes('manualChannel') && (entry.dataKey.endsWith('Upper') || entry.dataKey.endsWith('Lower')))) {
-            return null
-          }
-
-          // Skip rendering best channel upper/lower bounds in legend
-          if (entry.dataKey && (entry.dataKey.includes('bestChannel') && (entry.dataKey.endsWith('Upper') || entry.dataKey.endsWith('Lower')))) {
-            return null
-          }
-
-          // Skip rendering bestStdevChannel upper/lower bounds in legend
-          if (entry.dataKey && (entry.dataKey.includes('bestStdevChannel') && (entry.dataKey.endsWith('Upper') || entry.dataKey.endsWith('Lower')))) {
-            return null
-          }
-
-          const isVisible = isSma ? smaVisibility[period] : (isAllChannel ? allChannelsVisibility[channelIndex] : (isRevAllChannel ? revAllChannelsVisibility[revChannelIndex] : (isBestStdevChannel ? bestStdevChannelsVisibility[bestStdevChannelIndex] : (isTrendLine ? trendChannelVisible : true))))
-          const isClickable = isSma || isAllChannel || isRevAllChannel || isBestStdevChannel || isTrendLine
-
-          return (
-            <div
-              key={`item-${index}`}
-              className="flex items-center gap-2 px-2 py-1 rounded transition-all"
-            >
-              <button
-                onClick={() => {
-                  if (isSma && onToggleSma) {
-                    onToggleSma(period)
-                  } else if (isAllChannel) {
-                    setAllChannelsVisibility(prev => ({
-                      ...prev,
-                      [channelIndex]: !prev[channelIndex]
-                    }))
-                  } else if (isRevAllChannel) {
-                    setRevAllChannelsVisibility(prev => ({
-                      ...prev,
-                      [revChannelIndex]: !prev[revChannelIndex]
-                    }))
-                  } else if (isBestStdevChannel) {
-                    setBestStdevChannelsVisibility(prev => ({
-                      ...prev,
-                      [bestStdevChannelIndex]: !prev[bestStdevChannelIndex]
-                    }))
-                  } else if (isTrendLine) {
-                    setTrendChannelVisible(!trendChannelVisible)
-                  }
-                }}
-                className={`flex items-center gap-2 ${isClickable ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
-                  }`}
-                disabled={!isClickable}
-              >
-                <div
-                  style={{
-                    width: 12,
-                    height: 12,
-                    backgroundColor: entry.color,
-                    borderRadius: '50%',
-                    opacity: isVisible ? 1 : 0.3
-                  }}
-                />
-                <span className={`text-sm text-slate-300 ${!isVisible ? 'line-through opacity-50' : ''}`}>
-                  {entry.value}
-                </span>
-              </button>
-              {isSma && onDeleteSma && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onDeleteSma(period)
-                  }}
-                  className="ml-1 p-0.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded transition-colors"
-                  title="Delete SMA line"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-              {isAllChannel && (
-                <>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      // Remove this channel from allChannels array
-                      setAllChannels(prev => prev.filter((_, idx) => idx !== channelIndex))
-                      // Remove from visibility tracking
-                      setAllChannelsVisibility(prev => {
-                        const newVis = { ...prev }
-                        delete newVis[channelIndex]
-                        // Re-index remaining channels
-                        const reindexed = {}
-                        Object.keys(newVis).forEach(key => {
-                          const idx = parseInt(key)
-                          if (idx > channelIndex) {
-                            reindexed[idx - 1] = newVis[key]
-                          } else {
-                            reindexed[idx] = newVis[key]
-                          }
-                        })
-                        return reindexed
-                      })
-                    }}
-                    className="ml-1 p-0.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded transition-colors"
-                    title="Remove channel"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </>
-              )}
-              {isRevAllChannel && revAllChannels[revChannelIndex] && (
-                <>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      // Decrease range by 5% on each side without refitting
-                      setRevAllChannels(prev => prev.map((channel, idx) => {
-                        if (idx !== revChannelIndex) return channel
-                        const currentLength = channel.endIndex - channel.startIndex + 1
-                        const shrinkAmount = Math.max(1, Math.floor(currentLength * 0.05))
-                        const newStartIndex = channel.startIndex + shrinkAmount
-                        const newEndIndex = channel.endIndex - shrinkAmount
-                        return adjustChannelRangeWithoutRecalc(channel, newStartIndex, newEndIndex)
-                      }))
-                    }}
-                    className="ml-1 px-1.5 py-0.5 text-xs bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors"
-                    title="Shrink channel range by 5% on each side"
-                  >
-                    −
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      // Increase range by 5% on each side without refitting
-                      setRevAllChannels(prev => prev.map((channel, idx) => {
-                        if (idx !== revChannelIndex) return channel
-                        const currentLength = channel.endIndex - channel.startIndex + 1
-                        const expandAmount = Math.max(1, Math.floor(currentLength * 0.05))
-                        const newStartIndex = channel.startIndex - expandAmount
-                        const newEndIndex = channel.endIndex + expandAmount
-                        return adjustChannelRangeWithoutRecalc(channel, newStartIndex, newEndIndex)
-                      }))
-                    }}
-                    className="ml-1 px-1.5 py-0.5 text-xs bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors"
-                    title="Expand channel range by 5% on each side"
-                  >
-                    +
-                  </button>
-                </>
-              )}
-              {isTrendLine && slopeChannelEnabled && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    // Disable last channel by calling parent handler
-                    if (onSlopeChannelParamsChange) {
-                      // Signal to parent to disable last channel
-                      onSlopeChannelParamsChange({ slopeChannelEnabled: false })
-                    }
-                  }}
-                  className="ml-1 p-0.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded transition-colors"
-                  title="Remove trend channel"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-              {/* Show controls button next to Trend legend */}
-              {isTrendLine && slopeChannelEnabled && onSlopeChannelParamsChange && (
-                <button
-                  onClick={() => setControlsVisible(!controlsVisible)}
-                  className="ml-2 px-2 py-1 text-xs bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
-                  title={controlsVisible ? "Hide controls" : "Show controls"}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="3" />
-                    <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24" />
-                  </svg>
-                  {controlsVisible ? 'Hide' : 'Controls'}
-                </button>
-              )}
-              {/* Manual channel controls */}
-              {isManualChannel && (
-                <>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      // Extend this specific channel if it's the last one
-                      if (manualChannelIndex === manualChannels.length - 1) {
-                        extendManualChannel()
-                      }
-                    }}
-                    className="ml-1 p-0.5 text-slate-400 hover:text-green-400 hover:bg-slate-700 rounded transition-colors"
-                    title="Extend channel"
-                    disabled={manualChannelIndex !== manualChannels.length - 1}
-                    style={{ opacity: manualChannelIndex === manualChannels.length - 1 ? 1 : 0.3 }}
-                  >
-                    <ArrowLeftRight className="w-3 h-3" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      // Remove this channel from manualChannels array
-                      setManualChannels(prev => prev.filter((_, idx) => idx !== manualChannelIndex))
-                    }}
-                    className="ml-1 p-0.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded transition-colors"
-                    title="Remove channel"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                  {/* Show "Clear All" button only on the last manual channel */}
-                  {manualChannelIndex === manualChannels.length - 1 && manualChannels.length > 1 && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setManualChannels([])
-                      }}
-                      className="ml-2 px-2 py-1 text-xs bg-slate-700 text-slate-300 rounded hover:bg-red-600 hover:text-white transition-colors"
-                      title="Clear all manual channels"
-                    >
-                      Clear All
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          )
-        })}
-
-        {/* Volume Profile V2 Color Legend - inline with other legends (desktop only) */}
-        {volumeProfileV2Enabled && !isMobile && (() => {
-          // Calculate number of price zones for display
-          const reversedDisplayPrices = [...displayPrices].reverse()
-          const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
-          const allPrices = visibleData.map(p => p.close)
-          const globalMin = Math.min(...allPrices)
-          const globalMax = Math.max(...allPrices)
-          const globalRange = globalMax - globalMin
-          // Dynamic zone count based on cumulative/global range ratio
-          const numPriceZones = Math.max(1, Math.round((globalRange / globalRange) / 0.03))
-
-          // Generate color blocks for specific volume weight breakpoints
-          const legendSteps = [
-            { weight: 0.02, label: '2%' },
-            { weight: 0.04, label: '4%' },
-            { weight: 0.06, label: '6%' },
-            { weight: 0.08, label: '8%' },
-            { weight: 0.10, label: '10%' },
-            { weight: 0.12, label: '12%' },
-            { weight: 0.15, label: '15%' },
-            { weight: 0.18, label: '18%' },
-            { weight: 0.22, label: '22%' },
-            { weight: 0.26, label: '26%' },
-            { weight: 0.30, label: '30%' },
-            { weight: 0.35, label: '35%+' }
-          ]
-
-          return (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '6px',
-              padding: '8px 12px',
-              background: 'rgba(15, 23, 42, 0.95)',
-              border: '1px solid rgba(148, 163, 184, 0.3)',
-              borderRadius: '8px',
-              backdropFilter: 'blur(4px)'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>
-                  Volume Weight %
-                </span>
-                <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 600 }}>
-                  {numPriceZones} price zones/bar
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                {legendSteps.map((step, idx) => {
-                  const normalizedWeight = Math.min(1, step.weight / 0.35)
-                  const hue = Math.floor(normalizedWeight * 240)
-                  const saturation = 90 + (normalizedWeight * 10)
-                  const lightness = 60 - (normalizedWeight * 30)
-                  const opacity = 0.2 + (Math.pow(normalizedWeight, 0.5) * 0.75)
-
-                  return (
-                    <div key={idx} style={{
-                      width: '32px',
-                      height: '20px',
-                      background: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
-                      opacity: opacity,
-                      border: '1px solid rgba(59, 130, 246, 0.5)',
-                      borderRadius: '2px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}>
-                      <span style={{ fontSize: '8px', color: '#f1f5f9', fontWeight: 700, textShadow: '0 0 2px rgba(0,0,0,0.8)' }}>
-                        {step.label}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })()}
-      </div>
-    )
-  }
 
   // Use visible chart data directly (zones are now added during chartData creation)
   const chartDataWithZones = visibleChartData
@@ -5192,7 +4847,35 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             />
             <YAxis domain={['auto', 'auto']} tick={{ fill: '#94a3b8', fontSize: isMobile ? 10 : 12 }} stroke="#475569" width={isMobile ? 40 : 60} />
             <Tooltip content={<CustomTooltip />} />
-            <Legend content={<CustomLegend />} />
+            <Legend content={<ImportedCustomLegend
+              smaVisibility={smaVisibility}
+              onToggleSma={onToggleSma}
+              onDeleteSma={onDeleteSma}
+              allChannelsVisibility={allChannelsVisibility}
+              setAllChannelsVisibility={setAllChannelsVisibility}
+              allChannels={allChannels}
+              setAllChannels={setAllChannels}
+              revAllChannelsVisibility={revAllChannelsVisibility}
+              setRevAllChannelsVisibility={setRevAllChannelsVisibility}
+              revAllChannels={revAllChannels}
+              setRevAllChannels={setRevAllChannels}
+              adjustChannelRangeWithoutRecalc={adjustChannelRangeWithoutRecalc}
+              bestStdevChannelsVisibility={bestStdevChannelsVisibility}
+              setBestStdevChannelsVisibility={setBestStdevChannelsVisibility}
+              trendChannelVisible={trendChannelVisible}
+              setTrendChannelVisible={setTrendChannelVisible}
+              slopeChannelEnabled={slopeChannelEnabled}
+              onSlopeChannelParamsChange={onSlopeChannelParamsChange}
+              controlsVisible={controlsVisible}
+              setControlsVisible={setControlsVisible}
+              manualChannels={manualChannels}
+              setManualChannels={setManualChannels}
+              extendManualChannel={extendManualChannel}
+              volumeProfileV2Enabled={volumeProfileV2Enabled}
+              isMobile={isMobile}
+              displayPrices={displayPrices}
+              zoomRange={zoomRange}
+            />} />
             {syncedMouseDate && (
               <ReferenceLine
                 x={syncedMouseDate}
