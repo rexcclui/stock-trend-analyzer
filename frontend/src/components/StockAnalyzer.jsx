@@ -1222,30 +1222,28 @@ function StockAnalyzer() {
       )
 
       // After data is loaded, set initial zoom to show only the display period (not all fetched data)
-      // Wait for next tick to ensure charts are updated
-      setTimeout(() => {
-        const displayDaysNum = parseInt(displayDays)
-        const fetchDaysNum = parseInt(fetchDays)
+      // Use the freshly fetched results instead of stale charts state
+      const displayDaysNum = parseInt(displayDays)
+      const fetchDaysNum = parseInt(fetchDays)
 
-        if (displayDaysNum < fetchDaysNum && charts.length > 0) {
-          // We fetched more data than we want to display
-          // Use the first chart's actual data length to calculate the ratio
-          const firstChart = charts[0]
-          if (firstChart && firstChart.data && firstChart.data.prices) {
-            const actualDataLength = firstChart.data.prices.length
-            const displayRatio = displayDaysNum / fetchDaysNum
+      if (displayDaysNum < fetchDaysNum && results.length > 0) {
+        // We fetched more data than we want to display
+        // Use the first result's actual data length to calculate the ratio
+        const firstResult = results[0]
+        if (firstResult && firstResult.data && firstResult.data.prices) {
+          const actualDataLength = firstResult.data.prices.length
+          const displayRatio = displayDaysNum / fetchDaysNum
 
-            // Show only the most recent portion based on the ratio
-            const startIndex = Math.floor(actualDataLength * (1 - displayRatio))
-            setGlobalZoomRange({ start: startIndex, end: null })
-          } else {
-            setGlobalZoomRange({ start: 0, end: null })
-          }
+          // Show only the most recent portion based on the ratio
+          const startIndex = Math.floor(actualDataLength * (1 - displayRatio))
+          setGlobalZoomRange({ start: startIndex, end: null })
         } else {
-          // Show all fetched data
           setGlobalZoomRange({ start: 0, end: null })
         }
-      }, 100)
+      } else {
+        // Show all fetched data
+        setGlobalZoomRange({ start: 0, end: null })
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to update charts.')
     } finally {
