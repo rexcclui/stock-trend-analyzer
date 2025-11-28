@@ -79,11 +79,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // Volume Profile V2 calculated data (only recalculates on manual refresh)
   const [volumeProfileV2Result, setVolumeProfileV2Result] = useState({ slots: [], breakouts: [] })
 
-  // Early return if data is not available
-  if (!prices || !indicators || prices.length === 0 || indicators.length === 0) {
-    return <div className="text-slate-400 text-center p-8">Loading chart data...</div>
-  }
-
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
   // No need to reset here to avoid infinite loop
 
@@ -4209,6 +4204,15 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   return (
     <div ref={chartContainerRef} style={{ width: '100%', height: chartHeight, position: 'relative', cursor: getCursorStyle(), userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', msUserSelect: 'none' }}>
+      {/* Show loading state if data is not available */}
+      {(!prices || !indicators || prices.length === 0 || indicators.length === 0) ? (
+        <div className="flex items-center justify-center h-full text-slate-400">
+          <div className="text-center">
+            <div className="text-lg">Loading chart data...</div>
+          </div>
+        </div>
+      ) : (
+        <>
       {/* Last Channel Controls Panel */}
       {slopeChannelEnabled && slopeChannelInfo && onSlopeChannelParamsChange && controlsVisible && (
         <div
@@ -5256,6 +5260,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           </ComposedChart>
         </ResponsiveContainer>
       </div>
+      </>
+      )}
     </div>
   )
 }
