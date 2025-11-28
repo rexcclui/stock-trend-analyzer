@@ -2,6 +2,7 @@ import { useState } from 'react'
 import axios from 'axios'
 import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle } from 'lucide-react'
 import { apiCache } from '../utils/apiCache'
+import { joinUrl } from '../utils/urlHelper'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -236,7 +237,7 @@ function BacktestResults({ onStockSelect }) {
           let priceData = apiCache.get(cacheKey, days)
 
           if (!priceData) {
-            const response = await axios.get(`${API_URL}/prices`, {
+            const response = await axios.get(joinUrl(API_URL, '/prices'), {
               params: { symbol, days }
             })
             priceData = response.data.prices

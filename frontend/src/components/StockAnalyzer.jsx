@@ -5,6 +5,7 @@ import PriceChart from './PriceChart'
 import IndicatorsChart from './IndicatorsChart'
 import SignalsList from './SignalsList'
 import { apiCache } from '../utils/apiCache'
+import { joinUrl } from '../utils/urlHelper'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
@@ -213,7 +214,7 @@ function StockAnalyzer({ selectedSymbol }) {
             console.log(`[Cache] ✅ Cache available for ${upperSymbol}:${fetchDays}`)
           } else {
             console.log(`[Cache] ❌ Cache MISS for ${upperSymbol}:${fetchDays}, fetching from server...`)
-            const response = await axios.get(`${API_URL}/analyze`, {
+            const response = await axios.get(joinUrl(API_URL, '/analyze'), {
               params: {
                 symbol: upperSymbol,
                 days: fetchDays  // Fetch more data than displayed
@@ -699,7 +700,7 @@ function StockAnalyzer({ selectedSymbol }) {
 
         if (!spyData) {
           console.log(`[Cache] ❌ Cache MISS for SPY:${days}, fetching from server...`)
-          const response = await axios.get(`${API_URL}/analyze`, {
+          const response = await axios.get(joinUrl(API_URL, '/analyze'), {
             params: {
               symbol: 'SPY',
               days: days
@@ -944,7 +945,7 @@ function StockAnalyzer({ selectedSymbol }) {
 
         if (!spyData) {
           console.log(`[Cache] ❌ Cache MISS for SPY:${days}, fetching from server...`)
-          const response = await axios.get(`${API_URL}/analyze`, {
+          const response = await axios.get(joinUrl(API_URL, '/analyze'), {
             params: {
               symbol: 'SPY',
               days: days
@@ -1026,7 +1027,7 @@ function StockAnalyzer({ selectedSymbol }) {
 
       if (!benchmarkData) {
         console.log(`[Cache] ❌ Cache MISS for ${benchmarkSymbol}:${days}, fetching from server...`)
-        const response = await axios.get(`${API_URL}/analyze`, {
+        const response = await axios.get(joinUrl(API_URL, '/analyze'), {
           params: {
             symbol: benchmarkSymbol,
             days: days
@@ -1080,7 +1081,7 @@ function StockAnalyzer({ selectedSymbol }) {
 
       if (!stockData) {
         console.log(`[Cache] ❌ Cache MISS for ${symbol}:${maxDays}, fetching from server...`)
-        const response = await axios.get(`${API_URL}/analyze`, {
+        const response = await axios.get(joinUrl(API_URL, '/analyze'), {
           params: {
             symbol: symbol,
             days: maxDays
@@ -1175,7 +1176,7 @@ function StockAnalyzer({ selectedSymbol }) {
         spyDataForPeriod = apiCache.get('SPY', fetchDays)
         if (!spyDataForPeriod) {
           console.log(`[Cache] ❌ Cache MISS for SPY:${fetchDays}, fetching from server...`)
-          const response = await axios.get(`${API_URL}/analyze`, {
+          const response = await axios.get(joinUrl(API_URL, '/analyze'), {
             params: {
               symbol: 'SPY',
               days: fetchDays  // Fetch more data for SPY too
@@ -1196,7 +1197,7 @@ function StockAnalyzer({ selectedSymbol }) {
           console.log(`[Cache] ✅ Cache available for ${chart.symbol}:${fetchDays}`)
         } else {
           console.log(`[Cache] ❌ Cache MISS for ${chart.symbol}:${fetchDays}, fetching from server...`)
-          const response = await axios.get(`${API_URL}/analyze`, {
+          const response = await axios.get(joinUrl(API_URL, '/analyze'), {
             params: {
               symbol: chart.symbol,
               days: fetchDays  // Fetch more data than displayed
