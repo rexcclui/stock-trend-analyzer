@@ -2236,7 +2236,15 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     }
 
     // Detect up breakouts: current zone has <6% weight compared to MAX volume zone within 5 zones below
+    // State-based detection to prevent duplicate signals until price reaccumulates
     const breakouts = []
+    const BREAKOUT_THRESHOLD = 0.06 // 6% difference required for breakout
+    const RESET_THRESHOLD = 0.03    // 3% reaccumulation required to reset (half of breakout threshold)
+    const TIMEOUT_SLOTS = 5         // Auto-reset after 5 slots if no reaccumulation
+
+    let isInBreakout = false
+    let breakoutZoneWeight = 0
+    let breakoutSlotIdx = -1
 
     for (let i = 0; i < slots.length; i++) {
       const currentSlot = slots[i]
@@ -2254,9 +2262,25 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const currentZone = currentSlot.priceZones[currentZoneIdx]
       const currentWeight = currentZone.volumeWeight
 
-      // Look up to 5 zones below and find the zone with MAXIMUM volume weight
-      // This identifies the strongest support/resistance level to break through
-      if (currentZoneIdx > 0) {
+      // Check timeout: if in breakout state for 5+ slots without reset, auto-reset
+      if (isInBreakout && i - breakoutSlotIdx >= TIMEOUT_SLOTS) {
+        isInBreakout = false
+        breakoutZoneWeight = 0
+        breakoutSlotIdx = -1
+      }
+
+      // Check reset condition: entered high volume zone (breakout weight + 3%)
+      // This means price has "reaccumulated" and we can look for next breakout
+      if (isInBreakout && currentWeight >= breakoutZoneWeight + RESET_THRESHOLD) {
+        isInBreakout = false
+        breakoutZoneWeight = 0
+        breakoutSlotIdx = -1
+      }
+
+      // Only detect new breakouts if NOT currently in a breakout state
+      if (!isInBreakout && currentZoneIdx > 0) {
+        // Look up to 5 zones below and find the zone with MAXIMUM volume weight
+        // This identifies the strongest support/resistance level to break through
         const lookbackDepth = Math.min(5, currentZoneIdx) // Check up to 5 zones or until start
         let maxLowerWeight = 0
         let maxZoneIdx = -1
@@ -2271,7 +2295,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
         // Check if current zone has at least 6% less weight than the strongest zone below
         // This means price is breaking up through significant support into a lower volume area
-        if (currentWeight < maxLowerWeight && maxLowerWeight - currentWeight >= 0.06) {
+        if (currentWeight < maxLowerWeight && maxLowerWeight - currentWeight >= BREAKOUT_THRESHOLD) {
           breakouts.push({
             slotIdx: i,
             date: currentSlot.endDate,
@@ -2283,6 +2307,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             maxZoneIdx: maxZoneIdx, // Track which zone had the max volume
             zonesChecked: lookbackDepth // How many zones we looked at
           })
+
+          // Enter breakout state - no more signals until reset
+          isInBreakout = true
+          breakoutZoneWeight = currentWeight
+          breakoutSlotIdx = i
         }
       }
     }
