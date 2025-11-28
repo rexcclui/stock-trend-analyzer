@@ -10,7 +10,11 @@ import {
   CustomVolumeProfile as ImportedCustomVolumeProfile,
   CustomResistanceLine as ImportedCustomResistanceLine,
   CustomSecondVolZoneLine as ImportedCustomSecondVolZoneLine,
-  CustomThirdVolZoneLine as ImportedCustomThirdVolZoneLine
+  CustomThirdVolZoneLine as ImportedCustomThirdVolZoneLine,
+  CustomRevAllChannelZoneLines as ImportedCustomRevAllChannelZoneLines,
+  CustomRevAllChannelStdevLabels as ImportedCustomRevAllChannelStdevLabels,
+  CustomManualChannelZoneLines as ImportedCustomManualChannelZoneLines,
+  CustomBestChannelZoneLines as ImportedCustomBestChannelZoneLines
 } from './PriceChart/components'
 
 function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete }) {
@@ -5836,19 +5840,19 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             <Customized component={CustomSlopeChannelLabel} />
 
             {/* All Channels Zones as Parallel Lines */}
-            <Customized component={CustomRevAllChannelZoneLines} />
+            <Customized component={(props) => <ImportedCustomRevAllChannelZoneLines {...props} revAllChannelEnabled={revAllChannelEnabled} revAllChannels={revAllChannels} revAllChannelsVisibility={revAllChannelsVisibility} revAllChannelZones={revAllChannelZones} chartDataWithZones={chartDataWithZones} />} />
 
             {/* All Channels Stdev Labels at Lower Bound Midpoint */}
-            <Customized component={CustomRevAllChannelStdevLabels} />
+            <Customized component={(props) => <ImportedCustomRevAllChannelStdevLabels {...props} revAllChannelEnabled={revAllChannelEnabled} revAllChannels={revAllChannels} revAllChannelsVisibility={revAllChannelsVisibility} chartDataWithZones={chartDataWithZones} />} />
 
             {/* Manual Channel Zones as Parallel Lines */}
-            <Customized component={CustomManualChannelZoneLines} />
+            <Customized component={(props) => <ImportedCustomManualChannelZoneLines {...props} manualChannelEnabled={manualChannelEnabled} manualChannels={manualChannels} allManualChannelZones={allManualChannelZones} chartDataWithZones={chartDataWithZones} />} />
 
             {/* Manual Channel Stdev Labels */}
             <Customized component={CustomManualChannelLabels} />
 
             {/* Best Channel Zones as Parallel Lines */}
-            <Customized component={CustomBestChannelZoneLines} />
+            <Customized component={(props) => <ImportedCustomBestChannelZoneLines {...props} bestChannelEnabled={bestChannelEnabled} bestChannels={bestChannels} bestChannelsVisibility={bestChannelsVisibility} bestChannelZones={bestChannelZones} chartDataWithZones={chartDataWithZones} />} />
 
             {/* Best Channel Stdev Labels */}
             <Customized component={CustomBestChannelStdevLabels} />
