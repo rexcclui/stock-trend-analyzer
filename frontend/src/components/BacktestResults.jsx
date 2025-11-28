@@ -269,56 +269,98 @@ function calculateSMA(prices, period) {
   return sma
 }
 
-// Optimize single SMA period by testing different values
+// Optimize single SMA period by testing different values with actual P/L simulation
 function optimizeSMAParams(prices, breakouts) {
   if (!prices || prices.length === 0 || !breakouts || breakouts.length === 0) {
-    return { period: 50, score: 0 }
+    return { period: 50, pl: 0 }
   }
 
-  const smaPeriods = [10, 15, 20, 25, 30, 40, 50, 60, 75, 90, 100, 120, 150, 200]
+  // Helper to calculate P&L for a given SMA period
+  const calculatePLForSMA = (smaPeriod) => {
+    const smaValues = calculateSMA(prices, smaPeriod)
 
-  let bestSMA = 50 // Default
-  let bestScore = -Infinity
-
-  for (const period of smaPeriods) {
-    // Calculate SMA
-    const sma = calculateSMA(prices, period)
-
-    // Score based on how often breakouts occur when price is above SMA
-    let score = 0
-
-    for (const breakout of breakouts) {
-      const breakoutIndex = prices.findIndex(p => p.date === breakout.date)
-      if (breakoutIndex === -1) continue
-
-      const price = prices[breakoutIndex].close
-      const smaValue = sma[breakoutIndex]
-
-      if (smaValue === null) continue
-
-      // Award points for being above SMA at breakout (aligned trend)
-      if (price > smaValue) {
-        const abovePercent = (price - smaValue) / smaValue
-        score += abovePercent * breakout.weightDiff * 100
+    // Build a map of date to SMA value
+    const dateToSMA = new Map()
+    prices.forEach((p, idx) => {
+      if (smaValues[idx] !== null) {
+        dateToSMA.set(p.date, smaValues[idx])
       }
+    })
 
-      // Check potential gain after breakout (next 10 days)
-      const futureIndex = Math.min(breakoutIndex + 10, prices.length - 1)
-      const futurePrice = prices[futureIndex].close
-      const gain = (futurePrice - price) / price
+    // Helper to get SMA slope between two dates
+    const getSMASlope = (currentDate, prevDate) => {
+      const currentSMA = dateToSMA.get(currentDate)
+      const prevSMA = dateToSMA.get(prevDate)
+      if (currentSMA !== undefined && prevSMA !== undefined) {
+        return currentSMA - prevSMA
+      }
+      return null
+    }
 
-      if (gain > 0) {
-        score += gain * 100 // Bonus for profitable breakouts
+    const breakoutDates = new Set(breakouts.map(b => b.date))
+    const trades = []
+    let isHolding = false
+    let buyPrice = null
+
+    for (let i = 0; i < prices.length; i++) {
+      const currentDate = prices[i].date
+      const currentPrice = prices[i].close
+
+      // Buy on breakout
+      if (breakoutDates.has(currentDate) && !isHolding) {
+        isHolding = true
+        buyPrice = currentPrice
+      }
+      // Sell when SMA slope turns negative
+      else if (isHolding && i > 0) {
+        const prevDate = prices[i - 1].date
+        const slope = getSMASlope(currentDate, prevDate)
+
+        if (slope !== null && slope < 0) {
+          const sellPrice = currentPrice
+          const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
+          trades.push({ plPercent })
+          isHolding = false
+          buyPrice = null
+        }
       }
     }
 
-    if (score > bestScore) {
-      bestScore = score
+    // If still holding, close at end
+    if (isHolding) {
+      const currentPrice = prices[prices.length - 1].close
+      const plPercent = ((currentPrice - buyPrice) / buyPrice) * 100
+      trades.push({ plPercent, isOpen: true })
+    }
+
+    const totalPL = trades.reduce((sum, trade) => sum + trade.plPercent, 0)
+    return totalPL
+  }
+
+  // Test SMA values with proper increments (same as chart simulation)
+  const testValues = []
+  for (let val = 3; val <= 200;) {
+    testValues.push(val)
+    if (val <= 10) val += 1
+    else if (val <= 20) val += 2
+    else if (val <= 40) val += 3
+    else if (val <= 50) val += 4
+    else if (val <= 100) val += 5
+    else val += 10
+  }
+
+  let bestSMA = 50 // Default
+  let bestPL = -Infinity
+
+  for (const period of testValues) {
+    const pl = calculatePLForSMA(period)
+    if (pl > bestPL) {
+      bestPL = pl
       bestSMA = period
     }
   }
 
-  return { period: bestSMA, score: bestScore }
+  return { period: bestSMA, pl: bestPL }
 }
 
 function BacktestResults({ onStockSelect }) {
