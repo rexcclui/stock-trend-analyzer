@@ -13,7 +13,9 @@ export { CustomThirdVolZoneLine } from './CustomThirdVolZoneLine'
 export { CustomRevAllChannelZoneLines } from './CustomRevAllChannelZoneLines'
 export { CustomRevAllChannelStdevLabels } from './CustomRevAllChannelStdevLabels'
 export { CustomManualChannelZoneLines } from './CustomManualChannelZoneLines'
+export { CustomManualChannelLabels } from './CustomManualChannelLabels'
 export { CustomBestChannelZoneLines } from './CustomBestChannelZoneLines'
+export { CustomBestChannelStdevLabels } from './CustomBestChannelStdevLabels'
 
 // Note: Additional components to be extracted later:
 // - CustomLegend

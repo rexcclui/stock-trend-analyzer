@@ -14,7 +14,9 @@ import {
   CustomRevAllChannelZoneLines as ImportedCustomRevAllChannelZoneLines,
   CustomRevAllChannelStdevLabels as ImportedCustomRevAllChannelStdevLabels,
   CustomManualChannelZoneLines as ImportedCustomManualChannelZoneLines,
-  CustomBestChannelZoneLines as ImportedCustomBestChannelZoneLines
+  CustomManualChannelLabels as ImportedCustomManualChannelLabels,
+  CustomBestChannelZoneLines as ImportedCustomBestChannelZoneLines,
+  CustomBestChannelStdevLabels as ImportedCustomBestChannelStdevLabels
 } from './PriceChart/components'
 
 function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete }) {
@@ -4328,176 +4330,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     )
   }
 
-  // Custom component to render stdev labels beneath middle of lower bound slope for manual channels
-  const CustomManualChannelLabels = (props) => {
-    if (!manualChannelEnabled || manualChannels.length === 0) return null
-
-    const { xAxisMap, yAxisMap } = props
-    const xAxis = xAxisMap?.[0]
-    const yAxis = yAxisMap?.[0]
-
-    if (!xAxis || !yAxis) {
-      return null
-    }
-
-    const channelColors = [
-      '#22c55e', // Green
-      '#14b8a6', // Teal
-      '#06b6d4', // Cyan
-      '#84cc16', // Lime
-      '#10b981', // Emerald
-    ]
-
-    return (
-      <g>
-        {manualChannels.map((channel, channelIndex) => {
-          // Find the middle point of the lower bound line
-          const midIndex = Math.floor((channel.startIndex + channel.endIndex) / 2)
-
-          // IMPORTANT: channel indices are in displayPrices space (oldest to newest)
-          // But chartData is REVERSED (newest to oldest), so we need to convert
-          const totalDataLength = displayPrices.length
-          const midIndexReversed = totalDataLength - 1 - midIndex
-
-          // Now adjust for zoom offset - chartDataWithZones is sliced from zoomRange.start
-          const adjustedIndex = midIndexReversed - zoomRange.start
-
-          // Check if the midpoint is within the visible range
-          if (adjustedIndex < 0 || adjustedIndex >= chartDataWithZones.length) {
-            return null
-          }
-
-          // Get the data point at the middle
-          const midPoint = chartDataWithZones[adjustedIndex]
-          if (!midPoint) {
-            return null
-          }
-
-          const lowerValue = midPoint[`manualChannel${channelIndex}Lower`]
-          if (lowerValue === undefined) {
-            return null
-          }
-
-          const x = xAxis.scale(midPoint.date)
-          const y = yAxis.scale(lowerValue)
-
-          if (x === undefined || y === undefined) {
-            return null
-          }
-
-          const color = channelColors[channelIndex % channelColors.length]
-          const stdevText = `${channel.optimalStdevMult.toFixed(2)}σ`
-
-          return (
-            <g key={`manual-channel-label-${channelIndex}`}>
-              {/* Background rectangle for better readability */}
-              <rect
-                x={x - 20}
-                y={y + 5}
-                width={40}
-                height={16}
-                fill="rgba(15, 23, 42, 0.9)"
-                stroke={color}
-                strokeWidth={1}
-                rx={3}
-              />
-              {/* Stdev label */}
-              <text
-                x={x}
-                y={y + 15}
-                fill={color}
-                fontSize="11"
-                fontWeight="700"
-                textAnchor="middle"
-                dominantBaseline="middle"
-              >
-                {stdevText}
-              </text>
-            </g>
-          )
-        })}
-      </g>
-    )
-  }
-
-  // Custom component to render stdev labels at midpoint of Best Channel lower bounds
-  const CustomBestChannelStdevLabels = (props) => {
-    if (!bestChannelEnabled || bestChannels.length === 0) return null
-
-    const { xAxisMap, yAxisMap } = props
-    const xAxis = xAxisMap?.[0]
-    const yAxis = yAxisMap?.[0]
-
-    if (!xAxis || !yAxis) return null
-
-    // Color palette matching best channels
-    const channelColors = [
-      '#f59e0b',  // Amber
-      '#f97316',  // Orange
-      '#eab308',  // Yellow
-      '#fb923c',  // Light Orange
-      '#fbbf24',  // Light Amber
-    ]
-
-    return (
-      <g>
-        {bestChannels.map((channel, channelIndex) => {
-          const isVisible = bestChannelsVisibility[channelIndex] !== false
-          if (!isVisible) return null
-
-          // Find all points in chartDataWithZones that have this channel's data
-          const pointsWithChannel = chartDataWithZones
-            .map((point, idx) => ({ point, idx }))
-            .filter(({ point }) => point[`bestChannel${channelIndex}Lower`] !== undefined)
-
-          if (pointsWithChannel.length === 0) return null
-
-          // Find the midpoint among visible points with this channel
-          const midIndex = Math.floor(pointsWithChannel.length / 2)
-          const { point: midPoint } = pointsWithChannel[midIndex]
-
-          const x = xAxis.scale(midPoint.date)
-          const y = yAxis.scale(midPoint[`bestChannel${channelIndex}Lower`])
-
-          if (x === undefined || y === undefined) return null
-
-          const color = channelColors[channelIndex % channelColors.length]
-          const stdevText = `${channel.stdevMultiplier.toFixed(2)}σ`
-          const percentText = channel.percentInside !== undefined
-            ? `${channel.percentInside.toFixed(0)}%`
-            : ''
-
-          return (
-            <g key={`best-channel-label-${channelIndex}`}>
-              {/* Background rectangle for label - positioned under bottom slope */}
-              <rect
-                x={x - 30}
-                y={y + 8}
-                width={60}
-                height={16}
-                fill="rgba(15, 23, 42, 0.9)"
-                stroke={color}
-                strokeWidth={1}
-                rx={3}
-              />
-              {/* Stdev and percentage label under bottom slope midpoint */}
-              <text
-                x={x}
-                y={y + 18}
-                fill={color}
-                fontSize="11"
-                fontWeight="700"
-                textAnchor="middle"
-                dominantBaseline="middle"
-              >
-                {stdevText} {percentText}
-              </text>
-            </g>
-          )
-        })}
-      </g>
-    )
-  }
 
   // Custom component to render volume profile horizontal bars (supports multiple profiles)
   const CustomVolumeProfile = (props) => {
@@ -5389,13 +5221,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             <Customized component={(props) => <ImportedCustomManualChannelZoneLines {...props} manualChannelEnabled={manualChannelEnabled} manualChannels={manualChannels} allManualChannelZones={allManualChannelZones} chartDataWithZones={chartDataWithZones} />} />
 
             {/* Manual Channel Stdev Labels */}
-            <Customized component={CustomManualChannelLabels} />
+            <Customized component={(props) => <ImportedCustomManualChannelLabels {...props} manualChannelEnabled={manualChannelEnabled} manualChannels={manualChannels} displayPrices={displayPrices} chartDataWithZones={chartDataWithZones} zoomRange={zoomRange} />} />
 
             {/* Best Channel Zones as Parallel Lines */}
             <Customized component={(props) => <ImportedCustomBestChannelZoneLines {...props} bestChannelEnabled={bestChannelEnabled} bestChannels={bestChannels} bestChannelsVisibility={bestChannelsVisibility} bestChannelZones={bestChannelZones} chartDataWithZones={chartDataWithZones} />} />
 
             {/* Best Channel Stdev Labels */}
-            <Customized component={CustomBestChannelStdevLabels} />
+            <Customized component={(props) => <ImportedCustomBestChannelStdevLabels {...props} bestChannelEnabled={bestChannelEnabled} bestChannels={bestChannels} bestChannelsVisibility={bestChannelsVisibility} chartDataWithZones={chartDataWithZones} />} />
 
             {/* Volume Profile Horizontal Bars */}
             <Customized component={CustomVolumeProfile} />
