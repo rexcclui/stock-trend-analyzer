@@ -281,16 +281,18 @@ function BacktestResults({ onStockSelect }) {
         try {
           // Fetch price data
           const cacheKey = symbol
-          let priceData = apiCache.get(cacheKey, days)
+          let cachedData = apiCache.get(cacheKey, days)
+          let priceData
 
-          if (!priceData) {
+          if (!cachedData) {
             const response = await axios.get(joinUrl(API_URL, '/analyze'), {
               params: { symbol, days }
             })
+            // Cache the complete response data (prices, indicators, signals)
+            apiCache.set(cacheKey, days, response.data)
             priceData = response.data.prices
-            apiCache.set(cacheKey, days, { prices: priceData })
           } else {
-            priceData = priceData.prices
+            priceData = cachedData.prices
           }
 
           if (!priceData || priceData.length === 0) {
