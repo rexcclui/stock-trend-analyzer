@@ -2279,6 +2279,19 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
       // Only detect new breakouts if NOT currently in a breakout state
       if (!isInBreakout && currentZoneIdx > 0) {
+        // Verify price is moving UP by comparing with previous slot
+        // Can't have an "up breakout" if price is falling
+        if (i > 0) {
+          const previousSlot = slots[i - 1]
+          if (previousSlot) {
+            const previousPrice = previousSlot.currentPrice
+            // Skip if price is not moving up
+            if (currentPrice <= previousPrice) {
+              continue
+            }
+          }
+        }
+
         // Look up to 5 zones below and find the zone with MAXIMUM volume weight
         // This identifies the strongest support/resistance level to break through
         const lookbackDepth = Math.min(5, currentZoneIdx) // Check up to 5 zones or until start
