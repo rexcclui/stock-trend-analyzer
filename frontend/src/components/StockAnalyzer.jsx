@@ -239,8 +239,10 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
           if (hasOptimalParams) {
             console.log('[Chart Setup] Creating chart with optimal params:', params)
           }
-          const defaultSMAs = hasOptimalParams ? [20, 50, 200] : []
-          const defaultSMAVisibility = hasOptimalParams ? { 20: true, 50: true, 200: true } : {}
+          const defaultSMAs = hasOptimalParams ? params.smaPeriods : []
+          const defaultSMAVisibility = hasOptimalParams
+            ? params.smaPeriods.reduce((acc, period) => ({ ...acc, [period]: true }), {})
+            : {}
 
           // Create new chart
           const newChart = {

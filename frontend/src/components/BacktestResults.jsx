@@ -255,6 +255,82 @@ function optimizeVolPrfV2Params(prices) {
   return bestParams
 }
 
+// Calculate SMA for given period
+function calculateSMA(prices, period) {
+  const sma = []
+  for (let i = 0; i < prices.length; i++) {
+    if (i < period - 1) {
+      sma.push(null)
+    } else {
+      const sum = prices.slice(i - period + 1, i + 1).reduce((acc, p) => acc + p.close, 0)
+      sma.push(sum / period)
+    }
+  }
+  return sma
+}
+
+// Optimize SMA periods by testing combinations
+function optimizeSMAParams(prices, breakouts) {
+  if (!prices || prices.length === 0 || !breakouts || breakouts.length === 0) {
+    return { periods: [20, 50, 200], score: 0 }
+  }
+
+  const smaCombinations = [
+    [10, 20, 50],
+    [20, 50, 100],
+    [20, 50, 200],
+    [30, 60, 120],
+    [50, 100, 200],
+    [15, 45, 90],
+    [25, 75, 150],
+  ]
+
+  let bestSMAs = [20, 50, 200] // Default
+  let bestScore = -Infinity
+
+  for (const periods of smaCombinations) {
+    // Calculate SMAs
+    const smas = periods.map(period => calculateSMA(prices, period))
+
+    // Score based on how often breakouts occur when price is above SMAs
+    let score = 0
+
+    for (const breakout of breakouts) {
+      const breakoutIndex = prices.findIndex(p => p.date === breakout.date)
+      if (breakoutIndex === -1) continue
+
+      const price = prices[breakoutIndex].close
+      let aboveCount = 0
+
+      // Check if price is above each SMA at breakout
+      for (let i = 0; i < smas.length; i++) {
+        if (smas[i][breakoutIndex] !== null && price > smas[i][breakoutIndex]) {
+          aboveCount++
+        }
+      }
+
+      // Award points for being above SMAs (aligned trend)
+      score += aboveCount * breakout.weightDiff
+
+      // Check potential gain after breakout (next 10 days)
+      const futureIndex = Math.min(breakoutIndex + 10, prices.length - 1)
+      const futurePrice = prices[futureIndex].close
+      const gain = (futurePrice - price) / price
+
+      if (gain > 0) {
+        score += gain * 100 // Bonus for profitable breakouts
+      }
+    }
+
+    if (score > bestScore) {
+      bestScore = score
+      bestSMAs = periods
+    }
+  }
+
+  return { periods: bestSMAs, score: bestScore }
+}
+
 function BacktestResults({ onStockSelect }) {
   const [symbols, setSymbols] = useState('')
   const [days, setDays] = useState('1825') // Default to 5Y
@@ -305,6 +381,9 @@ function BacktestResults({ onStockSelect }) {
           // Calculate Vol Prf V2 breakouts with optimal parameters
           const breakouts = calculateVolPrfV2Breakouts(priceData, optimalParams)
 
+          // Optimize SMA parameters based on breakouts
+          const optimalSMAs = optimizeSMAParams(priceData, breakouts)
+
           // Check if breakout in last 10 days
           if (hasRecentBreakout(breakouts, priceData, 10)) {
             const latestBreakout = getLatestBreakout(breakouts)
@@ -316,7 +395,8 @@ function BacktestResults({ onStockSelect }) {
               latestBreakout,
               latestPrice,
               priceData,
-              optimalParams  // Store optimal parameters
+              optimalParams,  // Store optimal Vol Prf V2 parameters
+              optimalSMAs     // Store optimal SMA periods
             })
           }
         } catch (err) {
@@ -483,7 +563,7 @@ function BacktestResults({ onStockSelect }) {
                     return (
                       <tr
                         key={index}
-                        onClick={() => onStockSelect && onStockSelect(result.symbol, result.optimalParams)}
+                        onClick={() => onStockSelect && onStockSelect(result.symbol, { ...result.optimalParams, smaPeriods: result.optimalSMAs.periods })}
                         className="hover:bg-slate-700 cursor-pointer transition-colors"
                         title="Click to view in Technical Analysis with optimized parameters"
                       >
@@ -523,6 +603,7 @@ function BacktestResults({ onStockSelect }) {
                           <div className="space-y-0.5">
                             <div>Th:{(result.optimalParams.breakoutThreshold * 100).toFixed(0)}%</div>
                             <div>LB:{result.optimalParams.lookbackZones}</div>
+                            <div className="text-blue-400 font-medium">SMA:{result.optimalSMAs.periods.join('/')}</div>
                           </div>
                         </td>
                       </tr>
