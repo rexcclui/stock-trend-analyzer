@@ -2,10 +2,14 @@ import React from 'react'
 import { getVolumeColor } from '../utils/volumeColors'
 
 /**
- * Custom component to render colored resistance zone based on volume percentage
- * Color scheme: Red (low volume) > Green (medium) > Blue (high volume)
+ * Custom component to render third volume zone line with colored segments
+ * @param {Object} props - Component props
+ * @param {Array} props.chartDataWithZones - Chart data with zone information
+ * @param {boolean} props.resLnEnabled - Whether resistance lines are enabled
+ * @param {Object} props.xAxisMap - X-axis mapping from recharts
+ * @param {Object} props.yAxisMap - Y-axis mapping from recharts
  */
-export const CustomResistanceLine = ({ chartDataWithZones, resLnEnabled, xAxisMap, yAxisMap }) => {
+export const CustomThirdVolZoneLine = ({ chartDataWithZones, resLnEnabled, xAxisMap, yAxisMap }) => {
   if (!resLnEnabled) return null
 
   const xAxis = xAxisMap?.[0]
@@ -18,12 +22,12 @@ export const CustomResistanceLine = ({ chartDataWithZones, resLnEnabled, xAxisMa
   let currentSegment = null
 
   chartDataWithZones.forEach((point, index) => {
-    if (!point.highVolZone || point.volumePercent === undefined || point.highVolZoneLower === undefined || point.highVolZoneUpper === undefined) return
+    if (!point.thirdVolZone || point.thirdVolPercent === undefined || point.thirdVolZoneLower === undefined || point.thirdVolZoneUpper === undefined) return
 
     const x = xAxis.scale(point.date)
-    const yLower = yAxis.scale(point.highVolZoneLower)
-    const yUpper = yAxis.scale(point.highVolZoneUpper)
-    const color = getVolumeColor(point.volumePercent)
+    const yLower = yAxis.scale(point.thirdVolZoneLower)
+    const yUpper = yAxis.scale(point.thirdVolZoneUpper)
+    const color = getVolumeColor(point.thirdVolPercent)
 
     if (!currentSegment || currentSegment.color !== color) {
       // Start a new segment
@@ -53,31 +57,26 @@ export const CustomResistanceLine = ({ chartDataWithZones, resLnEnabled, xAxisMa
         if (segment.points.length < 2) return null
 
         // Create path for this segment (filled area)
-        // Move to first point upper
         let pathData = `M ${segment.points[0].x} ${segment.points[0].yUpper}`
 
-        // Draw line along upper edge
         for (let i = 1; i < segment.points.length; i++) {
           pathData += ` L ${segment.points[i].x} ${segment.points[i].yUpper}`
         }
 
-        // Draw line down to last point lower
         pathData += ` L ${segment.points[segment.points.length - 1].x} ${segment.points[segment.points.length - 1].yLower}`
 
-        // Draw line along lower edge (backwards)
         for (let i = segment.points.length - 2; i >= 0; i--) {
           pathData += ` L ${segment.points[i].x} ${segment.points[i].yLower}`
         }
 
-        // Close path
         pathData += ' Z'
 
         return (
           <path
-            key={`res-ln-segment-${segmentIndex}`}
+            key={`third-vol-zone-segment-${segmentIndex}`}
             d={pathData}
             fill={segment.color}
-            fillOpacity={0.35}
+            fillOpacity={0.25}
             stroke="none"
           />
         )
