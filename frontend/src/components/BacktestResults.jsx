@@ -237,7 +237,7 @@ function BacktestResults({ onStockSelect }) {
           let priceData = apiCache.get(cacheKey, days)
 
           if (!priceData) {
-            const response = await axios.get(joinUrl(API_URL, '/prices'), {
+            const response = await axios.get(joinUrl(API_URL, '/analyze'), {
               params: { symbol, days }
             })
             priceData = response.data.prices
