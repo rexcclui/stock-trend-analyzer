@@ -2235,7 +2235,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       })
     }
 
-    // Detect up breakouts: current zone has <5% weight compared to next lower price zone
+    // Detect up breakouts: current zone has <6% weight compared to MAX volume zone within 5 zones below
     const breakouts = []
 
     for (let i = 0; i < slots.length; i++) {
@@ -2254,23 +2254,34 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const currentZone = currentSlot.priceZones[currentZoneIdx]
       const currentWeight = currentZone.volumeWeight
 
-      // Find the next lower price zone (zone below current zone)
-      // Zones are ordered by price, so the zone at currentZoneIdx - 1 is the lower zone
+      // Look up to 5 zones below and find the zone with MAXIMUM volume weight
+      // This identifies the strongest support/resistance level to break through
       if (currentZoneIdx > 0) {
-        const lowerZone = currentSlot.priceZones[currentZoneIdx - 1]
-        const lowerWeight = lowerZone.volumeWeight
+        const lookbackDepth = Math.min(5, currentZoneIdx) // Check up to 5 zones or until start
+        let maxLowerWeight = 0
+        let maxZoneIdx = -1
 
-        // Check if current zone has less than 5% weight compared to lower zone
-        // This means price is breaking up into a lower volume area
-        if (currentWeight < lowerWeight && lowerWeight - currentWeight >= 0.05) {
+        for (let lookback = 1; lookback <= lookbackDepth; lookback++) {
+          const lowerZone = currentSlot.priceZones[currentZoneIdx - lookback]
+          if (lowerZone.volumeWeight > maxLowerWeight) {
+            maxLowerWeight = lowerZone.volumeWeight
+            maxZoneIdx = currentZoneIdx - lookback
+          }
+        }
+
+        // Check if current zone has at least 6% less weight than the strongest zone below
+        // This means price is breaking up through significant support into a lower volume area
+        if (currentWeight < maxLowerWeight && maxLowerWeight - currentWeight >= 0.06) {
           breakouts.push({
             slotIdx: i,
             date: currentSlot.endDate,
             price: currentPrice,
             isUpBreak: true,
             currentWeight: currentWeight,
-            lowerWeight: lowerWeight,
-            weightDiff: lowerWeight - currentWeight
+            lowerWeight: maxLowerWeight,
+            weightDiff: maxLowerWeight - currentWeight,
+            maxZoneIdx: maxZoneIdx, // Track which zone had the max volume
+            zonesChecked: lookbackDepth // How many zones we looked at
           })
         }
       }
