@@ -1426,7 +1426,7 @@ function StockAnalyzer() {
                   </button>
                 </div>
 
-                <div className="flex items-center justify-between mb-4 pr-24">
+                <div className="flex items-center justify-between pr-24">
                   <div className="flex items-center gap-3">
                     <h3 className="text-lg font-semibold text-slate-100">{chart.symbol}</h3>
                     {/* Mobile controls toggle button */}
