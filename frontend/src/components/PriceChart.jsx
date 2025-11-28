@@ -4209,6 +4209,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         <div className="flex items-center justify-center h-full text-slate-400">
           <div className="text-center">
             <div className="text-lg">Loading chart data...</div>
+            <div className="text-xs mt-2 opacity-50">
+              Debug: prices={prices?.length || 0}, indicators={indicators?.length || 0}
+            </div>
           </div>
         </div>
       ) : (
