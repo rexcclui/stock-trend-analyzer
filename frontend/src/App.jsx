@@ -49,8 +49,13 @@ function App() {
 
           {/* Tab Content */}
           <div className="p-0 md:p-6">
-            {activeTab === 'analyze' && <StockAnalyzer />}
-            {activeTab === 'backtest' && <BacktestResults />}
+            {/* Keep both components mounted to preserve state when switching tabs */}
+            <div style={{ display: activeTab === 'analyze' ? 'block' : 'none' }}>
+              <StockAnalyzer />
+            </div>
+            <div style={{ display: activeTab === 'backtest' ? 'block' : 'none' }}>
+              <BacktestResults />
+            </div>
           </div>
         </div>
 
