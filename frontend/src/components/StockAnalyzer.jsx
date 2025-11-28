@@ -1405,7 +1405,7 @@ function StockAnalyzer() {
           {charts.map((chart) => (
             <div key={chart.id} className="space-y-6">
               {/* Price Chart */}
-              <div className="bg-slate-800 p-2 md:p-6 pr-0 rounded-lg border-0 md:border md:border-slate-700 relative">
+              <div className="bg-slate-800 relative">
                 {/* Collapse and Close buttons */}
                 <div className="absolute top-4 right-4 flex gap-2">
                   <button
