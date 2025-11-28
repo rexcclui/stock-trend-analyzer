@@ -269,30 +269,22 @@ function calculateSMA(prices, period) {
   return sma
 }
 
-// Optimize SMA periods by testing combinations
+// Optimize single SMA period by testing different values
 function optimizeSMAParams(prices, breakouts) {
   if (!prices || prices.length === 0 || !breakouts || breakouts.length === 0) {
-    return { periods: [20, 50, 200], score: 0 }
+    return { period: 50, score: 0 }
   }
 
-  const smaCombinations = [
-    [10, 20, 50],
-    [20, 50, 100],
-    [20, 50, 200],
-    [30, 60, 120],
-    [50, 100, 200],
-    [15, 45, 90],
-    [25, 75, 150],
-  ]
+  const smaPeriods = [10, 15, 20, 25, 30, 40, 50, 60, 75, 90, 100, 120, 150, 200]
 
-  let bestSMAs = [20, 50, 200] // Default
+  let bestSMA = 50 // Default
   let bestScore = -Infinity
 
-  for (const periods of smaCombinations) {
-    // Calculate SMAs
-    const smas = periods.map(period => calculateSMA(prices, period))
+  for (const period of smaPeriods) {
+    // Calculate SMA
+    const sma = calculateSMA(prices, period)
 
-    // Score based on how often breakouts occur when price is above SMAs
+    // Score based on how often breakouts occur when price is above SMA
     let score = 0
 
     for (const breakout of breakouts) {
@@ -300,17 +292,15 @@ function optimizeSMAParams(prices, breakouts) {
       if (breakoutIndex === -1) continue
 
       const price = prices[breakoutIndex].close
-      let aboveCount = 0
+      const smaValue = sma[breakoutIndex]
 
-      // Check if price is above each SMA at breakout
-      for (let i = 0; i < smas.length; i++) {
-        if (smas[i][breakoutIndex] !== null && price > smas[i][breakoutIndex]) {
-          aboveCount++
-        }
+      if (smaValue === null) continue
+
+      // Award points for being above SMA at breakout (aligned trend)
+      if (price > smaValue) {
+        const abovePercent = (price - smaValue) / smaValue
+        score += abovePercent * breakout.weightDiff * 100
       }
-
-      // Award points for being above SMAs (aligned trend)
-      score += aboveCount * breakout.weightDiff
 
       // Check potential gain after breakout (next 10 days)
       const futureIndex = Math.min(breakoutIndex + 10, prices.length - 1)
@@ -324,11 +314,11 @@ function optimizeSMAParams(prices, breakouts) {
 
     if (score > bestScore) {
       bestScore = score
-      bestSMAs = periods
+      bestSMA = period
     }
   }
 
-  return { periods: bestSMAs, score: bestScore }
+  return { period: bestSMA, score: bestScore }
 }
 
 function BacktestResults({ onStockSelect }) {
@@ -563,7 +553,7 @@ function BacktestResults({ onStockSelect }) {
                     return (
                       <tr
                         key={index}
-                        onClick={() => onStockSelect && onStockSelect(result.symbol, { ...result.optimalParams, smaPeriods: result.optimalSMAs.periods })}
+                        onClick={() => onStockSelect && onStockSelect(result.symbol, { ...result.optimalParams, smaPeriods: [result.optimalSMAs.period] })}
                         className="hover:bg-slate-700 cursor-pointer transition-colors"
                         title="Click to view in Technical Analysis with optimized parameters"
                       >
@@ -603,7 +593,7 @@ function BacktestResults({ onStockSelect }) {
                           <div className="space-y-0.5">
                             <div>Th:{(result.optimalParams.breakoutThreshold * 100).toFixed(0)}%</div>
                             <div>LB:{result.optimalParams.lookbackZones}</div>
-                            <div className="text-blue-400 font-medium">SMA:{result.optimalSMAs.periods.join('/')}</div>
+                            <div className="text-blue-400 font-medium">SMA:{result.optimalSMAs.period}</div>
                           </div>
                         </td>
                       </tr>
