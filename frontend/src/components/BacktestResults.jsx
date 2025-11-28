@@ -636,6 +636,9 @@ function BacktestResults({ onStockSelect }) {
                             <div>Th:{(result.optimalParams.breakoutThreshold * 100).toFixed(0)}%</div>
                             <div>LB:{result.optimalParams.lookbackZones}</div>
                             <div className="text-blue-400 font-medium">SMA:{result.optimalSMAs.period}</div>
+                            <div className={`font-bold ${result.optimalSMAs.pl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              P/L:{result.optimalSMAs.pl.toFixed(1)}%
+                            </div>
                           </div>
                         </td>
                       </tr>
