@@ -138,13 +138,12 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
   useEffect(() => {
     if (selectedSymbol && selectedSymbol.trim()) {
       setSymbol(selectedSymbol)
-      // Store optimal parameters if provided and set days to 5Y to match backtest
+      // Set days to 5Y to match backtest if params provided
       if (selectedParams) {
-        setOptimalParams(selectedParams)
         setDays('1825')  // 5 years to match backtest period
       }
-      // Trigger analysis for the selected symbol
-      analyzeStock(selectedSymbol)
+      // Trigger analysis for the selected symbol, passing params directly
+      analyzeStock(selectedSymbol, selectedParams)
     }
   }, [selectedSymbol, selectedParams])
   const [slopeChannelDialogOpen, setSlopeChannelDialogOpen] = useState(false)
@@ -179,7 +178,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     localStorage.setItem(STOCK_HISTORY_KEY, JSON.stringify(updatedHistory))
   }
 
-  const analyzeStock = async (symbolToAnalyze = null) => {
+  const analyzeStock = async (symbolToAnalyze = null, params = null) => {
     // Check if symbolToAnalyze is a string (not an event object)
     const targetSymbol = (typeof symbolToAnalyze === 'string') ? symbolToAnalyze : symbol
 
@@ -236,7 +235,10 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
           saveToHistory(upperSymbol)
 
           // Check if we have optimal parameters from backtest results
-          const hasOptimalParams = optimalParams !== null
+          const hasOptimalParams = params !== null
+          if (hasOptimalParams) {
+            console.log('[Chart Setup] Creating chart with optimal params:', params)
+          }
           const defaultSMAs = hasOptimalParams ? [20, 50, 200] : []
           const defaultSMAVisibility = hasOptimalParams ? { 20: true, 50: true, 200: true } : {}
 
@@ -332,11 +334,6 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
       // Clear input if not clicked from history
       if (!symbolToAnalyze) {
         setSymbol('')
-      }
-
-      // Clear optimal params after using them
-      if (optimalParams !== null) {
-        setOptimalParams(null)
       }
     } catch (err) {
       setError(err.message || 'Failed to analyze stock. Please check the symbol and try again.')
