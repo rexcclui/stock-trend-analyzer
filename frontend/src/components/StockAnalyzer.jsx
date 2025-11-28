@@ -122,7 +122,7 @@ function getFetchPeriod(displayDays) {
   return '3650'
 }
 
-function StockAnalyzer({ selectedSymbol }) {
+function StockAnalyzer({ selectedSymbol, selectedParams }) {
   const [symbol, setSymbol] = useState('')
   const [days, setDays] = useState('365')
   const [loading, setLoading] = useState(false)
@@ -132,15 +132,20 @@ function StockAnalyzer({ selectedSymbol }) {
   const [stockHistory, setStockHistory] = useState([])
   const [displayColumns, setDisplayColumns] = useState(1)
   const [chartHeight, setChartHeight] = useState(460) // Increased by 15% from 400
+  const [optimalParams, setOptimalParams] = useState(null)
 
   // Handle external symbol selection (from backtest results)
   useEffect(() => {
     if (selectedSymbol && selectedSymbol.trim()) {
       setSymbol(selectedSymbol)
+      // Store optimal parameters if provided
+      if (selectedParams) {
+        setOptimalParams(selectedParams)
+      }
       // Trigger analysis for the selected symbol
       analyzeStock(selectedSymbol)
     }
-  }, [selectedSymbol])
+  }, [selectedSymbol, selectedParams])
   const [slopeChannelDialogOpen, setSlopeChannelDialogOpen] = useState(false)
   const [editingSlopeChannelChartId, setEditingSlopeChannelChartId] = useState(null)
   const [globalZoomRange, setGlobalZoomRange] = useState({ start: 0, end: null })

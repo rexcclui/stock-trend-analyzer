@@ -7,10 +7,12 @@ import './App.css'
 function App() {
   const [activeTab, setActiveTab] = useState('analyze')
   const [selectedSymbol, setSelectedSymbol] = useState('')
+  const [selectedParams, setSelectedParams] = useState(null)
 
   // Handle clicking on a stock in backtest results
-  const handleStockSelect = (symbol) => {
+  const handleStockSelect = (symbol, optimalParams) => {
     setSelectedSymbol(symbol)
+    setSelectedParams(optimalParams)
     setActiveTab('analyze')
   }
 
@@ -58,7 +60,7 @@ function App() {
           <div className="p-0 md:p-6">
             {/* Keep both components mounted to preserve state when switching tabs */}
             <div style={{ display: activeTab === 'analyze' ? 'block' : 'none' }}>
-              <StockAnalyzer selectedSymbol={selectedSymbol} />
+              <StockAnalyzer selectedSymbol={selectedSymbol} selectedParams={selectedParams} />
             </div>
             <div style={{ display: activeTab === 'backtest' ? 'block' : 'none' }}>
               <BacktestResults onStockSelect={handleStockSelect} />

@@ -17,8 +17,15 @@ function parseStockSymbols(input) {
   return symbols.map(s => s.trim().toUpperCase()).filter(s => s.length > 0)
 }
 
-// Calculate Vol Prf V2 breakouts (extracted from PriceChart.jsx logic)
-function calculateVolPrfV2Breakouts(prices) {
+// Calculate Vol Prf V2 breakouts with configurable parameters
+function calculateVolPrfV2Breakouts(prices, params = {}) {
+  const {
+    breakoutThreshold = 0.06,  // 6%
+    lookbackZones = 5,          // Check 5 zones below
+    resetThreshold = 0.03,      // 3% reaccumulation
+    timeoutSlots = 5            // 5-slot timeout
+  } = params
+
   if (!prices || prices.length === 0) return []
 
   const reversedDisplayPrices = [...prices].reverse()
@@ -103,11 +110,8 @@ function calculateVolPrfV2Breakouts(prices) {
     })
   }
 
-  // Detect breakouts with state-based logic
+  // Detect breakouts with state-based logic using provided parameters
   const breakouts = []
-  const BREAKOUT_THRESHOLD = 0.06
-  const RESET_THRESHOLD = 0.03
-  const TIMEOUT_SLOTS = 5
 
   let isInBreakout = false
   let breakoutZoneWeight = 0
@@ -129,14 +133,14 @@ function calculateVolPrfV2Breakouts(prices) {
     const currentWeight = currentZone.volumeWeight
 
     // Check timeout
-    if (isInBreakout && i - breakoutSlotIdx >= TIMEOUT_SLOTS) {
+    if (isInBreakout && i - breakoutSlotIdx >= timeoutSlots) {
       isInBreakout = false
       breakoutZoneWeight = 0
       breakoutSlotIdx = -1
     }
 
     // Check reset condition
-    if (isInBreakout && currentWeight >= breakoutZoneWeight + RESET_THRESHOLD) {
+    if (isInBreakout && currentWeight >= breakoutZoneWeight + resetThreshold) {
       isInBreakout = false
       breakoutZoneWeight = 0
       breakoutSlotIdx = -1
@@ -155,8 +159,8 @@ function calculateVolPrfV2Breakouts(prices) {
         }
       }
 
-      // Find max volume zone within 5 zones below
-      const lookbackDepth = Math.min(5, currentZoneIdx)
+      // Find max volume zone within N zones below (configurable)
+      const lookbackDepth = Math.min(lookbackZones, currentZoneIdx)
       let maxLowerWeight = 0
       let maxZoneIdx = -1
 
@@ -169,7 +173,7 @@ function calculateVolPrfV2Breakouts(prices) {
       }
 
       // Check breakout condition
-      if (currentWeight < maxLowerWeight && maxLowerWeight - currentWeight >= BREAKOUT_THRESHOLD) {
+      if (currentWeight < maxLowerWeight && maxLowerWeight - currentWeight >= breakoutThreshold) {
         breakouts.push({
           slotIdx: i,
           date: currentSlot.endDate,
@@ -206,6 +210,49 @@ function hasRecentBreakout(breakouts, prices, days = 10) {
 function getLatestBreakout(breakouts) {
   if (!breakouts || breakouts.length === 0) return null
   return breakouts[breakouts.length - 1]
+}
+
+// Optimize Vol Prf V2 parameters by testing combinations
+function optimizeVolPrfV2Params(prices) {
+  if (!prices || prices.length === 0) {
+    return { breakoutThreshold: 0.06, lookbackZones: 5, resetThreshold: 0.03, timeoutSlots: 5, winRate: 0 }
+  }
+
+  const paramCombinations = [
+    // Test different thresholds and lookback zones
+    { breakoutThreshold: 0.05, lookbackZones: 3, resetThreshold: 0.025, timeoutSlots: 5 },
+    { breakoutThreshold: 0.05, lookbackZones: 5, resetThreshold: 0.025, timeoutSlots: 5 },
+    { breakoutThreshold: 0.06, lookbackZones: 4, resetThreshold: 0.03, timeoutSlots: 5 },
+    { breakoutThreshold: 0.06, lookbackZones: 5, resetThreshold: 0.03, timeoutSlots: 5 },  // Default
+    { breakoutThreshold: 0.06, lookbackZones: 6, resetThreshold: 0.03, timeoutSlots: 5 },
+    { breakoutThreshold: 0.07, lookbackZones: 5, resetThreshold: 0.035, timeoutSlots: 5 },
+    { breakoutThreshold: 0.08, lookbackZones: 5, resetThreshold: 0.04, timeoutSlots: 7 },
+  ]
+
+  let bestParams = paramCombinations[3] // Default
+  let bestScore = -Infinity
+
+  for (const params of paramCombinations) {
+    const breakouts = calculateVolPrfV2Breakouts(prices, params)
+
+    if (breakouts.length === 0) continue
+
+    // Simple scoring: more recent breakouts are better
+    const recentBreakouts = breakouts.filter(b => {
+      const daysSince = (new Date(prices[prices.length - 1].date) - new Date(b.date)) / (1000 * 60 * 60 * 24)
+      return daysSince <= 30  // Last 30 days
+    })
+
+    // Score based on number of recent breakouts and strength
+    const score = recentBreakouts.reduce((sum, b) => sum + b.weightDiff, 0)
+
+    if (score > bestScore) {
+      bestScore = score
+      bestParams = { ...params, winRate: (recentBreakouts.length / Math.max(breakouts.length, 1)) * 100 }
+    }
+  }
+
+  return bestParams
 }
 
 function BacktestResults({ onStockSelect }) {
@@ -250,8 +297,11 @@ function BacktestResults({ onStockSelect }) {
             continue
           }
 
-          // Calculate Vol Prf V2 breakouts
-          const breakouts = calculateVolPrfV2Breakouts(priceData)
+          // Optimize Vol Prf V2 parameters for this stock
+          const optimalParams = optimizeVolPrfV2Params(priceData)
+
+          // Calculate Vol Prf V2 breakouts with optimal parameters
+          const breakouts = calculateVolPrfV2Breakouts(priceData, optimalParams)
 
           // Check if breakout in last 10 days
           if (hasRecentBreakout(breakouts, priceData, 10)) {
@@ -263,7 +313,8 @@ function BacktestResults({ onStockSelect }) {
               totalBreakouts: breakouts.length,
               latestBreakout,
               latestPrice,
-              priceData
+              priceData,
+              optimalParams  // Store optimal parameters
             })
           }
         } catch (err) {
@@ -419,6 +470,7 @@ function BacktestResults({ onStockSelect }) {
                     <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Support Vol</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Diff</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Total Signals</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Optimal Params</th>
                   </tr>
                 </thead>
                 <tbody className="bg-slate-800 divide-y divide-slate-700">
@@ -429,9 +481,9 @@ function BacktestResults({ onStockSelect }) {
                     return (
                       <tr
                         key={index}
-                        onClick={() => onStockSelect && onStockSelect(result.symbol)}
+                        onClick={() => onStockSelect && onStockSelect(result.symbol, result.optimalParams)}
                         className="hover:bg-slate-700 cursor-pointer transition-colors"
-                        title="Click to view in Technical Analysis"
+                        title="Click to view in Technical Analysis with optimized parameters"
                       >
                         <td className="px-4 py-3 text-sm font-bold text-blue-400">
                           {result.symbol}
@@ -465,6 +517,12 @@ function BacktestResults({ onStockSelect }) {
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
                           {result.totalBreakouts}
                         </td>
+                        <td className="px-4 py-3 text-xs text-slate-400 text-left">
+                          <div className="space-y-0.5">
+                            <div>Th:{(result.optimalParams.breakoutThreshold * 100).toFixed(0)}%</div>
+                            <div>LB:{result.optimalParams.lookbackZones}</div>
+                          </div>
+                        </td>
                       </tr>
                     )
                   })}
@@ -476,11 +534,13 @@ function BacktestResults({ onStockSelect }) {
           {/* Legend */}
           <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
             <h4 className="text-sm font-semibold text-slate-300 mb-2">Legend</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-slate-400">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-slate-400">
               <div><span className="font-semibold">Vol Weight:</span> Current price zone volume %</div>
-              <div><span className="font-semibold">Support Vol:</span> Max volume zone within 5 zones below</div>
-              <div><span className="font-semibold">Diff:</span> Breakout strength (Support - Current volume)</div>
+              <div><span className="font-semibold">Support Vol:</span> Max volume zone below</div>
+              <div><span className="font-semibold">Diff:</span> Breakout strength</div>
               <div><span className="font-semibold">Days Ago:</span> <span className="text-green-400">Green ≤3d</span>, <span className="text-yellow-400">Yellow ≤7d</span>, Gray &gt;7d</div>
+              <div><span className="font-semibold">Optimal Params:</span> Th=Threshold%, LB=Lookback Zones</div>
+              <div className="col-span-full text-purple-300">💡 Click any row to load stock in chart with optimized parameters</div>
             </div>
           </div>
         </div>
