@@ -2618,13 +2618,20 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
       console.log(`[Simulate] Testing ${testValues.length} SMA values...`)
 
+      const results = []
       for (const smaValue of testValues) {
         const pl = calculatePLForSMA(smaValue)
+        results.push({ sma: smaValue, pl })
         if (pl > bestPL) {
           bestPL = pl
           bestSmaValue = smaValue
         }
       }
+
+      // Show top 10 results
+      const top10 = [...results].sort((a, b) => b.pl - a.pl).slice(0, 10)
+      console.log(`[Simulate] Top 10 SMA values:`)
+      top10.forEach((r, i) => console.log(`  ${i + 1}. SMA ${r.sma}: ${r.pl.toFixed(2)}%`))
 
       console.log(`[Simulate] Best SMA: ${bestSmaValue} with P&L: ${bestPL.toFixed(2)}%`)
 

@@ -371,14 +371,21 @@ function optimizeSMAParams(prices, slots, breakouts) {
 
   let bestSMA = 50 // Default
   let bestPL = -Infinity
+  const results = []
 
   for (const period of testValues) {
     const pl = calculatePLForSMA(period)
+    results.push({ sma: period, pl })
     if (pl > bestPL) {
       bestPL = pl
       bestSMA = period
     }
   }
+
+  // Show top 10 for debugging
+  const top10 = [...results].sort((a, b) => b.pl - a.pl).slice(0, 10)
+  console.log(`[SMA Optimization] Top 10 SMA values:`)
+  top10.forEach((r, i) => console.log(`  ${i + 1}. SMA ${r.sma}: ${r.pl.toFixed(2)}%`))
 
   return { period: bestSMA, pl: bestPL }
 }
