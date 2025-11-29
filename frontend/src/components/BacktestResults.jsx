@@ -414,7 +414,7 @@ function BacktestResults({ onStockSelect }) {
 
     setLoading(true)
     setError(null)
-    setResults([])
+    // Don't clear previous results - we'll merge them
 
     const backtestResults = []
 
@@ -480,7 +480,14 @@ function BacktestResults({ onStockSelect }) {
         }
       }
 
-      setResults(backtestResults)
+      // Merge new results with existing results
+      // Keep existing results for stocks not in the new backtest
+      // Update/replace results for stocks that are in the new backtest
+      setResults(prevResults => {
+        const newSymbols = new Set(backtestResults.map(r => r.symbol))
+        const keptResults = prevResults.filter(r => !newSymbols.has(r.symbol))
+        return [...keptResults, ...backtestResults]
+      })
 
       if (backtestResults.length === 0) {
         setError('No stocks with breakouts in the last 10 days found.')
@@ -563,7 +570,7 @@ function BacktestResults({ onStockSelect }) {
               <option value="1825">5 Years</option>
             </select>
           </div>
-          <div className="flex items-end">
+          <div className="flex items-end gap-2">
             <button
               onClick={runBacktest}
               disabled={loading}
@@ -581,6 +588,16 @@ function BacktestResults({ onStockSelect }) {
                 </>
               )}
             </button>
+            {results.length > 0 && (
+              <button
+                onClick={() => setResults([])}
+                disabled={loading}
+                className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                title="Clear all results"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
         </div>
 
