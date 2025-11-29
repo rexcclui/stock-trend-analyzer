@@ -2359,12 +2359,22 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // Create a map of breakout dates for quick lookup
     const breakoutDates = new Set(volumeProfileV2Breakouts.map(b => b.date))
 
-    // Create date to SMA map from chartData (which has SMA values)
-    // Use whichever SMA is enabled (prefer smallest period)
+    // Calculate SMA on SLOTS (not daily prices!) to match simulation logic
+    const smaValues = []
+    for (let i = 0; i < volumeProfileV2Data.length; i++) {
+      if (i < smaPeriod - 1) {
+        smaValues.push(null)
+      } else {
+        const sum = volumeProfileV2Data.slice(i - smaPeriod + 1, i + 1).reduce((acc, s) => acc + s.currentPrice, 0)
+        smaValues.push(sum / smaPeriod)
+      }
+    }
+
+    // Create date to SMA map from calculated slot-based SMAs
     const dateToSMA = new Map()
-    chartData.forEach(d => {
-      if (d[smaKey] !== undefined && d[smaKey] !== null) {
-        dateToSMA.set(d.date, d[smaKey])
+    volumeProfileV2Data.forEach((slot, idx) => {
+      if (smaValues[idx] !== null) {
+        dateToSMA.set(slot.endDate, smaValues[idx])
       }
     })
 
