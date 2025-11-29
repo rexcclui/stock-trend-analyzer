@@ -233,7 +233,7 @@ function optimizeVolPrfV2Params(prices) {
   let bestScore = -Infinity
 
   for (const params of paramCombinations) {
-    const breakouts = calculateVolPrfV2Breakouts(prices, params)
+    const { breakouts } = calculateVolPrfV2Breakouts(prices, params)
 
     if (breakouts.length === 0) continue
 
