@@ -192,7 +192,7 @@ function calculateVolPrfV2Breakouts(prices, params = {}) {
     }
   }
 
-  return breakouts
+  return { slots, breakouts }
 }
 
 // Check if breakout occurred in last N days
@@ -270,20 +270,34 @@ function calculateSMA(prices, period) {
 }
 
 // Optimize single SMA period by testing different values with actual P/L simulation
-function optimizeSMAParams(prices, breakouts) {
-  if (!prices || prices.length === 0 || !breakouts || breakouts.length === 0) {
+function optimizeSMAParams(prices, slots, breakouts) {
+  if (!slots || slots.length === 0 || !breakouts || breakouts.length === 0) {
     return { period: 50, pl: 0 }
   }
 
-  // Helper to calculate P&L for a given SMA period
+  // Helper to calculate SMA for slots (not raw prices!)
+  const calculateSMAForSlots = (period) => {
+    const result = []
+    for (let i = 0; i < slots.length; i++) {
+      if (i < period - 1) {
+        result.push(null)
+      } else {
+        const sum = slots.slice(i - period + 1, i + 1).reduce((acc, s) => acc + s.currentPrice, 0)
+        result.push(sum / period)
+      }
+    }
+    return result
+  }
+
+  // Helper to calculate P&L for a given SMA period (using slots like the chart does)
   const calculatePLForSMA = (smaPeriod) => {
-    const smaValues = calculateSMA(prices, smaPeriod)
+    const smaValues = calculateSMAForSlots(smaPeriod)
 
     // Build a map of date to SMA value
     const dateToSMA = new Map()
-    prices.forEach((p, idx) => {
+    slots.forEach((slot, idx) => {
       if (smaValues[idx] !== null) {
-        dateToSMA.set(p.date, smaValues[idx])
+        dateToSMA.set(slot.endDate, smaValues[idx])
       }
     })
 
@@ -302,9 +316,12 @@ function optimizeSMAParams(prices, breakouts) {
     let isHolding = false
     let buyPrice = null
 
-    for (let i = 0; i < prices.length; i++) {
-      const currentDate = prices[i].date
-      const currentPrice = prices[i].close
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[i]
+      if (!slot) continue
+
+      const currentDate = slot.endDate
+      const currentPrice = slot.currentPrice
 
       // Buy on breakout
       if (breakoutDates.has(currentDate) && !isHolding) {
@@ -313,22 +330,25 @@ function optimizeSMAParams(prices, breakouts) {
       }
       // Sell when SMA slope turns negative
       else if (isHolding && i > 0) {
-        const prevDate = prices[i - 1].date
-        const slope = getSMASlope(currentDate, prevDate)
+        const prevSlot = slots[i - 1]
+        if (prevSlot) {
+          const slope = getSMASlope(currentDate, prevSlot.endDate)
 
-        if (slope !== null && slope < 0) {
-          const sellPrice = currentPrice
-          const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
-          trades.push({ plPercent })
-          isHolding = false
-          buyPrice = null
+          if (slope !== null && slope < 0) {
+            const sellPrice = currentPrice
+            const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
+            trades.push({ plPercent })
+            isHolding = false
+            buyPrice = null
+          }
         }
       }
     }
 
     // If still holding, close at end
-    if (isHolding) {
-      const currentPrice = prices[prices.length - 1].close
+    if (isHolding && slots.length > 0) {
+      const lastSlot = slots[slots.length - 1]
+      const currentPrice = lastSlot.currentPrice
       const plPercent = ((currentPrice - buyPrice) / buyPrice) * 100
       trades.push({ plPercent, isOpen: true })
     }
@@ -410,11 +430,11 @@ function BacktestResults({ onStockSelect }) {
           // Optimize Vol Prf V2 parameters for this stock
           const optimalParams = optimizeVolPrfV2Params(priceData)
 
-          // Calculate Vol Prf V2 breakouts with optimal parameters
-          const breakouts = calculateVolPrfV2Breakouts(priceData, optimalParams)
+          // Calculate Vol Prf V2 slots and breakouts with optimal parameters
+          const { slots, breakouts } = calculateVolPrfV2Breakouts(priceData, optimalParams)
 
-          // Optimize SMA parameters based on breakouts
-          const optimalSMAs = optimizeSMAParams(priceData, breakouts)
+          // Optimize SMA parameters based on slots and breakouts
+          const optimalSMAs = optimizeSMAParams(priceData, slots, breakouts)
 
           // Check if breakout in last 10 days
           if (hasRecentBreakout(breakouts, priceData, 10)) {
