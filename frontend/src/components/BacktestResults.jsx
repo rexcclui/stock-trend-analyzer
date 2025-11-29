@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import axios from 'axios'
-import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle } from 'lucide-react'
+import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X } from 'lucide-react'
 import { apiCache } from '../utils/apiCache'
 import { joinUrl } from '../utils/urlHelper'
 
