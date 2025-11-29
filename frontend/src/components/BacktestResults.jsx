@@ -433,6 +433,15 @@ function BacktestResults({ onStockSelect }) {
           // Calculate Vol Prf V2 slots and breakouts with optimal parameters
           const { slots, breakouts } = calculateVolPrfV2Breakouts(priceData, optimalParams)
 
+          console.log(`[${symbol}] Slots: ${slots.length}, Breakouts: ${breakouts.length}`)
+          if (breakouts.length > 0) {
+            const latest = breakouts[breakouts.length - 1]
+            const latestDate = new Date(latest.date)
+            const today = new Date(priceData[priceData.length - 1].date)
+            const daysAgo = Math.floor((today - latestDate) / (1000 * 60 * 60 * 24))
+            console.log(`[${symbol}] Latest breakout: ${latest.date} (${daysAgo} days ago)`)
+          }
+
           // Optimize SMA parameters based on slots and breakouts
           const optimalSMAs = optimizeSMAParams(priceData, slots, breakouts)
 
