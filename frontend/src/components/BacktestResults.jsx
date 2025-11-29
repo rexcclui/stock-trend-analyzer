@@ -275,31 +275,23 @@ function optimizeSMAParams(prices, slots, breakouts) {
     return { period: 50, pl: 0 }
   }
 
-  // Helper to calculate SMA for slots (not raw prices!)
-  const calculateSMAForSlots = (period) => {
-    const result = []
-    for (let i = 0; i < slots.length; i++) {
+  // Helper to calculate SMA from daily prices
+  const calculateSMAForPrices = (period) => {
+    const dateToSMA = new Map()
+    for (let i = 0; i < prices.length; i++) {
       if (i < period - 1) {
-        result.push(null)
+        dateToSMA.set(prices[i].date, null)
       } else {
-        const sum = slots.slice(i - period + 1, i + 1).reduce((acc, s) => acc + s.currentPrice, 0)
-        result.push(sum / period)
+        const sum = prices.slice(i - period + 1, i + 1).reduce((acc, p) => acc + p.close, 0)
+        dateToSMA.set(prices[i].date, sum / period)
       }
     }
-    return result
+    return dateToSMA
   }
 
-  // Helper to calculate P&L for a given SMA period (using slots like the chart does)
+  // Helper to calculate P&L for a given SMA period (using daily prices)
   const calculatePLForSMA = (smaPeriod) => {
-    const smaValues = calculateSMAForSlots(smaPeriod)
-
-    // Build a map of date to SMA value
-    const dateToSMA = new Map()
-    slots.forEach((slot, idx) => {
-      if (smaValues[idx] !== null) {
-        dateToSMA.set(slot.endDate, smaValues[idx])
-      }
-    })
+    const dateToSMA = calculateSMAForPrices(smaPeriod)
 
     // Helper to get SMA slope between two dates
     const getSMASlope = (currentDate, prevDate) => {

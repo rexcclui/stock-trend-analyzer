@@ -2359,24 +2359,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // Create a map of breakout dates for quick lookup
     const breakoutDates = new Set(volumeProfileV2Breakouts.map(b => b.date))
 
-    // Calculate SMA on SLOTS (not daily prices!) to match simulation logic
-    const smaValues = []
-    for (let i = 0; i < volumeProfileV2Data.length; i++) {
+    // Calculate SMA from daily prices
+    const dateToSMA = new Map()
+    for (let i = 0; i < prices.length; i++) {
       if (i < smaPeriod - 1) {
-        smaValues.push(null)
+        dateToSMA.set(prices[i].date, null)
       } else {
-        const sum = volumeProfileV2Data.slice(i - smaPeriod + 1, i + 1).reduce((acc, s) => acc + s.currentPrice, 0)
-        smaValues.push(sum / smaPeriod)
+        const sum = prices.slice(i - smaPeriod + 1, i + 1).reduce((acc, p) => acc + p.close, 0)
+        dateToSMA.set(prices[i].date, sum / smaPeriod)
       }
     }
-
-    // Create date to SMA map from calculated slot-based SMAs
-    const dateToSMA = new Map()
-    volumeProfileV2Data.forEach((slot, idx) => {
-      if (smaValues[idx] !== null) {
-        dateToSMA.set(slot.endDate, smaValues[idx])
-      }
-    })
 
     // Calculate SMA slope helper
     const getSMASlope = (currentDate, prevDate) => {
@@ -2466,7 +2458,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const winningTrades = closedTrades.filter(t => t.plPercent > 0).length
     const winRate = closedTrades.length > 0 ? (winningTrades / closedTrades.length) * 100 : 0
 
-    console.log(`[calculateBreakoutPL] Using SMA ${smaPeriod} on ${volumeProfileV2Data.length} slots`)
+    console.log(`[calculateBreakoutPL] Using SMA ${smaPeriod} calculated from ${prices.length} daily prices, checking at ${volumeProfileV2Data.length} slot dates`)
     console.log(`[calculateBreakoutPL] Trades: ${trades.length}, Total P/L: ${totalPL.toFixed(2)}%`)
     console.log(`[calculateBreakoutPL] Breakouts available: ${volumeProfileV2Breakouts.length}`)
 
