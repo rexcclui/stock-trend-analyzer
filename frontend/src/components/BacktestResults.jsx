@@ -645,6 +645,7 @@ function BacktestResults({ onStockSelect }) {
                     <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Diff</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Total Signals</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Optimal Params</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase">Action</th>
                   </tr>
                 </thead>
                 <tbody className="bg-slate-800 divide-y divide-slate-700">
@@ -700,6 +701,18 @@ function BacktestResults({ onStockSelect }) {
                               P/L:{result.optimalSMAs.pl.toFixed(1)}%
                             </div>
                           </div>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation() // Prevent row click
+                              setResults(prevResults => prevResults.filter(r => r.symbol !== result.symbol))
+                            }}
+                            className="p-1 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded transition-colors"
+                            title="Remove this stock"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
                         </td>
                       </tr>
                     )
