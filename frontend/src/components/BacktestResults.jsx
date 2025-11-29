@@ -354,7 +354,7 @@ function optimizeSMAParams(prices, slots, breakouts) {
     }
 
     const totalPL = trades.reduce((sum, trade) => sum + trade.plPercent, 0)
-    return totalPL
+    return { totalPL, trades }
   }
 
   // Test SMA values with proper increments (same as chart simulation)
@@ -371,14 +371,16 @@ function optimizeSMAParams(prices, slots, breakouts) {
 
   let bestSMA = 50 // Default
   let bestPL = -Infinity
+  let bestTrades = []
   const results = []
 
   for (const period of testValues) {
-    const pl = calculatePLForSMA(period)
-    results.push({ sma: period, pl })
-    if (pl > bestPL) {
-      bestPL = pl
+    const { totalPL, trades } = calculatePLForSMA(period)
+    results.push({ sma: period, pl: totalPL })
+    if (totalPL > bestPL) {
+      bestPL = totalPL
       bestSMA = period
+      bestTrades = trades
     }
   }
 
@@ -387,7 +389,12 @@ function optimizeSMAParams(prices, slots, breakouts) {
   console.log(`[SMA Optimization] Top 10 SMA values:`)
   top10.forEach((r, i) => console.log(`  ${i + 1}. SMA ${r.sma}: ${r.pl.toFixed(2)}%`))
 
-  return { period: bestSMA, pl: bestPL }
+  // Calculate total signals: closed trades = 1.0, open trades = 0.5
+  const closedTrades = bestTrades.filter(t => !t.isOpen)
+  const openTrades = bestTrades.filter(t => t.isOpen)
+  const totalSignals = closedTrades.length + (openTrades.length * 0.5)
+
+  return { period: bestSMA, pl: bestPL, totalSignals }
 }
 
 function BacktestResults({ onStockSelect }) {
@@ -459,7 +466,7 @@ function BacktestResults({ onStockSelect }) {
 
             backtestResults.push({
               symbol,
-              totalBreakouts: breakouts.length,
+              totalSignals: optimalSMAs.totalSignals,  // B+S pairs (closed=1.0, open=0.5)
               latestBreakout,
               latestPrice,
               priceData,
@@ -665,7 +672,7 @@ function BacktestResults({ onStockSelect }) {
                           {(result.latestBreakout.weightDiff * 100).toFixed(1)}%
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
-                          {result.totalBreakouts}
+                          {result.totalSignals}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 text-left">
                           <div className="space-y-0.5">
