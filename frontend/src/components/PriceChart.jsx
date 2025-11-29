@@ -2380,29 +2380,29 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return null
     }
 
-    for (let i = 0; i < volumeProfileV2Data.length; i++) {
-      const slot = volumeProfileV2Data[i]
-      if (!slot) continue
+    // Iterate through daily prices (not slots!) for simulation
+    for (let i = 0; i < prices.length; i++) {
+      const pricePoint = prices[i]
+      if (!pricePoint) continue
 
-      const currentDate = slot.endDate
-      const currentPrice = slot.currentPrice
+      const currentDate = pricePoint.date
+      const currentPrice = pricePoint.close
 
       // Check if this is an up breakout date - BUY signal
       if (breakoutDates.has(currentDate) && !isHolding) {
         isHolding = true
         buyPrice = currentPrice
         buyDate = currentDate
-        buySlotIdx = i
       }
       // If holding, check SMA slope for SELL signal
       else if (isHolding && i > 0) {
-        const prevSlot = volumeProfileV2Data[i - 1]
-        if (prevSlot) {
-          const slope = getSMASlope(currentDate, prevSlot.endDate)
+        const prevPrice = prices[i - 1]
+        if (prevPrice) {
+          const slope = getSMASlope(currentDate, prevPrice.date)
 
           // Debug logging for SMA slope (log for the actual SMA being used)
           if (slope !== null) {
-            console.log(`[SELL CHECK SMA-${smaPeriod}] Slot ${i}, Date: ${currentDate}, SMA slope: ${slope.toFixed(4)}, Holding: ${isHolding}`)
+            console.log(`[SELL CHECK SMA-${smaPeriod}] Day ${i}, Date: ${currentDate}, SMA slope: ${slope.toFixed(4)}, Holding: ${isHolding}`)
           }
 
           // If SMA is going down (negative slope), SELL
@@ -2422,31 +2422,29 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
             sellSignals.push({
               date: currentDate,
-              price: sellPrice,
-              slotIdx: i
+              price: sellPrice
             })
 
             // Reset state
             isHolding = false
             buyPrice = null
             buyDate = null
-            buySlotIdx = null
           }
         }
       }
     }
 
     // If still holding at the end, mark as open position
-    if (isHolding && volumeProfileV2Data.length > 0) {
-      const lastSlot = volumeProfileV2Data[volumeProfileV2Data.length - 1]
-      const currentPrice = lastSlot.currentPrice
+    if (isHolding && prices.length > 0) {
+      const lastPrice = prices[prices.length - 1]
+      const currentPrice = lastPrice.close
       const plPercent = ((currentPrice - buyPrice) / buyPrice) * 100
 
       trades.push({
         buyPrice,
         buyDate,
         sellPrice: currentPrice,
-        sellDate: lastSlot.endDate,
+        sellDate: lastPrice.date,
         plPercent,
         isOpen: true
       })
@@ -2458,7 +2456,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const winningTrades = closedTrades.filter(t => t.plPercent > 0).length
     const winRate = closedTrades.length > 0 ? (winningTrades / closedTrades.length) * 100 : 0
 
-    console.log(`[calculateBreakoutPL] Using SMA ${smaPeriod} calculated from ${prices.length} daily prices, checking at ${volumeProfileV2Data.length} slot dates`)
+    console.log(`[calculateBreakoutPL] Using SMA ${smaPeriod} calculated from ${prices.length} daily prices, checking at each daily price`)
     console.log(`[calculateBreakoutPL] Trades: ${trades.length}, Total P/L: ${totalPL.toFixed(2)}%`)
     console.log(`[calculateBreakoutPL] Breakouts available: ${volumeProfileV2Breakouts.length}`)
 

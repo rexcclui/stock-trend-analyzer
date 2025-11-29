@@ -308,12 +308,13 @@ function optimizeSMAParams(prices, slots, breakouts) {
     let isHolding = false
     let buyPrice = null
 
-    for (let i = 0; i < slots.length; i++) {
-      const slot = slots[i]
-      if (!slot) continue
+    // Iterate through daily prices (not slots!) for simulation
+    for (let i = 0; i < prices.length; i++) {
+      const pricePoint = prices[i]
+      if (!pricePoint) continue
 
-      const currentDate = slot.endDate
-      const currentPrice = slot.currentPrice
+      const currentDate = pricePoint.date
+      const currentPrice = pricePoint.close
 
       // Buy on breakout
       if (breakoutDates.has(currentDate) && !isHolding) {
@@ -322,9 +323,9 @@ function optimizeSMAParams(prices, slots, breakouts) {
       }
       // Sell when SMA slope turns negative
       else if (isHolding && i > 0) {
-        const prevSlot = slots[i - 1]
-        if (prevSlot) {
-          const slope = getSMASlope(currentDate, prevSlot.endDate)
+        const prevPrice = prices[i - 1]
+        if (prevPrice) {
+          const slope = getSMASlope(currentDate, prevPrice.date)
 
           if (slope !== null && slope < 0) {
             const sellPrice = currentPrice
@@ -338,9 +339,9 @@ function optimizeSMAParams(prices, slots, breakouts) {
     }
 
     // If still holding, close at end
-    if (isHolding && slots.length > 0) {
-      const lastSlot = slots[slots.length - 1]
-      const currentPrice = lastSlot.currentPrice
+    if (isHolding && prices.length > 0) {
+      const lastPrice = prices[prices.length - 1]
+      const currentPrice = lastPrice.close
       const plPercent = ((currentPrice - buyPrice) / buyPrice) * 100
       trades.push({ plPercent, isOpen: true })
     }
