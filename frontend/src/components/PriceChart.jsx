@@ -2538,14 +2538,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       let bestPL = -Infinity
       let bestSmaValue = null
 
-      // Helper to calculate SMA for a given period
+      // Helper to calculate SMA on SLOTS (not daily prices!)
       const calculateSMA = (period) => {
         const result = []
-        for (let i = 0; i < displayPrices.length; i++) {
+        for (let i = 0; i < volumeProfileV2Data.length; i++) {
           if (i < period - 1) {
             result.push(null)
           } else {
-            const sum = displayPrices.slice(i - period + 1, i + 1).reduce((acc, p) => acc + p.close, 0)
+            const sum = volumeProfileV2Data.slice(i - period + 1, i + 1).reduce((acc, s) => acc + s.currentPrice, 0)
             result.push(sum / period)
           }
         }
@@ -2558,9 +2558,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
         const smaValues = calculateSMA(smaPeriod)
         const dateToSMA = new Map()
-        displayPrices.forEach((p, idx) => {
+        volumeProfileV2Data.forEach((slot, idx) => {
           if (smaValues[idx] !== null) {
-            dateToSMA.set(p.date, smaValues[idx])
+            dateToSMA.set(slot.endDate, smaValues[idx])
           }
         })
 
