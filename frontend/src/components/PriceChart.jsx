@@ -2557,11 +2557,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         if (volumeProfileV2Data.length === 0) return -Infinity
 
         const smaValues = calculateSMA(smaPeriod)
-
-        if (smaPeriod === 50) {
-          console.log(`[calculatePLForSMA] Using SMA ${smaPeriod} on ${volumeProfileV2Data.length} slots`)
-          console.log(`[calculatePLForSMA] Breakouts available: ${volumeProfileV2Breakouts.length}`)
-        }
         const dateToSMA = new Map()
         displayPrices.forEach((p, idx) => {
           if (smaValues[idx] !== null) {
@@ -2622,7 +2617,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const totalPL = trades.reduce((sum, trade) => sum + trade.plPercent, 0)
 
         if (smaPeriod === 50) {
-          console.log(`[calculatePLForSMA] Trades found: ${trades.length}, Total P/L: ${totalPL.toFixed(2)}%`)
+          console.log(`[SIM-${smaPeriod}] Slots: ${volumeProfileV2Data.length}, Breakouts: ${volumeProfileV2Breakouts.length}`)
+          console.log(`[SIM-${smaPeriod}] Trades: ${trades.length}, Total P/L: ${totalPL.toFixed(2)}%`)
         }
 
         return totalPL
