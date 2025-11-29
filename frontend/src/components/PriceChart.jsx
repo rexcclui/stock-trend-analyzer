@@ -2408,10 +2408,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         if (prevSlot) {
           const slope = getSMASlope(currentDate, prevSlot.endDate)
 
+          // Debug logging for SMA slope
+          if (smaPeriod === 74 && slope !== null) {
+            console.log(`[SELL CHECK] Slot ${i}, Date: ${currentDate}, SMA slope: ${slope.toFixed(4)}, Holding: ${isHolding}`)
+          }
+
           // If SMA is going down (negative slope), SELL
           if (slope !== null && slope < 0) {
             const sellPrice = currentPrice
             const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
+
+            console.log(`[SELL SIGNAL] Date: ${currentDate}, Price: ${sellPrice}, Slope: ${slope.toFixed(4)}, P/L: ${plPercent.toFixed(2)}%`)
 
             trades.push({
               buyPrice,
