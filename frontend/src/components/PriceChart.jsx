@@ -21,10 +21,18 @@ import {
   CustomBestChannelStdevLabels as ImportedCustomBestChannelStdevLabels
 } from './PriceChart/components'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+
+  // Vol Profile V2 parameters - use provided params or defaults
+  const volPrfV2Params = volumeProfileV2Params || {
+    breakoutThreshold: 0.06,
+    lookbackZones: 5,
+    resetThreshold: 0.03,
+    timeoutSlots: 5
+  }
 
   // Store ABSOLUTE optimized parameters (not percentages) so they persist across period changes
   const [optimizedLookbackCount, setOptimizedLookbackCount] = useState(null)
@@ -2239,9 +2247,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // Detect up breakouts: current zone has <6% weight compared to MAX volume zone within 5 zones below
     // State-based detection to prevent duplicate signals until price reaccumulates
     const breakouts = []
-    const BREAKOUT_THRESHOLD = 0.06 // 6% difference required for breakout
-    const RESET_THRESHOLD = 0.03    // 3% reaccumulation required to reset (half of breakout threshold)
-    const TIMEOUT_SLOTS = 5         // Auto-reset after 5 slots if no reaccumulation
+    // Use Vol Profile V2 params from props (backtest optimization) or defaults
+    const BREAKOUT_THRESHOLD = volPrfV2Params.breakoutThreshold
+    const RESET_THRESHOLD = volPrfV2Params.resetThreshold
+    const TIMEOUT_SLOTS = volPrfV2Params.timeoutSlots
+    const LOOKBACK_ZONES = volPrfV2Params.lookbackZones
 
     let isInBreakout = false
     let breakoutZoneWeight = 0
@@ -2293,9 +2303,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           }
         }
 
-        // Look up to 5 zones below and find the zone with MAXIMUM volume weight
+        // Look up to N zones below and find the zone with MAXIMUM volume weight
         // This identifies the strongest support/resistance level to break through
-        const lookbackDepth = Math.min(5, currentZoneIdx) // Check up to 5 zones or until start
+        const lookbackDepth = Math.min(LOOKBACK_ZONES, currentZoneIdx) // Check up to N zones or until start
         let maxLowerWeight = 0
         let maxZoneIdx = -1
 

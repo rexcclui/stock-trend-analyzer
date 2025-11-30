@@ -267,6 +267,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
             volumeProfileV2StartDate: null,
             volumeProfileV2EndDate: null,
             volumeProfileV2RefreshTrigger: 0,
+            volumeProfileV2Params: hasOptimalParams ? params : null,
             spyData: null,
             performanceComparisonEnabled: false,
             performanceComparisonBenchmark: 'SPY',
@@ -2056,6 +2057,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                     volumeProfileV2StartDate={chart.volumeProfileV2StartDate}
                     volumeProfileV2EndDate={chart.volumeProfileV2EndDate}
                     volumeProfileV2RefreshTrigger={chart.volumeProfileV2RefreshTrigger}
+                    volumeProfileV2Params={chart.volumeProfileV2Params}
                     onVolumeProfileV2StartChange={(value) => updateVolumeProfileV2Start(chart.id, value)}
                     onVolumeProfileV2EndChange={(value) => updateVolumeProfileV2End(chart.id, value)}
                     spyData={chart.spyData}
