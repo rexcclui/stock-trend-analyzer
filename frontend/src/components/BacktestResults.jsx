@@ -275,15 +275,18 @@ function optimizeSMAParams(prices, slots, breakouts) {
     return { period: 50, pl: 0 }
   }
 
-  // Helper to calculate SMA from daily prices
+  // Prices are in reverse chronological order, reverse for forward-time processing
+  const reversedPrices = [...prices].reverse()
+
+  // Helper to calculate SMA from daily prices in forward chronological order
   const calculateSMAForPrices = (period) => {
     const dateToSMA = new Map()
-    for (let i = 0; i < prices.length; i++) {
+    for (let i = 0; i < reversedPrices.length; i++) {
       if (i < period - 1) {
-        dateToSMA.set(prices[i].date, null)
+        dateToSMA.set(reversedPrices[i].date, null)
       } else {
-        const sum = prices.slice(i - period + 1, i + 1).reduce((acc, p) => acc + p.close, 0)
-        dateToSMA.set(prices[i].date, sum / period)
+        const sum = reversedPrices.slice(i - period + 1, i + 1).reduce((acc, p) => acc + p.close, 0)
+        dateToSMA.set(reversedPrices[i].date, sum / period)
       }
     }
     return dateToSMA
@@ -308,9 +311,9 @@ function optimizeSMAParams(prices, slots, breakouts) {
     let isHolding = false
     let buyPrice = null
 
-    // Iterate through daily prices (not slots!) for simulation
-    for (let i = 0; i < prices.length; i++) {
-      const pricePoint = prices[i]
+    // Iterate through daily prices in forward chronological order for simulation
+    for (let i = 0; i < reversedPrices.length; i++) {
+      const pricePoint = reversedPrices[i]
       if (!pricePoint) continue
 
       const currentDate = pricePoint.date
@@ -323,7 +326,7 @@ function optimizeSMAParams(prices, slots, breakouts) {
       }
       // Sell when SMA slope turns negative
       else if (isHolding && i > 0) {
-        const prevPrice = prices[i - 1]
+        const prevPrice = reversedPrices[i - 1]
         if (prevPrice) {
           const slope = getSMASlope(currentDate, prevPrice.date)
 
@@ -339,8 +342,8 @@ function optimizeSMAParams(prices, slots, breakouts) {
     }
 
     // If still holding, close at end
-    if (isHolding && prices.length > 0) {
-      const lastPrice = prices[prices.length - 1]
+    if (isHolding && reversedPrices.length > 0) {
+      const lastPrice = reversedPrices[reversedPrices.length - 1]
       const currentPrice = lastPrice.close
       const plPercent = ((currentPrice - buyPrice) / buyPrice) * 100
       trades.push({ plPercent, isOpen: true })
