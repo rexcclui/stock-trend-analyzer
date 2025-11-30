@@ -1448,7 +1448,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
               {/* Price Chart */}
               <div className="bg-slate-800 relative">
                 {/* Collapse and Close buttons */}
-                <div className="absolute top-4 right-4 flex gap-2">
+                <div className="absolute top-4 right-4 flex gap-2 z-20">
                   <button
                     type="button"
                     onClick={() => toggleChartCollapse(chart.id)}
