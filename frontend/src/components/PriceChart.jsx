@@ -2399,10 +2399,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const prevPrice = prices[i - 1]
         if (prevPrice) {
           const slope = getSMASlope(currentDate, prevPrice.date)
+          const currentSMA = dateToSMA.get(currentDate)
+          const prevSMA = dateToSMA.get(prevPrice.date)
 
           // Debug logging for SMA slope (log for the actual SMA being used)
           if (slope !== null) {
-            console.log(`[SELL CHECK SMA-${smaPeriod}] Day ${i}, Date: ${currentDate}, SMA slope: ${slope.toFixed(4)}, Holding: ${isHolding}`)
+            console.log(`[SELL CHECK SMA-${smaPeriod}] Day ${i}, Date: ${currentDate}, Price: ${currentPrice.toFixed(2)}, SMA: ${currentSMA?.toFixed(2)}, PrevSMA: ${prevSMA?.toFixed(2)}, Slope: ${slope.toFixed(4)}, Holding: ${isHolding}`)
           }
 
           // If SMA is going down (negative slope), SELL
