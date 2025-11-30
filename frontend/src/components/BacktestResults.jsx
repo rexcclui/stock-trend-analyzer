@@ -494,10 +494,12 @@ function BacktestResults({ onStockSelect }) {
           // Optimize SMA parameters based on slots and breakouts
           const optimalSMAs = optimizeSMAParams(priceData, slots, breakouts)
 
-          // Check if breakout in last 10 days (relative to today)
+          // Capture most recent breakout and whether it's within the last 10 days
           const recentBreakouts = getRecentBreakouts(breakouts, 10)
-          if (recentBreakouts.length > 0) {
-            const latestBreakout = getLatestBreakout(recentBreakouts)
+          const latestBreakout = getLatestBreakout(breakouts)
+          const latestRecentBreakout = getLatestBreakout(recentBreakouts)
+
+          if (latestBreakout) {
             const latestPrice = priceData[priceData.length - 1].close
 
             backtestResults.push({
@@ -508,7 +510,9 @@ function BacktestResults({ onStockSelect }) {
               priceData,
               optimalParams,  // Store optimal Vol Prf V2 parameters
               optimalSMAs,    // Store optimal SMA periods
-              days            // Store the days period used for this backtest
+              days,           // Store the days period used for this backtest
+              isRecentBreakout: Boolean(latestRecentBreakout),
+              recentBreakout: latestRecentBreakout
             })
           }
         } catch (err) {
@@ -527,7 +531,7 @@ function BacktestResults({ onStockSelect }) {
       })
 
       if (backtestResults.length === 0) {
-        setError('No stocks with breakouts in the last 10 days found.')
+        setError('No breakouts found for the provided symbols.')
       }
     } catch (err) {
       setError('Failed to run backtest. Please try again.')
@@ -571,6 +575,8 @@ function BacktestResults({ onStockSelect }) {
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     return diffDays
   }
+
+  const recentBreakoutCount = results.filter(r => r.isRecentBreakout).length
 
   return (
     <div className="space-y-6">
@@ -678,12 +684,12 @@ function BacktestResults({ onStockSelect }) {
           <div className="bg-gradient-to-br from-green-900/50 to-green-800/50 p-6 rounded-lg border border-green-700">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-green-300">Stocks with Recent Breakouts</p>
+                <p className="text-sm font-medium text-green-300">Recent Breakouts (≤10 days)</p>
                 <p className="text-3xl font-bold mt-2 text-green-100">
-                  {results.length}
+                  {recentBreakoutCount}
                 </p>
                 <p className="text-sm mt-1 text-green-300">
-                  Breakouts detected in last 10 days
+                  From {results.length} stocks with detected breakouts
                 </p>
               </div>
               <TrendingUp className="w-12 h-12 text-green-400" />
@@ -725,8 +731,10 @@ function BacktestResults({ onStockSelect }) {
                         <td className="px-4 py-3 text-sm font-bold text-blue-400">
                           {result.symbol}
                         </td>
-                        <td className="px-4 py-3 text-sm text-slate-300">
-                          {formatDate(result.latestBreakout.date)}
+                        <td className="px-4 py-3 text-sm">
+                          <span className={`${result.isRecentBreakout ? 'text-green-200 bg-green-900/50 animate-pulse px-2 py-1 rounded' : 'text-slate-300'}`}>
+                            {formatDate(result.latestBreakout.date)}
+                          </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
                           <span className={`px-2 py-1 rounded ${daysAgo <= 3 ? 'bg-green-900/50 text-green-300' : daysAgo <= 7 ? 'bg-yellow-900/50 text-yellow-300' : 'bg-slate-700 text-slate-300'}`}>
