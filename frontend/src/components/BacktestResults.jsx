@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import axios from 'axios'
 import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X } from 'lucide-react'
 import { apiCache } from '../utils/apiCache'
 import { joinUrl } from '../utils/urlHelper'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const STOCK_HISTORY_KEY = 'stockSearchHistory'
 
 // Helper function to parse multiple stock symbols from input
 function parseStockSymbols(input) {
@@ -400,14 +401,51 @@ function BacktestResults({ onStockSelect }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [results, setResults] = useState([])
+  const [stockHistory, setStockHistory] = useState([])
 
-  const runBacktest = async () => {
-    const stockList = parseStockSymbols(symbols)
+  // Load stock history from localStorage on mount
+  useEffect(() => {
+    const savedHistory = localStorage.getItem(STOCK_HISTORY_KEY)
+    if (savedHistory) {
+      try {
+        setStockHistory(JSON.parse(savedHistory))
+      } catch (e) {
+        console.error('Failed to load stock history:', e)
+      }
+    }
+  }, [])
+
+  // Listen for history updates from other components (e.g., technical analysis tab)
+  useEffect(() => {
+    const handleHistoryUpdate = (event) => {
+      if (Array.isArray(event.detail)) {
+        setStockHistory(event.detail)
+      }
+    }
+
+    window.addEventListener('stockHistoryUpdated', handleHistoryUpdate)
+    return () => window.removeEventListener('stockHistoryUpdated', handleHistoryUpdate)
+  }, [])
+
+  const saveToHistory = (stockList) => {
+    if (!Array.isArray(stockList) || stockList.length === 0) return
+    const uniqueStocks = Array.from(new Set(stockList.filter(Boolean)))
+    const updatedHistory = [...uniqueStocks, ...stockHistory.filter(s => !uniqueStocks.includes(s))].slice(0, 10)
+    setStockHistory(updatedHistory)
+    localStorage.setItem(STOCK_HISTORY_KEY, JSON.stringify(updatedHistory))
+    window.dispatchEvent(new CustomEvent('stockHistoryUpdated', { detail: updatedHistory }))
+  }
+
+  const runBacktest = async (symbolOverride = null) => {
+    const targetSymbols = symbolOverride ?? symbols
+    const stockList = parseStockSymbols(targetSymbols)
 
     if (stockList.length === 0) {
       setError('Please enter at least one stock symbol')
       return
     }
+
+    saveToHistory(stockList)
 
     setLoading(true)
     setError(null)
@@ -503,6 +541,11 @@ function BacktestResults({ onStockSelect }) {
     }
   }
 
+  const handleHistoryClick = (stock) => {
+    setSymbols(stock)
+    runBacktest(stock)
+  }
+
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -540,9 +583,29 @@ function BacktestResults({ onStockSelect }) {
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Stock Symbols (comma or space separated)
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-slate-300">
+                Stock Symbols (comma or space separated)
+              </label>
+              {stockHistory.length > 0 && (
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className="text-xs text-slate-400">Recent:</span>
+                  {stockHistory.map((stock, index) => (
+                    <span key={stock}>
+                      <button
+                        onClick={() => handleHistoryClick(stock)}
+                        className="text-xs text-purple-400 hover:text-purple-300 hover:underline transition-colors"
+                      >
+                        {stock}
+                      </button>
+                      {index < stockHistory.length - 1 && (
+                        <span className="text-slate-500">, </span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
             <input
               type="text"
               value={symbols}

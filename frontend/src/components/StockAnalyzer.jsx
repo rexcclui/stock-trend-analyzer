@@ -173,10 +173,23 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     }
   }, [])
 
+  // Listen for history updates from other components (e.g., backtesting tab)
+  useEffect(() => {
+    const handleHistoryUpdate = (event) => {
+      if (Array.isArray(event.detail)) {
+        setStockHistory(event.detail)
+      }
+    }
+
+    window.addEventListener('stockHistoryUpdated', handleHistoryUpdate)
+    return () => window.removeEventListener('stockHistoryUpdated', handleHistoryUpdate)
+  }, [])
+
   const saveToHistory = (stockSymbol) => {
     const updatedHistory = [stockSymbol, ...stockHistory.filter(s => s !== stockSymbol)].slice(0, 10)
     setStockHistory(updatedHistory)
     localStorage.setItem(STOCK_HISTORY_KEY, JSON.stringify(updatedHistory))
+    window.dispatchEvent(new CustomEvent('stockHistoryUpdated', { detail: updatedHistory }))
   }
 
   const analyzeStock = async (symbolToAnalyze = null, params = null) => {
