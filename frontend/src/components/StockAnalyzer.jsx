@@ -204,8 +204,10 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
       console.log(`[Input] Processing ${symbols.length} symbol(s):`, symbols.join(', '))
 
       // Smart pre-loading: fetch more data than displayed to enable smooth panning
-      const displayDays = days
-      const fetchDays = getFetchPeriod(days)
+      // Use days from params if provided (from backtest results), otherwise use state
+      const displayDays = params?.days || days
+      const fetchDays = getFetchPeriod(displayDays)
+      console.log(`[Period] displayDays=${displayDays}, fetchDays=${fetchDays}, params.days=${params?.days}, state.days=${days}`)
 
       const newCharts = []
       const errors = []
