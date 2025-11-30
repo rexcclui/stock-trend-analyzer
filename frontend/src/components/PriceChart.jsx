@@ -2150,7 +2150,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     if (!volumeProfileV2Enabled || displayPrices.length === 0) return { slots: [], breakouts: [] }
 
     const reversedDisplayPrices = [...displayPrices].reverse()
-    const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
+
+    // Clamp zoomRange to actual data bounds (displayPrices may be filtered smaller than original fetch)
+    const clampedStart = Math.min(zoomRange.start, reversedDisplayPrices.length - 1)
+    const clampedEnd = zoomRange.end === null ? reversedDisplayPrices.length : Math.min(zoomRange.end, reversedDisplayPrices.length)
+
+    console.log(`[Vol Profile V2] displayPrices=${reversedDisplayPrices.length}, zoomRange=(${zoomRange.start},${zoomRange.end}), clamped=(${clampedStart},${clampedEnd})`)
+
+    const visibleData = reversedDisplayPrices.slice(clampedStart, clampedEnd)
 
     if (visibleData.length === 0) return { slots: [], breakouts: [] }
 
