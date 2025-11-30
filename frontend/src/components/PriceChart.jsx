@@ -1932,7 +1932,26 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Calculate last channel ONLY on the data that will be displayed
   // This prevents mismatch when period changes and indicators haven't updated yet
-  const displayPrices = prices.slice(0, dataLength)
+  // IMPORTANT: Filter to only include data within the display period (days parameter)
+  // to match what backtest uses, not all fetched data
+  const displayPrices = (() => {
+    const allPrices = prices.slice(0, dataLength)
+    if (allPrices.length === 0) return []
+
+    // Calculate cutoff date based on days parameter
+    const daysNum = parseInt(days)
+    const mostRecentDate = new Date(allPrices[0].date)
+    const cutoffDate = new Date(mostRecentDate)
+    cutoffDate.setDate(cutoffDate.getDate() - daysNum)
+
+    // Filter to only include prices after cutoff date
+    // Prices are in reverse chronological order (newest first)
+    const filteredPrices = allPrices.filter(p => new Date(p.date) >= cutoffDate)
+
+    console.log(`[displayPrices] days=${days}, allPrices=${allPrices.length}, filtered=${filteredPrices.length}, cutoff=${cutoffDate.toISOString().split('T')[0]}`)
+
+    return filteredPrices
+  })()
 
   // Build a map of SPY volumes by date for quick lookup
   const spyVolumeByDate = (() => {
@@ -2360,7 +2379,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const breakoutDates = new Set(volumeProfileV2Breakouts.map(b => b.date))
 
     // Prices are in reverse chronological order (newest first), so reverse for forward-time processing
-    const reversedPrices = [...prices].reverse()
+    // IMPORTANT: Use displayPrices (filtered by days parameter) not full prices array
+    const reversedPrices = [...displayPrices].reverse()
 
     // Calculate SMA from daily prices in forward chronological order
     const dateToSMA = new Map()
@@ -2541,7 +2561,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       let bestSmaValue = null
 
       // Prices are in reverse chronological order, reverse for forward-time processing
-      const reversedPrices = [...prices].reverse()
+      // IMPORTANT: Use displayPrices (filtered by days parameter) not full prices array
+      const reversedPrices = [...displayPrices].reverse()
 
       // Helper to calculate P&L for a given SMA period (using daily prices)
       const calculatePLForSMA = (smaPeriod) => {
