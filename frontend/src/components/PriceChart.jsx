@@ -2359,14 +2359,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // Create a map of breakout dates for quick lookup
     const breakoutDates = new Set(volumeProfileV2Breakouts.map(b => b.date))
 
-    // Calculate SMA from daily prices
+    // Prices are in reverse chronological order (newest first), so reverse for forward-time processing
+    const reversedPrices = [...prices].reverse()
+
+    // Calculate SMA from daily prices in forward chronological order
     const dateToSMA = new Map()
-    for (let i = 0; i < prices.length; i++) {
+    for (let i = 0; i < reversedPrices.length; i++) {
       if (i < smaPeriod - 1) {
-        dateToSMA.set(prices[i].date, null)
+        dateToSMA.set(reversedPrices[i].date, null)
       } else {
-        const sum = prices.slice(i - smaPeriod + 1, i + 1).reduce((acc, p) => acc + p.close, 0)
-        dateToSMA.set(prices[i].date, sum / smaPeriod)
+        const sum = reversedPrices.slice(i - smaPeriod + 1, i + 1).reduce((acc, p) => acc + p.close, 0)
+        dateToSMA.set(reversedPrices[i].date, sum / smaPeriod)
       }
     }
 
@@ -2380,9 +2383,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return null
     }
 
-    // Iterate through daily prices (not slots!) for simulation
-    for (let i = 0; i < prices.length; i++) {
-      const pricePoint = prices[i]
+    // Iterate through daily prices in forward chronological order for simulation
+    for (let i = 0; i < reversedPrices.length; i++) {
+      const pricePoint = reversedPrices[i]
       if (!pricePoint) continue
 
       const currentDate = pricePoint.date
@@ -2396,7 +2399,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       }
       // If holding, check SMA slope for SELL signal
       else if (isHolding && i > 0) {
-        const prevPrice = prices[i - 1]
+        const prevPrice = reversedPrices[i - 1]
         if (prevPrice) {
           const slope = getSMASlope(currentDate, prevPrice.date)
           const currentSMA = dateToSMA.get(currentDate)
@@ -2437,8 +2440,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     }
 
     // If still holding at the end, mark as open position
-    if (isHolding && prices.length > 0) {
-      const lastPrice = prices[prices.length - 1]
+    if (isHolding && reversedPrices.length > 0) {
+      const lastPrice = reversedPrices[reversedPrices.length - 1]
       const currentPrice = lastPrice.close
       const plPercent = ((currentPrice - buyPrice) / buyPrice) * 100
 
@@ -2458,7 +2461,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const winningTrades = closedTrades.filter(t => t.plPercent > 0).length
     const winRate = closedTrades.length > 0 ? (winningTrades / closedTrades.length) * 100 : 0
 
-    console.log(`[calculateBreakoutPL] Using SMA ${smaPeriod} calculated from ${prices.length} daily prices, checking at each daily price`)
+    console.log(`[calculateBreakoutPL] Using SMA ${smaPeriod} calculated from ${reversedPrices.length} daily prices (forward chronological order), checking at each daily price`)
     console.log(`[calculateBreakoutPL] Trades: ${trades.length}, Total P/L: ${totalPL.toFixed(2)}%`)
     console.log(`[calculateBreakoutPL] Breakouts available: ${volumeProfileV2Breakouts.length}`)
 
