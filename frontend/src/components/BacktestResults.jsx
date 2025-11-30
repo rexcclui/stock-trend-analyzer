@@ -468,7 +468,8 @@ function BacktestResults({ onStockSelect }) {
               latestPrice,
               priceData,
               optimalParams,  // Store optimal Vol Prf V2 parameters
-              optimalSMAs     // Store optimal SMA periods
+              optimalSMAs,    // Store optimal SMA periods
+              days            // Store the days period used for this backtest
             })
           }
         } catch (err) {
@@ -653,7 +654,7 @@ function BacktestResults({ onStockSelect }) {
                     return (
                       <tr
                         key={index}
-                        onClick={() => onStockSelect && onStockSelect(result.symbol, { ...result.optimalParams, smaPeriods: [result.optimalSMAs.period] })}
+                        onClick={() => onStockSelect && onStockSelect(result.symbol, { ...result.optimalParams, smaPeriods: [result.optimalSMAs.period], days: result.days })}
                         className="hover:bg-slate-700 cursor-pointer transition-colors"
                         title="Click to view in Technical Analysis with optimized parameters"
                       >

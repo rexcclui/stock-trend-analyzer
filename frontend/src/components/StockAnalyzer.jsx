@@ -138,9 +138,10 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
   useEffect(() => {
     if (selectedSymbol && selectedSymbol.trim()) {
       setSymbol(selectedSymbol)
-      // Set days to 5Y to match backtest if params provided
+      // Set days to match backtest period if params provided
       if (selectedParams) {
-        setDays('1825')  // 5 years to match backtest period
+        // Use the days from selectedParams if available, otherwise default to 5Y
+        setDays(selectedParams.days || '1825')
       }
       // Trigger analysis for the selected symbol, passing params directly
       analyzeStock(selectedSymbol, selectedParams)
