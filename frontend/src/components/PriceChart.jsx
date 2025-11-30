@@ -1932,38 +1932,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Calculate last channel ONLY on the data that will be displayed
   // This prevents mismatch when period changes and indicators haven't updated yet
-  // IMPORTANT: Filter to only include data within the display period (days parameter)
-  // to match what backtest uses, not all fetched data
-  // NOTE: We filter both prices AND indicators to keep them in sync
-  const { displayPrices, displayIndicators } = (() => {
-    const allPrices = prices.slice(0, dataLength)
-    const allIndicators = indicators.slice(0, dataLength)
-
-    if (allPrices.length === 0) return { displayPrices: [], displayIndicators: [] }
-
-    // Calculate cutoff date based on days parameter
-    const daysNum = parseInt(days)
-    const mostRecentDate = new Date(allPrices[0].date)
-    const cutoffDate = new Date(mostRecentDate)
-    cutoffDate.setDate(cutoffDate.getDate() - daysNum)
-
-    // Filter to only include prices after cutoff date
-    // Prices are in reverse chronological order (newest first)
-    // Filter indicators at the same indices to keep them aligned
-    const filteredPrices = []
-    const filteredIndicators = []
-
-    for (let i = 0; i < allPrices.length; i++) {
-      if (new Date(allPrices[i].date) >= cutoffDate) {
-        filteredPrices.push(allPrices[i])
-        filteredIndicators.push(allIndicators[i])
-      }
-    }
-
-    console.log(`[displayPrices] days=${days}, allPrices=${allPrices.length}, filtered=${filteredPrices.length}, cutoff=${cutoffDate.toISOString().split('T')[0]}`)
-
-    return { displayPrices: filteredPrices, displayIndicators: filteredIndicators }
-  })()
+  const displayPrices = prices.slice(0, dataLength)
+  const displayIndicators = indicators.slice(0, dataLength)
 
   // Build a map of SPY volumes by date for quick lookup
   const spyVolumeByDate = (() => {
@@ -2150,12 +2120,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     if (!volumeProfileV2Enabled || displayPrices.length === 0) return { slots: [], breakouts: [] }
 
     const reversedDisplayPrices = [...displayPrices].reverse()
-
-    // IMPORTANT: displayPrices is already filtered by days parameter to match backtest period
-    // Use ALL of it for Volume Profile V2 - don't apply zoomRange on top (that would be double filtering)
-    const visibleData = reversedDisplayPrices
-
-    console.log(`[Vol Profile V2] Using all displayPrices: ${visibleData.length} items`)
+    const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
 
     if (visibleData.length === 0) return { slots: [], breakouts: [] }
 
@@ -2396,8 +2361,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const breakoutDates = new Set(volumeProfileV2Breakouts.map(b => b.date))
 
     // Prices are in reverse chronological order (newest first), so reverse for forward-time processing
-    // IMPORTANT: Use displayPrices (filtered by days parameter) not full prices array
-    const reversedPrices = [...displayPrices].reverse()
+    const reversedPrices = [...prices].reverse()
 
     // Calculate SMA from daily prices in forward chronological order
     const dateToSMA = new Map()
@@ -2578,8 +2542,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       let bestSmaValue = null
 
       // Prices are in reverse chronological order, reverse for forward-time processing
-      // IMPORTANT: Use displayPrices (filtered by days parameter) not full prices array
-      const reversedPrices = [...displayPrices].reverse()
+      const reversedPrices = [...prices].reverse()
 
       // Helper to calculate P&L for a given SMA period (using daily prices)
       const calculatePLForSMA = (smaPeriod) => {
