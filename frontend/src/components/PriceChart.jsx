@@ -2540,31 +2540,23 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       let bestPL = -Infinity
       let bestSmaValue = null
 
-      // Helper to calculate SMA on SLOTS (not daily prices!)
-      const calculateSMA = (period) => {
-        const result = []
-        for (let i = 0; i < volumeProfileV2Data.length; i++) {
-          if (i < period - 1) {
-            result.push(null)
+      // Prices are in reverse chronological order, reverse for forward-time processing
+      const reversedPrices = [...prices].reverse()
+
+      // Helper to calculate P&L for a given SMA period (using daily prices)
+      const calculatePLForSMA = (smaPeriod) => {
+        if (reversedPrices.length === 0) return -Infinity
+
+        // Calculate SMA from daily prices in forward chronological order
+        const dateToSMA = new Map()
+        for (let i = 0; i < reversedPrices.length; i++) {
+          if (i < smaPeriod - 1) {
+            dateToSMA.set(reversedPrices[i].date, null)
           } else {
-            const sum = volumeProfileV2Data.slice(i - period + 1, i + 1).reduce((acc, s) => acc + s.currentPrice, 0)
-            result.push(sum / period)
+            const sum = reversedPrices.slice(i - smaPeriod + 1, i + 1).reduce((acc, p) => acc + p.close, 0)
+            dateToSMA.set(reversedPrices[i].date, sum / smaPeriod)
           }
         }
-        return result
-      }
-
-      // Helper to calculate P&L for a given SMA period
-      const calculatePLForSMA = (smaPeriod) => {
-        if (volumeProfileV2Data.length === 0) return -Infinity
-
-        const smaValues = calculateSMA(smaPeriod)
-        const dateToSMA = new Map()
-        volumeProfileV2Data.forEach((slot, idx) => {
-          if (smaValues[idx] !== null) {
-            dateToSMA.set(slot.endDate, smaValues[idx])
-          }
-        })
 
         const getSMASlope = (currentDate, prevDate) => {
           const currentSMA = dateToSMA.get(currentDate)
@@ -2581,21 +2573,22 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         let buyPrice = null
         let buyDate = null
 
-        for (let i = 0; i < volumeProfileV2Data.length; i++) {
-          const slot = volumeProfileV2Data[i]
-          if (!slot) continue
+        // Iterate through daily prices in forward chronological order
+        for (let i = 0; i < reversedPrices.length; i++) {
+          const pricePoint = reversedPrices[i]
+          if (!pricePoint) continue
 
-          const currentDate = slot.endDate
-          const currentPrice = slot.currentPrice
+          const currentDate = pricePoint.date
+          const currentPrice = pricePoint.close
 
           if (breakoutDates.has(currentDate) && !isHolding) {
             isHolding = true
             buyPrice = currentPrice
             buyDate = currentDate
           } else if (isHolding && i > 0) {
-            const prevSlot = volumeProfileV2Data[i - 1]
-            if (prevSlot) {
-              const slope = getSMASlope(currentDate, prevSlot.endDate)
+            const prevPrice = reversedPrices[i - 1]
+            if (prevPrice) {
+              const slope = getSMASlope(currentDate, prevPrice.date)
               if (slope !== null && slope < 0) {
                 const sellPrice = currentPrice
                 const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
@@ -2609,9 +2602,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         }
 
         // If still holding, close at end
-        if (isHolding && volumeProfileV2Data.length > 0) {
-          const lastSlot = volumeProfileV2Data[volumeProfileV2Data.length - 1]
-          const currentPrice = lastSlot.currentPrice
+        if (isHolding && reversedPrices.length > 0) {
+          const lastPrice = reversedPrices[reversedPrices.length - 1]
+          const currentPrice = lastPrice.close
           const plPercent = ((currentPrice - buyPrice) / buyPrice) * 100
           trades.push({ plPercent, isOpen: true })
         }
@@ -2619,7 +2612,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const totalPL = trades.reduce((sum, trade) => sum + trade.plPercent, 0)
 
         if (smaPeriod === 50) {
-          console.log(`[SIM-${smaPeriod}] Slots: ${volumeProfileV2Data.length}, Breakouts: ${volumeProfileV2Breakouts.length}`)
+          console.log(`[SIM-${smaPeriod}] Prices: ${reversedPrices.length}, Breakouts: ${volumeProfileV2Breakouts.length}`)
           console.log(`[SIM-${smaPeriod}] Trades: ${trades.length}, Total P/L: ${totalPL.toFixed(2)}%`)
         }
 
