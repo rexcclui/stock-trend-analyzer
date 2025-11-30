@@ -1934,9 +1934,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // This prevents mismatch when period changes and indicators haven't updated yet
   // IMPORTANT: Filter to only include data within the display period (days parameter)
   // to match what backtest uses, not all fetched data
-  const displayPrices = (() => {
+  // NOTE: We filter both prices AND indicators to keep them in sync
+  const { displayPrices, displayIndicators } = (() => {
     const allPrices = prices.slice(0, dataLength)
-    if (allPrices.length === 0) return []
+    const allIndicators = indicators.slice(0, dataLength)
+
+    if (allPrices.length === 0) return { displayPrices: [], displayIndicators: [] }
 
     // Calculate cutoff date based on days parameter
     const daysNum = parseInt(days)
@@ -1946,11 +1949,20 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     // Filter to only include prices after cutoff date
     // Prices are in reverse chronological order (newest first)
-    const filteredPrices = allPrices.filter(p => new Date(p.date) >= cutoffDate)
+    // Filter indicators at the same indices to keep them aligned
+    const filteredPrices = []
+    const filteredIndicators = []
+
+    for (let i = 0; i < allPrices.length; i++) {
+      if (new Date(allPrices[i].date) >= cutoffDate) {
+        filteredPrices.push(allPrices[i])
+        filteredIndicators.push(allIndicators[i])
+      }
+    }
 
     console.log(`[displayPrices] days=${days}, allPrices=${allPrices.length}, filtered=${filteredPrices.length}, cutoff=${cutoffDate.toISOString().split('T')[0]}`)
 
-    return filteredPrices
+    return { displayPrices: filteredPrices, displayIndicators: filteredIndicators }
   })()
 
   // Build a map of SPY volumes by date for quick lookup
@@ -2770,7 +2782,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     : []
 
   const chartData = displayPrices.map((price, index) => {
-    const indicator = indicators[index] || {}
+    const indicator = displayIndicators[index] || {}
 
     // Determine high/low volume based on mode using rolling thresholds
     let isHighVolume = false
