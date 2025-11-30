@@ -350,6 +350,7 @@ function optimizeSMAParams(prices, slots, breakouts) {
     }
 
     const totalPL = trades.reduce((sum, trade) => sum + trade.plPercent, 0)
+    console.log(`[BacktestOptimize SMA-${smaPeriod}] Prices: ${reversedPrices.length}, Breakouts: ${breakouts.length}, Trades: ${trades.length}, P/L: ${totalPL.toFixed(2)}%`)
     return { totalPL, trades }
   }
 
