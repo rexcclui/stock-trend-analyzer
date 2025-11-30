@@ -2151,13 +2151,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     const reversedDisplayPrices = [...displayPrices].reverse()
 
-    // Clamp zoomRange to actual data bounds (displayPrices may be filtered smaller than original fetch)
-    const clampedStart = Math.min(zoomRange.start, reversedDisplayPrices.length - 1)
-    const clampedEnd = zoomRange.end === null ? reversedDisplayPrices.length : Math.min(zoomRange.end, reversedDisplayPrices.length)
+    // IMPORTANT: displayPrices is already filtered by days parameter to match backtest period
+    // Use ALL of it for Volume Profile V2 - don't apply zoomRange on top (that would be double filtering)
+    const visibleData = reversedDisplayPrices
 
-    console.log(`[Vol Profile V2] displayPrices=${reversedDisplayPrices.length}, zoomRange=(${zoomRange.start},${zoomRange.end}), clamped=(${clampedStart},${clampedEnd})`)
-
-    const visibleData = reversedDisplayPrices.slice(clampedStart, clampedEnd)
+    console.log(`[Vol Profile V2] Using all displayPrices: ${visibleData.length} items`)
 
     if (visibleData.length === 0) return { slots: [], breakouts: [] }
 
