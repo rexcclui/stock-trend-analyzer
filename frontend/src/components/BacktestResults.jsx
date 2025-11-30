@@ -196,15 +196,15 @@ function calculateVolPrfV2Breakouts(prices, params = {}) {
   return { slots, breakouts }
 }
 
-// Check if breakout occurred in last N days
-function hasRecentBreakout(breakouts, prices, days = 10) {
-  if (!breakouts || breakouts.length === 0) return false
+// Check if breakout occurred in last N days (relative to today)
+function getRecentBreakouts(breakouts, days = 10) {
+  if (!breakouts || breakouts.length === 0) return []
 
-  const latestDate = new Date(prices[prices.length - 1].date)
-  const cutoffDate = new Date(latestDate)
+  const now = new Date()
+  const cutoffDate = new Date(now)
   cutoffDate.setDate(cutoffDate.getDate() - days)
 
-  return breakouts.some(b => new Date(b.date) >= cutoffDate)
+  return breakouts.filter(b => new Date(b.date) >= cutoffDate)
 }
 
 // Get latest breakout info
@@ -494,9 +494,10 @@ function BacktestResults({ onStockSelect }) {
           // Optimize SMA parameters based on slots and breakouts
           const optimalSMAs = optimizeSMAParams(priceData, slots, breakouts)
 
-          // Check if breakout in last 10 days
-          if (hasRecentBreakout(breakouts, priceData, 10)) {
-            const latestBreakout = getLatestBreakout(breakouts)
+          // Check if breakout in last 10 days (relative to today)
+          const recentBreakouts = getRecentBreakouts(breakouts, 10)
+          if (recentBreakouts.length > 0) {
+            const latestBreakout = getLatestBreakout(recentBreakouts)
             const latestPrice = priceData[priceData.length - 1].close
 
             backtestResults.push({
