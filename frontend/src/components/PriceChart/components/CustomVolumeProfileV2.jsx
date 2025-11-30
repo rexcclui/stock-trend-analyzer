@@ -236,32 +236,32 @@ export const CustomVolumeProfileV2 = ({
       {volumeProfileV2Enabled && breakoutPL.trades.length > 0 && (
         <g>
           <text
-            x={offset.left + offset.width - 10}
+            x={offset.left + 10}
             y={offset.top + 20}
             fill={breakoutPL.totalPL >= 0 ? '#22c55e' : '#ef4444'}
             fontSize="14"
             fontWeight="700"
-            textAnchor="end"
+            textAnchor="start"
             style={{ pointerEvents: 'none' }}
           >
             P&L: {breakoutPL.totalPL >= 0 ? '+' : ''}{breakoutPL.totalPL.toFixed(2)}%
           </text>
           <text
-            x={offset.left + offset.width - 10}
+            x={offset.left + 10}
             y={offset.top + 38}
             fill="#94a3b8"
             fontSize="11"
-            textAnchor="end"
+            textAnchor="start"
             style={{ pointerEvents: 'none' }}
           >
             Market: {breakoutPL.marketChange >= 0 ? '+' : ''}{breakoutPL.marketChange.toFixed(2)}% | α: {((breakoutPL.totalPL - breakoutPL.marketChange) >= 0 ? '+' : '')}{(breakoutPL.totalPL - breakoutPL.marketChange).toFixed(2)}%
           </text>
           <text
-            x={offset.left + offset.width - 10}
+            x={offset.left + 10}
             y={offset.top + 54}
             fill="#94a3b8"
             fontSize="10"
-            textAnchor="end"
+            textAnchor="start"
             style={{ pointerEvents: 'none' }}
           >
             Trades: {breakoutPL.closedTradeCount} | Win: {breakoutPL.winRate.toFixed(1)}%
