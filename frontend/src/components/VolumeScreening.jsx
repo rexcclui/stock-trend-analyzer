@@ -123,6 +123,31 @@ function detectBreakout(slots, currentIndex, lastPrice) {
   return nearBoundary && significantShift
 }
 
+function findResistance(slots, currentIndex, direction = 'down') {
+  if (!Array.isArray(slots) || slots.length === 0 || currentIndex < 0) return null
+
+  const currentWeight = slots[currentIndex]?.weight ?? null
+  if (currentWeight == null) return null
+
+  const threshold = currentWeight + 5
+  const step = direction === 'up' ? 1 : -1
+
+  let idx = currentIndex + step
+  while (idx >= 0 && idx < slots.length) {
+    const slot = slots[idx]
+    if (slot?.weight >= threshold) {
+      return {
+        index: idx,
+        range: formatPriceRange(slot.start, slot.end),
+        weight: slot.weight
+      }
+    }
+    idx += step
+  }
+
+  return null
+}
+
 function VolumeScreening() {
   const [symbolInput, setSymbolInput] = useState('')
   const [period, setPeriod] = useState('1825')
@@ -174,6 +199,8 @@ function VolumeScreening() {
           symbol,
           priceRange: '—',
           volumeLegend: [],
+          bottomResist: '—',
+          upperResist: '—',
           breakout: '—',
           status: 'idle',
           error: null
@@ -215,11 +242,15 @@ function VolumeScreening() {
         const slotIndex = findSlotIndex(slots, lastPrice)
         const legend = buildLegend(slots, slotIndex)
         const breakout = detectBreakout(slots, slotIndex, lastPrice)
+        const bottomResist = findResistance(slots, slotIndex, 'down')
+        const upperResist = findResistance(slots, slotIndex, 'up')
 
         return {
           ...entry,
           priceRange: slotIndex >= 0 ? formatPriceRange(slots[slotIndex].start, slots[slotIndex].end) : '—',
           volumeLegend: legend,
+          bottomResist: bottomResist ? `${bottomResist.range} (${bottomResist.weight.toFixed(1)}%)` : '—',
+          upperResist: upperResist ? `${upperResist.range} (${upperResist.weight.toFixed(1)}%)` : '—',
           breakout: breakout ? 'Break' : '—',
           status: 'ready',
           error: null
@@ -230,6 +261,8 @@ function VolumeScreening() {
           ...entry,
           priceRange: '—',
           volumeLegend: [],
+          bottomResist: '—',
+          upperResist: '—',
           breakout: '—',
           status: 'error',
           error: error?.response?.data?.error || error?.message || 'Failed to scan'
@@ -341,6 +374,12 @@ function VolumeScreening() {
                   Volume Weight %
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                  Bottom Resist
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                  Upper Resist
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Break
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-wider">
@@ -351,7 +390,7 @@ function VolumeScreening() {
             <tbody className="divide-y divide-slate-800">
               {entries.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-4 py-6 text-center text-slate-400">
+                  <td colSpan="7" className="px-4 py-6 text-center text-slate-400">
                     No symbols added yet. Add stocks above to start screening.
                   </td>
                 </tr>
@@ -390,6 +429,8 @@ function VolumeScreening() {
                         <span className="text-slate-400">—</span>
                       )}
                     </td>
+                    <td className="px-4 py-3 text-slate-200">{entry.bottomResist}</td>
+                    <td className="px-4 py-3 text-slate-200">{entry.upperResist}</td>
                     <td className="px-4 py-3 text-slate-200">{entry.breakout}</td>
                     <td className="px-4 py-3 text-right">
                       <button
