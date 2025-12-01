@@ -206,19 +206,21 @@ function buildLegend(slots, currentIndex) {
 //   A break is flagged when any of those slots differs from the current weight by ≥5 percentage points.
 // - If the prior slot is higher, do the same check on up to five slots above the current range.
 // - If the prior slot is the same or unavailable, no break is reported.
+// - Returns the direction of the break ("up" | "down") or null when no break is detected.
 function detectBreakout(slots, currentIndex, lastPrice, previousPrice) {
-  if (!Array.isArray(slots) || slots.length === 0 || currentIndex < 0 || lastPrice == null) return false
+  if (!Array.isArray(slots) || slots.length === 0 || currentIndex < 0 || lastPrice == null) return null
   const currentSlot = slots[currentIndex]
   const prevIndex = findSlotIndex(slots, previousPrice)
 
   if (prevIndex < 0 || prevIndex === currentIndex) {
-    return false
+    return null
   }
 
   const currentWeight = currentSlot.weight
   const targetSlots = []
+  const direction = prevIndex < currentIndex ? 'up' : 'down'
 
-  if (prevIndex < currentIndex) {
+  if (direction === 'up') {
     // Prior slot sat below the current one; inspect up to five ranges below for a sharp volume shift.
     for (let i = currentIndex - 1; i >= Math.max(0, currentIndex - 5); i -= 1) {
       targetSlots.push(slots[i])
@@ -230,7 +232,8 @@ function detectBreakout(slots, currentIndex, lastPrice, previousPrice) {
     }
   }
 
-  return targetSlots.some(slot => Math.abs((slot?.weight ?? 0) - currentWeight) >= 5)
+  const hasBreak = targetSlots.some(slot => Math.abs((slot?.weight ?? 0) - currentWeight) >= 5)
+  return hasBreak ? direction : null
 }
 
 function findResistance(slots, currentIndex, direction = 'down') {
@@ -489,7 +492,7 @@ function VolumeScreening({ onStockSelect }) {
         volumeLegend: legend,
         bottomResist: bottomResist ? `${bottomResist.range} (${bottomResist.weight.toFixed(1)}%)` : '—',
         upperResist: upperResist ? `${upperResist.range} (${upperResist.weight.toFixed(1)}%)` : '—',
-        breakout: breakout ? 'Break' : '—',
+        breakout: breakout ? (breakout === 'up' ? 'Up' : 'Down') : '—',
         lastScanAt: new Date().toISOString(),
         status: 'ready',
         error: null
@@ -562,7 +565,7 @@ function VolumeScreening({ onStockSelect }) {
   }
 
   const visibleEntries = showBreakOnly
-    ? entries.filter(entry => entry.breakout === 'Break')
+    ? entries.filter(entry => entry.breakout && entry.breakout !== '—')
     : entries
 
   useEffect(() => {
