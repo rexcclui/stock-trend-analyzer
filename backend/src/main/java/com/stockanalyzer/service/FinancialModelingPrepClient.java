@@ -44,6 +44,10 @@ public class FinancialModelingPrepClient {
                 // Extract historical data
                 List<Map<String, Object>> historical = (List<Map<String, Object>>) data.get("historical");
 
+                if (historical == null || historical.isEmpty()) {
+                    return List.of();
+                }
+
                 return historical.stream()
                         .map(this::mapToStockPrice)
                         .toList();
@@ -84,6 +88,10 @@ public class FinancialModelingPrepClient {
                 Map<String, Object> data = gson.fromJson(json, type);
 
                 List<Map<String, Object>> historical = (List<Map<String, Object>>) data.get("historical");
+
+                if (historical == null || historical.isEmpty()) {
+                    return List.of();
+                }
 
                 List<StockPrice> prices = historical.stream()
                         .map(this::mapToStockPrice)
