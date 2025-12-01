@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus, ScanLine, XCircle, Activity } from 'lucide-react'
 
+const STOCK_HISTORY_KEY = 'stockSearchHistory'
+
 const periods = [
-  { label: '7D', value: '7' },
-  { label: '1M', value: '30' },
-  { label: '3M', value: '90' },
-  { label: '6M', value: '180' },
-  { label: '1Y', value: '365' }
+  { label: '1Y', value: '365' },
+  { label: '3Y', value: '1095' },
+  { label: '5Y', value: '1825' },
+  { label: 'Max', value: '3650' }
 ]
 
 function parseStockSymbols(input) {
@@ -19,12 +20,46 @@ function parseStockSymbols(input) {
 
 function VolumeScreening() {
   const [symbolInput, setSymbolInput] = useState('')
-  const [period, setPeriod] = useState(periods[1].value)
+  const [period, setPeriod] = useState('1825')
+  const [stockHistory, setStockHistory] = useState([])
   const [entries, setEntries] = useState([])
+
+  useEffect(() => {
+    const savedHistory = localStorage.getItem(STOCK_HISTORY_KEY)
+    if (savedHistory) {
+      try {
+        setStockHistory(JSON.parse(savedHistory))
+      } catch (e) {
+        console.error('Failed to load stock history:', e)
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    const handleHistoryUpdate = (event) => {
+      if (Array.isArray(event.detail)) {
+        setStockHistory(event.detail)
+      }
+    }
+
+    window.addEventListener('stockHistoryUpdated', handleHistoryUpdate)
+    return () => window.removeEventListener('stockHistoryUpdated', handleHistoryUpdate)
+  }, [])
+
+  const saveToHistory = (symbols) => {
+    if (!Array.isArray(symbols) || symbols.length === 0) return
+    const uniqueSymbols = Array.from(new Set(symbols.filter(Boolean)))
+    const updatedHistory = [...uniqueSymbols, ...stockHistory.filter(s => !uniqueSymbols.includes(s))].slice(0, 10)
+    setStockHistory(updatedHistory)
+    localStorage.setItem(STOCK_HISTORY_KEY, JSON.stringify(updatedHistory))
+    window.dispatchEvent(new CustomEvent('stockHistoryUpdated', { detail: updatedHistory }))
+  }
 
   const addSymbols = () => {
     const symbols = parseStockSymbols(symbolInput)
     if (symbols.length === 0) return
+
+    saveToHistory(symbols)
 
     const nextEntries = [...entries]
     symbols.forEach(symbol => {
@@ -66,14 +101,38 @@ function VolumeScreening() {
     setEntries(entries.filter(entry => entry.id !== id))
   }
 
+  const handleHistoryClick = (symbol) => {
+    setSymbolInput(symbol)
+  }
+
   return (
     <div className="space-y-4">
       <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 space-y-4">
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1">
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Stock Symbol
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-slate-300">
+                Stock Symbol
+              </label>
+              {stockHistory.length > 0 && (
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className="text-xs text-slate-400">Recent:</span>
+                  {stockHistory.map((stock, index) => (
+                    <span key={stock}>
+                      <button
+                        onClick={() => handleHistoryClick(stock)}
+                        className="text-xs text-purple-400 hover:text-purple-300 hover:underline transition-colors"
+                      >
+                        {stock}
+                      </button>
+                      {index < stockHistory.length - 1 && (
+                        <span className="text-slate-500">, </span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
             <input
               type="text"
               value={symbolInput}
