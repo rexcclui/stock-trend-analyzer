@@ -78,7 +78,7 @@ function App() {
               <BacktestResults onStockSelect={handleStockSelect} />
             </div>
             <div style={{ display: activeTab === 'volume' ? 'block' : 'none' }}>
-              <VolumeScreening />
+              <VolumeScreening onStockSelect={handleStockSelect} />
             </div>
           </div>
         </div>

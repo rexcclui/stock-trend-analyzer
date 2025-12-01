@@ -148,7 +148,7 @@ function findResistance(slots, currentIndex, direction = 'down') {
   return null
 }
 
-function VolumeScreening() {
+function VolumeScreening({ onStockSelect }) {
   const [symbolInput, setSymbolInput] = useState('')
   const [period, setPeriod] = useState('1825')
   const [stockHistory, setStockHistory] = useState([])
@@ -277,6 +277,11 @@ function VolumeScreening() {
     setEntries(entries.filter(entry => entry.id !== id))
   }
 
+  const handleRowClick = (entry) => {
+    if (!onStockSelect) return
+    onStockSelect(entry.symbol, { days: period, forceVolumeProfileV2: true })
+  }
+
   const handleHistoryClick = (symbol) => {
     setSymbolInput(symbol)
   }
@@ -396,7 +401,12 @@ function VolumeScreening() {
                 </tr>
               ) : (
                 entries.map(entry => (
-                  <tr key={entry.id} className="hover:bg-slate-800/60">
+                  <tr
+                    key={entry.id}
+                    className="hover:bg-slate-800/60 cursor-pointer"
+                    onClick={() => handleRowClick(entry)}
+                    title="Click to open in Technical Analysis with Vol Prf V2"
+                  >
                     <td className="px-4 py-3 text-slate-100 font-medium">{entry.symbol}</td>
                     <td className="px-4 py-3 text-slate-200">{entry.priceRange}</td>
                     <td className="px-4 py-3 text-slate-200">
@@ -434,7 +444,10 @@ function VolumeScreening() {
                     <td className="px-4 py-3 text-slate-200">{entry.breakout}</td>
                     <td className="px-4 py-3 text-right">
                       <button
-                        onClick={() => removeEntry(entry.id)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          removeEntry(entry.id)
+                        }}
                         className="inline-flex items-center gap-1 text-slate-400 hover:text-red-400 transition-colors"
                         aria-label={`Remove ${entry.symbol}`}
                       >
