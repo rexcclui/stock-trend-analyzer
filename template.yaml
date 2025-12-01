@@ -53,6 +53,19 @@ Resources:
             Path: /backtest
             Method: get
 
+  TopMarketCapFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend
+      Handler: com.stockanalyzer.handler.TopMarketCapHandler::handleRequest
+      Events:
+        TopMarketCap:
+          Type: Api
+          Properties:
+            RestApiId: !Ref StockAnalyzerApi
+            Path: /top-market-cap
+            Method: get
+
 Outputs:
   StockAnalyzerApiUrl:
     Description: "API Gateway endpoint URL"
@@ -65,3 +78,7 @@ Outputs:
   BacktestEndpoint:
     Description: "Backtest Endpoint"
     Value: !Sub "https://${StockAnalyzerApi}.execute-api.${AWS::Region}.amazonaws.com/prod/backtest"
+
+  TopMarketCapEndpoint:
+    Description: "Top Market Cap Endpoint"
+    Value: !Sub "https://${StockAnalyzerApi}.execute-api.${AWS::Region}.amazonaws.com/prod/top-market-cap"

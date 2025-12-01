@@ -269,6 +269,28 @@ curl "https://your-api-url.amazonaws.com/prod/backtest?symbol=TSLA&days=365"
 }
 ```
 
+### 3. Top Market Cap Symbols
+**Endpoint**: `GET /top-market-cap`
+
+**Query Parameters**:
+- `limit` (optional): Number of symbols to return (default: 2000)
+
+**Example**:
+```bash
+curl "https://your-api-url.amazonaws.com/prod/top-market-cap?limit=2000"
+```
+
+**Response**:
+```json
+{
+  "symbols": [
+    "AAPL",
+    "MSFT",
+    "AMZN"
+  ]
+}
+```
+
 ## Usage Guide
 
 ### Analyzing a Stock
