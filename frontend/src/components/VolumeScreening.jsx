@@ -295,12 +295,14 @@ function parseResistanceWeight(resistanceValue) {
   return Number.isFinite(parsed) ? Math.abs(parsed) : null
 }
 
-function getResistanceDifference(bottomResist, upperResist) {
+function hasCloseResistance(bottomResist, upperResist, threshold = 10) {
   const bottomWeight = parseResistanceWeight(bottomResist)
   const upperWeight = parseResistanceWeight(upperResist)
 
-  if (bottomWeight == null || upperWeight == null) return null
-  return Math.abs(bottomWeight - upperWeight)
+  const isBottomClose = bottomWeight != null && bottomWeight < threshold
+  const isUpperClose = upperWeight != null && upperWeight < threshold
+
+  return isBottomClose || isUpperClose
 }
 
 function VolumeScreening({ onStockSelect }) {
@@ -645,10 +647,7 @@ function VolumeScreening({ onStockSelect }) {
     setIsPaused(prev => !prev)
   }
 
-  const isPotentialBreak = (entry) => {
-    const difference = getResistanceDifference(entry.bottomResist, entry.upperResist)
-    return difference != null && difference < 10
-  }
+  const isPotentialBreak = (entry) => hasCloseResistance(entry.bottomResist, entry.upperResist)
 
   const filteredEntries = entries.filter(entry => {
     if (showPotentialBreakOnly && !isPotentialBreak(entry)) return false
