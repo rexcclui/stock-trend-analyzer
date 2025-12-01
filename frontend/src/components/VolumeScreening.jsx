@@ -5,6 +5,7 @@ import { joinUrl } from '../utils/urlHelper'
 
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
 const VOLUME_CACHE_KEY = 'volumeScreeningEntries'
+const VOLUME_SYMBOLS_KEY = 'volumeScreeningSymbols'
 const VOLUME_RESULT_CACHE_KEY = 'volumeScreeningResultsBySymbol'
 const TOP_SYMBOL_CACHE_KEY = 'volumeTopMarketSymbols'
 const CACHE_TTL_MS = 16 * 60 * 60 * 1000
@@ -414,20 +415,42 @@ function VolumeScreening({ onStockSelect }) {
 
   useEffect(() => {
     const savedEntries = localStorage.getItem(VOLUME_CACHE_KEY)
-    if (!savedEntries) return
+    if (savedEntries) {
+      try {
+        const parsed = JSON.parse(savedEntries)
+        if (Array.isArray(parsed)) {
+          const hydrated = parsed.map(item => {
+            const cached = hydrateFromResultCache(item.symbol)
+            const merged = { ...baseEntryState, ...item, ...(cached || {}) }
+            return isEntryFresh(merged) ? merged : clearEntryResults(merged)
+          })
+          if (hydrated.length > 0) {
+            setEntries(hydrated)
+            return
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load cached volume entries:', error)
+      }
+    }
 
     try {
-      const parsed = JSON.parse(savedEntries)
-      if (!Array.isArray(parsed)) return
+      const savedSymbolsRaw = localStorage.getItem(VOLUME_SYMBOLS_KEY)
+      if (!savedSymbolsRaw) return
 
-      const hydrated = parsed.map(item => {
-        const cached = hydrateFromResultCache(item.symbol)
-        const merged = { ...baseEntryState, ...item, ...(cached || {}) }
-        return isEntryFresh(merged) ? merged : clearEntryResults(merged)
-      })
-      setEntries(hydrated)
+      const symbols = JSON.parse(savedSymbolsRaw)
+      if (!Array.isArray(symbols)) return
+
+      const cleanedSymbols = Array.from(new Set(symbols.filter(symbol => typeof symbol === 'string' && symbol.trim())));
+      if (cleanedSymbols.length === 0) return
+
+      setEntries(cleanedSymbols.map(symbol => ({
+        id: `${symbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        symbol: symbol.toUpperCase(),
+        ...baseEntryState
+      })))
     } catch (error) {
-      console.error('Failed to load cached volume entries:', error)
+      console.error('Failed to load saved volume symbols:', error)
     }
   }, [])
 
@@ -445,6 +468,7 @@ function VolumeScreening({ onStockSelect }) {
   useEffect(() => {
     const leanEntries = entries.map(({ id, symbol, status, lastScanAt }) => ({ id, symbol, status, lastScanAt }))
     safeSetItem(VOLUME_CACHE_KEY, JSON.stringify(leanEntries))
+    safeSetItem(VOLUME_SYMBOLS_KEY, JSON.stringify(entries.map(entry => entry.symbol).filter(Boolean)))
     persistReadyResults(entries)
   }, [entries])
 
