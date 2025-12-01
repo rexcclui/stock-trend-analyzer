@@ -5,6 +5,7 @@ import { joinUrl } from '../utils/urlHelper'
 
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
 const VOLUME_CACHE_KEY = 'volumeScreeningEntries'
+const VOLUME_RESULT_CACHE_KEY = 'volumeScreeningResultsBySymbol'
 const CACHE_TTL_MS = 16 * 60 * 60 * 1000
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -32,6 +33,25 @@ function formatTimestamp(dateString) {
   const parsed = new Date(dateString)
   if (Number.isNaN(parsed.getTime())) return '—'
   return parsed.toLocaleString()
+}
+
+function loadResultCache() {
+  try {
+    const stored = localStorage.getItem(VOLUME_RESULT_CACHE_KEY)
+    const parsed = stored ? JSON.parse(stored) : {}
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch (error) {
+    console.error('Failed to load volume result cache:', error)
+    return {}
+  }
+}
+
+function saveResultCache(cache) {
+  try {
+    localStorage.setItem(VOLUME_RESULT_CACHE_KEY, JSON.stringify(cache))
+  } catch (error) {
+    console.error('Failed to save volume result cache:', error)
+  }
 }
 
 function getSlotColor(weight, maxWeight) {
@@ -221,6 +241,29 @@ function VolumeScreening({ onStockSelect }) {
     return Number.isFinite(scannedAt) && Date.now() - scannedAt < CACHE_TTL_MS
   }
 
+  const hydrateFromResultCache = (symbol) => {
+    const cache = loadResultCache()
+    const cached = cache?.[symbol]
+    if (!cached) return null
+
+    const hydrated = { ...baseEntryState, ...cached, symbol, status: cached.status || 'ready' }
+    return isEntryFresh(hydrated) ? hydrated : null
+  }
+
+  const persistReadyResults = (list) => {
+    const existing = loadResultCache()
+    const merged = { ...existing }
+
+    list.forEach(entry => {
+      if (entry.status === 'ready' && isEntryFresh(entry)) {
+        const { id, ...rest } = entry
+        merged[entry.symbol] = rest
+      }
+    })
+
+    saveResultCache(merged)
+  }
+
   useEffect(() => {
     const savedHistory = localStorage.getItem(STOCK_HISTORY_KEY)
     if (savedHistory) {
@@ -263,6 +306,7 @@ function VolumeScreening({ onStockSelect }) {
 
   useEffect(() => {
     localStorage.setItem(VOLUME_CACHE_KEY, JSON.stringify(entries))
+    persistReadyResults(entries)
   }, [entries])
 
   const saveToHistory = (symbols) => {
@@ -283,10 +327,11 @@ function VolumeScreening({ onStockSelect }) {
     const nextEntries = [...entries]
     symbols.forEach(symbol => {
       if (!nextEntries.some(entry => entry.symbol === symbol)) {
+        const cached = hydrateFromResultCache(symbol)
         nextEntries.push({
           id: `${symbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
           symbol,
-          ...baseEntryState
+          ...(cached || baseEntryState)
         })
       }
     })
