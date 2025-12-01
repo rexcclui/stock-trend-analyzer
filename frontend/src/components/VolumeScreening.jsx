@@ -198,6 +198,7 @@ function VolumeScreening({ onStockSelect }) {
           id: `${symbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
           symbol,
           priceRange: '—',
+          testedDays: '—',
           volumeLegend: [],
           bottomResist: '—',
           upperResist: '—',
@@ -248,6 +249,7 @@ function VolumeScreening({ onStockSelect }) {
         return {
           ...entry,
           priceRange: slotIndex >= 0 ? formatPriceRange(slots[slotIndex].start, slots[slotIndex].end) : '—',
+          testedDays: period,
           volumeLegend: legend,
           bottomResist: bottomResist ? `${bottomResist.range} (${bottomResist.weight.toFixed(1)}%)` : '—',
           upperResist: upperResist ? `${upperResist.range} (${upperResist.weight.toFixed(1)}%)` : '—',
@@ -376,6 +378,9 @@ function VolumeScreening({ onStockSelect }) {
                   Current Price Range
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                  Days Tested
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Volume Weight %
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
@@ -395,7 +400,7 @@ function VolumeScreening({ onStockSelect }) {
             <tbody className="divide-y divide-slate-800">
               {entries.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-4 py-6 text-center text-slate-400">
+                  <td colSpan="8" className="px-4 py-6 text-center text-slate-400">
                     No symbols added yet. Add stocks above to start screening.
                   </td>
                 </tr>
@@ -409,6 +414,7 @@ function VolumeScreening({ onStockSelect }) {
                   >
                     <td className="px-4 py-3 text-slate-100 font-medium">{entry.symbol}</td>
                     <td className="px-4 py-3 text-slate-200">{entry.priceRange}</td>
+                    <td className="px-4 py-3 text-slate-200">{entry.testedDays}</td>
                     <td className="px-4 py-3 text-slate-200">
                     {entry.status === 'loading' ? (
                         <div className="flex items-center gap-2 text-amber-400">
