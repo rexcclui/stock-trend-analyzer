@@ -510,10 +510,14 @@ function VolumeScreening({ onStockSelect }) {
         breakout: breakout ? (breakout === 'up' ? 'Up' : 'Down') : '—',
         lastScanAt: new Date().toISOString(),
         status: 'ready',
-        error: null
+        error: null,
+        stopAll: false
       }
     } catch (error) {
       console.error('Failed to scan symbol', entry.symbol, error)
+      const status = error?.response?.status
+      const isServerError = typeof status === 'number' && status >= 500
+
       return {
         ...entry,
         priceRange: '—',
@@ -524,7 +528,8 @@ function VolumeScreening({ onStockSelect }) {
         breakout: '—',
         lastScanAt: new Date().toISOString(),
         status: 'error',
-        error: error?.response?.data?.error || error?.message || 'Failed to scan'
+        error: error?.response?.data?.error || error?.message || 'Failed to scan',
+        stopAll: isServerError
       }
     }
   }
@@ -557,11 +562,18 @@ function VolumeScreening({ onStockSelect }) {
     )))
 
     const result = await performScan(prepared)
+    const { stopAll, ...entryResult } = result || {}
     setEntries(prev => prev.map(entry => (
       entry.id === id
-        ? result
+        ? entryResult
         : entry
     )))
+    if (stopAll) {
+      setScanQueue([])
+      setIsScanning(false)
+      setIsPaused(false)
+      return
+    }
     setScanQueue(prev => prev.filter(item => item.id !== id))
   }
 
@@ -605,12 +617,21 @@ function VolumeScreening({ onStockSelect }) {
 
     ;(async () => {
       const result = await performScan(current)
+      const { stopAll, ...entryResult } = result || {}
 
       setEntries(prev => prev.map(entry => (
         entry.id === current.id
-          ? result
+          ? entryResult
           : entry
       )))
+
+      if (stopAll) {
+        setScanQueue([])
+        setIsScanning(false)
+        setIsPaused(false)
+        activeScanIdRef.current = null
+        return
+      }
 
       setScanQueue(prev => prev.slice(1))
       activeScanIdRef.current = null
