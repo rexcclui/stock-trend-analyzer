@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
 import { Plus, ScanLine, Activity, Loader2, RefreshCcw, Trash2, DownloadCloud, Pause, Play } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
@@ -268,6 +268,7 @@ function VolumeScreening({ onStockSelect }) {
   const [isScanning, setIsScanning] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [showBreakOnly, setShowBreakOnly] = useState(false)
+  const activeScanIdRef = useRef(null)
 
   const baseEntryState = {
     priceRange: '—',
@@ -572,11 +573,20 @@ function VolumeScreening({ onStockSelect }) {
     }
 
     const current = scanQueue[0]
-    let cancelled = false
+
+    // Allow an in-flight scan to finish even if pause is toggled; only block starting new work.
+    if (activeScanIdRef.current && activeScanIdRef.current !== current.id) {
+      return
+    }
+
+    if (activeScanIdRef.current === current.id) {
+      return
+    }
+
+    activeScanIdRef.current = current.id
 
     ;(async () => {
       const result = await performScan(current)
-      if (cancelled) return
 
       setEntries(prev => prev.map(entry => (
         entry.id === current.id
@@ -585,9 +595,8 @@ function VolumeScreening({ onStockSelect }) {
       )))
 
       setScanQueue(prev => prev.slice(1))
+      activeScanIdRef.current = null
     })()
-
-    return () => { cancelled = true }
   }, [isScanning, isPaused, scanQueue])
 
   useEffect(() => {
