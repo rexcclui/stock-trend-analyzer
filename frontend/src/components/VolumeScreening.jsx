@@ -277,6 +277,8 @@ function findResistance(slots, currentIndex, direction = 'down') {
     if (slot?.weight >= threshold) {
       return {
         index: idx,
+        start: slot.start,
+        end: slot.end,
         range: formatPriceRange(slot.start, slot.end),
         weight: slot.weight
       }
@@ -293,6 +295,25 @@ function parseResistanceWeight(resistanceValue) {
   if (!match) return null
   const parsed = parseFloat(match[1])
   return Number.isFinite(parsed) ? Math.abs(parsed) : null
+}
+
+function calculatePercentGap(currentRange, targetRange) {
+  if (!currentRange || !targetRange) return null
+  const currentMid = (currentRange.start + currentRange.end) / 2
+  const targetMid = (targetRange.start + targetRange.end) / 2
+  if (!Number.isFinite(currentMid) || currentMid === 0 || !Number.isFinite(targetMid)) return null
+
+  const diff = ((targetMid - currentMid) / currentMid) * 100
+  return diff
+}
+
+function formatResistance(currentRange, resistance) {
+  if (!resistance || !currentRange) return '—'
+  const diff = calculatePercentGap(currentRange, resistance)
+  if (diff == null) return '—'
+
+  const sign = diff > 0 ? '+' : ''
+  return `${resistance.range} (${sign}${diff.toFixed(1)}%)`
 }
 
 function hasCloseResistance(bottomResist, upperResist, threshold = 10) {
@@ -321,6 +342,7 @@ function VolumeScreening({ onStockSelect }) {
 
   const baseEntryState = {
     priceRange: '—',
+    currentRange: null,
     testedDays: '—',
     slotCount: '—',
     volumeLegend: [],
@@ -536,6 +558,7 @@ function VolumeScreening({ onStockSelect }) {
       const prices = response.data?.prices || []
       const { slots, lastPrice, previousPrice } = buildVolumeSlots(prices)
       const slotIndex = findSlotIndex(slots, lastPrice)
+      const currentRange = slotIndex >= 0 ? slots[slotIndex] : null
       const legend = buildLegend(slots, slotIndex)
       const breakout = detectBreakout(slots, slotIndex, lastPrice, previousPrice)
       const bottomResist = findResistance(slots, slotIndex, 'down')
@@ -543,12 +566,13 @@ function VolumeScreening({ onStockSelect }) {
 
       return {
         ...entry,
-        priceRange: slotIndex >= 0 ? formatPriceRange(slots[slotIndex].start, slots[slotIndex].end) : '—',
+        priceRange: currentRange ? formatPriceRange(currentRange.start, currentRange.end) : '—',
+        currentRange: currentRange ? { start: currentRange.start, end: currentRange.end } : null,
         testedDays: period,
         slotCount: slots.length,
         volumeLegend: legend,
-        bottomResist: bottomResist ? `${bottomResist.range} (${bottomResist.weight.toFixed(1)}%)` : '—',
-        upperResist: upperResist ? `${upperResist.range} (${upperResist.weight.toFixed(1)}%)` : '—',
+        bottomResist: formatResistance(currentRange, bottomResist),
+        upperResist: formatResistance(currentRange, upperResist),
         breakout: breakout ? (breakout === 'up' ? 'Up' : 'Down') : '—',
         lastScanAt: new Date().toISOString(),
         status: 'ready',
@@ -648,6 +672,10 @@ function VolumeScreening({ onStockSelect }) {
   }
 
   const isPotentialBreak = (entry) => hasCloseResistance(entry.bottomResist, entry.upperResist)
+  const isResistanceClose = (value) => {
+    const parsed = parseResistanceWeight(value)
+    return parsed != null && parsed < 10
+  }
 
   const filteredEntries = entries.filter(entry => {
     if (showPotentialBreakOnly && !isPotentialBreak(entry)) return false
@@ -659,6 +687,13 @@ function VolumeScreening({ onStockSelect }) {
 
   const sortedEntries = sortConfig.field
     ? [...visibleEntries].sort((a, b) => {
+        if (sortConfig.field === 'lastScanAt') {
+          const timeA = a.lastScanAt ? new Date(a.lastScanAt).getTime() : -Infinity
+          const timeB = b.lastScanAt ? new Date(b.lastScanAt).getTime() : -Infinity
+          const diff = timeA - timeB
+          return sortConfig.direction === 'asc' ? diff : -diff
+        }
+
         const weightA = parseResistanceWeight(a[sortConfig.field])
         const weightB = parseResistanceWeight(b[sortConfig.field])
 
@@ -877,8 +912,17 @@ function VolumeScreening({ onStockSelect }) {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Px Slots
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Last Scan
+                <th
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider cursor-pointer select-none"
+                  onClick={() => toggleSort('lastScanAt')}
+                  title="Sort by Last Scan time"
+                >
+                  <div className="flex items-center gap-1">
+                    <span>Last Scan</span>
+                    {sortConfig.field === 'lastScanAt' && (
+                      <span className="text-amber-300">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
+                    )}
+                  </div>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Volume Weight %
@@ -964,8 +1008,12 @@ function VolumeScreening({ onStockSelect }) {
                         <span className="text-slate-400">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-200">{entry.bottomResist}</td>
-                    <td className="px-4 py-3 text-slate-200">{entry.upperResist}</td>
+                    <td className={`px-4 py-3 text-slate-200 ${isResistanceClose(entry.bottomResist) ? 'text-sky-400 font-semibold' : ''}`}>
+                      {entry.bottomResist}
+                    </td>
+                    <td className={`px-4 py-3 text-slate-200 ${isResistanceClose(entry.upperResist) ? 'text-sky-400 font-semibold' : ''}`}>
+                      {entry.upperResist}
+                    </td>
                     <td className="px-4 py-3 text-slate-200">{entry.breakout}</td>
                     <td className="px-4 py-3 text-right">
                       <button
