@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
-import { Plus, ScanLine, Activity, Loader2, RefreshCcw, Trash2, DownloadCloud } from 'lucide-react'
+import { Plus, ScanLine, Activity, Loader2, RefreshCcw, Trash2, DownloadCloud, Pause, Play } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
@@ -8,7 +8,7 @@ const VOLUME_CACHE_KEY = 'volumeScreeningEntries'
 const VOLUME_RESULT_CACHE_KEY = 'volumeScreeningResultsBySymbol'
 const TOP_SYMBOL_CACHE_KEY = 'volumeTopMarketSymbols'
 const CACHE_TTL_MS = 16 * 60 * 60 * 1000
-const TOP_SYMBOL_TTL_MS = 16 * 60 * 60 * 1000
+const TOP_SYMBOL_TTL_MS = 30 * 24 * 60 * 60 * 1000
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 const periods = [
@@ -264,6 +264,10 @@ function VolumeScreening({ onStockSelect }) {
   const [stockHistory, setStockHistory] = useState([])
   const [entries, setEntries] = useState([])
   const [loadingTopSymbols, setLoadingTopSymbols] = useState(false)
+  const [scanQueue, setScanQueue] = useState([])
+  const [isScanning, setIsScanning] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
+  const [showBreakOnly, setShowBreakOnly] = useState(false)
 
   const baseEntryState = {
     priceRange: '—',
@@ -454,14 +458,9 @@ function VolumeScreening({ onStockSelect }) {
         : { ...entry, status: 'loading', error: null }
     ))
     setEntries(loadingEntries)
-
-    const scanned = await Promise.all(loadingEntries.map(async entry => (
-      entry.status === 'ready'
-        ? entry
-        : await performScan(entry)
-    )))
-
-    setEntries(scanned)
+    setScanQueue(loadingEntries.filter(entry => entry.status === 'loading'))
+    setIsScanning(true)
+    setIsPaused(false)
   }
 
   const performScan = async (entry) => {
@@ -512,7 +511,8 @@ function VolumeScreening({ onStockSelect }) {
   }
 
   const removeEntry = (id) => {
-    setEntries(entries.filter(entry => entry.id !== id))
+    setEntries(prev => prev.filter(entry => entry.id !== id))
+    setScanQueue(prev => prev.filter(item => item.id !== id))
   }
 
   const clearEntry = (id) => {
@@ -523,6 +523,7 @@ function VolumeScreening({ onStockSelect }) {
       }
       return entry
     }))
+    setScanQueue(prev => prev.filter(item => item.id !== id))
   }
 
   const scanEntryRow = async (id) => {
@@ -542,6 +543,7 @@ function VolumeScreening({ onStockSelect }) {
         ? result
         : entry
     )))
+    setScanQueue(prev => prev.filter(item => item.id !== id))
   }
 
   const handleRowClick = (entry) => {
@@ -552,6 +554,48 @@ function VolumeScreening({ onStockSelect }) {
   const handleHistoryClick = (symbol) => {
     setSymbolInput(symbol)
   }
+
+  const togglePauseResume = () => {
+    if (!isScanning) return
+    setIsPaused(prev => !prev)
+  }
+
+  const visibleEntries = showBreakOnly
+    ? entries.filter(entry => entry.breakout === 'Break')
+    : entries
+
+  useEffect(() => {
+    if (!isScanning || isPaused) return
+    if (scanQueue.length === 0) {
+      setIsScanning(false)
+      return
+    }
+
+    const current = scanQueue[0]
+    let cancelled = false
+
+    ;(async () => {
+      const result = await performScan(current)
+      if (cancelled) return
+
+      setEntries(prev => prev.map(entry => (
+        entry.id === current.id
+          ? result
+          : entry
+      )))
+
+      setScanQueue(prev => prev.slice(1))
+    })()
+
+    return () => { cancelled = true }
+  }, [isScanning, isPaused, scanQueue])
+
+  useEffect(() => {
+    if (isScanning && scanQueue.length === 0) {
+      setIsScanning(false)
+      setIsPaused(false)
+    }
+  }, [isScanning, scanQueue.length])
 
   return (
     <div className="space-y-4">
@@ -632,6 +676,15 @@ function VolumeScreening({ onStockSelect }) {
               <ScanLine className="w-5 h-5" />
               Scan
             </button>
+            <button
+              type="button"
+              onClick={togglePauseResume}
+              disabled={!isScanning}
+              className="flex-1 lg:flex-none px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+            >
+              {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
+              {isScanning ? (isPaused ? 'Resume' : 'Pause') : 'Pause/Resume'}
+            </button>
           </div>
         </div>
         <p className="text-xs text-slate-400 flex items-center gap-2">
@@ -641,6 +694,17 @@ function VolumeScreening({ onStockSelect }) {
       </div>
 
       <div className="bg-slate-900 border border-slate-700 rounded-lg overflow-hidden">
+        <div className="flex items-center justify-end px-4 py-3 border-b border-slate-800 bg-slate-900">
+          <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
+            <input
+              type="checkbox"
+              checked={showBreakOnly}
+              onChange={(e) => setShowBreakOnly(e.target.checked)}
+              className="form-checkbox rounded border-slate-600 text-emerald-500 focus:ring-2 focus:ring-emerald-500"
+            />
+            Show Break only
+          </label>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-700">
             <thead className="bg-slate-800">
@@ -678,14 +742,14 @@ function VolumeScreening({ onStockSelect }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {entries.length === 0 ? (
+              {visibleEntries.length === 0 ? (
                 <tr>
                   <td colSpan="10" className="px-4 py-6 text-center text-slate-400">
-                    No symbols added yet. Add stocks above to start screening.
+                    {showBreakOnly ? 'No symbols with Break detected. Disable the filter to see all entries.' : 'No symbols added yet. Add stocks above to start screening.'}
                   </td>
                 </tr>
               ) : (
-                entries.map(entry => (
+                visibleEntries.map(entry => (
                   <tr
                     key={entry.id}
                     className="hover:bg-slate-800/60 cursor-pointer"
