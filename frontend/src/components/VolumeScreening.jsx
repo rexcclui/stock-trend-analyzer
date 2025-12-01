@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
-import { Plus, ScanLine, XCircle, Activity, Loader2 } from 'lucide-react'
+import { Plus, ScanLine, XCircle, Activity, Loader2, Eraser } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
+const VOLUME_CACHE_KEY = 'volumeScreeningEntries'
+const CACHE_TTL_MS = 16 * 60 * 60 * 1000
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 const periods = [
@@ -23,6 +25,13 @@ function parseStockSymbols(input) {
 
 function formatPriceRange(start, end) {
   return `$${Number(start).toFixed(2)} - $${Number(end).toFixed(2)}`
+}
+
+function formatTimestamp(dateString) {
+  if (!dateString) return '—'
+  const parsed = new Date(dateString)
+  if (Number.isNaN(parsed.getTime())) return '—'
+  return parsed.toLocaleString()
 }
 
 function getSlotColor(weight, maxWeight) {
@@ -188,6 +197,30 @@ function VolumeScreening({ onStockSelect }) {
   const [stockHistory, setStockHistory] = useState([])
   const [entries, setEntries] = useState([])
 
+  const baseEntryState = {
+    priceRange: '—',
+    testedDays: '—',
+    slotCount: '—',
+    volumeLegend: [],
+    bottomResist: '—',
+    upperResist: '—',
+    breakout: '—',
+    status: 'idle',
+    error: null,
+    lastScanAt: null
+  }
+
+  const clearEntryResults = (entry) => ({
+    ...entry,
+    ...baseEntryState
+  })
+
+  const isEntryFresh = (entry) => {
+    if (!entry?.lastScanAt || entry.status !== 'ready') return false
+    const scannedAt = new Date(entry.lastScanAt).getTime()
+    return Number.isFinite(scannedAt) && Date.now() - scannedAt < CACHE_TTL_MS
+  }
+
   useEffect(() => {
     const savedHistory = localStorage.getItem(STOCK_HISTORY_KEY)
     if (savedHistory) {
@@ -196,6 +229,24 @@ function VolumeScreening({ onStockSelect }) {
       } catch (e) {
         console.error('Failed to load stock history:', e)
       }
+    }
+  }, [])
+
+  useEffect(() => {
+    const savedEntries = localStorage.getItem(VOLUME_CACHE_KEY)
+    if (!savedEntries) return
+
+    try {
+      const parsed = JSON.parse(savedEntries)
+      if (!Array.isArray(parsed)) return
+
+      const hydrated = parsed.map(item => {
+        const merged = { ...baseEntryState, ...item }
+        return isEntryFresh(merged) ? merged : clearEntryResults(merged)
+      })
+      setEntries(hydrated)
+    } catch (error) {
+      console.error('Failed to load cached volume entries:', error)
     }
   }, [])
 
@@ -209,6 +260,10 @@ function VolumeScreening({ onStockSelect }) {
     window.addEventListener('stockHistoryUpdated', handleHistoryUpdate)
     return () => window.removeEventListener('stockHistoryUpdated', handleHistoryUpdate)
   }, [])
+
+  useEffect(() => {
+    localStorage.setItem(VOLUME_CACHE_KEY, JSON.stringify(entries))
+  }, [entries])
 
   const saveToHistory = (symbols) => {
     if (!Array.isArray(symbols) || symbols.length === 0) return
@@ -231,15 +286,7 @@ function VolumeScreening({ onStockSelect }) {
         nextEntries.push({
           id: `${symbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
           symbol,
-          priceRange: '—',
-          testedDays: '—',
-          slotCount: '—',
-          volumeLegend: [],
-          bottomResist: '—',
-          upperResist: '—',
-          breakout: '—',
-          status: 'idle',
-          error: null
+          ...baseEntryState
         })
       }
     })
@@ -251,16 +298,22 @@ function VolumeScreening({ onStockSelect }) {
   const scanEntries = async () => {
     if (entries.length === 0) return
 
-    const pendingEntries = entries.filter(entry => entry.status !== 'ready')
+    const refreshedEntries = entries.map(entry => (
+      isEntryFresh(entry) ? entry : clearEntryResults(entry)
+    ))
+    setEntries(refreshedEntries)
+
+    const pendingEntries = refreshedEntries.filter(entry => entry.status !== 'ready')
     if (pendingEntries.length === 0) return
 
-    setEntries(prev => prev.map(entry => (
+    const loadingEntries = refreshedEntries.map(entry => (
       entry.status === 'ready'
         ? entry
         : { ...entry, status: 'loading', error: null }
-    )))
+    ))
+    setEntries(loadingEntries)
 
-    const scanned = await Promise.all(entries.map(async entry => {
+    const scanned = await Promise.all(loadingEntries.map(async entry => {
       if (entry.status === 'ready') {
         return entry
       }
@@ -290,6 +343,7 @@ function VolumeScreening({ onStockSelect }) {
           bottomResist: bottomResist ? `${bottomResist.range} (${bottomResist.weight.toFixed(1)}%)` : '—',
           upperResist: upperResist ? `${upperResist.range} (${upperResist.weight.toFixed(1)}%)` : '—',
           breakout: breakout ? 'Break' : '—',
+          lastScanAt: new Date().toISOString(),
           status: 'ready',
           error: null
         }
@@ -303,6 +357,7 @@ function VolumeScreening({ onStockSelect }) {
           bottomResist: '—',
           upperResist: '—',
           breakout: '—',
+          lastScanAt: new Date().toISOString(),
           status: 'error',
           error: error?.response?.data?.error || error?.message || 'Failed to scan'
         }
@@ -314,6 +369,14 @@ function VolumeScreening({ onStockSelect }) {
 
   const removeEntry = (id) => {
     setEntries(entries.filter(entry => entry.id !== id))
+  }
+
+  const clearEntry = (id) => {
+    setEntries(prev => prev.map(entry => (
+      entry.id === id
+        ? clearEntryResults(entry)
+        : entry
+    )))
   }
 
   const handleRowClick = (entry) => {
@@ -421,6 +484,9 @@ function VolumeScreening({ onStockSelect }) {
                   Price Range Slots
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                  Last Scan
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Volume Weight %
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
@@ -440,7 +506,7 @@ function VolumeScreening({ onStockSelect }) {
             <tbody className="divide-y divide-slate-800">
               {entries.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="px-4 py-6 text-center text-slate-400">
+                  <td colSpan="10" className="px-4 py-6 text-center text-slate-400">
                     No symbols added yet. Add stocks above to start screening.
                   </td>
                 </tr>
@@ -456,6 +522,7 @@ function VolumeScreening({ onStockSelect }) {
                     <td className="px-4 py-3 text-slate-200">{entry.priceRange}</td>
                     <td className="px-4 py-3 text-slate-200">{entry.testedDays}</td>
                     <td className="px-4 py-3 text-slate-200">{entry.slotCount}</td>
+                    <td className="px-4 py-3 text-slate-200">{formatTimestamp(entry.lastScanAt)}</td>
                     <td className="px-4 py-3 text-slate-200">
                     {entry.status === 'loading' ? (
                         <div className="flex items-center gap-2 text-amber-400">
@@ -490,6 +557,17 @@ function VolumeScreening({ onStockSelect }) {
                     <td className="px-4 py-3 text-slate-200">{entry.upperResist}</td>
                     <td className="px-4 py-3 text-slate-200">{entry.breakout}</td>
                     <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          clearEntry(entry.id)
+                        }}
+                        className="inline-flex items-center gap-1 text-slate-400 hover:text-amber-400 transition-colors mr-3"
+                        aria-label={`Clear ${entry.symbol}`}
+                      >
+                        <Eraser className="w-5 h-5" />
+                        Clear
+                      </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
