@@ -563,6 +563,20 @@ sam logs -n AnalyzeStockFunction --stack-name stock-trend-analyzer --tail
 - Ensure you set the parameter during deployment
 - Verify in Lambda console: Environment Variables → FMP_API_KEY
 
+**Problem**: "I can't find the API Gateway in AWS"
+- The default region in `samconfig.toml` is **eu-west-1**; switch to that region in the console or CLI (`aws configure set region eu-west-1`).
+- Confirm the CloudFormation stack exists and is `CREATE_COMPLETE`:
+  ```bash
+  aws cloudformation describe-stacks --stack-name stock-trend-analyzer \
+    --query "Stacks[0].StackStatus"
+  ```
+- If the stack is missing, run the deployment (`./deploy.sh` or `sam deploy --guided --parameter-overrides FMPApiKey=$FMP_API_KEY`).
+- To list the API explicitly, run:
+  ```bash
+  aws apigateway get-rest-apis --query "items[?name=='stock-trend-analyzer'].{id:id,name:name}"
+  ```
+- The deployed API stage is `prod`, and the full URL is exported as `StockAnalyzerApiUrl` in the stack outputs.
+
 ### Frontend Issues
 
 **Problem**: Cannot connect to API
