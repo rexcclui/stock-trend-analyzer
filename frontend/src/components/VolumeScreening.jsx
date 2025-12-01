@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import axios from 'axios'
-import { Plus, ScanLine, XCircle, Activity, Loader2, Eraser } from 'lucide-react'
+import { Plus, ScanLine, Activity, Loader2, RefreshCcw, Trash2 } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
@@ -358,58 +358,60 @@ function VolumeScreening({ onStockSelect }) {
     ))
     setEntries(loadingEntries)
 
-    const scanned = await Promise.all(loadingEntries.map(async entry => {
-      if (entry.status === 'ready') {
-        return entry
-      }
-
-      try {
-        const response = await axios.get(joinUrl(API_URL, '/analyze'), {
-          params: {
-            symbol: entry.symbol,
-            days: period
-          }
-        })
-
-        const prices = response.data?.prices || []
-        const { slots, lastPrice, previousPrice } = buildVolumeSlots(prices)
-        const slotIndex = findSlotIndex(slots, lastPrice)
-        const legend = buildLegend(slots, slotIndex)
-        const breakout = detectBreakout(slots, slotIndex, lastPrice, previousPrice)
-        const bottomResist = findResistance(slots, slotIndex, 'down')
-        const upperResist = findResistance(slots, slotIndex, 'up')
-
-        return {
-          ...entry,
-          priceRange: slotIndex >= 0 ? formatPriceRange(slots[slotIndex].start, slots[slotIndex].end) : '—',
-          testedDays: period,
-          slotCount: slots.length,
-          volumeLegend: legend,
-          bottomResist: bottomResist ? `${bottomResist.range} (${bottomResist.weight.toFixed(1)}%)` : '—',
-          upperResist: upperResist ? `${upperResist.range} (${upperResist.weight.toFixed(1)}%)` : '—',
-          breakout: breakout ? 'Break' : '—',
-          lastScanAt: new Date().toISOString(),
-          status: 'ready',
-          error: null
-        }
-      } catch (error) {
-        console.error('Failed to scan symbol', entry.symbol, error)
-        return {
-          ...entry,
-          priceRange: '—',
-          slotCount: '—',
-          volumeLegend: [],
-          bottomResist: '—',
-          upperResist: '—',
-          breakout: '—',
-          lastScanAt: new Date().toISOString(),
-          status: 'error',
-          error: error?.response?.data?.error || error?.message || 'Failed to scan'
-        }
-      }
-    }))
+    const scanned = await Promise.all(loadingEntries.map(async entry => (
+      entry.status === 'ready'
+        ? entry
+        : await performScan(entry)
+    )))
 
     setEntries(scanned)
+  }
+
+  const performScan = async (entry) => {
+    try {
+      const response = await axios.get(joinUrl(API_URL, '/analyze'), {
+        params: {
+          symbol: entry.symbol,
+          days: period
+        }
+      })
+
+      const prices = response.data?.prices || []
+      const { slots, lastPrice, previousPrice } = buildVolumeSlots(prices)
+      const slotIndex = findSlotIndex(slots, lastPrice)
+      const legend = buildLegend(slots, slotIndex)
+      const breakout = detectBreakout(slots, slotIndex, lastPrice, previousPrice)
+      const bottomResist = findResistance(slots, slotIndex, 'down')
+      const upperResist = findResistance(slots, slotIndex, 'up')
+
+      return {
+        ...entry,
+        priceRange: slotIndex >= 0 ? formatPriceRange(slots[slotIndex].start, slots[slotIndex].end) : '—',
+        testedDays: period,
+        slotCount: slots.length,
+        volumeLegend: legend,
+        bottomResist: bottomResist ? `${bottomResist.range} (${bottomResist.weight.toFixed(1)}%)` : '—',
+        upperResist: upperResist ? `${upperResist.range} (${upperResist.weight.toFixed(1)}%)` : '—',
+        breakout: breakout ? 'Break' : '—',
+        lastScanAt: new Date().toISOString(),
+        status: 'ready',
+        error: null
+      }
+    } catch (error) {
+      console.error('Failed to scan symbol', entry.symbol, error)
+      return {
+        ...entry,
+        priceRange: '—',
+        slotCount: '—',
+        volumeLegend: [],
+        bottomResist: '—',
+        upperResist: '—',
+        breakout: '—',
+        lastScanAt: new Date().toISOString(),
+        status: 'error',
+        error: error?.response?.data?.error || error?.message || 'Failed to scan'
+      }
+    }
   }
 
   const removeEntry = (id) => {
@@ -420,6 +422,25 @@ function VolumeScreening({ onStockSelect }) {
     setEntries(prev => prev.map(entry => (
       entry.id === id
         ? clearEntryResults(entry)
+        : entry
+    )))
+  }
+
+  const scanEntryRow = async (id) => {
+    const target = entries.find(entry => entry.id === id)
+    if (!target) return
+
+    const prepared = clearEntryResults(target)
+    setEntries(prev => prev.map(entry => (
+      entry.id === id
+        ? { ...prepared, status: 'loading', error: null }
+        : entry
+    )))
+
+    const result = await performScan(prepared)
+    setEntries(prev => prev.map(entry => (
+      entry.id === id
+        ? result
         : entry
     )))
   }
@@ -605,24 +626,35 @@ function VolumeScreening({ onStockSelect }) {
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
+                          scanEntryRow(entry.id)
+                        }}
+                        className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-emerald-400 hover:bg-emerald-900/40 transition-colors mr-2"
+                        aria-label={`Scan ${entry.symbol}`}
+                        title="Scan this symbol"
+                      >
+                        <ScanLine className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
                           clearEntry(entry.id)
                         }}
-                        className="inline-flex items-center gap-1 text-slate-400 hover:text-amber-400 transition-colors mr-3"
+                        className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-amber-400 hover:bg-amber-900/40 transition-colors mr-2"
                         aria-label={`Clear ${entry.symbol}`}
+                        title="Clear scan result"
                       >
-                        <Eraser className="w-5 h-5" />
-                        Clear
+                        <RefreshCcw className="w-5 h-5" />
                       </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
                           removeEntry(entry.id)
                         }}
-                        className="inline-flex items-center gap-1 text-slate-400 hover:text-red-400 transition-colors"
+                        className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-red-400 hover:bg-red-900/40 transition-colors"
                         aria-label={`Remove ${entry.symbol}`}
+                        title="Remove row"
                       >
-                        <XCircle className="w-5 h-5" />
-                        Remove
+                        <Trash2 className="w-5 h-5" />
                       </button>
                     </td>
                   </tr>
