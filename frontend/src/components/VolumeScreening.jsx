@@ -93,8 +93,8 @@ function buildVolumeSlots(prices) {
 function buildLegend(slots, currentIndex) {
   if (!Array.isArray(slots) || slots.length === 0 || currentIndex < 0) return []
 
-  const startIndex = Math.max(0, currentIndex - 2)
-  const endIndex = Math.min(slots.length - 1, currentIndex + 3)
+  const startIndex = Math.max(0, currentIndex - 5)
+  const endIndex = Math.min(slots.length - 1, currentIndex + 5)
   const selected = slots.slice(startIndex, endIndex + 1)
   const maxWeight = Math.max(...selected.map(slot => slot.weight), 0)
 
@@ -188,9 +188,20 @@ function VolumeScreening() {
   const scanEntries = async () => {
     if (entries.length === 0) return
 
-    setEntries(prev => prev.map(entry => ({ ...entry, status: 'loading', error: null })))
+    const pendingEntries = entries.filter(entry => entry.status !== 'ready')
+    if (pendingEntries.length === 0) return
+
+    setEntries(prev => prev.map(entry => (
+      entry.status === 'ready'
+        ? entry
+        : { ...entry, status: 'loading', error: null }
+    )))
 
     const scanned = await Promise.all(entries.map(async entry => {
+      if (entry.status === 'ready') {
+        return entry
+      }
+
       try {
         const response = await axios.get(joinUrl(API_URL, '/analyze'), {
           params: {
