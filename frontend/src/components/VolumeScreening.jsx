@@ -335,6 +335,8 @@ function VolumeScreening({ onStockSelect }) {
   const [scanQueue, setScanQueue] = useState([])
   const [isScanning, setIsScanning] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
+  const [scanTotal, setScanTotal] = useState(0)
+  const [scanCompleted, setScanCompleted] = useState(0)
   const [showBreakOnly, setShowBreakOnly] = useState(false)
   const [showPotentialBreakOnly, setShowPotentialBreakOnly] = useState(false)
   const [sortConfig, setSortConfig] = useState(defaultSortConfig)
@@ -364,6 +366,8 @@ function VolumeScreening({ onStockSelect }) {
     activeScanIdRef.current = null
     setIsScanning(false)
     setIsPaused(false)
+    setScanTotal(0)
+    setScanCompleted(0)
     setScanQueue([])
     setEntries(prev => prev.map(entry => clearEntryResults(entry)))
   }
@@ -533,7 +537,11 @@ function VolumeScreening({ onStockSelect }) {
     setEntries(refreshedEntries)
 
     const pendingEntries = refreshedEntries.filter(entry => entry.status !== 'ready')
-    if (pendingEntries.length === 0) return
+    if (pendingEntries.length === 0) {
+      setScanTotal(0)
+      setScanCompleted(0)
+      return
+    }
 
     const loadingEntries = refreshedEntries.map(entry => (
       entry.status === 'ready'
@@ -542,6 +550,8 @@ function VolumeScreening({ onStockSelect }) {
     ))
     setEntries(loadingEntries)
     setScanQueue(loadingEntries.filter(entry => entry.status === 'loading'))
+    setScanTotal(pendingEntries.length)
+    setScanCompleted(0)
     setIsScanning(true)
     setIsPaused(false)
   }
@@ -608,7 +618,14 @@ function VolumeScreening({ onStockSelect }) {
 
   const removeEntry = (id) => {
     setEntries(prev => prev.filter(entry => entry.id !== id))
-    setScanQueue(prev => prev.filter(item => item.id !== id))
+    setScanQueue(prev => {
+      const filtered = prev.filter(item => item.id !== id)
+      const removedCount = prev.length - filtered.length
+      if (removedCount > 0) {
+        setScanTotal(total => Math.max(0, total - removedCount))
+      }
+      return filtered
+    })
   }
 
   const clearEntry = (id) => {
@@ -619,7 +636,14 @@ function VolumeScreening({ onStockSelect }) {
       }
       return entry
     }))
-    setScanQueue(prev => prev.filter(item => item.id !== id))
+    setScanQueue(prev => {
+      const filtered = prev.filter(item => item.id !== id)
+      const removedCount = prev.length - filtered.length
+      if (removedCount > 0) {
+        setScanTotal(total => Math.max(0, total - removedCount))
+      }
+      return filtered
+    })
   }
 
   const scanEntryRow = async (id) => {
@@ -748,6 +772,8 @@ function VolumeScreening({ onStockSelect }) {
           )))
         }
 
+        setScanCompleted(prev => prev + 1)
+
         if (stopAll) {
           setScanQueue([])
           setIsScanning(false)
@@ -866,15 +892,20 @@ function VolumeScreening({ onStockSelect }) {
 
       <div className="bg-slate-900 border border-slate-700 rounded-lg overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900">
-          <button
-            type="button"
-            onClick={clearAllEntries}
-            className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-amber-400 hover:bg-amber-900/40 transition-colors"
-            title="Clear all scan results"
-            aria-label="Clear all scan results"
-          >
-            <RefreshCcw className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={clearAllEntries}
+              className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-amber-400 hover:bg-amber-900/40 transition-colors"
+              title="Clear all scan results"
+              aria-label="Clear all scan results"
+            >
+              <RefreshCcw className="w-5 h-5" />
+            </button>
+            {isScanning && scanTotal > 0 && (
+              <span className="text-xs text-slate-300 whitespace-nowrap">{scanCompleted}/{scanTotal} processing</span>
+            )}
+          </div>
           <div className="flex items-center gap-6">
             <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
               <input
