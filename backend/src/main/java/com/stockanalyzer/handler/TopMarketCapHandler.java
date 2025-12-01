@@ -71,8 +71,8 @@ public class TopMarketCapHandler implements RequestHandler<APIGatewayProxyReques
         Map<String, String> headers = new HashMap<>();
         headers.put("Content-Type", "application/json");
         headers.put("Access-Control-Allow-Origin", "*");
-        headers.put("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        headers.put("Access-Control-Allow-Headers", "Content-Type");
+        headers.put("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+        headers.put("Access-Control-Allow-Headers", "*");
         return headers;
     }
 }

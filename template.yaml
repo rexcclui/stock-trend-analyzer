@@ -23,8 +23,8 @@ Resources:
     Properties:
       StageName: prod
       Cors:
-        AllowMethods: "'GET, POST, OPTIONS'"
-        AllowHeaders: "'Content-Type'"
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'*'"
         AllowOrigin: "'*'"
       GatewayResponses:
         DEFAULT_4XX:
@@ -32,13 +32,13 @@ Resources:
             Headers:
               Access-Control-Allow-Origin: "'*'"
               Access-Control-Allow-Headers: "'*'"
-              Access-Control-Allow-Methods: "'GET, POST, OPTIONS'"
+              Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
         DEFAULT_5XX:
           ResponseParameters:
             Headers:
               Access-Control-Allow-Origin: "'*'"
               Access-Control-Allow-Headers: "'*'"
-              Access-Control-Allow-Methods: "'GET, POST, OPTIONS'"
+              Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
 
   AnalyzeStockFunction:
     Type: AWS::Serverless::Function
