@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { TrendingUp, BarChart3, Activity } from 'lucide-react'
+import { TrendingUp, BarChart3, Activity, Waves } from 'lucide-react'
 import StockAnalyzer from './components/StockAnalyzer'
 import BacktestResults from './components/BacktestResults'
+import VolumeScreening from './components/VolumeScreening'
 import './App.css'
 
 function App() {
@@ -54,6 +55,17 @@ function App() {
               <BarChart3 className="w-5 h-5" />
               Backtesting
             </button>
+            <button
+              onClick={() => setActiveTab('volume')}
+              className={`flex-1 px-6 py-4 font-semibold transition-colors flex items-center justify-center gap-2 ${
+                activeTab === 'volume'
+                  ? 'text-purple-400 border-b-2 border-purple-400 bg-slate-900'
+                  : 'text-slate-300 hover:text-purple-400 hover:bg-slate-700'
+              }`}
+            >
+              <Waves className="w-5 h-5" />
+              Volume Screening
+            </button>
           </div>
 
           {/* Tab Content */}
@@ -64,6 +76,9 @@ function App() {
             </div>
             <div style={{ display: activeTab === 'backtest' ? 'block' : 'none' }}>
               <BacktestResults onStockSelect={handleStockSelect} />
+            </div>
+            <div style={{ display: activeTab === 'volume' ? 'block' : 'none' }}>
+              <VolumeScreening />
             </div>
           </div>
         </div>
