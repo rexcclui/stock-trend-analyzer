@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public class FinancialModelingPrepClient {
     private static final String BASE_URL = "https://financialmodelingprep.com/api/v3";
@@ -42,6 +43,10 @@ public class FinancialModelingPrepClient {
 
                 // Extract historical data
                 List<Map<String, Object>> historical = (List<Map<String, Object>>) data.get("historical");
+
+                if (historical == null || historical.isEmpty()) {
+                    return List.of();
+                }
 
                 return historical.stream()
                         .map(this::mapToStockPrice)
@@ -84,6 +89,10 @@ public class FinancialModelingPrepClient {
 
                 List<Map<String, Object>> historical = (List<Map<String, Object>>) data.get("historical");
 
+                if (historical == null || historical.isEmpty()) {
+                    return List.of();
+                }
+
                 List<StockPrice> prices = historical.stream()
                         .map(this::mapToStockPrice)
                         .toList();
@@ -93,6 +102,31 @@ public class FinancialModelingPrepClient {
                 cache.logStats();
 
                 return prices;
+            }
+        }
+    }
+
+    public List<String> getTopMarketCapSymbols(int limit) throws IOException {
+        String url = String.format("%s/stock-screener?marketCapMoreThan=0&limit=%d&apikey=%s", BASE_URL, limit, apiKey);
+
+        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+            HttpGet request = new HttpGet(url);
+            try (CloseableHttpResponse response = httpClient.execute(request)) {
+                String json = EntityUtils.toString(response.getEntity());
+
+                Type type = new TypeToken<List<Map<String, Object>>>() {
+                }.getType();
+                List<Map<String, Object>> data = gson.fromJson(json, type);
+
+                if (data == null) {
+                    return List.of();
+                }
+
+                return data.stream()
+                        .map(entry -> (String) entry.get("symbol"))
+                        .filter(Objects::nonNull)
+                        .map(String::toUpperCase)
+                        .toList();
             }
         }
     }
