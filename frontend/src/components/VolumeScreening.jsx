@@ -737,16 +737,16 @@ function VolumeScreening({ onStockSelect }) {
             <thead className="bg-slate-800">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Stock Code
+                  Stock
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Current Price Range
+                  Px Range
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Days Tested
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Price Range Slots
+                  Px Slots
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Last Scan
@@ -787,7 +787,7 @@ function VolumeScreening({ onStockSelect }) {
                     <td className="px-4 py-3 text-slate-200">{entry.priceRange}</td>
                     <td className="px-4 py-3 text-slate-200">{entry.testedDays}</td>
                     <td className="px-4 py-3 text-slate-200">{entry.slotCount}</td>
-                    <td className="px-4 py-3 text-slate-200">{formatTimestamp(entry.lastScanAt)}</td>
+                    <td className="px-4 py-3 text-slate-200 text-xs">{formatTimestamp(entry.lastScanAt)}</td>
                     <td className="px-4 py-3 text-slate-200">
                     {entry.status === 'loading' ? (
                         <div className="flex items-center gap-2 text-amber-400">
