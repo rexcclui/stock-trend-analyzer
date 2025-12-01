@@ -6,7 +6,9 @@ import { joinUrl } from '../utils/urlHelper'
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
 const VOLUME_CACHE_KEY = 'volumeScreeningEntries'
 const VOLUME_RESULT_CACHE_KEY = 'volumeScreeningResultsBySymbol'
+const TOP_SYMBOL_CACHE_KEY = 'volumeTopMarketSymbols'
 const CACHE_TTL_MS = 16 * 60 * 60 * 1000
+const TOP_SYMBOL_TTL_MS = 16 * 60 * 60 * 1000
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 const periods = [
@@ -51,6 +53,38 @@ function saveResultCache(cache) {
     localStorage.setItem(VOLUME_RESULT_CACHE_KEY, JSON.stringify(cache))
   } catch (error) {
     console.error('Failed to save volume result cache:', error)
+  }
+}
+
+function loadTopSymbolCache() {
+  try {
+    const stored = localStorage.getItem(TOP_SYMBOL_CACHE_KEY)
+    if (!stored) return null
+
+    const parsed = JSON.parse(stored)
+    if (!parsed || !Array.isArray(parsed.symbols) || !parsed.cachedAt) return null
+
+    const cachedAt = new Date(parsed.cachedAt).getTime()
+    if (!Number.isFinite(cachedAt) || Date.now() - cachedAt > TOP_SYMBOL_TTL_MS) {
+      return null
+    }
+
+    return parsed.symbols
+  } catch (error) {
+    console.error('Failed to load top symbol cache:', error)
+    return null
+  }
+}
+
+function saveTopSymbolCache(symbols) {
+  if (!Array.isArray(symbols) || symbols.length === 0) return
+  try {
+    localStorage.setItem(TOP_SYMBOL_CACHE_KEY, JSON.stringify({
+      symbols,
+      cachedAt: new Date().toISOString()
+    }))
+  } catch (error) {
+    console.error('Failed to save top symbol cache:', error)
   }
 }
 
@@ -370,21 +404,30 @@ function VolumeScreening({ onStockSelect }) {
 
     setLoadingTopSymbols(true)
     try {
-      const response = await axios.get(joinUrl(API_URL, '/top-market-cap'), {
-        params: { limit: 2000 }
-      })
+      const cachedSymbols = loadTopSymbolCache()
+      let symbols = cachedSymbols
 
-      const payload = response.data
-      const symbols = Array.isArray(payload)
-        ? payload
-        : Array.isArray(payload?.symbols)
-          ? payload.symbols
-          : []
+      if (!symbols) {
+        const response = await axios.get(joinUrl(API_URL, '/top-market-cap'), {
+          params: { limit: 2000 }
+        })
+
+        const payload = response.data
+        symbols = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.symbols)
+            ? payload.symbols
+            : []
+      }
 
       const normalized = symbols
         .map(item => (typeof item === 'string' ? item : item?.symbol))
         .filter(Boolean)
         .map(symbol => symbol.toUpperCase())
+
+      if (!cachedSymbols && normalized.length > 0) {
+        saveTopSymbolCache(normalized)
+      }
 
       mergeSymbolsIntoEntries(normalized)
     } catch (error) {
