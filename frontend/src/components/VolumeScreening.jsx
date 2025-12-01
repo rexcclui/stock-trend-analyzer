@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Plus, ScanLine, XCircle, Activity } from 'lucide-react'
+import axios from 'axios'
+import { Plus, ScanLine, XCircle, Activity, Loader2 } from 'lucide-react'
+import { joinUrl } from '../utils/urlHelper'
 
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 const periods = [
   { label: '1Y', value: '365' },
@@ -16,6 +19,108 @@ function parseStockSymbols(input) {
     .split(/[,\s]+/)
     .map(symbol => symbol.trim().toUpperCase())
     .filter(Boolean)
+}
+
+function formatPriceRange(start, end) {
+  return `$${Number(start).toFixed(2)} - $${Number(end).toFixed(2)}`
+}
+
+function getSlotColor(weight, maxWeight) {
+  // Lower volume = yellow, higher volume = red
+  const lowColor = [250, 204, 21]   // #facc15
+  const highColor = [220, 38, 38]   // #dc2626
+  const ratio = maxWeight > 0 ? Math.min(1, Math.max(0, weight / maxWeight)) : 0
+  const mix = (start, end) => Math.round(start + (end - start) * ratio)
+  return `rgb(${mix(lowColor[0], highColor[0])}, ${mix(lowColor[1], highColor[1])}, ${mix(lowColor[2], highColor[2])})`
+}
+
+function findSlotIndex(slots, price) {
+  if (!Array.isArray(slots) || slots.length === 0 || price == null) return -1
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i]
+    const isLast = i === slots.length - 1
+    if ((price >= slot.start && price <= slot.end) || (isLast && price >= slot.start)) {
+      return i
+    }
+  }
+  return -1
+}
+
+function buildVolumeSlots(prices) {
+  if (!Array.isArray(prices) || prices.length === 0) {
+    return { slots: [], lastPrice: null }
+  }
+
+  const sorted = [...prices].sort((a, b) => new Date(a.date) - new Date(b.date))
+  const minLow = Math.min(...sorted.map(p => p.low))
+  const maxHigh = Math.max(...sorted.map(p => p.high))
+  const baseSlotSize = (maxHigh - minLow) / 20 || 0
+  const effectiveMax = minLow === maxHigh
+    ? maxHigh + Math.max(0.0001, maxHigh * 0.05)
+    : maxHigh
+  const slots = []
+
+  let start = minLow
+  while (start < effectiveMax) {
+    const maxSlotWidth = start > 0 ? start * 0.05 : (baseSlotSize || minLow * 0.05)
+    const fallbackWidth = Math.max(0.0001, baseSlotSize || maxSlotWidth)
+    const width = Math.max(0.0001, Math.min(fallbackWidth, maxSlotWidth || fallbackWidth))
+    const end = Math.min(effectiveMax, start + width)
+    slots.push({ start, end, volume: 0, weight: 0 })
+    start = end
+  }
+
+  sorted.forEach(price => {
+    const refPrice = price.close ?? price.high ?? price.low
+    const slotIndex = findSlotIndex(slots, refPrice)
+    if (slotIndex >= 0) {
+      slots[slotIndex].volume += price.volume || 0
+    }
+  })
+
+  const totalVolume = slots.reduce((sum, slot) => sum + slot.volume, 0)
+  const safeDivisor = totalVolume > 0 ? totalVolume : 1
+  slots.forEach(slot => {
+    slot.weight = (slot.volume / safeDivisor) * 100
+  })
+
+  const lastPoint = sorted[sorted.length - 1]
+  const lastPrice = lastPoint?.close ?? lastPoint?.high ?? lastPoint?.low ?? null
+
+  return { slots, lastPrice }
+}
+
+function buildLegend(slots, currentIndex) {
+  if (!Array.isArray(slots) || slots.length === 0 || currentIndex < 0) return []
+
+  const startIndex = Math.max(0, currentIndex - 2)
+  const endIndex = Math.min(slots.length - 1, currentIndex + 3)
+  const selected = slots.slice(startIndex, endIndex + 1)
+  const maxWeight = Math.max(...selected.map(slot => slot.weight), 0)
+
+  return selected.map((slot, idx) => ({
+    ...slot,
+    legendIndex: startIndex + idx,
+    label: `${slot.weight.toFixed(1)}%`,
+    color: getSlotColor(slot.weight, maxWeight),
+    textColor: slot.weight >= maxWeight * 0.5 ? '#f8fafc' : '#0f172a',
+    isCurrent: startIndex + idx === currentIndex
+  }))
+}
+
+function detectBreakout(slots, currentIndex, lastPrice) {
+  if (!Array.isArray(slots) || slots.length === 0 || currentIndex < 0 || lastPrice == null) return false
+  const currentSlot = slots[currentIndex]
+  const lowerGap = Math.abs(lastPrice - currentSlot.start) / Math.max(currentSlot.start || 1, 1)
+  const upperGap = Math.abs(currentSlot.end - lastPrice) / Math.max(currentSlot.end || 1, 1)
+  const nearBoundary = lowerGap <= 0.05 || upperGap <= 0.05
+
+  const neighborWeights = []
+  if (slots[currentIndex - 1]) neighborWeights.push(slots[currentIndex - 1].weight)
+  if (slots[currentIndex + 1]) neighborWeights.push(slots[currentIndex + 1].weight)
+
+  const significantShift = neighborWeights.some(weight => Math.abs(weight - currentSlot.weight) >= 5)
+  return nearBoundary && significantShift
 }
 
 function VolumeScreening() {
@@ -68,8 +173,10 @@ function VolumeScreening() {
           id: `${symbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
           symbol,
           priceRange: '—',
-          volumeWeight: '—',
-          breakout: '—'
+          volumeLegend: [],
+          breakout: '—',
+          status: 'idle',
+          error: null
         })
       }
     })
@@ -78,21 +185,46 @@ function VolumeScreening() {
     setSymbolInput('')
   }
 
-  const scanEntries = () => {
-    const scanned = entries.map(entry => {
-      const basePrice = Math.max(5, Math.random() * 200)
-      const lower = (basePrice * 0.95).toFixed(2)
-      const upper = (basePrice * 1.05).toFixed(2)
-      const volumeWeight = (Math.random() * 40 + 10).toFixed(2)
-      const breakout = Math.random() > 0.6 ? 'Yes' : 'No'
+  const scanEntries = async () => {
+    if (entries.length === 0) return
 
-      return {
-        ...entry,
-        priceRange: `$${lower} - $${upper}`,
-        volumeWeight: `${volumeWeight}%`,
-        breakout
+    setEntries(prev => prev.map(entry => ({ ...entry, status: 'loading', error: null })))
+
+    const scanned = await Promise.all(entries.map(async entry => {
+      try {
+        const response = await axios.get(joinUrl(API_URL, '/analyze'), {
+          params: {
+            symbol: entry.symbol,
+            days: period
+          }
+        })
+
+        const prices = response.data?.prices || []
+        const { slots, lastPrice } = buildVolumeSlots(prices)
+        const slotIndex = findSlotIndex(slots, lastPrice)
+        const legend = buildLegend(slots, slotIndex)
+        const breakout = detectBreakout(slots, slotIndex, lastPrice)
+
+        return {
+          ...entry,
+          priceRange: slotIndex >= 0 ? formatPriceRange(slots[slotIndex].start, slots[slotIndex].end) : '—',
+          volumeLegend: legend,
+          breakout: breakout ? 'Break' : '—',
+          status: 'ready',
+          error: null
+        }
+      } catch (error) {
+        console.error('Failed to scan symbol', entry.symbol, error)
+        return {
+          ...entry,
+          priceRange: '—',
+          volumeLegend: [],
+          breakout: '—',
+          status: 'error',
+          error: error?.response?.data?.error || error?.message || 'Failed to scan'
+        }
       }
-    })
+    }))
 
     setEntries(scanned)
   }
@@ -217,7 +349,36 @@ function VolumeScreening() {
                   <tr key={entry.id} className="hover:bg-slate-800/60">
                     <td className="px-4 py-3 text-slate-100 font-medium">{entry.symbol}</td>
                     <td className="px-4 py-3 text-slate-200">{entry.priceRange}</td>
-                    <td className="px-4 py-3 text-slate-200">{entry.volumeWeight}</td>
+                    <td className="px-4 py-3 text-slate-200">
+                    {entry.status === 'loading' ? (
+                        <div className="flex items-center gap-2 text-amber-400">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Scanning…</span>
+                        </div>
+                      ) : entry.status === 'error' ? (
+                        <span className="text-red-400 text-sm">{entry.error || 'Failed to scan'}</span>
+                      ) : entry.volumeLegend?.length ? (
+                        <div className="flex flex-wrap gap-1">
+                          {entry.volumeLegend.map(slot => (
+                            <span
+                              key={`${entry.id}-${slot.legendIndex}`}
+                              title={`${formatPriceRange(slot.start, slot.end)} • ${slot.label}`}
+                              className={`px-2 py-1 text-xs font-semibold rounded-md shadow-sm border border-slate-800/60 ${
+                                slot.isCurrent ? 'ring-2 ring-amber-400' : ''
+                              }`}
+                              style={{
+                                backgroundColor: slot.color,
+                                color: slot.textColor || '#0f172a'
+                              }}
+                            >
+                              {slot.label}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-slate-200">{entry.breakout}</td>
                     <td className="px-4 py-3 text-right">
                       <button
