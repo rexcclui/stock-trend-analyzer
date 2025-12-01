@@ -58,17 +58,32 @@ function buildVolumeSlots(prices) {
   const effectiveMax = minLow === maxHigh
     ? maxHigh + Math.max(0.0001, maxHigh * 0.05)
     : maxHigh
-  const slots = []
 
-  let start = minLow
-  while (start < effectiveMax) {
-    const maxSlotWidth = start > 0 ? start * 0.05 : (baseSlotSize || minLow * 0.05)
-    const fallbackWidth = Math.max(0.0001, baseSlotSize || maxSlotWidth)
-    const width = Math.max(0.0001, Math.min(fallbackWidth, maxSlotWidth || fallbackWidth))
-    const end = Math.min(effectiveMax, start + width)
-    slots.push({ start, end, volume: 0, weight: 0 })
-    start = end
+  const buildSlots = (getWidth) => {
+    const slots = []
+    let start = minLow
+
+    while (start < effectiveMax) {
+      const width = Math.max(0.0001, getWidth(start))
+      const end = Math.min(effectiveMax, start + width)
+      if (end === start) break
+      slots.push({ start, end, volume: 0, weight: 0 })
+      start = end
+    }
+
+    return slots
   }
+
+  // Prefer 5% slices when a 20-slice baseline would exceed that width.
+  const adaptiveSlots = buildSlots((start) => {
+    const percentWidth = Math.max(0.0001, (start || minLow || 1) * 0.05)
+    const targetWidth = baseSlotSize || percentWidth
+    return targetWidth > percentWidth ? percentWidth : targetWidth
+  })
+
+  const slots = adaptiveSlots.length > 40
+    ? buildSlots(() => Math.max(0.0001, (effectiveMax - minLow) / 40))
+    : adaptiveSlots
 
   sorted.forEach(price => {
     const refPrice = price.close ?? price.high ?? price.low
