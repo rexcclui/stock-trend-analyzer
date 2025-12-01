@@ -131,7 +131,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
   const [syncedMouseDate, setSyncedMouseDate] = useState(null)
   const [stockHistory, setStockHistory] = useState([])
   const [displayColumns, setDisplayColumns] = useState(1)
-  const [chartHeight, setChartHeight] = useState(460) // Increased by 15% from 400
+  const [chartHeight, setChartHeight] = useState(520) // Increased by 30% from 400
   const [optimalParams, setOptimalParams] = useState(null)
 
   // Handle external symbol selection (from backtest results)
