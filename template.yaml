@@ -26,6 +26,19 @@ Resources:
         AllowMethods: "'GET, POST, OPTIONS'"
         AllowHeaders: "'Content-Type'"
         AllowOrigin: "'*'"
+      GatewayResponses:
+        DEFAULT_4XX:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: "'*'"
+              Access-Control-Allow-Headers: "'*'"
+              Access-Control-Allow-Methods: "'GET, POST, OPTIONS'"
+        DEFAULT_5XX:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: "'*'"
+              Access-Control-Allow-Headers: "'*'"
+              Access-Control-Allow-Methods: "'GET, POST, OPTIONS'"
 
   AnalyzeStockFunction:
     Type: AWS::Serverless::Function
