@@ -101,6 +101,14 @@ function saveTopSymbolCache(symbols) {
   )
 }
 
+function clearResultCache() {
+  try {
+    localStorage.removeItem(VOLUME_RESULT_CACHE_KEY)
+  } catch (error) {
+    console.error('Failed to clear volume result cache:', error)
+  }
+}
+
 function removeResultFromCache(symbol) {
   if (!symbol) return
   try {
@@ -303,6 +311,15 @@ function VolumeScreening({ onStockSelect }) {
     ...entry,
     ...baseEntryState
   })
+
+  const clearAllEntries = () => {
+    clearResultCache()
+    activeScanIdRef.current = null
+    setIsScanning(false)
+    setIsPaused(false)
+    setScanQueue([])
+    setEntries(prev => prev.map(entry => clearEntryResults(entry)))
+  }
 
   const isEntryFresh = (entry) => {
     if (!entry?.lastScanAt || entry.status !== 'ready') return false
@@ -761,7 +778,16 @@ function VolumeScreening({ onStockSelect }) {
       </div>
 
       <div className="bg-slate-900 border border-slate-700 rounded-lg overflow-hidden">
-        <div className="flex items-center justify-end px-4 py-3 border-b border-slate-800 bg-slate-900">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900">
+          <button
+            type="button"
+            onClick={clearAllEntries}
+            className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-amber-400 hover:bg-amber-900/40 transition-colors"
+            title="Clear all scan results"
+            aria-label="Clear all scan results"
+          >
+            <RefreshCcw className="w-5 h-5" />
+          </button>
           <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
             <input
               type="checkbox"
