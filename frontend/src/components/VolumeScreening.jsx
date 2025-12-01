@@ -516,9 +516,12 @@ function VolumeScreening({ onStockSelect }) {
     } catch (error) {
       console.error('Failed to scan symbol', entry.symbol, error)
       const status = error?.response?.status
-      // Treat any HTTP failure (4xx/5xx) as a stop condition so bulk scans halt
-      // after the current in-flight request rather than continuing silently.
-      const isServerError = typeof status === 'number' && status >= 400
+      const message = error?.response?.data?.error || error?.message || 'Failed to scan'
+      const isNoData =
+        status === 404 && typeof message === 'string' && message.includes('No data found for symbol')
+      // Treat HTTP failures as stop conditions unless this is the known 404/no-data case,
+      // which should simply drop the row and continue.
+      const isServerError = typeof status === 'number' && status >= 400 && !isNoData
 
       return {
         ...entry,
@@ -530,8 +533,9 @@ function VolumeScreening({ onStockSelect }) {
         breakout: '—',
         lastScanAt: new Date().toISOString(),
         status: 'error',
-        error: error?.response?.data?.error || error?.message || 'Failed to scan',
-        stopAll: isServerError
+        error: message,
+        stopAll: isServerError,
+        removeRow: isNoData
       }
     }
   }
@@ -564,7 +568,15 @@ function VolumeScreening({ onStockSelect }) {
     )))
 
     const result = await performScan(prepared)
-    const { stopAll, ...entryResult } = result || {}
+    const { stopAll, removeRow, ...entryResult } = result || {}
+
+    if (removeRow) {
+      removeResultFromCache(prepared.symbol)
+      setEntries(prev => prev.filter(entry => entry.id !== id))
+      setScanQueue(prev => prev.filter(item => item.id !== id))
+      return
+    }
+
     setEntries(prev => prev.map(entry => (
       entry.id === id
         ? entryResult
@@ -619,13 +631,18 @@ function VolumeScreening({ onStockSelect }) {
 
     ;(async () => {
       const result = await performScan(current)
-      const { stopAll, ...entryResult } = result || {}
+      const { stopAll, removeRow, ...entryResult } = result || {}
 
-      setEntries(prev => prev.map(entry => (
-        entry.id === current.id
-          ? entryResult
-          : entry
-      )))
+      if (removeRow) {
+        removeResultFromCache(current.symbol)
+        setEntries(prev => prev.filter(entry => entry.id !== current.id))
+      } else {
+        setEntries(prev => prev.map(entry => (
+          entry.id === current.id
+            ? entryResult
+            : entry
+        )))
+      }
 
       if (stopAll) {
         setScanQueue([])
