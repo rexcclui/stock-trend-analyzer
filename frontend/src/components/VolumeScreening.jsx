@@ -516,7 +516,9 @@ function VolumeScreening({ onStockSelect }) {
     } catch (error) {
       console.error('Failed to scan symbol', entry.symbol, error)
       const status = error?.response?.status
-      const isServerError = typeof status === 'number' && status >= 500
+      // Treat any HTTP failure (4xx/5xx) as a stop condition so bulk scans halt
+      // after the current in-flight request rather than continuing silently.
+      const isServerError = typeof status === 'number' && status >= 400
 
       return {
         ...entry,
