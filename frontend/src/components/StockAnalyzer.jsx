@@ -227,6 +227,13 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
       const errors = []
 
       // Fetch data for each symbol
+      const forceVolumeProfileV2 = params?.forceVolumeProfileV2 === true
+      const hasOptimalParams = Array.isArray(params?.smaPeriods) && params.smaPeriods.length > 0
+      const defaultSMAs = hasOptimalParams ? params.smaPeriods : []
+      const defaultSMAVisibility = hasOptimalParams
+        ? params.smaPeriods.reduce((acc, period) => ({ ...acc, [period]: true }), {})
+        : {}
+
       for (const upperSymbol of symbols) {
         try {
           // Try to get from cache first (use fetch period for cache key)
@@ -250,17 +257,6 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
 
           // Save to history
           saveToHistory(upperSymbol)
-
-          // Check if we have optimal parameters from backtest results
-          const hasOptimalParams = params !== null
-          if (hasOptimalParams) {
-            console.log('[Chart Setup] Creating chart with optimal params:', params)
-          }
-          const defaultSMAs = hasOptimalParams ? params.smaPeriods : []
-          const defaultSMAVisibility = hasOptimalParams
-            ? params.smaPeriods.reduce((acc, period) => ({ ...acc, [period]: true }), {})
-            : {}
-
           // Create new chart
           const newChart = {
             id: Date.now() + newCharts.length, // Ensure unique IDs
@@ -275,11 +271,11 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
             volumeProfileEnabled: false,
             volumeProfileMode: 'auto',
             volumeProfileManualRanges: [],
-            volumeProfileV2Enabled: hasOptimalParams,
+            volumeProfileV2Enabled: hasOptimalParams || forceVolumeProfileV2,
             volumeProfileV2StartDate: null,
             volumeProfileV2EndDate: null,
             volumeProfileV2RefreshTrigger: 0,
-            volumeProfileV2Params: hasOptimalParams ? params : null,
+            volumeProfileV2Params: hasOptimalParams || forceVolumeProfileV2 ? params : null,
             spyData: null,
             performanceComparisonEnabled: false,
             performanceComparisonBenchmark: 'SPY',
