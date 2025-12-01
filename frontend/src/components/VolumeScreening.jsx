@@ -37,6 +37,16 @@ function formatTimestamp(dateString) {
   return parsed.toLocaleString()
 }
 
+function safeSetItem(key, value) {
+  try {
+    localStorage.setItem(key, value)
+    return true
+  } catch (error) {
+    console.error(`Failed to persist ${key}:`, error)
+    return false
+  }
+}
+
 function loadResultCache() {
   try {
     const stored = localStorage.getItem(VOLUME_RESULT_CACHE_KEY)
@@ -49,11 +59,15 @@ function loadResultCache() {
 }
 
 function saveResultCache(cache) {
-  try {
-    localStorage.setItem(VOLUME_RESULT_CACHE_KEY, JSON.stringify(cache))
-  } catch (error) {
-    console.error('Failed to save volume result cache:', error)
-  }
+  const saved = safeSetItem(VOLUME_RESULT_CACHE_KEY, JSON.stringify(cache))
+  if (saved) return
+
+  // Fall back to a lighter payload (without legends) if quota is exceeded.
+  const trimmed = Object.fromEntries(
+    Object.entries(cache).map(([symbol, value]) => [symbol, { ...value, volumeLegend: undefined }])
+  )
+
+  safeSetItem(VOLUME_RESULT_CACHE_KEY, JSON.stringify(trimmed))
 }
 
 function loadTopSymbolCache() {
@@ -78,14 +92,13 @@ function loadTopSymbolCache() {
 
 function saveTopSymbolCache(symbols) {
   if (!Array.isArray(symbols) || symbols.length === 0) return
-  try {
-    localStorage.setItem(TOP_SYMBOL_CACHE_KEY, JSON.stringify({
+  safeSetItem(
+    TOP_SYMBOL_CACHE_KEY,
+    JSON.stringify({
       symbols,
       cachedAt: new Date().toISOString()
-    }))
-  } catch (error) {
-    console.error('Failed to save top symbol cache:', error)
-  }
+    })
+  )
 }
 
 function removeResultFromCache(symbol) {
@@ -340,7 +353,8 @@ function VolumeScreening({ onStockSelect }) {
       if (!Array.isArray(parsed)) return
 
       const hydrated = parsed.map(item => {
-        const merged = { ...baseEntryState, ...item }
+        const cached = hydrateFromResultCache(item.symbol)
+        const merged = { ...baseEntryState, ...item, ...(cached || {}) }
         return isEntryFresh(merged) ? merged : clearEntryResults(merged)
       })
       setEntries(hydrated)
@@ -361,7 +375,8 @@ function VolumeScreening({ onStockSelect }) {
   }, [])
 
   useEffect(() => {
-    localStorage.setItem(VOLUME_CACHE_KEY, JSON.stringify(entries))
+    const leanEntries = entries.map(({ id, symbol, status, lastScanAt }) => ({ id, symbol, status, lastScanAt }))
+    safeSetItem(VOLUME_CACHE_KEY, JSON.stringify(leanEntries))
     persistReadyResults(entries)
   }, [entries])
 
@@ -370,7 +385,7 @@ function VolumeScreening({ onStockSelect }) {
     const uniqueSymbols = Array.from(new Set(symbols.filter(Boolean)))
     const updatedHistory = [...uniqueSymbols, ...stockHistory.filter(s => !uniqueSymbols.includes(s))].slice(0, 10)
     setStockHistory(updatedHistory)
-    localStorage.setItem(STOCK_HISTORY_KEY, JSON.stringify(updatedHistory))
+    safeSetItem(STOCK_HISTORY_KEY, JSON.stringify(updatedHistory))
     window.dispatchEvent(new CustomEvent('stockHistoryUpdated', { detail: updatedHistory }))
   }
 
