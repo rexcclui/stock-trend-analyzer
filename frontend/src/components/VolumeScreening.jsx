@@ -8,7 +8,7 @@ const VOLUME_CACHE_KEY = 'volumeScreeningEntries'
 const VOLUME_RESULT_CACHE_KEY = 'volumeScreeningResultsBySymbol'
 const TOP_SYMBOL_CACHE_KEY = 'volumeTopMarketSymbols'
 const CACHE_TTL_MS = 16 * 60 * 60 * 1000
-const TOP_SYMBOL_TTL_MS = 30 * 24 * 60 * 60 * 1000
+const TOP_SYMBOL_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 1 month cache for top 2000 symbols
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 const periods = [
@@ -442,7 +442,7 @@ function VolumeScreening({ onStockSelect }) {
   }
 
   const scanEntries = async () => {
-    if (entries.length === 0) return
+    if (entries.length === 0 || isScanning) return
 
     const refreshedEntries = entries.map(entry => (
       isEntryFresh(entry) ? entry : clearEntryResults(entry)
@@ -670,7 +670,7 @@ function VolumeScreening({ onStockSelect }) {
             <button
               type="button"
               onClick={scanEntries}
-              disabled={entries.length === 0}
+              disabled={entries.length === 0 || isScanning}
               className="flex-1 lg:flex-none px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
               <ScanLine className="w-5 h-5" />
