@@ -48,7 +48,7 @@ function findSlotIndex(slots, price) {
 
 function buildVolumeSlots(prices) {
   if (!Array.isArray(prices) || prices.length === 0) {
-    return { slots: [], lastPrice: null }
+    return { slots: [], lastPrice: null, previousPrice: null }
   }
 
   const sorted = [...prices].sort((a, b) => new Date(a.date) - new Date(b.date))
@@ -101,8 +101,10 @@ function buildVolumeSlots(prices) {
 
   const lastPoint = sorted[sorted.length - 1]
   const lastPrice = lastPoint?.close ?? lastPoint?.high ?? lastPoint?.low ?? null
+  const priorPoint = sorted[sorted.length - 2]
+  const previousPrice = priorPoint?.close ?? priorPoint?.high ?? priorPoint?.low ?? null
 
-  return { slots, lastPrice }
+  return { slots, lastPrice, previousPrice }
 }
 
 function buildLegend(slots, currentIndex) {
@@ -123,19 +125,36 @@ function buildLegend(slots, currentIndex) {
   }))
 }
 
-function detectBreakout(slots, currentIndex, lastPrice) {
+// Break logic:
+// - Find the closest slot on the prior date; if it is lower, check up to five slots below the current range.
+//   A break is flagged when any of those slots differs from the current weight by ≥5 percentage points.
+// - If the prior slot is higher, do the same check on up to five slots above the current range.
+// - If the prior slot is the same or unavailable, no break is reported.
+function detectBreakout(slots, currentIndex, lastPrice, previousPrice) {
   if (!Array.isArray(slots) || slots.length === 0 || currentIndex < 0 || lastPrice == null) return false
   const currentSlot = slots[currentIndex]
-  const lowerGap = Math.abs(lastPrice - currentSlot.start) / Math.max(currentSlot.start || 1, 1)
-  const upperGap = Math.abs(currentSlot.end - lastPrice) / Math.max(currentSlot.end || 1, 1)
-  const nearBoundary = lowerGap <= 0.05 || upperGap <= 0.05
+  const prevIndex = findSlotIndex(slots, previousPrice)
 
-  const neighborWeights = []
-  if (slots[currentIndex - 1]) neighborWeights.push(slots[currentIndex - 1].weight)
-  if (slots[currentIndex + 1]) neighborWeights.push(slots[currentIndex + 1].weight)
+  if (prevIndex < 0 || prevIndex === currentIndex) {
+    return false
+  }
 
-  const significantShift = neighborWeights.some(weight => Math.abs(weight - currentSlot.weight) >= 5)
-  return nearBoundary && significantShift
+  const currentWeight = currentSlot.weight
+  const targetSlots = []
+
+  if (prevIndex < currentIndex) {
+    // Prior slot sat below the current one; inspect up to five ranges below for a sharp volume shift.
+    for (let i = currentIndex - 1; i >= Math.max(0, currentIndex - 5); i -= 1) {
+      targetSlots.push(slots[i])
+    }
+  } else {
+    // Prior slot sat above the current one; inspect up to five ranges above for a sharp volume shift.
+    for (let i = currentIndex + 1; i <= Math.min(slots.length - 1, currentIndex + 5); i += 1) {
+      targetSlots.push(slots[i])
+    }
+  }
+
+  return targetSlots.some(slot => Math.abs((slot?.weight ?? 0) - currentWeight) >= 5)
 }
 
 function findResistance(slots, currentIndex, direction = 'down') {
@@ -255,10 +274,10 @@ function VolumeScreening({ onStockSelect }) {
         })
 
         const prices = response.data?.prices || []
-        const { slots, lastPrice } = buildVolumeSlots(prices)
+        const { slots, lastPrice, previousPrice } = buildVolumeSlots(prices)
         const slotIndex = findSlotIndex(slots, lastPrice)
         const legend = buildLegend(slots, slotIndex)
-        const breakout = detectBreakout(slots, slotIndex, lastPrice)
+        const breakout = detectBreakout(slots, slotIndex, lastPrice, previousPrice)
         const bottomResist = findResistance(slots, slotIndex, 'down')
         const upperResist = findResistance(slots, slotIndex, 'up')
 

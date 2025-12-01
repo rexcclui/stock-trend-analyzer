@@ -36,6 +36,11 @@ A full-stack serverless application for analyzing stock price trends, detecting 
 - Detailed backtesting results
 - Trade performance tables
 
+### Volume Screening Break Logic
+- **Reference move:** Compare the latest price slot to the slot from the previous trading day. If the prior slot is below the current slot, treat the move as upward; if it is above, treat it as downward.
+- **Volume contrast test:** For an upward move, examine up to five slots directly below the current range; for a downward move, examine up to five slots directly above. A break is flagged when any inspected slot's volume weight differs from the current slot by at least **5 percentage points**.
+- **Stability guard:** No break is shown when the prior day's slot matches the current slot or cannot be determined from the data.
+
 ## Architecture
 
 ### Backend (Java + AWS Lambda)
