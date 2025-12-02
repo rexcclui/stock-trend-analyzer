@@ -456,29 +456,12 @@ function optimizeSMAParams(prices, slots, breakouts) {
 }
 
 function BacktestResults({ onStockSelect }) {
-  const loadCachedResults = () => {
-    if (typeof localStorage === 'undefined') return []
-
-    try {
-      const savedResults = localStorage.getItem(BACKTEST_RESULTS_KEY)
-      if (!savedResults) return []
-
-      const parsed = JSON.parse(savedResults)
-      return normalizeCachedResults(parsed)
-    } catch (e) {
-      console.error('Failed to load cached backtest results:', e)
-      return []
-    }
-  }
-
-  const initialCachedResultsRef = useRef(loadCachedResults())
-
   const [symbols, setSymbols] = useState('')
   const [days, setDays] = useState('1825') // Default to 5Y
   const [loading, setLoading] = useState(false)
   const [loadingTopSymbols, setLoadingTopSymbols] = useState(false)
   const [error, setError] = useState(null)
-  const [results, setResults] = useState(initialCachedResultsRef.current)
+  const [results, setResults] = useState([])
   const [stockHistory, setStockHistory] = useState([])
   const [scanQueue, setScanQueue] = useState([])
   const [isScanning, setIsScanning] = useState(false)
@@ -492,10 +475,23 @@ function BacktestResults({ onStockSelect }) {
 
   // Hydrate cached backtest results after mount before enabling persistence
   useEffect(() => {
-    if (initialCachedResultsRef.current.length > 0) {
-      setResults(initialCachedResultsRef.current)
+    if (typeof localStorage === 'undefined') {
+      setHasHydratedCache(true)
+      return
     }
-    setHasHydratedCache(true)
+
+    try {
+      const savedResults = localStorage.getItem(BACKTEST_RESULTS_KEY)
+      if (savedResults) {
+        const parsed = JSON.parse(savedResults)
+        const normalized = normalizeCachedResults(parsed)
+        setResults(normalized)
+      }
+    } catch (e) {
+      console.error('Failed to load cached backtest results:', e)
+    } finally {
+      setHasHydratedCache(true)
+    }
   }, [])
 
   const clearEntryData = (entry, status = 'pending', errorMsg = null) => ({
