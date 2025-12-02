@@ -618,6 +618,16 @@ function VolumeScreening({ onStockSelect }) {
       })
 
       const prices = response.data?.prices || []
+      const hasVolume = prices.some(price => Number(price?.volume) > 0)
+
+      if (!hasVolume) {
+        return {
+          ...entry,
+          removeRow: true,
+          stopAll: false
+        }
+      }
+
       const { slots, lastPrice, previousPrice } = buildVolumeSlots(prices)
       const slotIndex = findSlotIndex(slots, lastPrice)
       const currentRange = slotIndex >= 0 ? slots[slotIndex] : null
