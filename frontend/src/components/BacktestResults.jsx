@@ -471,12 +471,14 @@ function BacktestResults({ onStockSelect }) {
     }
   }
 
+  const initialCachedResultsRef = useRef(loadCachedResults())
+
   const [symbols, setSymbols] = useState('')
   const [days, setDays] = useState('1825') // Default to 5Y
   const [loading, setLoading] = useState(false)
   const [loadingTopSymbols, setLoadingTopSymbols] = useState(false)
   const [error, setError] = useState(null)
-  const [results, setResults] = useState([])
+  const [results, setResults] = useState(initialCachedResultsRef.current)
   const [stockHistory, setStockHistory] = useState([])
   const [scanQueue, setScanQueue] = useState([])
   const [isScanning, setIsScanning] = useState(false)
@@ -490,9 +492,8 @@ function BacktestResults({ onStockSelect }) {
 
   // Hydrate cached backtest results after mount before enabling persistence
   useEffect(() => {
-    const cached = loadCachedResults()
-    if (cached.length > 0) {
-      setResults(cached)
+    if (initialCachedResultsRef.current.length > 0) {
+      setResults(initialCachedResultsRef.current)
     }
     setHasHydratedCache(true)
   }, [])
