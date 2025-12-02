@@ -461,7 +461,23 @@ function BacktestResults({ onStockSelect }) {
   const [loading, setLoading] = useState(false)
   const [loadingTopSymbols, setLoadingTopSymbols] = useState(false)
   const [error, setError] = useState(null)
-  const [results, setResults] = useState([])
+  const initialHydratedResultsRef = useRef(null)
+  const [results, setResults] = useState(() => {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return []
+
+    try {
+      const saved = localStorage.getItem(BACKTEST_RESULTS_KEY)
+      if (!saved) return []
+
+      const parsed = JSON.parse(saved)
+      const normalized = normalizeCachedResults(parsed)
+      initialHydratedResultsRef.current = normalized
+      return normalized
+    } catch (e) {
+      console.error('Failed to parse cached backtest results:', e)
+      return []
+    }
+  })
   const [stockHistory, setStockHistory] = useState([])
   const [scanQueue, setScanQueue] = useState([])
   const [isScanning, setIsScanning] = useState(false)
@@ -470,12 +486,13 @@ function BacktestResults({ onStockSelect }) {
   const [scanTotal, setScanTotal] = useState(0)
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false)
-  const [hasHydratedCache, setHasHydratedCache] = useState(false)
+  const [hasHydratedCache, setHasHydratedCache] = useState(() => initialHydratedResultsRef.current !== null)
   const activeScanSymbolRef = useRef(null)
 
   // Hydrate cached backtest results after mount before enabling persistence
   useEffect(() => {
-    if (typeof localStorage === 'undefined') {
+    if (hasHydratedCache) return
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
       setHasHydratedCache(true)
       return
     }
@@ -486,13 +503,14 @@ function BacktestResults({ onStockSelect }) {
         const parsed = JSON.parse(savedResults)
         const normalized = normalizeCachedResults(parsed)
         setResults(normalized)
+        initialHydratedResultsRef.current = normalized
       }
     } catch (e) {
       console.error('Failed to load cached backtest results:', e)
     } finally {
       setHasHydratedCache(true)
     }
-  }, [])
+  }, [hasHydratedCache])
 
   const clearEntryData = (entry, status = 'pending', errorMsg = null) => ({
     ...entry,
