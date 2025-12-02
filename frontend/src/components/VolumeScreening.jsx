@@ -14,6 +14,7 @@ const TOP_SYMBOL_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 1 month cache for top 2000
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const INVALID_FIVE_CHAR_LENGTH = 5
 const BLOCKED_SUFFIX = '.TO'
+const HYPHEN = '-'
 
 const periods = [
   { label: '1Y', value: '365' },
@@ -59,7 +60,7 @@ function hasBlockedSuffix(symbol) {
 }
 
 function isDisallowedSymbol(symbol) {
-  return isInvalidFiveCharSymbol(symbol) || hasBlockedSuffix(symbol)
+  return isInvalidFiveCharSymbol(symbol) || hasBlockedSuffix(symbol) || (typeof symbol === 'string' && symbol.includes(HYPHEN))
 }
 
 function safeSetItem(key, value) {
@@ -74,11 +75,49 @@ function safeSetItem(key, value) {
   }
 }
 
+function normalizeCachedResult(cached) {
+  if (!cached || typeof cached !== 'object') return null
+
+  return {
+    priceRange: cached.priceRange ?? cached.pr ?? '—',
+    currentRange: cached.currentRange ?? cached.cr ?? null,
+    testedDays: cached.testedDays ?? cached.td ?? '—',
+    slotCount: cached.slotCount ?? cached.sc ?? '—',
+    volumeLegend: cached.volumeLegend ?? cached.vl ?? [],
+    bottomResist: cached.bottomResist ?? cached.br ?? '—',
+    upperResist: cached.upperResist ?? cached.ur ?? '—',
+    breakout: cached.breakout ?? cached.bo ?? '—',
+    lastScanAt: cached.lastScanAt ?? cached.ls ?? null,
+    status: cached.status ?? cached.st ?? 'idle'
+  }
+}
+
+function compressResultEntry(entry) {
+  return {
+    pr: entry.priceRange,
+    cr: entry.currentRange,
+    td: entry.testedDays,
+    sc: entry.slotCount,
+    vl: entry.volumeLegend,
+    br: entry.bottomResist,
+    ur: entry.upperResist,
+    bo: entry.breakout,
+    ls: entry.lastScanAt,
+    st: entry.status
+  }
+}
+
 function loadResultCache() {
   try {
     const stored = localStorage.getItem(VOLUME_RESULT_CACHE_KEY)
     const parsed = stored ? JSON.parse(stored) : {}
-    return parsed && typeof parsed === 'object' ? parsed : {}
+    if (!parsed || typeof parsed !== 'object') return {}
+
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .map(([symbol, data]) => [symbol, normalizeCachedResult(data)])
+        .filter(([, value]) => value != null)
+    )
   } catch (error) {
     console.error('Failed to load volume result cache:', error)
     return {}
@@ -86,7 +125,11 @@ function loadResultCache() {
 }
 
 function saveResultCache(cache) {
-  const tryPersist = (payload) => safeSetItem(VOLUME_RESULT_CACHE_KEY, JSON.stringify(payload))
+  const compressCache = (payload) => Object.fromEntries(
+    Object.entries(payload || {}).map(([symbol, data]) => [symbol, compressResultEntry(data)])
+  )
+
+  const tryPersist = (payload) => safeSetItem(VOLUME_RESULT_CACHE_KEY, JSON.stringify(compressCache(payload)))
 
   if (tryPersist(cache)) return
 
@@ -404,7 +447,6 @@ function VolumeScreening({ onStockSelect }) {
   const [scanTotal, setScanTotal] = useState(0)
   const [scanCompleted, setScanCompleted] = useState(0)
   const [showBookmarkedOnly, setShowBookmarkedOnly] = useState(false)
-  const [showBreakOnly, setShowBreakOnly] = useState(false)
   const [showUpBreakOnly, setShowUpBreakOnly] = useState(false)
   const [showDownBreakOnly, setShowDownBreakOnly] = useState(false)
   const [showPotentialBreakOnly, setShowPotentialBreakOnly] = useState(false)
@@ -890,7 +932,6 @@ function VolumeScreening({ onStockSelect }) {
   const matchesBreakFilters = (entry) => {
     const breakout = entry.breakout && entry.breakout !== '—' ? entry.breakout : null
 
-    if (showBreakOnly && !breakout) return false
     if (!showUpBreakOnly && !showDownBreakOnly) return true
     if (!breakout) return false
 
@@ -962,6 +1003,7 @@ function VolumeScreening({ onStockSelect }) {
         priceRange: entry.priceRange,
         testedDays: entry.testedDays,
         slotCount: entry.slotCount,
+        volumeLegend: entry.volumeLegend,
         bottomResist: entry.bottomResist,
         upperResist: entry.upperResist,
         breakout: entry.breakout,
@@ -1039,6 +1081,7 @@ function VolumeScreening({ onStockSelect }) {
             priceRange: item?.priceRange ?? baseEntryState.priceRange,
             testedDays: item?.testedDays ?? baseEntryState.testedDays,
             slotCount: item?.slotCount ?? baseEntryState.slotCount,
+            volumeLegend: Array.isArray(item?.volumeLegend) ? item.volumeLegend : baseEntryState.volumeLegend,
             bottomResist: item?.bottomResist ?? baseEntryState.bottomResist,
             upperResist: item?.upperResist ?? baseEntryState.upperResist,
             breakout: item?.breakout ?? baseEntryState.breakout,
@@ -1297,6 +1340,15 @@ function VolumeScreening({ onStockSelect }) {
             <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
               <input
                 type="checkbox"
+                checked={showBookmarkedOnly}
+                onChange={(e) => setShowBookmarkedOnly(e.target.checked)}
+                className="form-checkbox rounded border-slate-600 text-yellow-400 focus:ring-2 focus:ring-yellow-400"
+              />
+              Bookmarked
+            </label>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
+              <input
+                type="checkbox"
                 checked={showPotentialBreakOnly}
                 onChange={(e) => setShowPotentialBreakOnly(e.target.checked)}
                 className="form-checkbox rounded border-slate-600 text-blue-500 focus:ring-2 focus:ring-blue-500"
@@ -1306,11 +1358,20 @@ function VolumeScreening({ onStockSelect }) {
             <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
               <input
                 type="checkbox"
-                checked={showBreakOnly}
-                onChange={(e) => setShowBreakOnly(e.target.checked)}
+                checked={showUpBreakOnly}
+                onChange={(e) => setShowUpBreakOnly(e.target.checked)}
                 className="form-checkbox rounded border-slate-600 text-emerald-500 focus:ring-2 focus:ring-emerald-500"
               />
-              Show Break only
+              Up Break
+            </label>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
+              <input
+                type="checkbox"
+                checked={showDownBreakOnly}
+                onChange={(e) => setShowDownBreakOnly(e.target.checked)}
+                className="form-checkbox rounded border-slate-600 text-rose-500 focus:ring-2 focus:ring-rose-500"
+              />
+              Down Break
             </label>
           </div>
         </div>
@@ -1318,6 +1379,9 @@ function VolumeScreening({ onStockSelect }) {
           <table className="min-w-full divide-y divide-slate-700">
             <thead className="bg-slate-800">
               <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                  <span className="sr-only">Bookmark</span>
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Stock
                 </th>
@@ -1374,8 +1438,10 @@ function VolumeScreening({ onStockSelect }) {
             <tbody className="divide-y divide-slate-800">
               {displayEntries.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="px-4 py-6 text-center text-slate-400">
-                    {showBreakOnly ? 'No symbols with Break detected. Disable the filter to see all entries.' : 'No symbols added yet. Add stocks above to start screening.'}
+                  <td colSpan="11" className="px-4 py-6 text-center text-slate-400">
+                    {showUpBreakOnly || showDownBreakOnly || showPotentialBreakOnly || showBookmarkedOnly
+                      ? 'No symbols matched the current filters. Disable filters to see all entries.'
+                      : 'No symbols added yet. Add stocks above to start screening.'}
                   </td>
                 </tr>
               ) : (
@@ -1386,6 +1452,18 @@ function VolumeScreening({ onStockSelect }) {
                     onClick={() => handleRowClick(entry)}
                     title="Click to open in Technical Analysis with Vol Prf V2"
                   >
+                    <td className="px-4 py-3 text-slate-200">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toggleBookmark(entry.id)
+                        }}
+                        aria-label={entry.bookmarked ? 'Unbookmark' : 'Bookmark'}
+                        className={`p-1 rounded-full hover:bg-slate-800 transition-colors ${entry.bookmarked ? 'text-yellow-400' : 'text-slate-400'}`}
+                      >
+                        <Star className="w-5 h-5" fill={entry.bookmarked ? 'currentColor' : 'none'} />
+                      </button>
+                    </td>
                     <td className="px-4 py-3 text-slate-100 font-medium">{entry.symbol}</td>
                     <td className="px-4 py-3 text-slate-200">{entry.testedDays}</td>
                     <td className="px-4 py-3 text-slate-200">{entry.slotCount}</td>
