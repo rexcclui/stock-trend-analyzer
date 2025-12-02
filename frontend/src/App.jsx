@@ -70,7 +70,7 @@ function App() {
 
           {/* Tab Content */}
           <div className="p-0 md:p-6">
-            {/* Keep both components mounted to preserve state when switching tabs */}
+            {/* Keep all components mounted so cached volume data hydrates even before the tab is visible */}
             <div style={{ display: activeTab === 'analyze' ? 'block' : 'none' }}>
               <StockAnalyzer selectedSymbol={selectedSymbol} selectedParams={selectedParams} />
             </div>
