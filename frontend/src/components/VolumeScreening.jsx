@@ -746,11 +746,13 @@ function VolumeScreening({ onStockSelect }) {
     return parsed != null && parsed < 10
   }
 
-  const filteredEntries = entries.filter(entry => {
+  const getVisibleEntries = () => entries.filter(entry => {
     if (showPotentialBreakOnly && !isPotentialBreak(entry)) return false
     if (showBreakOnly && !(entry.breakout && entry.breakout !== '—')) return false
     return true
   })
+
+  const filteredEntries = getVisibleEntries()
 
   const isFiltered = filteredEntries.length !== entries.length
   const visibleEntries = filteredEntries
@@ -813,6 +815,35 @@ function VolumeScreening({ onStockSelect }) {
 
   const handleImportClick = () => {
     importInputRef.current?.click()
+  }
+
+  const scanVisibleEntries = () => {
+    if (isScanning) return
+
+    const candidates = getVisibleEntries()
+    if (candidates.length === 0) return
+
+    const candidateIds = new Set(candidates.map(entry => entry.id))
+
+    const resetEntries = entries.map(entry => (
+      candidateIds.has(entry.id)
+        ? clearEntryResults(entry)
+        : entry
+    ))
+
+    const loadingEntries = resetEntries.map(entry => (
+      candidateIds.has(entry.id)
+        ? { ...entry, status: 'loading', error: null }
+        : entry
+    ))
+
+    setEntries(loadingEntries)
+    setScanQueue(loadingEntries.filter(entry => candidateIds.has(entry.id)))
+    setScanTotal(candidateIds.size)
+    setScanCompleted(0)
+    setIsScanning(true)
+    setIsPaused(false)
+    activeScanIdRef.current = null
   }
 
   const handleImportFileChange = async (event) => {
@@ -1023,6 +1054,16 @@ function VolumeScreening({ onStockSelect }) {
       <div className="bg-slate-900 border border-slate-700 rounded-lg overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900">
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={scanVisibleEntries}
+              className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-emerald-400 hover:bg-emerald-900/40 transition-colors"
+              title="Re-scan visible rows"
+              aria-label="Re-scan visible rows"
+              disabled={isScanning || visibleEntries.length === 0}
+            >
+              <RefreshCcw className="w-5 h-5" />
+            </button>
             <button
               type="button"
               onClick={clearAllEntries}
