@@ -899,7 +899,7 @@ function BacktestResults({ onStockSelect }) {
         return entry.latestPrice ?? -Infinity
       case 'volWeight':
         return entry.latestBreakout?.currentWeight ?? -Infinity
-      case 'supportVol':
+      case 'resistVol':
         return entry.latestBreakout?.lowerWeight ?? -Infinity
       case 'diff':
         return entry.latestBreakout?.weightDiff ?? -Infinity
@@ -909,8 +909,6 @@ function BacktestResults({ onStockSelect }) {
         return entry.optimalSMAs?.pl ?? -Infinity
       case 'marketChange':
         return typeof entry.marketChange === 'number' ? entry.marketChange : -Infinity
-      case 'duration':
-        return typeof entry.durationMs === 'number' ? entry.durationMs : Infinity
       case 'bookmark':
         return entry.bookmarked ? 1 : 0
       default:
@@ -936,6 +934,10 @@ function BacktestResults({ onStockSelect }) {
 
   const completedResults = normalizedResults.filter(r => r.status === 'completed' && r.latestBreakout)
   const recentBreakoutCount = completedResults.filter(r => r.isRecentBreakout).length
+  const totalScanDurationMs = normalizedResults.reduce((sum, entry) =>
+    typeof entry.durationMs === 'number' ? sum + entry.durationMs : sum
+  , 0)
+  const totalDurationDisplay = totalScanDurationMs > 0 ? formatDuration(totalScanDurationMs) : '—'
 
   return (
     <div className="space-y-6">
@@ -1091,6 +1093,7 @@ function BacktestResults({ onStockSelect }) {
                 </p>
               </div>
               <div className="text-sm text-green-200 space-y-1 text-right">
+                <div>Total Duration: {totalDurationDisplay}</div>
                 <div>Queued: {scanCompleted}/{scanTotal || normalizedResults.length}</div>
                 {isScanning && (
                   <div className="flex items-center gap-2 justify-end text-amber-200">
@@ -1120,7 +1123,12 @@ function BacktestResults({ onStockSelect }) {
                 <table className="min-w-full divide-y divide-slate-700">
                 <thead className="bg-slate-900">
                   <tr>
-                    <th onClick={() => handleSort('bookmark')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Bookmark {renderSortIndicator('bookmark')}</th>
+                    <th onClick={() => handleSort('bookmark')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">
+                      <span className="flex items-center gap-1">
+                        <Bookmark className="w-4 h-4" />
+                        {renderSortIndicator('bookmark')}
+                      </span>
+                    </th>
                     <th onClick={() => handleSort('symbol')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Symbol {renderSortIndicator('symbol')}</th>
                     <th onClick={() => handleSort('status')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Status {renderSortIndicator('status')}</th>
                     <th onClick={() => handleSort('latestBreakout')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Latest Breakout {renderSortIndicator('latestBreakout')}</th>
@@ -1128,10 +1136,9 @@ function BacktestResults({ onStockSelect }) {
                     <th onClick={() => handleSort('breakoutPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Breakout Price {renderSortIndicator('breakoutPrice')}</th>
                     <th onClick={() => handleSort('currentPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Current Price {renderSortIndicator('currentPrice')}</th>
                     <th onClick={() => handleSort('volWeight')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Vol Weight {renderSortIndicator('volWeight')}</th>
-                    <th onClick={() => handleSort('supportVol')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Support Vol {renderSortIndicator('supportVol')}</th>
+                    <th onClick={() => handleSort('resistVol')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Resist Vol {renderSortIndicator('resistVol')}</th>
                     <th onClick={() => handleSort('diff')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Diff {renderSortIndicator('diff')}</th>
                     <th onClick={() => handleSort('totalSignals')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Total Signals {renderSortIndicator('totalSignals')}</th>
-                    <th onClick={() => handleSort('duration')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Duration {renderSortIndicator('duration')}</th>
                     <th onClick={() => handleSort('pl')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">P/L {renderSortIndicator('pl')}</th>
                     <th onClick={() => handleSort('marketChange')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Market Change {renderSortIndicator('marketChange')}</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Optimal Params</th>
@@ -1219,9 +1226,6 @@ function BacktestResults({ onStockSelect }) {
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
                           {hasBreakout ? result.totalSignals : '—'}
                         </td>
-                        <td className="px-4 py-3 text-sm text-slate-300 text-right">
-                          {result.status === 'completed' || result.status === 'error' ? formatDuration(result.durationMs) : '—'}
-                        </td>
                         <td className="px-4 py-3 text-sm text-right font-semibold">
                           {hasBreakout ? (
                             <span className={result.optimalSMAs.pl >= 0 ? 'text-green-400' : 'text-red-400'}>
@@ -1294,7 +1298,7 @@ function BacktestResults({ onStockSelect }) {
             <h4 className="text-sm font-semibold text-slate-300 mb-2">Legend</h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-slate-400">
               <div><span className="font-semibold">Vol Weight:</span> Current price zone volume %</div>
-              <div><span className="font-semibold">Support Vol:</span> Max volume zone below</div>
+              <div><span className="font-semibold">Resist Vol:</span> Max volume zone below</div>
               <div><span className="font-semibold">Diff:</span> Breakout strength</div>
               <div><span className="font-semibold">Days Ago:</span> <span className="text-green-400">Green ≤3d</span>, <span className="text-yellow-400">Yellow ≤7d</span>, Gray &gt;7d</div>
               <div><span className="font-semibold">Optimal Params:</span> Th=Threshold%, LB=Lookback Zones</div>
