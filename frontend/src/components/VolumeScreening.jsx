@@ -1096,9 +1096,6 @@ function VolumeScreening({ onStockSelect }) {
                   Stock
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Px Range
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Days Tested
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
@@ -1118,6 +1115,9 @@ function VolumeScreening({ onStockSelect }) {
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Volume Weight %
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                  Px Range
                 </th>
                 <th
                   className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider cursor-pointer select-none"
@@ -1167,7 +1167,6 @@ function VolumeScreening({ onStockSelect }) {
                     title="Click to open in Technical Analysis with Vol Prf V2"
                   >
                     <td className="px-4 py-3 text-slate-100 font-medium">{entry.symbol}</td>
-                    <td className="px-4 py-3 text-slate-200">{entry.priceRange}</td>
                     <td className="px-4 py-3 text-slate-200">{entry.testedDays}</td>
                     <td className="px-4 py-3 text-slate-200">{entry.slotCount}</td>
                     <td className="px-4 py-3 text-slate-200 text-xs">{formatTimestamp(entry.lastScanAt)}</td>
@@ -1200,6 +1199,7 @@ function VolumeScreening({ onStockSelect }) {
                         <span className="text-slate-400">—</span>
                       )}
                     </td>
+                    <td className="px-4 py-3 text-slate-200">{entry.priceRange}</td>
                     <td className={`px-4 py-3 text-slate-200 ${isResistanceClose(entry.bottomResist) ? 'text-sky-400 font-semibold' : ''}`}>
                       {entry.bottomResist}
                     </td>
