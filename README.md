@@ -118,6 +118,10 @@ git clone <repository-url>
 cd stock-trend-analyzer
 ```
 
+## Browser storage limits
+
+The frontend relies on `localStorage` to cache scan results. Most browsers cap `localStorage` at roughly **5–10 MB per origin** (Chrome and Edge are usually ~5 MB). When the combined size of cached results exceeds that quota, writes will fail with `QuotaExceededError`, and the app will prune or rebuild the cache to stay under the limit.
+
 ### 2. Backend Setup
 
 #### Build the Backend
