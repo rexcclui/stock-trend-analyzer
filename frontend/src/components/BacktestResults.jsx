@@ -11,6 +11,50 @@ const INVALID_FIVE_CHAR_LENGTH = 5
 const BLOCKED_SUFFIX = '.TO'
 const HYPHEN = '-'
 
+function computeMarketChange(priceData) {
+  if (!Array.isArray(priceData) || priceData.length === 0) return null
+  const firstClose = priceData[0]?.close
+  const lastClose = priceData[priceData.length - 1]?.close
+  if (typeof firstClose !== 'number' || typeof lastClose !== 'number' || firstClose === 0) return null
+  return ((lastClose - firstClose) / firstClose) * 100
+}
+
+function normalizeCachedResults(entries = []) {
+  if (!Array.isArray(entries)) return []
+
+  return entries
+    .filter(entry => entry && entry.symbol && !isDisallowedSymbol(entry.symbol))
+    .map(entry => {
+      const normalizedEntry = {
+        ...entry,
+        status: entry.status === 'loading' ? 'pending' : entry.status || 'pending',
+        error: entry.error || null,
+        bookmarked: Boolean(entry.bookmarked),
+        marketChange: typeof entry.marketChange === 'number' ? entry.marketChange : computeMarketChange(entry.priceData),
+        durationMs: typeof entry.durationMs === 'number' ? entry.durationMs : null
+      }
+
+      if (typeof normalizedEntry.totalSignals === 'number' && normalizedEntry.totalSignals < 4) {
+        return {
+          ...normalizedEntry,
+          status: 'pending',
+          latestBreakout: null,
+          latestPrice: null,
+          priceData: null,
+          optimalParams: null,
+          optimalSMAs: null,
+          marketChange: null,
+          isRecentBreakout: false,
+          recentBreakout: null,
+          totalSignals: null,
+          error: null
+        }
+      }
+
+      return normalizedEntry
+    })
+}
+
 // Helper function to parse multiple stock symbols from input
 function parseStockSymbols(input) {
   if (!input || !input.trim()) return []
@@ -412,12 +456,29 @@ function optimizeSMAParams(prices, slots, breakouts) {
 }
 
 function BacktestResults({ onStockSelect }) {
+  const loadCachedResults = () => {
+    if (typeof localStorage === 'undefined') return []
+
+    try {
+      const savedResults = localStorage.getItem(BACKTEST_RESULTS_KEY)
+      if (!savedResults) return []
+
+      const parsed = JSON.parse(savedResults)
+      return normalizeCachedResults(parsed)
+    } catch (e) {
+      console.error('Failed to load cached backtest results:', e)
+      return []
+    }
+  }
+
+  const cachedResultsRef = useRef(loadCachedResults())
+
   const [symbols, setSymbols] = useState('')
   const [days, setDays] = useState('1825') // Default to 5Y
   const [loading, setLoading] = useState(false)
   const [loadingTopSymbols, setLoadingTopSymbols] = useState(false)
   const [error, setError] = useState(null)
-  const [results, setResults] = useState([])
+  const [results, setResults] = useState(cachedResultsRef.current)
   const [stockHistory, setStockHistory] = useState([])
   const [scanQueue, setScanQueue] = useState([])
   const [isScanning, setIsScanning] = useState(false)
@@ -426,7 +487,7 @@ function BacktestResults({ onStockSelect }) {
   const [scanTotal, setScanTotal] = useState(0)
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false)
-  const [hasHydratedCache, setHasHydratedCache] = useState(false)
+  const [hasHydratedCache, setHasHydratedCache] = useState(true)
   const activeScanSymbolRef = useRef(null)
 
   const clearEntryData = (entry, status = 'pending', errorMsg = null) => ({
@@ -469,39 +530,6 @@ function BacktestResults({ onStockSelect }) {
         console.error('Failed to load stock history:', e)
       }
     }
-  }, [])
-
-  // Load cached backtest results on mount
-  useEffect(() => {
-    const savedResults = localStorage.getItem(BACKTEST_RESULTS_KEY)
-    if (savedResults) {
-      try {
-        const parsed = JSON.parse(savedResults)
-        if (Array.isArray(parsed)) {
-          const normalized = parsed.map(entry => {
-            const normalizedEntry = {
-              ...entry,
-              status: entry.status === 'loading' ? 'pending' : entry.status || 'pending',
-              error: entry.error || null,
-              bookmarked: Boolean(entry.bookmarked),
-              marketChange: typeof entry.marketChange === 'number' ? entry.marketChange : computeMarketChange(entry.priceData),
-              durationMs: typeof entry.durationMs === 'number' ? entry.durationMs : null
-            }
-
-            if (typeof normalizedEntry.totalSignals === 'number' && normalizedEntry.totalSignals < 4) {
-              return clearEntryData(normalizedEntry)
-            }
-
-            return normalizedEntry
-          })
-          setResults(pruneDisallowedEntries(normalized))
-        }
-      } catch (e) {
-        console.error('Failed to load cached backtest results:', e)
-      }
-    }
-
-    setHasHydratedCache(true)
   }, [])
 
   // Listen for history updates from other components (e.g., technical analysis tab)
@@ -814,14 +842,6 @@ function BacktestResults({ onStockSelect }) {
       setLoading(false)
     }
   }, [isScanning, scanQueue.length])
-
-  const computeMarketChange = (priceData) => {
-    if (!Array.isArray(priceData) || priceData.length === 0) return null
-    const firstClose = priceData[0]?.close
-    const lastClose = priceData[priceData.length - 1]?.close
-    if (typeof firstClose !== 'number' || typeof lastClose !== 'number' || firstClose === 0) return null
-    return ((lastClose - firstClose) / firstClose) * 100
-  }
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-US', {
