@@ -7,6 +7,7 @@ import { joinUrl } from '../utils/urlHelper'
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
 const BACKTEST_RESULTS_KEY = 'backtestResults'
+const SCAN_QUEUE_KEY = 'backtestScanQueue'
 const INVALID_FIVE_CHAR_LENGTH = 5
 const BLOCKED_SUFFIX = '.TO'
 const HYPHEN = '-'
@@ -34,23 +35,8 @@ function normalizeCachedResults(entries = []) {
         durationMs: typeof entry.durationMs === 'number' ? entry.durationMs : null
       }
 
-      if (typeof normalizedEntry.totalSignals === 'number' && normalizedEntry.totalSignals < 4) {
-        return {
-          ...normalizedEntry,
-          status: 'pending',
-          latestBreakout: null,
-          latestPrice: null,
-          priceData: null,
-          optimalParams: null,
-          optimalSMAs: null,
-          marketChange: null,
-          isRecentBreakout: false,
-          recentBreakout: null,
-          totalSignals: null,
-          error: null
-        }
-      }
-
+      // Don't clear completed or error results on reload - they should be preserved
+      // The < 4 signals check is already enforced during backtest execution
       return normalizedEntry
     })
 }
@@ -479,11 +465,52 @@ function BacktestResults({ onStockSelect }) {
     }
   })
   const [stockHistory, setStockHistory] = useState([])
-  const [scanQueue, setScanQueue] = useState([])
-  const [isScanning, setIsScanning] = useState(false)
+  const [scanQueue, setScanQueue] = useState(() => {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return []
+    try {
+      const saved = localStorage.getItem(SCAN_QUEUE_KEY)
+      if (!saved) return []
+      const parsed = JSON.parse(saved)
+      return Array.isArray(parsed.queue) ? parsed.queue : []
+    } catch (e) {
+      console.error('Failed to parse cached scan queue:', e)
+      return []
+    }
+  })
+  const [isScanning, setIsScanning] = useState(() => {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return false
+    try {
+      const saved = localStorage.getItem(SCAN_QUEUE_KEY)
+      if (!saved) return false
+      const parsed = JSON.parse(saved)
+      return Boolean(parsed.isScanning)
+    } catch (e) {
+      return false
+    }
+  })
   const [isPaused, setIsPaused] = useState(false)
-  const [scanCompleted, setScanCompleted] = useState(0)
-  const [scanTotal, setScanTotal] = useState(0)
+  const [scanCompleted, setScanCompleted] = useState(() => {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return 0
+    try {
+      const saved = localStorage.getItem(SCAN_QUEUE_KEY)
+      if (!saved) return 0
+      const parsed = JSON.parse(saved)
+      return typeof parsed.completed === 'number' ? parsed.completed : 0
+    } catch (e) {
+      return 0
+    }
+  })
+  const [scanTotal, setScanTotal] = useState(() => {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return 0
+    try {
+      const saved = localStorage.getItem(SCAN_QUEUE_KEY)
+      if (!saved) return 0
+      const parsed = JSON.parse(saved)
+      return typeof parsed.total === 'number' ? parsed.total : 0
+    } catch (e) {
+      return 0
+    }
+  })
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false)
   const [hasHydratedCache, setHasHydratedCache] = useState(() => initialHydratedResultsRef.current !== null)
@@ -586,6 +613,23 @@ function BacktestResults({ onStockSelect }) {
     }
   }, [results, hasHydratedCache])
 
+  // Persist scan queue and progress to localStorage
+  useEffect(() => {
+    if (!hasHydratedCache) return
+
+    try {
+      const queueData = {
+        queue: scanQueue,
+        isScanning,
+        completed: scanCompleted,
+        total: scanTotal
+      }
+      localStorage.setItem(SCAN_QUEUE_KEY, JSON.stringify(queueData))
+    } catch (e) {
+      console.error('Failed to cache scan queue:', e)
+    }
+  }, [scanQueue, isScanning, scanCompleted, scanTotal, hasHydratedCache])
+
   const ensureEntries = (symbolList) => {
     if (!Array.isArray(symbolList) || symbolList.length === 0) return
 
@@ -632,6 +676,7 @@ function BacktestResults({ onStockSelect }) {
   const clearCachedResults = () => {
     try {
       localStorage.removeItem(BACKTEST_RESULTS_KEY)
+      localStorage.removeItem(SCAN_QUEUE_KEY)
     } catch (e) {
       console.error('Failed to clear cached results:', e)
     }
