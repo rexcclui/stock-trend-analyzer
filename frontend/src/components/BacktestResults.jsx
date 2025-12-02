@@ -1146,7 +1146,7 @@ function BacktestResults({ onStockSelect }) {
             <div className="overflow-x-auto">
               <div className="max-h-[520px] overflow-y-auto">
                 <table className="min-w-full divide-y divide-slate-700">
-                <thead className="bg-slate-900">
+                <thead className="bg-slate-900 sticky top-0 z-10">
                   <tr>
                     <th onClick={() => handleSort('bookmark')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">
                       <span className="flex items-center gap-1">
