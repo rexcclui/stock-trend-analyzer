@@ -1362,7 +1362,7 @@ function VolumeScreening({ onStockSelect }) {
                 onChange={(e) => setShowUpBreakOnly(e.target.checked)}
                 className="form-checkbox rounded border-slate-600 text-emerald-500 focus:ring-2 focus:ring-emerald-500"
               />
-              Up Break
+              Upper Break
             </label>
             <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
               <input
@@ -1386,7 +1386,7 @@ function VolumeScreening({ onStockSelect }) {
                   Stock
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Days Tested
+                  Days
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Px Slots
