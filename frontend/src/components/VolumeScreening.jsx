@@ -384,6 +384,7 @@ function VolumeScreening({ onStockSelect }) {
   const [scanTotal, setScanTotal] = useState(0)
   const [scanCompleted, setScanCompleted] = useState(0)
   const [showBookmarkedOnly, setShowBookmarkedOnly] = useState(false)
+  const [showBreakOnly, setShowBreakOnly] = useState(false)
   const [showUpBreakOnly, setShowUpBreakOnly] = useState(false)
   const [showDownBreakOnly, setShowDownBreakOnly] = useState(false)
   const [showPotentialBreakOnly, setShowPotentialBreakOnly] = useState(false)
@@ -869,6 +870,7 @@ function VolumeScreening({ onStockSelect }) {
   const matchesBreakFilters = (entry) => {
     const breakout = entry.breakout && entry.breakout !== '—' ? entry.breakout : null
 
+    if (showBreakOnly && !breakout) return false
     if (!showUpBreakOnly && !showDownBreakOnly) return true
     if (!breakout) return false
 
