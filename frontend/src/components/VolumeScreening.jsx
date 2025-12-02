@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Plus, ScanLine, Activity, Loader2, Eraser, Trash2, DownloadCloud, Pause, Play } from 'lucide-react'
+import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, Pause, Play } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
@@ -392,6 +392,12 @@ function VolumeScreening({ onStockSelect }) {
     if (!entry?.lastScanAt || entry.status !== 'ready') return false
     const scannedAt = new Date(entry.lastScanAt).getTime()
     return Number.isFinite(scannedAt) && Date.now() - scannedAt < CACHE_TTL_MS
+  }
+
+  const isRecentScan = (timestamp, thresholdMinutes = 60) => {
+    if (!timestamp) return false
+    const scannedAt = new Date(timestamp).getTime()
+    return Number.isFinite(scannedAt) && Date.now() - scannedAt < thresholdMinutes * 60 * 1000
   }
 
   const hydrateFromResultCache = (symbol) => {
@@ -994,7 +1000,7 @@ function VolumeScreening({ onStockSelect }) {
               disabled={entries.length === 0 || isScanning}
               className="flex-1 lg:flex-none px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
-              <ScanLine className="w-5 h-5" />
+              <RefreshCcw className="w-5 h-5" />
               Scan
             </button>
             <button
@@ -1152,6 +1158,7 @@ function VolumeScreening({ onStockSelect }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
+              
               {visibleEntries.length === 0 ? (
                 <tr>
                   <td colSpan="10" className="px-4 py-6 text-center text-slate-400">
@@ -1159,91 +1166,95 @@ function VolumeScreening({ onStockSelect }) {
                   </td>
                 </tr>
               ) : (
-                sortedEntries.map(entry => (
-                  <tr
-                    key={entry.id}
-                    className="hover:bg-slate-800/60 cursor-pointer"
-                    onClick={() => handleRowClick(entry)}
-                    title="Click to open in Technical Analysis with Vol Prf V2"
-                  >
-                    <td className="px-4 py-3 text-slate-100 font-medium">{entry.symbol}</td>
-                    <td className="px-4 py-3 text-slate-200">{entry.testedDays}</td>
-                    <td className="px-4 py-3 text-slate-200">{entry.slotCount}</td>
-                    <td className="px-4 py-3 text-slate-200 text-xs">{formatTimestamp(entry.lastScanAt)}</td>
-                    <td className="px-4 py-3 text-slate-200">
-                      {entry.status === 'loading' ? (
-                        <div className="flex items-center gap-2 text-amber-400">
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Scanning…</span>
-                        </div>
-                      ) : entry.status === 'error' ? (
-                        <span className="text-red-400 text-sm">{entry.error || 'Failed to scan'}</span>
-                      ) : entry.volumeLegend?.length ? (
-                        <div className="flex flex-wrap gap-1">
-                          {entry.volumeLegend.map(slot => (
-                            <span
-                              key={`${entry.id}-${slot.legendIndex}`}
-                              title={`${formatPriceRange(slot.start, slot.end)} • ${slot.label}`}
-                              className={`px-2 py-1 text-xs font-semibold rounded-md shadow-sm border border-slate-800/60 ${slot.isCurrent ? 'ring-2 ring-amber-400' : ''
-                                }`}
-                              style={{
-                                backgroundColor: slot.color,
-                                color: slot.textColor || '#0f172a'
-                              }}
-                            >
-                              {slot.label}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-slate-200">{entry.priceRange}</td>
-                    <td className={`px-4 py-3 text-slate-200 ${isResistanceClose(entry.bottomResist) ? 'text-sky-400 font-semibold' : ''}`}>
-                      {entry.bottomResist}
-                    </td>
-                    <td className={`px-4 py-3 text-slate-200 ${isResistanceClose(entry.upperResist) ? 'text-sky-400 font-semibold' : ''}`}>
-                      {entry.upperResist}
-                    </td>
-                    <td className="px-4 py-3 text-slate-200">{entry.breakout}</td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          scanEntryRow(entry.id)
-                        }}
-                        className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-emerald-400 hover:bg-emerald-900/40 transition-colors mr-2"
-                        aria-label={`Scan ${entry.symbol}`}
-                        title="Scan this symbol"
-                      >
-                        <ScanLine className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          clearEntry(entry.id)
-                        }}
-                        className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-amber-400 hover:bg-amber-900/40 transition-colors mr-2"
-                        aria-label={`Clear ${entry.symbol}`}
-                        title="Clear scan result"
-                      >
-                        <Eraser className="w-5 h-5" strokeWidth={2.25} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          removeEntry(entry.id)
-                        }}
-                        className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-red-400 hover:bg-red-900/40 transition-colors"
-                        aria-label={`Remove ${entry.symbol}`}
-                        title="Remove row"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                sortedEntries.map(entry => {
+                  const isRecent = isRecentScan(entry.lastScanAt)
+                  return (
+                    <tr
+                      key={entry.id}
+                      className="hover:bg-slate-800/60 cursor-pointer"
+                      onClick={() => handleRowClick(entry)}
+                      title="Click to open in Technical Analysis with Vol Prf V2"
+                    >
+                      <td className="px-4 py-3 text-slate-100 font-medium">{entry.symbol}</td>
+                      <td className="px-4 py-3 text-slate-200">{entry.testedDays}</td>
+                      <td className="px-4 py-3 text-slate-200">{entry.slotCount}</td>
+                      <td className={`px-4 py-3 text-xs ${isRecent ? 'text-amber-300 font-semibold' : 'text-slate-200'}`}>
+                        {formatTimestamp(entry.lastScanAt)}
+                      </td>
+                      <td className="px-4 py-3 text-slate-200">
+                        {entry.status === 'loading' ? (
+                          <div className="flex items-center gap-2 text-amber-400">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            <span>Scanning…</span>
+                          </div>
+                        ) : entry.status === 'error' ? (
+                          <span className="text-red-400 text-sm">{entry.error || 'Failed to scan'}</span>
+                        ) : entry.volumeLegend?.length ? (
+                          <div className="flex flex-wrap gap-1">
+                            {entry.volumeLegend.map(slot => (
+                              <span
+                                key={`${entry.id}-${slot.legendIndex}`}
+                                title={`${formatPriceRange(slot.start, slot.end)} • ${slot.label}`}
+                                className={`px-2 py-1 text-xs font-semibold rounded-md shadow-sm border border-slate-800/60 ${slot.isCurrent ? 'ring-2 ring-amber-400' : ''}`}
+                                style={{
+                                  backgroundColor: slot.color,
+                                  color: slot.textColor || '#0f172a'
+                                }}
+                              >
+                                {slot.label}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-200">{entry.priceRange}</td>
+                      <td className={`px-4 py-3 text-slate-200 ${isResistanceClose(entry.bottomResist) ? 'text-sky-400 font-semibold' : ''}`}>
+                        {entry.bottomResist}
+                      </td>
+                      <td className={`px-4 py-3 text-slate-200 ${isResistanceClose(entry.upperResist) ? 'text-sky-400 font-semibold' : ''}`}>
+                        {entry.upperResist}
+                      </td>
+                      <td className="px-4 py-3 text-slate-200">{entry.breakout}</td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            scanEntryRow(entry.id)
+                          }}
+                          className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-emerald-400 hover:bg-emerald-900/40 transition-colors mr-2"
+                          aria-label={`Scan ${entry.symbol}`}
+                          title="Scan this symbol"
+                        >
+                          <RefreshCcw className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            clearEntry(entry.id)
+                          }}
+                          className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-amber-400 hover:bg-amber-900/40 transition-colors mr-2"
+                          aria-label={`Clear ${entry.symbol}`}
+                          title="Clear scan result"
+                        >
+                          <Eraser className="w-5 h-5" strokeWidth={2.25} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            removeEntry(entry.id)
+                          }}
+                          className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-red-400 hover:bg-red-900/40 transition-colors"
+                          aria-label={`Remove ${entry.symbol}`}
+                          title="Remove row"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
