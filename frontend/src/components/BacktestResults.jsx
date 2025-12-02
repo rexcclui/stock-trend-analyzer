@@ -426,6 +426,7 @@ function BacktestResults({ onStockSelect }) {
   const [scanTotal, setScanTotal] = useState(0)
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false)
+  const [hasHydratedCache, setHasHydratedCache] = useState(false)
   const activeScanSymbolRef = useRef(null)
 
   const clearEntryData = (entry, status = 'pending', errorMsg = null) => ({
@@ -472,31 +473,33 @@ function BacktestResults({ onStockSelect }) {
   // Load cached backtest results on mount
   useEffect(() => {
     const savedResults = localStorage.getItem(BACKTEST_RESULTS_KEY)
-    if (!savedResults) return
+    if (savedResults) {
+      try {
+        const parsed = JSON.parse(savedResults)
+        if (Array.isArray(parsed)) {
+          const normalized = parsed.map(entry => {
+            const normalizedEntry = {
+              ...entry,
+              status: entry.status === 'loading' ? 'pending' : entry.status || 'pending',
+              error: entry.error || null,
+              bookmarked: Boolean(entry.bookmarked),
+              marketChange: typeof entry.marketChange === 'number' ? entry.marketChange : computeMarketChange(entry.priceData)
+            }
 
-    try {
-      const parsed = JSON.parse(savedResults)
-      if (Array.isArray(parsed)) {
-        const normalized = parsed.map(entry => {
-          const normalizedEntry = {
-            ...entry,
-            status: entry.status === 'loading' ? 'pending' : entry.status || 'pending',
-            error: entry.error || null,
-            bookmarked: Boolean(entry.bookmarked),
-            marketChange: typeof entry.marketChange === 'number' ? entry.marketChange : computeMarketChange(entry.priceData)
-          }
+            if (typeof normalizedEntry.totalSignals === 'number' && normalizedEntry.totalSignals < 4) {
+              return clearEntryData(normalizedEntry)
+            }
 
-          if (typeof normalizedEntry.totalSignals === 'number' && normalizedEntry.totalSignals < 4) {
-            return clearEntryData(normalizedEntry)
-          }
-
-          return normalizedEntry
-        })
-        setResults(pruneDisallowedEntries(normalized))
+            return normalizedEntry
+          })
+          setResults(pruneDisallowedEntries(normalized))
+        }
+      } catch (e) {
+        console.error('Failed to load cached backtest results:', e)
       }
-    } catch (e) {
-      console.error('Failed to load cached backtest results:', e)
     }
+
+    setHasHydratedCache(true)
   }, [])
 
   // Listen for history updates from other components (e.g., technical analysis tab)
@@ -522,12 +525,14 @@ function BacktestResults({ onStockSelect }) {
 
   // Persist backtest results to localStorage
   useEffect(() => {
+    if (!hasHydratedCache) return
+
     try {
       localStorage.setItem(BACKTEST_RESULTS_KEY, JSON.stringify(results))
     } catch (e) {
       console.error('Failed to cache backtest results:', e)
     }
-  }, [results])
+  }, [results, hasHydratedCache])
 
   const ensureEntries = (symbolList) => {
     if (!Array.isArray(symbolList) || symbolList.length === 0) return
