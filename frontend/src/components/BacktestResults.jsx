@@ -471,14 +471,12 @@ function BacktestResults({ onStockSelect }) {
     }
   }
 
-  const cachedResultsRef = useRef(loadCachedResults())
-
   const [symbols, setSymbols] = useState('')
   const [days, setDays] = useState('1825') // Default to 5Y
   const [loading, setLoading] = useState(false)
   const [loadingTopSymbols, setLoadingTopSymbols] = useState(false)
   const [error, setError] = useState(null)
-  const [results, setResults] = useState(cachedResultsRef.current)
+  const [results, setResults] = useState([])
   const [stockHistory, setStockHistory] = useState([])
   const [scanQueue, setScanQueue] = useState([])
   const [isScanning, setIsScanning] = useState(false)
@@ -487,8 +485,17 @@ function BacktestResults({ onStockSelect }) {
   const [scanTotal, setScanTotal] = useState(0)
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false)
-  const [hasHydratedCache, setHasHydratedCache] = useState(true)
+  const [hasHydratedCache, setHasHydratedCache] = useState(false)
   const activeScanSymbolRef = useRef(null)
+
+  // Hydrate cached backtest results after mount before enabling persistence
+  useEffect(() => {
+    const cached = loadCachedResults()
+    if (cached.length > 0) {
+      setResults(cached)
+    }
+    setHasHydratedCache(true)
+  }, [])
 
   const clearEntryData = (entry, status = 'pending', errorMsg = null) => ({
     ...entry,
