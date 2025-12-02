@@ -346,6 +346,7 @@ function VolumeScreening({ onStockSelect }) {
   const [showPotentialBreakOnly, setShowPotentialBreakOnly] = useState(false)
   const [sortConfig, setSortConfig] = useState(defaultSortConfig)
   const activeScanIdRef = useRef(null)
+  const importInputRef = useRef(null)
 
   const baseEntryState = {
     priceRange: '—',
@@ -735,6 +736,7 @@ function VolumeScreening({ onStockSelect }) {
     return true
   })
 
+  const isFiltered = filteredEntries.length !== entries.length
   const visibleEntries = filteredEntries
 
   const sortedEntries = sortConfig.field
@@ -763,6 +765,89 @@ function VolumeScreening({ onStockSelect }) {
       const direction = prev.field === field && prev.direction === 'desc' ? 'asc' : 'desc'
       return { field, direction }
     })
+  }
+
+  const exportResults = () => {
+    if (visibleEntries.length === 0) return
+
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      entries: visibleEntries.map(entry => ({
+        symbol: entry.symbol,
+        priceRange: entry.priceRange,
+        testedDays: entry.testedDays,
+        slotCount: entry.slotCount,
+        bottomResist: entry.bottomResist,
+        upperResist: entry.upperResist,
+        breakout: entry.breakout,
+        lastScanAt: entry.lastScanAt,
+        status: entry.status
+      }))
+    }
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'volume-screening-results.json'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleImportClick = () => {
+    importInputRef.current?.click()
+  }
+
+  const handleImportFileChange = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    try {
+      const text = await file.text()
+      const parsed = JSON.parse(text)
+      const importedEntries = Array.isArray(parsed?.entries)
+        ? parsed.entries
+        : Array.isArray(parsed)
+          ? parsed
+          : []
+
+      const normalized = importedEntries
+        .map(item => {
+          const symbol = typeof item?.symbol === 'string' ? item.symbol.trim().toUpperCase() : ''
+          if (!symbol) return null
+
+          return {
+            id: `${symbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+            symbol,
+            ...baseEntryState,
+            priceRange: item?.priceRange ?? baseEntryState.priceRange,
+            testedDays: item?.testedDays ?? baseEntryState.testedDays,
+            slotCount: item?.slotCount ?? baseEntryState.slotCount,
+            bottomResist: item?.bottomResist ?? baseEntryState.bottomResist,
+            upperResist: item?.upperResist ?? baseEntryState.upperResist,
+            breakout: item?.breakout ?? baseEntryState.breakout,
+            lastScanAt: item?.lastScanAt ?? baseEntryState.lastScanAt,
+            status: typeof item?.status === 'string' ? item.status : 'ready'
+          }
+        })
+        .filter(Boolean)
+
+      if (normalized.length > 0) {
+        setEntries(prevEntries => {
+          const merged = new Map(normalized.map(entry => [entry.symbol, entry]))
+          prevEntries.forEach(entry => {
+            if (!merged.has(entry.symbol)) {
+              merged.set(entry.symbol, entry)
+            }
+          })
+          return Array.from(merged.values())
+        })
+      }
+    } catch (error) {
+      console.error('Failed to import volume screening entries:', error)
+    } finally {
+      event.target.value = ''
+    }
   }
 
   useEffect(() => {
@@ -934,25 +1019,53 @@ function VolumeScreening({ onStockSelect }) {
               <span className="text-xs text-slate-300 whitespace-nowrap">{scanCompleted}/{scanTotal} processing</span>
             )}
           </div>
-          <div className="flex items-center gap-6">
-            <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
+          <div className="flex items-center gap-4">
+            {isFiltered && (
+              <span className="text-xs text-slate-300 whitespace-nowrap">Showing {visibleEntries.length}/{entries.length}</span>
+            )}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={exportResults}
+                className="px-3 py-1.5 rounded-md bg-slate-800 text-slate-200 text-sm border border-slate-700 hover:border-amber-400 hover:text-amber-300 transition-colors"
+              >
+                Export
+              </button>
+              <button
+                type="button"
+                onClick={handleImportClick}
+                className="px-3 py-1.5 rounded-md bg-slate-800 text-slate-200 text-sm border border-slate-700 hover:border-emerald-400 hover:text-emerald-300 transition-colors"
+              >
+                Import
+              </button>
               <input
-                type="checkbox"
-                checked={showPotentialBreakOnly}
-                onChange={(e) => setShowPotentialBreakOnly(e.target.checked)}
-                className="form-checkbox rounded border-slate-600 text-amber-500 focus:ring-2 focus:ring-amber-500"
+                type="file"
+                accept="application/json"
+                ref={importInputRef}
+                onChange={handleImportFileChange}
+                className="hidden"
               />
-              Potential to break
-            </label>
-            <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
-              <input
-                type="checkbox"
-                checked={showBreakOnly}
-                onChange={(e) => setShowBreakOnly(e.target.checked)}
-                className="form-checkbox rounded border-slate-600 text-emerald-500 focus:ring-2 focus:ring-emerald-500"
-              />
-              Show Break only
-            </label>
+            </div>
+            <div className="flex items-center gap-6">
+              <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
+                <input
+                  type="checkbox"
+                  checked={showPotentialBreakOnly}
+                  onChange={(e) => setShowPotentialBreakOnly(e.target.checked)}
+                  className="form-checkbox rounded border-slate-600 text-amber-500 focus:ring-2 focus:ring-amber-500"
+                />
+                Potential to break
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
+                <input
+                  type="checkbox"
+                  checked={showBreakOnly}
+                  onChange={(e) => setShowBreakOnly(e.target.checked)}
+                  className="form-checkbox rounded border-slate-600 text-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                />
+                Show Break only
+              </label>
+            </div>
           </div>
         </div>
         <div className="overflow-x-auto">
