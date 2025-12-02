@@ -12,6 +12,7 @@ const CACHE_TTL_MS = 16 * 60 * 60 * 1000
 const RECENT_SCAN_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000
 const TOP_SYMBOL_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 1 month cache for top 2000 symbols
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+const INVALID_FIVE_CHAR_LENGTH = 5
 
 const periods = [
   { label: '1Y', value: '365' },
@@ -46,6 +47,10 @@ function formatTimestamp(dateString) {
   const hours = String(parsed.getHours()).padStart(2, '0')
   const minutes = String(parsed.getMinutes()).padStart(2, '0')
   return `${month}-${day} ${hours}:${minutes}`
+}
+
+function isInvalidFiveCharSymbol(symbol) {
+  return typeof symbol === 'string' && symbol.length === INVALID_FIVE_CHAR_LENGTH && !symbol.includes('.')
 }
 
 function safeSetItem(key, value) {
@@ -534,6 +539,27 @@ function VolumeScreening({ onStockSelect }) {
     }
   }
 
+  const dropInvalidScanSymbols = (currentEntries) => {
+    const invalidIds = new Set(
+      currentEntries
+        .filter(entry => isInvalidFiveCharSymbol(entry.symbol))
+        .map(entry => entry.id)
+    )
+
+    if (invalidIds.size === 0) return currentEntries
+
+    currentEntries
+      .filter(entry => invalidIds.has(entry.id))
+      .forEach(entry => removeResultFromCache(entry.symbol))
+
+    const cleaned = currentEntries.filter(entry => !invalidIds.has(entry.id))
+
+    setEntries(cleaned)
+    setScanQueue(prev => prev.filter(item => !invalidIds.has(item.id)))
+
+    return cleaned
+  }
+
   const addSymbols = () => {
     const symbols = parseStockSymbols(symbolInput)
     if (symbols.length === 0) return
@@ -581,9 +607,10 @@ function VolumeScreening({ onStockSelect }) {
   }
 
   const scanEntries = async () => {
-    if (entries.length === 0 || isScanning) return
+    const cleanedEntries = dropInvalidScanSymbols(entries)
+    if (cleanedEntries.length === 0 || isScanning) return
 
-    const refreshedEntries = entries.map(entry => (
+    const refreshedEntries = cleanedEntries.map(entry => (
       isRecentlyScanned(entry) || isEntryFresh(entry) ? entry : clearEntryResults(entry)
     ))
     setEntries(refreshedEntries)
@@ -601,8 +628,9 @@ function VolumeScreening({ onStockSelect }) {
         : { ...entry, status: 'loading', error: null }
     ))
     setEntries(loadingEntries)
-    setScanQueue(loadingEntries.filter(entry => entry.status === 'loading'))
-    setScanTotal(pendingEntries.length)
+    const queuedEntries = loadingEntries.filter(entry => entry.status === 'loading')
+    setScanQueue(queuedEntries)
+    setScanTotal(queuedEntries.length)
     setScanCompleted(0)
     setIsScanning(true)
     setIsPaused(false)
@@ -763,7 +791,7 @@ function VolumeScreening({ onStockSelect }) {
     return parsed != null && parsed < 10
   }
 
-  const getVisibleEntries = () => entries.filter(entry => {
+  const getVisibleEntries = (sourceEntries = entries) => sourceEntries.filter(entry => {
     if (showPotentialBreakOnly && !isPotentialBreak(entry)) return false
     if (showBreakOnly && !(entry.breakout && entry.breakout !== '—')) return false
     return true
@@ -835,9 +863,10 @@ function VolumeScreening({ onStockSelect }) {
   }
 
   const scanVisibleEntries = () => {
-    if (isScanning) return
+    const cleanedEntries = dropInvalidScanSymbols(entries)
+    if (cleanedEntries.length === 0 || isScanning) return
 
-    const candidates = getVisibleEntries()
+    const candidates = getVisibleEntries(cleanedEntries)
     const scannable = candidates.filter(entry => !isRecentlyScanned(entry))
     if (scannable.length === 0) return
 
