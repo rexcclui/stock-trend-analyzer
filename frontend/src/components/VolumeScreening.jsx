@@ -512,6 +512,12 @@ function VolumeScreening({ onStockSelect }) {
     return Number.isFinite(scannedAt) && Date.now() - scannedAt < thresholdMs
   }
 
+  const isScanStale = (timestamp, thresholdMs = RECENT_SCAN_THRESHOLD_MS) => {
+    if (!timestamp) return false
+    const scannedAt = new Date(timestamp).getTime()
+    return Number.isFinite(scannedAt) && Date.now() - scannedAt >= thresholdMs
+  }
+
   const hydrateFromResultCache = (symbol) => {
     const cache = loadResultCache()
     const cached = cache?.[symbol]
@@ -1467,7 +1473,9 @@ function VolumeScreening({ onStockSelect }) {
                     <td className="px-4 py-3 text-slate-100 font-medium">{entry.symbol}</td>
                     <td className="px-4 py-3 text-slate-200">{entry.testedDays}</td>
                     <td className="px-4 py-3 text-slate-200">{entry.slotCount}</td>
-                    <td className="px-4 py-3 text-slate-200 text-xs">{formatTimestamp(entry.lastScanAt)}</td>
+                    <td className={`px-4 py-3 text-xs ${isScanStale(entry.lastScanAt) ? 'text-red-400' : 'text-slate-200'}`}>
+                      {formatTimestamp(entry.lastScanAt)}
+                    </td>
                     <td className="px-4 py-3 text-slate-200">
                       {entry.status === 'loading' ? (
                         <div className="flex items-center gap-2 text-amber-400">
