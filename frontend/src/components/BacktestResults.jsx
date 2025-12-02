@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
-import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown } from 'lucide-react'
+import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2 } from 'lucide-react'
 import { apiCache } from '../utils/apiCache'
 import { joinUrl } from '../utils/urlHelper'
 
@@ -413,6 +413,21 @@ function BacktestResults({ onStockSelect }) {
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false)
   const activeScanSymbolRef = useRef(null)
 
+  const clearEntryData = (entry, status = 'pending', errorMsg = null) => ({
+    ...entry,
+    status,
+    latestBreakout: null,
+    latestPrice: null,
+    priceData: null,
+    optimalParams: null,
+    optimalSMAs: null,
+    marketChange: null,
+    isRecentBreakout: false,
+    recentBreakout: null,
+    totalSignals: null,
+    error: errorMsg
+  })
+
   // Load stock history from localStorage on mount
   useEffect(() => {
     const savedHistory = localStorage.getItem(STOCK_HISTORY_KEY)
@@ -433,13 +448,21 @@ function BacktestResults({ onStockSelect }) {
     try {
       const parsed = JSON.parse(savedResults)
       if (Array.isArray(parsed)) {
-        const normalized = parsed.map(entry => ({
-          ...entry,
-          status: entry.status === 'loading' ? 'pending' : entry.status || 'pending',
-          error: entry.error || null,
-          bookmarked: Boolean(entry.bookmarked),
-          marketChange: typeof entry.marketChange === 'number' ? entry.marketChange : computeMarketChange(entry.priceData)
-        }))
+        const normalized = parsed.map(entry => {
+          const normalizedEntry = {
+            ...entry,
+            status: entry.status === 'loading' ? 'pending' : entry.status || 'pending',
+            error: entry.error || null,
+            bookmarked: Boolean(entry.bookmarked),
+            marketChange: typeof entry.marketChange === 'number' ? entry.marketChange : computeMarketChange(entry.priceData)
+          }
+
+          if (typeof normalizedEntry.totalSignals === 'number' && normalizedEntry.totalSignals < 4) {
+            return clearEntryData(normalizedEntry)
+          }
+
+          return normalizedEntry
+        })
         setResults(normalized)
       }
     } catch (e) {
@@ -507,6 +530,30 @@ function BacktestResults({ onStockSelect }) {
     })
   }
 
+  const eraseResult = (symbol) => {
+    setResults(prev => prev.map(entry => (
+      entry.symbol === symbol ? clearEntryData(entry) : entry
+    )))
+  }
+
+  const eraseAllResults = () => {
+    setResults(prev => prev.map(entry => clearEntryData(entry)))
+  }
+
+  const clearCachedResults = () => {
+    try {
+      localStorage.removeItem(BACKTEST_RESULTS_KEY)
+    } catch (e) {
+      console.error('Failed to clear cached results:', e)
+    }
+    setResults([])
+    setScanQueue([])
+    setScanTotal(0)
+    setScanCompleted(0)
+    setIsScanning(false)
+    setIsPaused(false)
+  }
+
   const runBacktestForSymbol = async (symbol) => {
     ensureEntries([symbol])
     setResults(prev => prev.map(entry => (
@@ -537,6 +584,10 @@ function BacktestResults({ onStockSelect }) {
       const optimalParams = optimizeVolPrfV2Params(priceData)
       const { slots, breakouts } = calculateVolPrfV2Breakouts(priceData, optimalParams)
       const optimalSMAs = optimizeSMAParams(priceData, slots, breakouts)
+
+      if (optimalSMAs.totalSignals < 4) {
+        throw new Error('Excluded: fewer than 4 total signals')
+      }
 
       const recentBreakouts = getRecentBreakouts(breakouts, 10)
       const latestBreakout = getLatestBreakout(breakouts)
@@ -572,7 +623,7 @@ function BacktestResults({ onStockSelect }) {
       console.error(`Error processing ${symbol}:`, err)
       setResults(prev => prev.map(entry => (
         entry.symbol === symbol
-          ? { ...entry, status: 'error', error: err.message || 'Failed to run backtest' }
+          ? clearEntryData(entry, 'error', err.message || 'Failed to run backtest')
           : entry
       )))
     }
@@ -926,14 +977,26 @@ function BacktestResults({ onStockSelect }) {
               {isPaused ? 'Resume' : 'Pause'}
             </button>
             {results.length > 0 && (
-              <button
-                onClick={() => setResults([])}
-                disabled={loading}
-                className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-                title="Clear all results"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <>
+                <button
+                  onClick={eraseAllResults}
+                  disabled={loading}
+                  className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                  title="Erase all backtest results"
+                >
+                  <Eraser className="w-5 h-5" />
+                  Clear Results
+                </button>
+                <button
+                  onClick={clearCachedResults}
+                  disabled={loading}
+                  className="px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                  title="Remove cached backtests"
+                >
+                  <Trash2 className="w-5 h-5" />
+                  Clear Storage
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -987,7 +1050,8 @@ function BacktestResults({ onStockSelect }) {
               </button>
             </div>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-700">
+              <div className="max-h-[520px] overflow-y-auto">
+                <table className="min-w-full divide-y divide-slate-700">
                 <thead className="bg-slate-900">
                   <tr>
                     <th onClick={() => handleSort('bookmark')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Bookmark {renderSortIndicator('bookmark')}</th>
@@ -1126,6 +1190,16 @@ function BacktestResults({ onStockSelect }) {
                           </button>
                           <button
                             onClick={(e) => {
+                              e.stopPropagation()
+                              eraseResult(result.symbol)
+                            }}
+                            className="p-1 text-slate-400 hover:text-blue-300 hover:bg-blue-900/20 rounded transition-colors mr-1"
+                            title="Erase backtest result"
+                          >
+                            <Eraser className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
                               e.stopPropagation() // Prevent row click
                               setResults(prevResults => prevResults.filter(r => r.symbol !== result.symbol))
                               setScanQueue(prev => prev.filter(symbol => symbol !== result.symbol))
@@ -1140,7 +1214,8 @@ function BacktestResults({ onStockSelect }) {
                     )
                   })}
                 </tbody>
-              </table>
+                </table>
+              </div>
             </div>
           </div>
 
