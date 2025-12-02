@@ -345,11 +345,31 @@ function parseResistanceWeight(resistanceValue) {
 
 function calculatePercentGap(currentRange, targetRange) {
   if (!currentRange || !targetRange) return null
-  const currentMid = (currentRange.start + currentRange.end) / 2
-  const targetMid = (targetRange.start + targetRange.end) / 2
-  if (!Number.isFinite(currentMid) || currentMid === 0 || !Number.isFinite(targetMid)) return null
 
-  const diff = ((targetMid - currentMid) / currentMid) * 100
+  const currentStart = Number(currentRange.start)
+  const currentEnd = Number(currentRange.end)
+  const targetStart = Number(targetRange.start)
+  const targetEnd = Number(targetRange.end)
+
+  if (!Number.isFinite(currentStart) || !Number.isFinite(currentEnd) || !Number.isFinite(targetStart) || !Number.isFinite(targetEnd)) {
+    return null
+  }
+
+  const currentMid = (currentStart + currentEnd) / 2
+  if (!Number.isFinite(currentMid) || currentMid === 0) return null
+
+  let gap = 0
+  let direction = 0
+
+  if (targetStart > currentEnd) {
+    gap = targetStart - currentEnd
+    direction = 1
+  } else if (targetEnd < currentStart) {
+    gap = currentStart - targetEnd
+    direction = -1
+  }
+
+  const diff = (gap / currentMid) * 100 * (direction || 0)
   return diff
 }
 
@@ -913,11 +933,22 @@ function VolumeScreening({ onStockSelect }) {
     })
     : visibleEntries
 
+  const displayEntries = sortedEntries
+
   const toggleSort = (field) => {
     setSortConfig(prev => {
       const direction = prev.field === field && prev.direction === 'desc' ? 'asc' : 'desc'
       return { field, direction }
     })
+  }
+
+  const renderSortIndicator = (field) => {
+    if (sortConfig.field !== field) return null
+    return (
+      <span aria-hidden className="ml-1 text-slate-400">
+        {sortConfig.direction === 'asc' ? '▲' : '▼'}
+      </span>
+    )
   }
 
   const exportResults = () => {
@@ -1192,24 +1223,42 @@ function VolumeScreening({ onStockSelect }) {
 
       <div className="bg-slate-900 border border-slate-700 rounded-lg overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900">
-          <button
-            type="button"
-            onClick={clearAllEntries}
-            className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-amber-400 hover:bg-amber-900/40 transition-colors"
-            title="Clear all scan results"
-            aria-label="Clear all scan results"
-          >
-            <RefreshCcw className="w-5 h-5" />
-          </button>
-          <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
-            <input
-              type="checkbox"
-              checked={showBreakOnly}
-              onChange={(e) => setShowBreakOnly(e.target.checked)}
-              className="form-checkbox rounded border-slate-600 text-emerald-500 focus:ring-2 focus:ring-emerald-500"
-            />
-            Show Break only
-          </label>
+          <div className="flex items-center gap-3 text-xs text-slate-300">
+            <button
+              type="button"
+              onClick={clearAllEntries}
+              className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-amber-400 hover:bg-amber-900/40 transition-colors"
+              title="Clear all scan results"
+              aria-label="Clear all scan results"
+            >
+              <RefreshCcw className="w-5 h-5" />
+            </button>
+            {scanTotal > 0 && (
+              <span className="whitespace-nowrap">
+                {Math.min(scanCompleted, scanTotal)}/{scanTotal} processing
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-4">
+            <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
+              <input
+                type="checkbox"
+                checked={showPotentialBreakOnly}
+                onChange={(e) => setShowPotentialBreakOnly(e.target.checked)}
+                className="form-checkbox rounded border-slate-600 text-blue-500 focus:ring-2 focus:ring-blue-500"
+              />
+              Potential to break
+            </label>
+            <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
+              <input
+                type="checkbox"
+                checked={showBreakOnly}
+                onChange={(e) => setShowBreakOnly(e.target.checked)}
+                className="form-checkbox rounded border-slate-600 text-emerald-500 focus:ring-2 focus:ring-emerald-500"
+              />
+              Show Break only
+            </label>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-slate-700">
@@ -1228,16 +1277,37 @@ function VolumeScreening({ onStockSelect }) {
                   Px Slots
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Last Scan
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('lastScanAt')}
+                    className="inline-flex items-center gap-1 hover:text-slate-100"
+                  >
+                    Last Scan
+                    {renderSortIndicator('lastScanAt')}
+                  </button>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Volume Weight %
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Bottom Resist
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('bottomResist')}
+                    className="inline-flex items-center gap-1 hover:text-slate-100"
+                  >
+                    Bottom Resist
+                    {renderSortIndicator('bottomResist')}
+                  </button>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Upper Resist
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('upperResist')}
+                    className="inline-flex items-center gap-1 hover:text-slate-100"
+                  >
+                    Upper Resist
+                    {renderSortIndicator('upperResist')}
+                  </button>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Break
@@ -1248,14 +1318,14 @@ function VolumeScreening({ onStockSelect }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
-              {visibleEntries.length === 0 ? (
+              {displayEntries.length === 0 ? (
                 <tr>
                   <td colSpan="10" className="px-4 py-6 text-center text-slate-400">
                     {showBreakOnly ? 'No symbols with Break detected. Disable the filter to see all entries.' : 'No symbols added yet. Add stocks above to start screening.'}
                   </td>
                 </tr>
               ) : (
-                visibleEntries.map(entry => (
+                displayEntries.map(entry => (
                   <tr
                     key={entry.id}
                     className="hover:bg-slate-800/60 cursor-pointer"
@@ -1296,8 +1366,12 @@ function VolumeScreening({ onStockSelect }) {
                         <span className="text-slate-400">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-200">{entry.bottomResist}</td>
-                    <td className="px-4 py-3 text-slate-200">{entry.upperResist}</td>
+                    <td className={`px-4 py-3 text-slate-200 ${isResistanceClose(entry.bottomResist) ? 'text-sky-400 font-semibold' : ''}`}>
+                      {entry.bottomResist}
+                    </td>
+                    <td className={`px-4 py-3 text-slate-200 ${isResistanceClose(entry.upperResist) ? 'text-sky-400 font-semibold' : ''}`}>
+                      {entry.upperResist}
+                    </td>
                     <td className="px-4 py-3 text-slate-200">{entry.breakout}</td>
                     <td className="px-4 py-3 text-right">
                       <button
