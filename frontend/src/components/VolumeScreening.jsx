@@ -420,6 +420,12 @@ function parseResistanceWeight(resistanceValue) {
   return Number.isFinite(parsed) ? Math.abs(parsed) : null
 }
 
+function getCurrentVolumeWeight(entry) {
+  const currentSlot = entry?.volumeLegend?.find(slot => slot?.isCurrent)
+  const weight = currentSlot?.weight
+  return Number.isFinite(weight) ? weight : null
+}
+
 function calculatePercentGap(currentRange, targetRange) {
   if (!currentRange || !targetRange) return null
 
@@ -1013,8 +1019,12 @@ function VolumeScreening({ onStockSelect }) {
         return sortConfig.direction === 'asc' ? diff : -diff
       }
 
-      const weightA = parseResistanceWeight(a[sortConfig.field])
-      const weightB = parseResistanceWeight(b[sortConfig.field])
+      const weightA = sortConfig.field === 'volumeWeight'
+        ? getCurrentVolumeWeight(a)
+        : parseResistanceWeight(a[sortConfig.field])
+      const weightB = sortConfig.field === 'volumeWeight'
+        ? getCurrentVolumeWeight(b)
+        : parseResistanceWeight(b[sortConfig.field])
 
       if (weightA == null && weightB == null) return 0
       if (weightA == null) return 1
@@ -1457,7 +1467,14 @@ function VolumeScreening({ onStockSelect }) {
                   </button>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Volume Weight %
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('volumeWeight')}
+                    className="inline-flex items-center gap-1 hover:text-slate-100"
+                  >
+                    Volume Weight %
+                    {renderSortIndicator('volumeWeight')}
+                  </button>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Px Range
