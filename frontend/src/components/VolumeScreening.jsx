@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, Pause, Play } from 'lucide-react'
+import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, Pause, Play, Star } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
@@ -13,6 +13,7 @@ const RECENT_SCAN_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000
 const TOP_SYMBOL_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 1 month cache for top 2000 symbols
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const INVALID_FIVE_CHAR_LENGTH = 5
+const BLOCKED_SUFFIX = '.TO'
 
 const periods = [
   { label: '1Y', value: '365' },
@@ -51,6 +52,14 @@ function formatTimestamp(dateString) {
 
 function isInvalidFiveCharSymbol(symbol) {
   return typeof symbol === 'string' && symbol.length === INVALID_FIVE_CHAR_LENGTH && !symbol.includes('.')
+}
+
+function hasBlockedSuffix(symbol) {
+  return typeof symbol === 'string' && symbol.toUpperCase().endsWith(BLOCKED_SUFFIX)
+}
+
+function isDisallowedSymbol(symbol) {
+  return isInvalidFiveCharSymbol(symbol) || hasBlockedSuffix(symbol)
 }
 
 function safeSetItem(key, value) {
@@ -374,7 +383,9 @@ function VolumeScreening({ onStockSelect }) {
   const [isPaused, setIsPaused] = useState(false)
   const [scanTotal, setScanTotal] = useState(0)
   const [scanCompleted, setScanCompleted] = useState(0)
-  const [showBreakOnly, setShowBreakOnly] = useState(false)
+  const [showBookmarkedOnly, setShowBookmarkedOnly] = useState(false)
+  const [showUpBreakOnly, setShowUpBreakOnly] = useState(false)
+  const [showDownBreakOnly, setShowDownBreakOnly] = useState(false)
   const [showPotentialBreakOnly, setShowPotentialBreakOnly] = useState(false)
   const [sortConfig, setSortConfig] = useState(defaultSortConfig)
   const activeScanIdRef = useRef(null)
@@ -488,11 +499,13 @@ function VolumeScreening({ onStockSelect }) {
       try {
         const parsed = JSON.parse(savedEntries)
         if (Array.isArray(parsed)) {
-          const hydrated = parsed.map(item => {
-            const cached = hydrateFromResultCache(item.symbol)
-            const merged = { ...baseEntryState, ...item, ...(cached || {}) }
-            return isEntryFresh(merged) ? merged : clearEntryResults(merged)
-          })
+          const hydrated = parsed
+            .filter(item => !isDisallowedSymbol(item?.symbol))
+            .map(item => {
+              const cached = hydrateFromResultCache(item.symbol)
+              const merged = { ...baseEntryState, bookmarked: !!item.bookmarked, ...item, ...(cached || {}) }
+              return isEntryFresh(merged) ? merged : clearEntryResults(merged)
+            })
           if (hydrated.length > 0) {
             setEntries(hydrated)
             return
@@ -510,12 +523,20 @@ function VolumeScreening({ onStockSelect }) {
       const symbols = JSON.parse(savedSymbolsRaw)
       if (!Array.isArray(symbols)) return
 
-      const cleanedSymbols = Array.from(new Set(symbols.filter(symbol => typeof symbol === 'string' && symbol.trim())));
+      const cleanedSymbols = Array.from(
+        new Set(
+          symbols
+            .filter(symbol => typeof symbol === 'string' && symbol.trim())
+            .map(symbol => symbol.toUpperCase())
+            .filter(symbol => !isDisallowedSymbol(symbol))
+        )
+      )
       if (cleanedSymbols.length === 0) return
 
       setEntries(cleanedSymbols.map(symbol => ({
         id: `${symbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-        symbol: symbol.toUpperCase(),
+        symbol,
+        bookmarked: false,
         ...baseEntryState
       })))
     } catch (error) {
@@ -535,7 +556,7 @@ function VolumeScreening({ onStockSelect }) {
   }, [])
 
   useEffect(() => {
-    const leanEntries = entries.map(({ id, symbol, status, lastScanAt }) => ({ id, symbol, status, lastScanAt }))
+    const leanEntries = entries.map(({ id, symbol, status, lastScanAt, bookmarked }) => ({ id, symbol, status, lastScanAt, bookmarked: !!bookmarked }))
     safeSetItem(VOLUME_CACHE_KEY, JSON.stringify(leanEntries))
     safeSetItem(VOLUME_SYMBOLS_KEY, JSON.stringify(entries.map(entry => entry.symbol).filter(Boolean)))
     persistReadyResults(entries)
@@ -553,15 +574,19 @@ function VolumeScreening({ onStockSelect }) {
   const mergeSymbolsIntoEntries = (symbols, { persistHistory = false } = {}) => {
     if (!Array.isArray(symbols) || symbols.length === 0) return
 
+    const allowedSymbols = symbols.filter(symbol => !isDisallowedSymbol(symbol))
+    if (allowedSymbols.length === 0) return
+
     setEntries(prevEntries => {
       const nextEntries = [...prevEntries]
 
-      symbols.forEach(symbol => {
+      allowedSymbols.forEach(symbol => {
         if (!nextEntries.some(entry => entry.symbol === symbol)) {
           const cached = hydrateFromResultCache(symbol)
           nextEntries.push({
             id: `${symbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
             symbol,
+            bookmarked: false,
             ...(cached || baseEntryState)
           })
         }
@@ -578,7 +603,7 @@ function VolumeScreening({ onStockSelect }) {
   const dropInvalidScanSymbols = (currentEntries) => {
     const invalidIds = new Set(
       currentEntries
-        .filter(entry => isInvalidFiveCharSymbol(entry.symbol))
+        .filter(entry => isDisallowedSymbol(entry.symbol))
         .map(entry => entry.id)
     )
 
@@ -598,9 +623,10 @@ function VolumeScreening({ onStockSelect }) {
 
   const addSymbols = () => {
     const symbols = parseStockSymbols(symbolInput)
-    if (symbols.length === 0) return
+    const allowedSymbols = symbols.filter(symbol => !isDisallowedSymbol(symbol))
+    if (allowedSymbols.length === 0) return
 
-    mergeSymbolsIntoEntries(symbols, { persistHistory: true })
+    mergeSymbolsIntoEntries(allowedSymbols, { persistHistory: true })
     setSymbolInput('')
   }
 
@@ -772,9 +798,22 @@ function VolumeScreening({ onStockSelect }) {
     })
   }
 
+  const toggleBookmark = (id) => {
+    setEntries(prev => prev.map(entry => (
+      entry.id === id ? { ...entry, bookmarked: !entry.bookmarked } : entry
+    )))
+  }
+
   const scanEntryRow = async (id) => {
     const target = entries.find(entry => entry.id === id)
     if (!target) return
+
+    if (isDisallowedSymbol(target.symbol)) {
+      removeResultFromCache(target.symbol)
+      setEntries(prev => prev.filter(entry => entry.id !== id))
+      setScanQueue(prev => prev.filter(item => item.id !== id))
+      return
+    }
 
     const prepared = clearEntryResults(target)
     setEntries(prev => prev.map(entry => (
@@ -827,9 +866,22 @@ function VolumeScreening({ onStockSelect }) {
     return parsed != null && parsed < 10
   }
 
+  const matchesBreakFilters = (entry) => {
+    const breakout = entry.breakout && entry.breakout !== '—' ? entry.breakout : null
+
+    if (!showUpBreakOnly && !showDownBreakOnly) return true
+    if (!breakout) return false
+
+    const matchesUp = showUpBreakOnly && breakout === 'Up'
+    const matchesDown = showDownBreakOnly && breakout === 'Down'
+
+    return matchesUp || matchesDown
+  }
+
   const getVisibleEntries = (sourceEntries = entries) => sourceEntries.filter(entry => {
+    if (showBookmarkedOnly && !entry.bookmarked) return false
     if (showPotentialBreakOnly && !isPotentialBreak(entry)) return false
-    if (showBreakOnly && !(entry.breakout && entry.breakout !== '—')) return false
+    if (!matchesBreakFilters(entry)) return false
     return true
   })
 
@@ -881,7 +933,8 @@ function VolumeScreening({ onStockSelect }) {
         upperResist: entry.upperResist,
         breakout: entry.breakout,
         lastScanAt: entry.lastScanAt,
-        status: entry.status
+        status: entry.status,
+        bookmarked: !!entry.bookmarked
       }))
     }
 
@@ -908,7 +961,7 @@ function VolumeScreening({ onStockSelect }) {
 
     const candidateIds = new Set(scannable.map(entry => entry.id))
 
-    const resetEntries = entries.map(entry => (
+    const resetEntries = cleanedEntries.map(entry => (
       candidateIds.has(entry.id)
         ? clearEntryResults(entry)
         : entry
@@ -945,7 +998,7 @@ function VolumeScreening({ onStockSelect }) {
       const normalized = importedEntries
         .map(item => {
           const symbol = typeof item?.symbol === 'string' ? item.symbol.trim().toUpperCase() : ''
-          if (!symbol) return null
+          if (!symbol || isDisallowedSymbol(symbol)) return null
 
           return {
             id: `${symbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
@@ -958,7 +1011,8 @@ function VolumeScreening({ onStockSelect }) {
             upperResist: item?.upperResist ?? baseEntryState.upperResist,
             breakout: item?.breakout ?? baseEntryState.breakout,
             lastScanAt: item?.lastScanAt ?? baseEntryState.lastScanAt,
-            status: typeof item?.status === 'string' ? item.status : 'ready'
+            status: typeof item?.status === 'string' ? item.status : 'ready',
+            bookmarked: !!item?.bookmarked
           }
         })
         .filter(Boolean)
@@ -1200,6 +1254,15 @@ function VolumeScreening({ onStockSelect }) {
               <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
                 <input
                   type="checkbox"
+                  checked={showBookmarkedOnly}
+                  onChange={(e) => setShowBookmarkedOnly(e.target.checked)}
+                  className="form-checkbox rounded border-slate-600 text-amber-500 focus:ring-2 focus:ring-amber-500"
+                />
+                Bookmarked only
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
+                <input
+                  type="checkbox"
                   checked={showPotentialBreakOnly}
                   onChange={(e) => setShowPotentialBreakOnly(e.target.checked)}
                   className="form-checkbox rounded border-slate-600 text-amber-500 focus:ring-2 focus:ring-amber-500"
@@ -1209,11 +1272,20 @@ function VolumeScreening({ onStockSelect }) {
               <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
                 <input
                   type="checkbox"
-                  checked={showBreakOnly}
-                  onChange={(e) => setShowBreakOnly(e.target.checked)}
+                  checked={showUpBreakOnly}
+                  onChange={(e) => setShowUpBreakOnly(e.target.checked)}
                   className="form-checkbox rounded border-slate-600 text-emerald-500 focus:ring-2 focus:ring-emerald-500"
                 />
-                Show Break only
+                Up Break only
+              </label>
+              <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
+                <input
+                  type="checkbox"
+                  checked={showDownBreakOnly}
+                  onChange={(e) => setShowDownBreakOnly(e.target.checked)}
+                  className="form-checkbox rounded border-slate-600 text-red-500 focus:ring-2 focus:ring-red-500"
+                />
+                Down Break only
               </label>
             </div>
           </div>
@@ -1222,6 +1294,9 @@ function VolumeScreening({ onStockSelect }) {
           <table className="min-w-full divide-y divide-slate-700">
             <thead className="bg-slate-800">
               <tr>
+                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                  Fav
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Stock
                 </th>
@@ -1285,8 +1360,10 @@ function VolumeScreening({ onStockSelect }) {
               
               {visibleEntries.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="px-4 py-6 text-center text-slate-400">
-                    {showBreakOnly ? 'No symbols with Break detected. Disable the filter to see all entries.' : 'No symbols added yet. Add stocks above to start screening.'}
+                  <td colSpan="11" className="px-4 py-6 text-center text-slate-400">
+                    {(showUpBreakOnly || showDownBreakOnly)
+                      ? 'No symbols with Break detected. Disable the Break filters to see all entries.'
+                      : 'No symbols added yet. Add stocks above to start screening.'}
                   </td>
                 </tr>
               ) : (
@@ -1299,6 +1376,22 @@ function VolumeScreening({ onStockSelect }) {
                       onClick={() => handleRowClick(entry)}
                       title="Click to open in Technical Analysis with Vol Prf V2"
                     >
+                      <td className="px-3 py-3 text-slate-200">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleBookmark(entry.id)
+                          }}
+                          className="inline-flex items-center justify-center rounded-full p-2 hover:text-amber-300 hover:bg-amber-900/40 transition-colors"
+                          aria-label={`Toggle bookmark for ${entry.symbol}`}
+                          title="Bookmark this symbol"
+                        >
+                          <Star
+                            className={`w-5 h-5 ${entry.bookmarked ? 'text-amber-300' : 'text-slate-400'} ${entry.bookmarked ? 'fill-amber-300' : 'fill-transparent'}`}
+                            strokeWidth={entry.bookmarked ? 2.25 : 2}
+                          />
+                        </button>
+                      </td>
                       <td className="px-4 py-3 text-slate-100 font-medium">{entry.symbol}</td>
                       <td className="px-4 py-3 text-slate-200">{entry.testedDays}</td>
                       <td className="px-4 py-3 text-slate-200">{entry.slotCount}</td>
