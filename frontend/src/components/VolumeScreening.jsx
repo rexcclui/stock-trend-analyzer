@@ -58,7 +58,9 @@ function safeSetItem(key, value) {
     localStorage.setItem(key, value)
     return true
   } catch (error) {
-    console.error(`Failed to persist ${key}:`, error)
+    const approxSizeKb = typeof value === 'string' ? (value.length * 2) / 1024 : null
+    const sizeNote = approxSizeKb ? ` (payload ~${approxSizeKb.toFixed(1)} KB)` : ''
+    console.error(`Failed to persist ${key}${sizeNote}:`, error)
     return false
   }
 }
@@ -103,6 +105,7 @@ function saveResultCache(cache) {
 
   // If persisting still fails, clear the stored cache to avoid repeated quota errors.
   try {
+    console.warn('Clearing cached volume results after repeated persistence failures')
     localStorage.removeItem(VOLUME_RESULT_CACHE_KEY)
   } catch (error) {
     console.error('Failed to clear result cache after quota issues:', error)
