@@ -909,8 +909,6 @@ function BacktestResults({ onStockSelect }) {
         return entry.symbol ?? ''
       case 'status':
         return entry.status ?? ''
-      case 'latestBreakout':
-        return entry.latestBreakout ? new Date(entry.latestBreakout.date).getTime() : 0
       case 'daysAgo':
         return entry.latestBreakout ? getDaysAgo(entry.latestBreakout.date) : Infinity
       case 'breakoutPrice':
@@ -1151,7 +1149,6 @@ function BacktestResults({ onStockSelect }) {
                     </th>
                     <th onClick={() => handleSort('symbol')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Symbol {renderSortIndicator('symbol')}</th>
                     <th onClick={() => handleSort('status')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Status {renderSortIndicator('status')}</th>
-                    <th onClick={() => handleSort('latestBreakout')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Latest Breakout {renderSortIndicator('latestBreakout')}</th>
                     <th onClick={() => handleSort('daysAgo')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Days Ago {renderSortIndicator('daysAgo')}</th>
                     <th onClick={() => handleSort('breakoutPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Breakout Price {renderSortIndicator('breakoutPrice')}</th>
                     <th onClick={() => handleSort('currentPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Current Price {renderSortIndicator('currentPrice')}</th>
@@ -1205,18 +1202,12 @@ function BacktestResults({ onStockSelect }) {
                             <div className="text-xs text-red-300 mt-1">{result.error}</div>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm">
-                          {hasBreakout ? (
-                            <span className={`${result.isRecentBreakout ? 'text-green-200 bg-green-900/50 animate-pulse px-2 py-1 rounded' : 'text-slate-300'}`}>
-                              {formatDate(result.latestBreakout.date)}
-                            </span>
-                          ) : (
-                            <span className="text-slate-500">—</span>
-                          )}
-                        </td>
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
                           {hasBreakout ? (
-                            <span className={`px-2 py-1 rounded ${daysAgo <= 3 ? 'bg-green-900/50 text-green-300' : daysAgo <= 7 ? 'bg-yellow-900/50 text-yellow-300' : daysAgo <= 10 ? 'bg-blue-900/50 text-blue-200' : 'bg-slate-700 text-slate-300'}`}>
+                            <span
+                              className={`px-2 py-1 rounded ${daysAgo <= 3 ? 'bg-green-900/50 text-green-300' : daysAgo <= 7 ? 'bg-yellow-900/50 text-yellow-300' : daysAgo <= 10 ? 'bg-blue-900/50 text-blue-200' : 'bg-slate-700 text-slate-300'}`}
+                              title={formatDate(result.latestBreakout.date)}
+                            >
                               {daysAgo}d
                             </span>
                           ) : (
