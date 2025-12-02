@@ -6,6 +6,7 @@ import { joinUrl } from '../utils/urlHelper'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
+const BACKTEST_RESULTS_KEY = 'backtestResults'
 
 // Helper function to parse multiple stock symbols from input
 function parseStockSymbols(input) {
@@ -422,6 +423,26 @@ function BacktestResults({ onStockSelect }) {
     }
   }, [])
 
+  // Load cached backtest results on mount
+  useEffect(() => {
+    const savedResults = localStorage.getItem(BACKTEST_RESULTS_KEY)
+    if (!savedResults) return
+
+    try {
+      const parsed = JSON.parse(savedResults)
+      if (Array.isArray(parsed)) {
+        const normalized = parsed.map(entry => ({
+          ...entry,
+          status: entry.status === 'loading' ? 'pending' : entry.status || 'pending',
+          error: entry.error || null
+        }))
+        setResults(normalized)
+      }
+    } catch (e) {
+      console.error('Failed to load cached backtest results:', e)
+    }
+  }, [])
+
   // Listen for history updates from other components (e.g., technical analysis tab)
   useEffect(() => {
     const handleHistoryUpdate = (event) => {
@@ -442,6 +463,15 @@ function BacktestResults({ onStockSelect }) {
     localStorage.setItem(STOCK_HISTORY_KEY, JSON.stringify(updatedHistory))
     window.dispatchEvent(new CustomEvent('stockHistoryUpdated', { detail: updatedHistory }))
   }
+
+  // Persist backtest results to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(BACKTEST_RESULTS_KEY, JSON.stringify(results))
+    } catch (e) {
+      console.error('Failed to cache backtest results:', e)
+    }
+  }, [results])
 
   const ensureEntries = (symbolList) => {
     if (!Array.isArray(symbolList) || symbolList.length === 0) return
