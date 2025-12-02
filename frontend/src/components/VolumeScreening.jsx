@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, ScanLine } from 'lucide-react'
+import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
@@ -1310,7 +1310,7 @@ function VolumeScreening({ onStockSelect }) {
               title="Scan visible symbols"
               aria-label="Scan visible symbols"
             >
-              <ScanLine className="w-5 h-5" />
+              <RefreshCcw className="w-5 h-5" />
             </button>
             <button
               type="button"
@@ -1529,7 +1529,7 @@ function VolumeScreening({ onStockSelect }) {
                         aria-label={`Scan ${entry.symbol}`}
                         title="Scan this symbol"
                       >
-                        <ScanLine className="w-5 h-5" />
+                        <RefreshCcw className="w-5 h-5" />
                       </button>
                       <button
                         onClick={(e) => {
