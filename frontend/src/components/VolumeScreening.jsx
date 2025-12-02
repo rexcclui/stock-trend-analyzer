@@ -75,15 +75,38 @@ function loadResultCache() {
 }
 
 function saveResultCache(cache) {
-  const saved = safeSetItem(VOLUME_RESULT_CACHE_KEY, JSON.stringify(cache))
-  if (saved) return
+  const tryPersist = (payload) => safeSetItem(VOLUME_RESULT_CACHE_KEY, JSON.stringify(payload))
+
+  if (tryPersist(cache)) return
 
   // Fall back to a lighter payload (without legends) if quota is exceeded.
-  const trimmed = Object.fromEntries(
-    Object.entries(cache).map(([symbol, value]) => [symbol, { ...value, volumeLegend: undefined }])
+  const trimmedLegends = Object.fromEntries(
+    Object.entries(cache).map(([symbol, value]) => {
+      const { volumeLegend, ...rest } = value || {}
+      return [symbol, rest]
+    })
   )
 
-  safeSetItem(VOLUME_RESULT_CACHE_KEY, JSON.stringify(trimmed))
+  if (tryPersist(trimmedLegends)) return
+
+  // As a last resort, keep only the most recently scanned items and attempt to persist again.
+  const sortedByRecency = Object.entries(trimmedLegends).sort(([, a], [, b]) => {
+    const aTime = new Date(a?.lastScanAt || 0).getTime()
+    const bTime = new Date(b?.lastScanAt || 0).getTime()
+    return bTime - aTime
+  })
+
+  for (let keep = Math.min(sortedByRecency.length, 100); keep > 0; keep--) {
+    const subset = Object.fromEntries(sortedByRecency.slice(0, keep))
+    if (tryPersist(subset)) return
+  }
+
+  // If persisting still fails, clear the stored cache to avoid repeated quota errors.
+  try {
+    localStorage.removeItem(VOLUME_RESULT_CACHE_KEY)
+  } catch (error) {
+    console.error('Failed to clear result cache after quota issues:', error)
+  }
 }
 
 function loadTopSymbolCache() {
@@ -422,17 +445,27 @@ function VolumeScreening({ onStockSelect }) {
   }
 
   const persistReadyResults = (list) => {
-    const existing = loadResultCache()
-    const merged = { ...existing }
+    const cache = {}
 
     list.forEach(entry => {
       if (entry.status === 'ready' && isEntryFresh(entry)) {
-        const { id, ...rest } = entry
-        merged[entry.symbol] = rest
+        const { id, symbol, ...rest } = entry
+        cache[symbol] = {
+          priceRange: rest.priceRange,
+          currentRange: rest.currentRange,
+          testedDays: rest.testedDays,
+          slotCount: rest.slotCount,
+          volumeLegend: rest.volumeLegend,
+          bottomResist: rest.bottomResist,
+          upperResist: rest.upperResist,
+          breakout: rest.breakout,
+          lastScanAt: rest.lastScanAt,
+          status: rest.status
+        }
       }
     })
 
-    saveResultCache(merged)
+    saveResultCache(cache)
   }
 
   useEffect(() => {
