@@ -778,11 +778,12 @@ function VolumeScreening({ onStockSelect }) {
   }
 
   const exportResults = () => {
-    if (visibleEntries.length === 0) return
+    const readyEntries = visibleEntries.filter(entry => entry.status === 'ready')
+    if (readyEntries.length === 0) return
 
     const payload = {
       exportedAt: new Date().toISOString(),
-      entries: visibleEntries.map(entry => ({
+      entries: readyEntries.map(entry => ({
         symbol: entry.symbol,
         priceRange: entry.priceRange,
         testedDays: entry.testedDays,
@@ -842,16 +843,16 @@ function VolumeScreening({ onStockSelect }) {
         })
         .filter(Boolean)
 
-      if (normalized.length > 0) {
-        setEntries(prevEntries => {
-          const merged = new Map(normalized.map(entry => [entry.symbol, entry]))
-          prevEntries.forEach(entry => {
-            if (!merged.has(entry.symbol)) {
-              merged.set(entry.symbol, entry)
-            }
-          })
-          return Array.from(merged.values())
-        })
+      const readyEntries = normalized.filter(entry => entry.status === 'ready')
+
+      if (readyEntries.length > 0) {
+        activeScanIdRef.current = null
+        setIsScanning(false)
+        setIsPaused(false)
+        setScanQueue([])
+        setScanTotal(0)
+        setScanCompleted(0)
+        setEntries(readyEntries)
       }
     } catch (error) {
       console.error('Failed to import volume screening entries:', error)
