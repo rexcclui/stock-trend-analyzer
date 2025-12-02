@@ -659,7 +659,31 @@ function VolumeScreening({ onStockSelect }) {
   }, [])
 
   useEffect(() => {
-    const leanEntries = entries.map(({ id, symbol, status, lastScanAt, bookmarked }) => ({ id, symbol, status, lastScanAt, bookmarked: !!bookmarked }))
+    const leanEntries = entries.map(entry => {
+      const { id, symbol, status, lastScanAt, bookmarked } = entry
+      const resultFields = isEntryFresh(entry)
+        ? {
+            priceRange: entry.priceRange,
+            currentRange: entry.currentRange,
+            testedDays: entry.testedDays,
+            slotCount: entry.slotCount,
+            volumeLegend: entry.volumeLegend,
+            bottomResist: entry.bottomResist,
+            upperResist: entry.upperResist,
+            breakout: entry.breakout
+          }
+        : {}
+
+      return {
+        id,
+        symbol,
+        status,
+        lastScanAt,
+        bookmarked: !!bookmarked,
+        ...resultFields
+      }
+    })
+
     safeSetItem(VOLUME_CACHE_KEY, JSON.stringify(leanEntries))
     safeSetItem(VOLUME_SYMBOLS_KEY, JSON.stringify(entries.map(entry => entry.symbol).filter(Boolean)))
     persistReadyResults(entries)
