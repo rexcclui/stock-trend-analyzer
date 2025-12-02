@@ -741,30 +741,16 @@ function VolumeScreening({ onStockSelect }) {
     const cleanedEntries = dropInvalidScanSymbols(entries)
     if (cleanedEntries.length === 0 || isScanning) return
 
-    const refreshedEntries = cleanedEntries.map(entry => (
-      isRecentlyScanned(entry) || isEntryFresh(entry) ? entry : clearEntryResults(entry)
-    ))
-    setEntries(refreshedEntries)
+    const refreshedEntries = cleanedEntries.map(entry => clearEntryResults(entry))
+    const loadingEntries = refreshedEntries.map(entry => ({ ...entry, status: 'loading', error: null }))
 
-    const pendingEntries = refreshedEntries.filter(entry => entry.status !== 'ready' && !isRecentlyScanned(entry))
-    if (pendingEntries.length === 0) {
-      setScanTotal(0)
-      setScanCompleted(0)
-      return
-    }
-
-    const loadingEntries = refreshedEntries.map(entry => (
-      entry.status === 'ready' || isRecentlyScanned(entry)
-        ? entry
-        : { ...entry, status: 'loading', error: null }
-    ))
     setEntries(loadingEntries)
-    const queuedEntries = loadingEntries.filter(entry => entry.status === 'loading')
-    setScanQueue(queuedEntries)
-    setScanTotal(queuedEntries.length)
+    setScanQueue(loadingEntries)
+    setScanTotal(loadingEntries.length)
     setScanCompleted(0)
     setIsScanning(true)
     setIsPaused(false)
+    activeScanIdRef.current = null
   }
 
   const performScan = async (entry) => {
@@ -1038,10 +1024,9 @@ function VolumeScreening({ onStockSelect }) {
     if (cleanedEntries.length === 0 || isScanning) return
 
     const candidates = getVisibleEntries(cleanedEntries)
-    const scannable = candidates.filter(entry => !isRecentlyScanned(entry))
-    if (scannable.length === 0) return
+    if (candidates.length === 0) return
 
-    const candidateIds = new Set(scannable.map(entry => entry.id))
+    const candidateIds = new Set(candidates.map(entry => entry.id))
 
     const resetEntries = cleanedEntries.map(entry => (
       candidateIds.has(entry.id)
