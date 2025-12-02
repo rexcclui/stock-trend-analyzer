@@ -1024,7 +1024,7 @@ function VolumeScreening({ onStockSelect }) {
               title="Clear all scan results"
               aria-label="Clear all scan results"
             >
-              <Eraser className="w-5 h-5" />
+              <Eraser className="w-5 h-5" strokeWidth={2.25} />
             </button>
             <button
               type="button"
@@ -1228,7 +1228,7 @@ function VolumeScreening({ onStockSelect }) {
                         aria-label={`Clear ${entry.symbol}`}
                         title="Clear scan result"
                       >
-                        <Eraser className="w-5 h-5" />
+                        <Eraser className="w-5 h-5" strokeWidth={2.25} />
                       </button>
                       <button
                         onClick={(e) => {
