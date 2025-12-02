@@ -378,6 +378,16 @@ function VolumeScreening({ onStockSelect }) {
     setEntries(prev => prev.map(entry => clearEntryResults(entry)))
   }
 
+  const removeAllRows = () => {
+    activeScanIdRef.current = null
+    setIsScanning(false)
+    setIsPaused(false)
+    setScanTotal(0)
+    setScanCompleted(0)
+    setScanQueue([])
+    setEntries([])
+  }
+
   const isEntryFresh = (entry) => {
     if (!entry?.lastScanAt || entry.status !== 'ready') return false
     const scannedAt = new Date(entry.lastScanAt).getTime()
@@ -1014,6 +1024,15 @@ function VolumeScreening({ onStockSelect }) {
               aria-label="Clear all scan results"
             >
               <RefreshCcw className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              onClick={removeAllRows}
+              className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-red-400 hover:bg-red-900/40 transition-colors"
+              title="Remove all rows"
+              aria-label="Remove all rows"
+            >
+              <Trash2 className="w-5 h-5" />
             </button>
             {isScanning && scanTotal > 0 && (
               <span className="text-xs text-slate-300 whitespace-nowrap">{scanCompleted}/{scanTotal} processing</span>
