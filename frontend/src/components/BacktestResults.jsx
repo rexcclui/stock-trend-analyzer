@@ -7,6 +7,9 @@ import { joinUrl } from '../utils/urlHelper'
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
 const BACKTEST_RESULTS_KEY = 'backtestResults'
+const INVALID_FIVE_CHAR_LENGTH = 5
+const BLOCKED_SUFFIX = '.TO'
+const HYPHEN = '-'
 
 // Helper function to parse multiple stock symbols from input
 function parseStockSymbols(input) {
@@ -17,6 +20,18 @@ function parseStockSymbols(input) {
 
   // Convert to uppercase and filter valid symbols
   return symbols.map(s => s.trim().toUpperCase()).filter(s => s.length > 0)
+}
+
+function isInvalidFiveCharSymbol(symbol) {
+  return typeof symbol === 'string' && symbol.length === INVALID_FIVE_CHAR_LENGTH && !symbol.includes('.')
+}
+
+function hasBlockedSuffix(symbol) {
+  return typeof symbol === 'string' && symbol.toUpperCase().endsWith(BLOCKED_SUFFIX)
+}
+
+function isDisallowedSymbol(symbol) {
+  return isInvalidFiveCharSymbol(symbol) || hasBlockedSuffix(symbol) || (typeof symbol === 'string' && symbol.includes(HYPHEN))
 }
 
 // Calculate Vol Prf V2 breakouts with configurable parameters
@@ -428,6 +443,20 @@ function BacktestResults({ onStockSelect }) {
     error: errorMsg
   })
 
+  const pruneDisallowedEntries = (currentEntries = []) => {
+    const disallowed = new Set(
+      currentEntries
+        .filter(entry => isDisallowedSymbol(entry.symbol))
+        .map(entry => entry.symbol)
+    )
+
+    if (disallowed.size === 0) return currentEntries
+
+    setScanQueue(prev => prev.filter(symbol => !disallowed.has(symbol)))
+
+    return currentEntries.filter(entry => !disallowed.has(entry.symbol))
+  }
+
   // Load stock history from localStorage on mount
   useEffect(() => {
     const savedHistory = localStorage.getItem(STOCK_HISTORY_KEY)
@@ -463,7 +492,7 @@ function BacktestResults({ onStockSelect }) {
 
           return normalizedEntry
         })
-        setResults(normalized)
+        setResults(pruneDisallowedEntries(normalized))
       }
     } catch (e) {
       console.error('Failed to load cached backtest results:', e)
@@ -503,9 +532,12 @@ function BacktestResults({ onStockSelect }) {
   const ensureEntries = (symbolList) => {
     if (!Array.isArray(symbolList) || symbolList.length === 0) return
 
+    const allowedSymbols = symbolList.filter(symbol => !isDisallowedSymbol(symbol))
+    if (allowedSymbols.length === 0) return
+
     setResults(prev => {
       const existingSymbols = new Set(prev.map(r => r.symbol))
-      const newEntries = symbolList
+      const newEntries = allowedSymbols
         .filter(Boolean)
         .filter(symbol => !existingSymbols.has(symbol))
         .map(symbol => ({
@@ -631,11 +663,15 @@ function BacktestResults({ onStockSelect }) {
 
   const queueSymbols = (symbolList, { startScan = true } = {}) => {
     if (!Array.isArray(symbolList) || symbolList.length === 0) return
-    ensureEntries(symbolList)
+
+    const allowedSymbols = symbolList.filter(symbol => !isDisallowedSymbol(symbol))
+    if (allowedSymbols.length === 0) return
+
+    ensureEntries(allowedSymbols)
     if (startScan) {
       setScanQueue(prev => {
         const existing = new Set(prev)
-        const merged = [...prev, ...symbolList.filter(symbol => !existing.has(symbol))]
+        const merged = [...prev, ...allowedSymbols.filter(symbol => !existing.has(symbol))]
         setScanTotal(merged.length)
         return merged
       })
@@ -664,6 +700,7 @@ function BacktestResults({ onStockSelect }) {
         .map(item => (typeof item === 'string' ? item : item?.symbol))
         .filter(Boolean)
         .map(symbol => symbol.toUpperCase())
+        .filter(symbol => !isDisallowedSymbol(symbol))
 
       ensureEntries(normalized)
     } catch (err) {
@@ -676,7 +713,7 @@ function BacktestResults({ onStockSelect }) {
 
   const runBacktest = (symbolOverride = null) => {
     const targetSymbols = symbolOverride ?? symbols
-    const stockList = parseStockSymbols(targetSymbols)
+    const stockList = parseStockSymbols(targetSymbols).filter(symbol => !isDisallowedSymbol(symbol))
 
     if (stockList.length === 0) {
       setError('Please enter at least one stock symbol')
@@ -702,7 +739,10 @@ function BacktestResults({ onStockSelect }) {
 
   const scanAllQueued = () => {
     if (normalizedResults.length === 0) return
-    const pendingSymbols = normalizedResults
+
+    setResults(prev => pruneDisallowedEntries(prev))
+
+    const pendingSymbols = pruneDisallowedEntries(normalizedResults)
       .filter(entry => entry.status !== 'completed')
       .map(entry => entry.symbol)
 
