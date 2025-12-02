@@ -1372,9 +1372,9 @@ function VolumeScreening({ onStockSelect }) {
             </label>
           </div>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-[70vh]">
           <table className="min-w-full divide-y divide-slate-700">
-            <thead className="bg-slate-800">
+            <thead className="bg-slate-800 sticky top-0 z-10 shadow-lg">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   <span className="sr-only">Bookmark</span>
