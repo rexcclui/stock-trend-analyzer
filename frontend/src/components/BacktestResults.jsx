@@ -441,6 +441,7 @@ function BacktestResults({ onStockSelect }) {
     isRecentBreakout: false,
     recentBreakout: null,
     totalSignals: null,
+    durationMs: entry.durationMs ?? null,
     error: errorMsg
   })
 
@@ -483,7 +484,8 @@ function BacktestResults({ onStockSelect }) {
               status: entry.status === 'loading' ? 'pending' : entry.status || 'pending',
               error: entry.error || null,
               bookmarked: Boolean(entry.bookmarked),
-              marketChange: typeof entry.marketChange === 'number' ? entry.marketChange : computeMarketChange(entry.priceData)
+              marketChange: typeof entry.marketChange === 'number' ? entry.marketChange : computeMarketChange(entry.priceData),
+              durationMs: typeof entry.durationMs === 'number' ? entry.durationMs : null
             }
 
             if (typeof normalizedEntry.totalSignals === 'number' && normalizedEntry.totalSignals < 4) {
@@ -595,10 +597,11 @@ function BacktestResults({ onStockSelect }) {
     ensureEntries([symbol])
     setResults(prev => prev.map(entry => (
       entry.symbol === symbol
-        ? { ...entry, status: 'loading', error: null }
+        ? { ...entry, status: 'loading', error: null, durationMs: null }
         : entry
     )))
 
+    const startTime = Date.now()
     try {
       const cacheKey = symbol
       let cachedData = apiCache.get(cacheKey, days)
@@ -636,6 +639,7 @@ function BacktestResults({ onStockSelect }) {
 
       const latestPrice = priceData[priceData.length - 1].close
       const marketChange = computeMarketChange(priceData)
+      const durationMs = Date.now() - startTime
 
       const completedEntry = {
         symbol,
@@ -647,6 +651,7 @@ function BacktestResults({ onStockSelect }) {
         optimalParams,
         optimalSMAs,
         marketChange,
+        durationMs,
         days,
         isRecentBreakout: Boolean(latestRecentBreakout),
         recentBreakout: latestRecentBreakout,
@@ -660,7 +665,7 @@ function BacktestResults({ onStockSelect }) {
       console.error(`Error processing ${symbol}:`, err)
       setResults(prev => prev.map(entry => (
         entry.symbol === symbol
-          ? clearEntryData(entry, 'error', err.message || 'Failed to run backtest')
+          ? clearEntryData({ ...entry, durationMs: Date.now() - startTime }, 'error', err.message || 'Failed to run backtest')
           : entry
       )))
     }
@@ -830,6 +835,17 @@ function BacktestResults({ onStockSelect }) {
     return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
   }
 
+  const formatDuration = (ms) => {
+    if (typeof ms !== 'number' || Number.isNaN(ms)) return '—'
+    if (ms < 1000) return `${ms.toFixed(0)} ms`
+    const totalSeconds = ms / 1000
+    if (totalSeconds < 60) return `${totalSeconds.toFixed(1)}s`
+    const minutes = Math.floor(totalSeconds / 60)
+    const seconds = Math.round(totalSeconds % 60)
+    const paddedSeconds = seconds.toString().padStart(2, '0')
+    return `${minutes}:${paddedSeconds}`
+  }
+
   const formatDate = (dateStr) => {
     const date = new Date(dateStr)
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -893,6 +909,8 @@ function BacktestResults({ onStockSelect }) {
         return entry.optimalSMAs?.pl ?? -Infinity
       case 'marketChange':
         return typeof entry.marketChange === 'number' ? entry.marketChange : -Infinity
+      case 'duration':
+        return typeof entry.durationMs === 'number' ? entry.durationMs : Infinity
       case 'bookmark':
         return entry.bookmarked ? 1 : 0
       default:
@@ -1110,6 +1128,7 @@ function BacktestResults({ onStockSelect }) {
                     <th onClick={() => handleSort('supportVol')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Support Vol {renderSortIndicator('supportVol')}</th>
                     <th onClick={() => handleSort('diff')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Diff {renderSortIndicator('diff')}</th>
                     <th onClick={() => handleSort('totalSignals')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Total Signals {renderSortIndicator('totalSignals')}</th>
+                    <th onClick={() => handleSort('duration')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Duration {renderSortIndicator('duration')}</th>
                     <th onClick={() => handleSort('pl')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">P/L {renderSortIndicator('pl')}</th>
                     <th onClick={() => handleSort('marketChange')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Market Change {renderSortIndicator('marketChange')}</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Optimal Params</th>
@@ -1196,6 +1215,9 @@ function BacktestResults({ onStockSelect }) {
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
                           {hasBreakout ? result.totalSignals : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-300 text-right">
+                          {result.status === 'completed' || result.status === 'error' ? formatDuration(result.durationMs) : '—'}
                         </td>
                         <td className="px-4 py-3 text-sm text-right font-semibold">
                           {hasBreakout ? (
