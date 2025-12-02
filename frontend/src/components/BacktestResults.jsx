@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
-import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud } from 'lucide-react'
+import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown } from 'lucide-react'
 import { apiCache } from '../utils/apiCache'
 import { joinUrl } from '../utils/urlHelper'
 
@@ -409,6 +409,8 @@ function BacktestResults({ onStockSelect }) {
   const [isPaused, setIsPaused] = useState(false)
   const [scanCompleted, setScanCompleted] = useState(0)
   const [scanTotal, setScanTotal] = useState(0)
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
+  const [showBookmarksOnly, setShowBookmarksOnly] = useState(false)
   const activeScanSymbolRef = useRef(null)
 
   // Load stock history from localStorage on mount
@@ -434,7 +436,9 @@ function BacktestResults({ onStockSelect }) {
         const normalized = parsed.map(entry => ({
           ...entry,
           status: entry.status === 'loading' ? 'pending' : entry.status || 'pending',
-          error: entry.error || null
+          error: entry.error || null,
+          bookmarked: Boolean(entry.bookmarked),
+          marketChange: typeof entry.marketChange === 'number' ? entry.marketChange : computeMarketChange(entry.priceData)
         }))
         setResults(normalized)
       }
@@ -493,7 +497,9 @@ function BacktestResults({ onStockSelect }) {
           isRecentBreakout: false,
           recentBreakout: null,
           totalSignals: null,
-          error: null
+          error: null,
+          bookmarked: false,
+          marketChange: null
         }))
 
       if (newEntries.length === 0) return prev
@@ -541,6 +547,7 @@ function BacktestResults({ onStockSelect }) {
       }
 
       const latestPrice = priceData[priceData.length - 1].close
+      const marketChange = computeMarketChange(priceData)
 
       const completedEntry = {
         symbol,
@@ -551,6 +558,7 @@ function BacktestResults({ onStockSelect }) {
         priceData,
         optimalParams,
         optimalSMAs,
+        marketChange,
         days,
         isRecentBreakout: Boolean(latestRecentBreakout),
         recentBreakout: latestRecentBreakout,
@@ -656,6 +664,12 @@ function BacktestResults({ onStockSelect }) {
     setIsScanning(true)
   }
 
+  const toggleBookmark = (symbol) => {
+    setResults(prev => prev.map(entry => (
+      entry.symbol === symbol ? { ...entry, bookmarked: !entry.bookmarked } : entry
+    )))
+  }
+
   const scanSingle = (symbol) => {
     setScanQueue([symbol])
     setScanTotal(1)
@@ -700,6 +714,14 @@ function BacktestResults({ onStockSelect }) {
     }
   }, [isScanning, scanQueue.length])
 
+  const computeMarketChange = (priceData) => {
+    if (!Array.isArray(priceData) || priceData.length === 0) return null
+    const firstClose = priceData[0]?.close
+    const lastClose = priceData[priceData.length - 1]?.close
+    if (typeof firstClose !== 'number' || typeof lastClose !== 'number' || firstClose === 0) return null
+    return ((lastClose - firstClose) / firstClose) * 100
+  }
+
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -725,10 +747,78 @@ function BacktestResults({ onStockSelect }) {
     return diffDays
   }
 
-  const normalizedResults = results.map(entry => ({
-    status: 'completed',
-    ...entry
-  }))
+  const normalizedResults = results.map(entry => {
+    const computedMarketChange = typeof entry.marketChange === 'number'
+      ? entry.marketChange
+      : computeMarketChange(entry.priceData)
+
+    return {
+      status: 'completed',
+      bookmarked: Boolean(entry.bookmarked),
+      marketChange: computedMarketChange,
+      ...entry
+    }
+  })
+
+  const filteredResults = normalizedResults.filter(result => (
+    showBookmarksOnly ? result.bookmarked : true
+  ))
+
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }))
+  }
+
+  const getSortableValue = (entry, key) => {
+    switch (key) {
+      case 'symbol':
+        return entry.symbol ?? ''
+      case 'status':
+        return entry.status ?? ''
+      case 'latestBreakout':
+        return entry.latestBreakout ? new Date(entry.latestBreakout.date).getTime() : 0
+      case 'daysAgo':
+        return entry.latestBreakout ? getDaysAgo(entry.latestBreakout.date) : Infinity
+      case 'breakoutPrice':
+        return entry.latestBreakout?.price ?? -Infinity
+      case 'currentPrice':
+        return entry.latestPrice ?? -Infinity
+      case 'volWeight':
+        return entry.latestBreakout?.currentWeight ?? -Infinity
+      case 'supportVol':
+        return entry.latestBreakout?.lowerWeight ?? -Infinity
+      case 'diff':
+        return entry.latestBreakout?.weightDiff ?? -Infinity
+      case 'totalSignals':
+        return entry.totalSignals ?? -Infinity
+      case 'pl':
+        return entry.optimalSMAs?.pl ?? -Infinity
+      case 'marketChange':
+        return typeof entry.marketChange === 'number' ? entry.marketChange : -Infinity
+      case 'bookmark':
+        return entry.bookmarked ? 1 : 0
+      default:
+        return 0
+    }
+  }
+
+  const sortedResults = [...filteredResults].sort((a, b) => {
+    if (!sortConfig.key) return 0
+    const aVal = getSortableValue(a, sortConfig.key)
+    const bVal = getSortableValue(b, sortConfig.key)
+    if (aVal === bVal) return 0
+    const direction = sortConfig.direction === 'asc' ? 1 : -1
+    return aVal > bVal ? direction : -direction
+  })
+
+  const renderSortIndicator = (key) => {
+    if (sortConfig.key !== key) return <ArrowUpDown className="w-4 h-4 inline ml-1 text-slate-500" />
+    return sortConfig.direction === 'asc'
+      ? <span className="ml-1 text-slate-300">↑</span>
+      : <span className="ml-1 text-slate-300">↓</span>
+  }
 
   const completedResults = normalizedResults.filter(r => r.status === 'completed' && r.latestBreakout)
   const recentBreakoutCount = completedResults.filter(r => r.isRecentBreakout).length
@@ -886,27 +976,39 @@ function BacktestResults({ onStockSelect }) {
 
           {/* Results Table */}
           <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
-            <h3 className="text-lg font-semibold mb-4 text-slate-100">Breakout Signals</h3>
+            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+              <h3 className="text-lg font-semibold text-slate-100">Breakout Signals</h3>
+              <button
+                onClick={() => setShowBookmarksOnly(prev => !prev)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${showBookmarksOnly ? 'border-amber-500 text-amber-200 bg-amber-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
+              >
+                {showBookmarksOnly ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
+                {showBookmarksOnly ? 'Showing Bookmarks' : 'Filter Bookmarks'}
+              </button>
+            </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-slate-700">
                 <thead className="bg-slate-900">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Symbol</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Latest Breakout</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Days Ago</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Breakout Price</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Current Price</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Vol Weight</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Support Vol</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Diff</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Total Signals</th>
+                    <th onClick={() => handleSort('bookmark')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Bookmark {renderSortIndicator('bookmark')}</th>
+                    <th onClick={() => handleSort('symbol')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Symbol {renderSortIndicator('symbol')}</th>
+                    <th onClick={() => handleSort('status')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Status {renderSortIndicator('status')}</th>
+                    <th onClick={() => handleSort('latestBreakout')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Latest Breakout {renderSortIndicator('latestBreakout')}</th>
+                    <th onClick={() => handleSort('daysAgo')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Days Ago {renderSortIndicator('daysAgo')}</th>
+                    <th onClick={() => handleSort('breakoutPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Breakout Price {renderSortIndicator('breakoutPrice')}</th>
+                    <th onClick={() => handleSort('currentPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Current Price {renderSortIndicator('currentPrice')}</th>
+                    <th onClick={() => handleSort('volWeight')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Vol Weight {renderSortIndicator('volWeight')}</th>
+                    <th onClick={() => handleSort('supportVol')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Support Vol {renderSortIndicator('supportVol')}</th>
+                    <th onClick={() => handleSort('diff')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Diff {renderSortIndicator('diff')}</th>
+                    <th onClick={() => handleSort('totalSignals')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Total Signals {renderSortIndicator('totalSignals')}</th>
+                    <th onClick={() => handleSort('pl')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">P/L {renderSortIndicator('pl')}</th>
+                    <th onClick={() => handleSort('marketChange')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Market Change {renderSortIndicator('marketChange')}</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Optimal Params</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase">Action</th>
                   </tr>
                 </thead>
                 <tbody className="bg-slate-800 divide-y divide-slate-700">
-                  {normalizedResults.map((result, index) => {
+                  {sortedResults.map((result, index) => {
                     const hasBreakout = Boolean(result.latestBreakout)
                     const daysAgo = hasBreakout ? getDaysAgo(result.latestBreakout.date) : null
                     const priceChange = hasBreakout
@@ -922,6 +1024,18 @@ function BacktestResults({ onStockSelect }) {
                         className={`transition-colors ${hasBreakout ? 'hover:bg-slate-700 cursor-pointer' : 'opacity-75'} ${isWithinLast10Days ? 'bg-blue-900/20 hover:bg-blue-800/30' : ''}`}
                         title={hasBreakout ? 'Click to view in Technical Analysis with optimized parameters' : 'Pending scan'}
                       >
+                        <td className="px-4 py-3 text-sm">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleBookmark(result.symbol)
+                            }}
+                            className={`p-1 rounded transition-colors ${result.bookmarked ? 'text-amber-300 hover:text-amber-200 hover:bg-amber-900/30' : 'text-slate-400 hover:text-amber-200 hover:bg-slate-700/70'}`}
+                            title={result.bookmarked ? 'Remove bookmark' : 'Bookmark stock'}
+                          >
+                            {result.bookmarked ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
+                          </button>
+                        </td>
                         <td className="px-4 py-3 text-sm font-bold text-blue-400">
                           {result.symbol}
                         </td>
@@ -974,15 +1088,26 @@ function BacktestResults({ onStockSelect }) {
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
                           {hasBreakout ? result.totalSignals : '—'}
                         </td>
+                        <td className="px-4 py-3 text-sm text-right font-semibold">
+                          {hasBreakout ? (
+                            <span className={result.optimalSMAs.pl >= 0 ? 'text-green-400' : 'text-red-400'}>
+                              {formatPercent(result.optimalSMAs.pl)}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right font-semibold">
+                          {typeof result.marketChange === 'number' ? (
+                            <span className={result.marketChange >= 0 ? 'text-green-300' : 'text-red-300'}>
+                              {formatPercent(result.marketChange)}
+                            </span>
+                          ) : '—'}
+                        </td>
                         <td className="px-4 py-3 text-xs text-slate-400 text-left">
                           {hasBreakout ? (
                             <div className="space-y-0.5">
                               <div>Th:{(result.optimalParams.breakoutThreshold * 100).toFixed(0)}%</div>
                               <div>LB:{result.optimalParams.lookbackZones}</div>
                               <div className="text-blue-400 font-medium">SMA:{result.optimalSMAs.period}</div>
-                              <div className={`font-bold ${result.optimalSMAs.pl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                P/L:{result.optimalSMAs.pl.toFixed(1)}%
-                              </div>
                             </div>
                           ) : (
                             <span className="text-slate-500">—</span>
