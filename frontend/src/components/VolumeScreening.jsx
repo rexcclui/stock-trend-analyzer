@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Plus, ScanLine, Activity, Loader2, RefreshCcw, Trash2, DownloadCloud, Pause, Play } from 'lucide-react'
+import { Plus, ScanLine, Activity, Loader2, Eraser, Trash2, DownloadCloud, Pause, Play } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
@@ -1023,7 +1023,7 @@ function VolumeScreening({ onStockSelect }) {
               title="Clear all scan results"
               aria-label="Clear all scan results"
             >
-              <RefreshCcw className="w-5 h-5" />
+              <Eraser className="w-5 h-5" />
             </button>
             <button
               type="button"
@@ -1227,7 +1227,7 @@ function VolumeScreening({ onStockSelect }) {
                         aria-label={`Clear ${entry.symbol}`}
                         title="Clear scan result"
                       >
-                        <RefreshCcw className="w-5 h-5" />
+                        <Eraser className="w-5 h-5" />
                       </button>
                       <button
                         onClick={(e) => {
