@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, Pause, Play, Star, ScanLine } from 'lucide-react'
+import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, ScanLine } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
@@ -952,7 +952,7 @@ function VolumeScreening({ onStockSelect }) {
   }
 
   const exportResults = () => {
-    const readyEntries = visibleEntries.filter(entry => entry.status === 'ready')
+    const readyEntries = entries.filter(entry => entry.status === 'ready')
     if (readyEntries.length === 0) return
 
     const payload = {
@@ -1034,7 +1034,6 @@ function VolumeScreening({ onStockSelect }) {
           if (!symbol || isDisallowedSymbol(symbol)) return null
 
           return {
-            id: `${symbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
             symbol,
             ...baseEntryState,
             priceRange: item?.priceRange ?? baseEntryState.priceRange,
@@ -1053,13 +1052,24 @@ function VolumeScreening({ onStockSelect }) {
       const readyEntries = normalized.filter(entry => entry.status === 'ready')
 
       if (readyEntries.length > 0) {
+        const readyBySymbol = Object.fromEntries(readyEntries.map(entry => [entry.symbol, entry]))
         activeScanIdRef.current = null
         setIsScanning(false)
         setIsPaused(false)
         setScanQueue([])
         setScanTotal(0)
         setScanCompleted(0)
-        setEntries(readyEntries)
+        setEntries(prev => prev.map(entry => {
+          const override = readyBySymbol[entry.symbol]
+          if (!override) return entry
+
+          return {
+            ...entry,
+            ...override,
+            id: entry.id,
+            status: override.status || 'ready'
+          }
+        }))
       }
     } catch (error) {
       console.error('Failed to import volume screening entries:', error)
@@ -1222,8 +1232,8 @@ function VolumeScreening({ onStockSelect }) {
       </div>
 
       <div className="bg-slate-900 border border-slate-700 rounded-lg overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900">
-          <div className="flex items-center gap-3 text-xs text-slate-300">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800 bg-slate-900 flex-wrap gap-3">
+          <div className="flex items-center gap-2 text-xs text-slate-300">
             <button
               type="button"
               onClick={clearAllEntries}
@@ -1231,8 +1241,52 @@ function VolumeScreening({ onStockSelect }) {
               title="Clear all scan results"
               aria-label="Clear all scan results"
             >
-              <RefreshCcw className="w-5 h-5" />
+              <Eraser className="w-5 h-5" />
             </button>
+            <button
+              type="button"
+              onClick={removeAllRows}
+              className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-red-400 hover:bg-red-900/40 transition-colors"
+              title="Remove all rows"
+              aria-label="Remove all rows"
+            >
+              <Trash2 className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              onClick={scanVisibleEntries}
+              disabled={entries.length === 0 || isScanning}
+              className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-emerald-400 hover:bg-emerald-900/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Scan visible symbols"
+              aria-label="Scan visible symbols"
+            >
+              <ScanLine className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              onClick={exportResults}
+              className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-blue-400 hover:bg-blue-900/40 transition-colors"
+              title="Export scanned results"
+              aria-label="Export scanned results"
+            >
+              <DownloadCloud className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleImportClick}
+              className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-indigo-400 hover:bg-indigo-900/40 transition-colors"
+              title="Import scan results"
+              aria-label="Import scan results"
+            >
+              <UploadCloud className="w-5 h-5" />
+            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json"
+              onChange={handleImportFileChange}
+              className="hidden"
+            />
             {scanTotal > 0 && (
               <span className="whitespace-nowrap">
                 {Math.min(scanCompleted, scanTotal)}/{scanTotal} processing
@@ -1268,9 +1322,6 @@ function VolumeScreening({ onStockSelect }) {
                   Stock
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Px Range
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Days Tested
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
@@ -1288,6 +1339,9 @@ function VolumeScreening({ onStockSelect }) {
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Volume Weight %
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                  Px Range
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   <button
@@ -1333,7 +1387,6 @@ function VolumeScreening({ onStockSelect }) {
                     title="Click to open in Technical Analysis with Vol Prf V2"
                   >
                     <td className="px-4 py-3 text-slate-100 font-medium">{entry.symbol}</td>
-                    <td className="px-4 py-3 text-slate-200">{entry.priceRange}</td>
                     <td className="px-4 py-3 text-slate-200">{entry.testedDays}</td>
                     <td className="px-4 py-3 text-slate-200">{entry.slotCount}</td>
                     <td className="px-4 py-3 text-slate-200 text-xs">{formatTimestamp(entry.lastScanAt)}</td>
@@ -1366,6 +1419,7 @@ function VolumeScreening({ onStockSelect }) {
                         <span className="text-slate-400">—</span>
                       )}
                     </td>
+                    <td className="px-4 py-3 text-slate-200">{entry.priceRange}</td>
                     <td className={`px-4 py-3 text-slate-200 ${isResistanceClose(entry.bottomResist) ? 'text-sky-400 font-semibold' : ''}`}>
                       {entry.bottomResist}
                     </td>
@@ -1394,7 +1448,7 @@ function VolumeScreening({ onStockSelect }) {
                         aria-label={`Clear ${entry.symbol}`}
                         title="Clear scan result"
                       >
-                        <RefreshCcw className="w-5 h-5" />
+                        <Eraser className="w-5 h-5" />
                       </button>
                       <button
                         onClick={(e) => {
