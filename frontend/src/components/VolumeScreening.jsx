@@ -957,6 +957,7 @@ function VolumeScreening({ onStockSelect }) {
   const filteredEntries = getVisibleEntries()
 
   const isFiltered = filteredEntries.length !== entries.length
+  const filteredCount = Math.max(0, entries.length - filteredEntries.length)
   const visibleEntries = filteredEntries
 
   const sortedEntries = sortConfig.field
@@ -1343,6 +1344,11 @@ function VolumeScreening({ onStockSelect }) {
             )}
           </div>
           <div className="flex items-center gap-4">
+            {isFiltered && (
+              <div className="text-xs text-slate-400 whitespace-nowrap" title="Showing only filtered symbols">
+                Showing {filteredEntries.length} / {entries.length} ({filteredCount} filtered)
+              </div>
+            )}
             <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
               <input
                 type="checkbox"
