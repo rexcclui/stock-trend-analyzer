@@ -9,6 +9,7 @@ const VOLUME_SYMBOLS_KEY = 'volumeScreeningSymbols'
 const VOLUME_RESULT_CACHE_KEY = 'volumeScreeningResultsBySymbol'
 const TOP_SYMBOL_CACHE_KEY = 'volumeTopMarketSymbols'
 const CACHE_TTL_MS = 16 * 60 * 60 * 1000
+const RECENT_SCAN_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000
 const TOP_SYMBOL_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 1 month cache for top 2000 symbols
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -400,6 +401,12 @@ function VolumeScreening({ onStockSelect }) {
     return Number.isFinite(scannedAt) && Date.now() - scannedAt < thresholdMinutes * 60 * 1000
   }
 
+  const isRecentlyScanned = (entry, thresholdMs = RECENT_SCAN_THRESHOLD_MS) => {
+    if (!entry?.lastScanAt || entry.status !== 'ready') return false
+    const scannedAt = new Date(entry.lastScanAt).getTime()
+    return Number.isFinite(scannedAt) && Date.now() - scannedAt < thresholdMs
+  }
+
   const hydrateFromResultCache = (symbol) => {
     const cache = loadResultCache()
     const cached = cache?.[symbol]
@@ -577,11 +584,11 @@ function VolumeScreening({ onStockSelect }) {
     if (entries.length === 0 || isScanning) return
 
     const refreshedEntries = entries.map(entry => (
-      isEntryFresh(entry) ? entry : clearEntryResults(entry)
+      isRecentlyScanned(entry) || isEntryFresh(entry) ? entry : clearEntryResults(entry)
     ))
     setEntries(refreshedEntries)
 
-    const pendingEntries = refreshedEntries.filter(entry => entry.status !== 'ready')
+    const pendingEntries = refreshedEntries.filter(entry => entry.status !== 'ready' && !isRecentlyScanned(entry))
     if (pendingEntries.length === 0) {
       setScanTotal(0)
       setScanCompleted(0)
@@ -589,7 +596,7 @@ function VolumeScreening({ onStockSelect }) {
     }
 
     const loadingEntries = refreshedEntries.map(entry => (
-      entry.status === 'ready'
+      entry.status === 'ready' || isRecentlyScanned(entry)
         ? entry
         : { ...entry, status: 'loading', error: null }
     ))
@@ -821,9 +828,10 @@ function VolumeScreening({ onStockSelect }) {
     if (isScanning) return
 
     const candidates = getVisibleEntries()
-    if (candidates.length === 0) return
+    const scannable = candidates.filter(entry => !isRecentlyScanned(entry))
+    if (scannable.length === 0) return
 
-    const candidateIds = new Set(candidates.map(entry => entry.id))
+    const candidateIds = new Set(scannable.map(entry => entry.id))
 
     const resetEntries = entries.map(entry => (
       candidateIds.has(entry.id)
