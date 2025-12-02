@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
-import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X } from 'lucide-react'
+import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud } from 'lucide-react'
 import { apiCache } from '../utils/apiCache'
 import { joinUrl } from '../utils/urlHelper'
 
@@ -399,9 +399,16 @@ function BacktestResults({ onStockSelect }) {
   const [symbols, setSymbols] = useState('')
   const [days, setDays] = useState('1825') // Default to 5Y
   const [loading, setLoading] = useState(false)
+  const [loadingTopSymbols, setLoadingTopSymbols] = useState(false)
   const [error, setError] = useState(null)
   const [results, setResults] = useState([])
   const [stockHistory, setStockHistory] = useState([])
+  const [scanQueue, setScanQueue] = useState([])
+  const [isScanning, setIsScanning] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
+  const [scanCompleted, setScanCompleted] = useState(0)
+  const [scanTotal, setScanTotal] = useState(0)
+  const activeScanSymbolRef = useRef(null)
 
   // Load stock history from localStorage on mount
   useEffect(() => {
@@ -436,7 +443,149 @@ function BacktestResults({ onStockSelect }) {
     window.dispatchEvent(new CustomEvent('stockHistoryUpdated', { detail: updatedHistory }))
   }
 
-  const runBacktest = async (symbolOverride = null) => {
+  const ensureEntries = (symbolList) => {
+    if (!Array.isArray(symbolList) || symbolList.length === 0) return
+
+    setResults(prev => {
+      const existingSymbols = new Set(prev.map(r => r.symbol))
+      const newEntries = symbolList
+        .filter(Boolean)
+        .filter(symbol => !existingSymbols.has(symbol))
+        .map(symbol => ({
+          symbol,
+          status: 'pending',
+          latestBreakout: null,
+          latestPrice: null,
+          priceData: null,
+          optimalParams: null,
+          optimalSMAs: null,
+          days,
+          isRecentBreakout: false,
+          recentBreakout: null,
+          totalSignals: null,
+          error: null
+        }))
+
+      if (newEntries.length === 0) return prev
+      return [...prev, ...newEntries]
+    })
+  }
+
+  const runBacktestForSymbol = async (symbol) => {
+    ensureEntries([symbol])
+    setResults(prev => prev.map(entry => (
+      entry.symbol === symbol
+        ? { ...entry, status: 'loading', error: null }
+        : entry
+    )))
+
+    try {
+      const cacheKey = symbol
+      let cachedData = apiCache.get(cacheKey, days)
+      let priceData
+
+      if (!cachedData) {
+        const response = await axios.get(joinUrl(API_URL, '/analyze'), {
+          params: { symbol, days }
+        })
+        apiCache.set(cacheKey, days, response.data)
+        priceData = response.data.prices
+      } else {
+        priceData = cachedData.prices
+      }
+
+      if (!priceData || priceData.length === 0) {
+        throw new Error('No price data found')
+      }
+
+      const optimalParams = optimizeVolPrfV2Params(priceData)
+      const { slots, breakouts } = calculateVolPrfV2Breakouts(priceData, optimalParams)
+      const optimalSMAs = optimizeSMAParams(priceData, slots, breakouts)
+
+      const recentBreakouts = getRecentBreakouts(breakouts, 10)
+      const latestBreakout = getLatestBreakout(breakouts)
+      const latestRecentBreakout = getLatestBreakout(recentBreakouts)
+
+      if (!latestBreakout) {
+        throw new Error('No breakout detected')
+      }
+
+      const latestPrice = priceData[priceData.length - 1].close
+
+      const completedEntry = {
+        symbol,
+        status: 'completed',
+        totalSignals: optimalSMAs.totalSignals,
+        latestBreakout,
+        latestPrice,
+        priceData,
+        optimalParams,
+        optimalSMAs,
+        days,
+        isRecentBreakout: Boolean(latestRecentBreakout),
+        recentBreakout: latestRecentBreakout,
+        error: null
+      }
+
+      setResults(prev => prev.map(entry => (
+        entry.symbol === symbol ? completedEntry : entry
+      )))
+    } catch (err) {
+      console.error(`Error processing ${symbol}:`, err)
+      setResults(prev => prev.map(entry => (
+        entry.symbol === symbol
+          ? { ...entry, status: 'error', error: err.message || 'Failed to run backtest' }
+          : entry
+      )))
+    }
+  }
+
+  const queueSymbols = (symbolList, { startScan = true } = {}) => {
+    if (!Array.isArray(symbolList) || symbolList.length === 0) return
+    ensureEntries(symbolList)
+    if (startScan) {
+      setScanQueue(prev => {
+        const existing = new Set(prev)
+        const merged = [...prev, ...symbolList.filter(symbol => !existing.has(symbol))]
+        setScanTotal(merged.length)
+        return merged
+      })
+      setScanCompleted(0)
+      setIsPaused(false)
+      setIsScanning(true)
+    }
+  }
+
+  const loadTopSymbols = async () => {
+    if (loadingTopSymbols) return
+    setLoadingTopSymbols(true)
+    try {
+      const response = await axios.get(joinUrl(API_URL, '/top-market-cap'), {
+        params: { limit: 2000 }
+      })
+
+      const payload = response.data
+      const symbols = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.symbols)
+          ? payload.symbols
+          : []
+
+      const normalized = symbols
+        .map(item => (typeof item === 'string' ? item : item?.symbol))
+        .filter(Boolean)
+        .map(symbol => symbol.toUpperCase())
+
+      ensureEntries(normalized)
+    } catch (err) {
+      console.error('Failed to load top market cap symbols', err)
+      setError('Failed to load top market cap symbols')
+    } finally {
+      setLoadingTopSymbols(false)
+    }
+  }
+
+  const runBacktest = (symbolOverride = null) => {
     const targetSymbols = symbolOverride ?? symbols
     const stockList = parseStockSymbols(targetSymbols)
 
@@ -446,98 +595,9 @@ function BacktestResults({ onStockSelect }) {
     }
 
     saveToHistory(stockList)
-
-    setLoading(true)
     setError(null)
-    // Don't clear previous results - we'll merge them
-
-    const backtestResults = []
-
-    try {
-      for (const symbol of stockList) {
-        try {
-          // Fetch price data
-          const cacheKey = symbol
-          let cachedData = apiCache.get(cacheKey, days)
-          let priceData
-
-          if (!cachedData) {
-            const response = await axios.get(joinUrl(API_URL, '/analyze'), {
-              params: { symbol, days }
-            })
-            // Cache the complete response data (prices, indicators, signals)
-            apiCache.set(cacheKey, days, response.data)
-            priceData = response.data.prices
-          } else {
-            priceData = cachedData.prices
-          }
-
-          if (!priceData || priceData.length === 0) {
-            continue
-          }
-
-          // Optimize Vol Prf V2 parameters for this stock
-          const optimalParams = optimizeVolPrfV2Params(priceData)
-
-          // Calculate Vol Prf V2 slots and breakouts with optimal parameters
-          const { slots, breakouts } = calculateVolPrfV2Breakouts(priceData, optimalParams)
-
-          console.log(`[${symbol}] Slots: ${slots.length}, Breakouts: ${breakouts.length}`)
-          if (breakouts.length > 0) {
-            const latest = breakouts[breakouts.length - 1]
-            const latestDate = new Date(latest.date)
-            const today = new Date(priceData[priceData.length - 1].date)
-            const daysAgo = Math.floor((today - latestDate) / (1000 * 60 * 60 * 24))
-            console.log(`[${symbol}] Latest breakout: ${latest.date} (${daysAgo} days ago)`)
-          }
-
-          // Optimize SMA parameters based on slots and breakouts
-          const optimalSMAs = optimizeSMAParams(priceData, slots, breakouts)
-
-          // Capture most recent breakout and whether it's within the last 10 days
-          const recentBreakouts = getRecentBreakouts(breakouts, 10)
-          const latestBreakout = getLatestBreakout(breakouts)
-          const latestRecentBreakout = getLatestBreakout(recentBreakouts)
-
-          if (latestBreakout) {
-            const latestPrice = priceData[priceData.length - 1].close
-
-            backtestResults.push({
-              symbol,
-              totalSignals: optimalSMAs.totalSignals,  // B+S pairs (closed=1.0, open=0.5)
-              latestBreakout,
-              latestPrice,
-              priceData,
-              optimalParams,  // Store optimal Vol Prf V2 parameters
-              optimalSMAs,    // Store optimal SMA periods
-              days,           // Store the days period used for this backtest
-              isRecentBreakout: Boolean(latestRecentBreakout),
-              recentBreakout: latestRecentBreakout
-            })
-          }
-        } catch (err) {
-          console.error(`Error processing ${symbol}:`, err)
-          // Continue with next stock
-        }
-      }
-
-      // Merge new results with existing results
-      // Keep existing results for stocks not in the new backtest
-      // Update/replace results for stocks that are in the new backtest
-      setResults(prevResults => {
-        const newSymbols = new Set(backtestResults.map(r => r.symbol))
-        const keptResults = prevResults.filter(r => !newSymbols.has(r.symbol))
-        return [...keptResults, ...backtestResults]
-      })
-
-      if (backtestResults.length === 0) {
-        setError('No breakouts found for the provided symbols.')
-      }
-    } catch (err) {
-      setError('Failed to run backtest. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+    ensureEntries(stockList)
+    queueSymbols(stockList, { startScan: true })
   }
 
   const handleKeyPress = (e) => {
@@ -550,6 +610,65 @@ function BacktestResults({ onStockSelect }) {
     setSymbols(stock)
     runBacktest(stock)
   }
+
+  const scanAllQueued = () => {
+    if (normalizedResults.length === 0) return
+    const pendingSymbols = normalizedResults
+      .filter(entry => entry.status !== 'completed')
+      .map(entry => entry.symbol)
+
+    if (pendingSymbols.length === 0) return
+
+    setScanQueue(pendingSymbols)
+    setScanTotal(pendingSymbols.length)
+    setScanCompleted(0)
+    setIsPaused(false)
+    setIsScanning(true)
+  }
+
+  const scanSingle = (symbol) => {
+    setScanQueue([symbol])
+    setScanTotal(1)
+    setScanCompleted(0)
+    setIsPaused(false)
+    setIsScanning(true)
+  }
+
+  const togglePauseResume = () => {
+    if (!isScanning) return
+    setIsPaused(prev => !prev)
+  }
+
+  useEffect(() => {
+    if (!isScanning || isPaused) return
+    if (scanQueue.length === 0) {
+      setIsScanning(false)
+      setIsPaused(false)
+      setLoading(false)
+      return
+    }
+
+    const currentSymbol = scanQueue[0]
+    if (activeScanSymbolRef.current === currentSymbol) return
+
+    activeScanSymbolRef.current = currentSymbol
+    setLoading(true)
+
+    ; (async () => {
+      await runBacktestForSymbol(currentSymbol)
+      setScanCompleted(prev => prev + 1)
+      setScanQueue(prev => prev.slice(1))
+      activeScanSymbolRef.current = null
+    })()
+  }, [isScanning, isPaused, scanQueue])
+
+  useEffect(() => {
+    if (isScanning && scanQueue.length === 0) {
+      setIsScanning(false)
+      setIsPaused(false)
+      setLoading(false)
+    }
+  }, [isScanning, scanQueue.length])
 
   const formatCurrency = (value) => {
     return new Intl.NumberFormat('en-US', {
@@ -576,7 +695,13 @@ function BacktestResults({ onStockSelect }) {
     return diffDays
   }
 
-  const recentBreakoutCount = results.filter(r => r.isRecentBreakout).length
+  const normalizedResults = results.map(entry => ({
+    status: 'completed',
+    ...entry
+  }))
+
+  const completedResults = normalizedResults.filter(r => r.status === 'completed' && r.latestBreakout)
+  const recentBreakoutCount = completedResults.filter(r => r.isRecentBreakout).length
 
   return (
     <div className="space-y-6">
@@ -638,7 +763,7 @@ function BacktestResults({ onStockSelect }) {
               <option value="1825">5 Years</option>
             </select>
           </div>
-          <div className="flex items-end gap-2">
+          <div className="flex items-end gap-2 flex-wrap">
             <button
               onClick={runBacktest}
               disabled={loading}
@@ -655,6 +780,30 @@ function BacktestResults({ onStockSelect }) {
                   Scan Stocks
                 </>
               )}
+            </button>
+            <button
+              onClick={loadTopSymbols}
+              disabled={loadingTopSymbols || loading}
+              className="w-full md:w-auto px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+            >
+              {loadingTopSymbols ? <Loader2 className="w-5 h-5 animate-spin" /> : <DownloadCloud className="w-5 h-5" />}
+              Load 2000
+            </button>
+            <button
+              onClick={scanAllQueued}
+              disabled={results.length === 0 || isScanning}
+              className="w-full md:w-auto px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+            >
+              <RefreshCcw className="w-5 h-5" />
+              Scan
+            </button>
+            <button
+              onClick={togglePauseResume}
+              disabled={!isScanning}
+              className="w-full md:w-auto px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+            >
+              {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
+              {isPaused ? 'Resume' : 'Pause'}
             </button>
             {results.length > 0 && (
               <button
@@ -678,7 +827,7 @@ function BacktestResults({ onStockSelect }) {
       </div>
 
       {/* Results Section */}
-      {results.length > 0 && (
+      {normalizedResults.length > 0 && (
         <div className="space-y-6">
           {/* Summary Card */}
           <div className="bg-gradient-to-br from-green-900/50 to-green-800/50 p-6 rounded-lg border border-green-700">
@@ -689,8 +838,17 @@ function BacktestResults({ onStockSelect }) {
                   {recentBreakoutCount}
                 </p>
                 <p className="text-sm mt-1 text-green-300">
-                  From {results.length} stocks with detected breakouts
+                  From {completedResults.length} stocks with detected breakouts
                 </p>
+              </div>
+              <div className="text-sm text-green-200 space-y-1 text-right">
+                <div>Queued: {scanCompleted}/{scanTotal || normalizedResults.length}</div>
+                {isScanning && (
+                  <div className="flex items-center gap-2 justify-end text-amber-200">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {isPaused ? 'Paused' : 'Scanning'}
+                  </div>
+                )}
               </div>
               <TrendingUp className="w-12 h-12 text-green-400" />
             </div>
@@ -704,6 +862,7 @@ function BacktestResults({ onStockSelect }) {
                 <thead className="bg-slate-900">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Symbol</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Status</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Latest Breakout</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Days Ago</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase">Breakout Price</th>
@@ -717,66 +876,104 @@ function BacktestResults({ onStockSelect }) {
                   </tr>
                 </thead>
                 <tbody className="bg-slate-800 divide-y divide-slate-700">
-                  {results.map((result, index) => {
-                    const daysAgo = getDaysAgo(result.latestBreakout.date)
-                    const priceChange = ((result.latestPrice - result.latestBreakout.price) / result.latestBreakout.price * 100)
+                  {normalizedResults.map((result, index) => {
+                    const hasBreakout = Boolean(result.latestBreakout)
+                    const daysAgo = hasBreakout ? getDaysAgo(result.latestBreakout.date) : null
+                    const priceChange = hasBreakout
+                      ? ((result.latestPrice - result.latestBreakout.price) / result.latestBreakout.price * 100)
+                      : null
+                    const isWithinLast10Days = hasBreakout && daysAgo <= 10
+                    const status = result.status || (hasBreakout ? 'completed' : 'pending')
 
                     return (
                       <tr
                         key={index}
-                        onClick={() => onStockSelect && onStockSelect(result.symbol, { ...result.optimalParams, smaPeriods: [result.optimalSMAs.period], days: result.days })}
-                        className="hover:bg-slate-700 cursor-pointer transition-colors"
-                        title="Click to view in Technical Analysis with optimized parameters"
+                        onClick={() => hasBreakout && onStockSelect && onStockSelect(result.symbol, { ...result.optimalParams, smaPeriods: [result.optimalSMAs?.period], days: result.days })}
+                        className={`transition-colors ${hasBreakout ? 'hover:bg-slate-700 cursor-pointer' : 'opacity-75'} ${isWithinLast10Days ? 'bg-blue-900/20 hover:bg-blue-800/30' : ''}`}
+                        title={hasBreakout ? 'Click to view in Technical Analysis with optimized parameters' : 'Pending scan'}
                       >
                         <td className="px-4 py-3 text-sm font-bold text-blue-400">
                           {result.symbol}
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          <span className={`${result.isRecentBreakout ? 'text-green-200 bg-green-900/50 animate-pulse px-2 py-1 rounded' : 'text-slate-300'}`}>
-                            {formatDate(result.latestBreakout.date)}
+                          <span className={`px-2 py-1 rounded-full text-xs font-semibold ${status === 'completed' ? 'bg-emerald-900/50 text-emerald-200' : status === 'loading' ? 'bg-amber-900/40 text-amber-200' : status === 'error' ? 'bg-red-900/50 text-red-200' : 'bg-slate-700 text-slate-200'}`}>
+                            {status === 'completed' ? 'Done' : status === 'loading' ? 'Scanning' : status === 'error' ? 'Error' : 'Pending'}
                           </span>
+                          {result.error && (
+                            <div className="text-xs text-red-300 mt-1">{result.error}</div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {hasBreakout ? (
+                            <span className={`${result.isRecentBreakout ? 'text-green-200 bg-green-900/50 animate-pulse px-2 py-1 rounded' : 'text-slate-300'}`}>
+                              {formatDate(result.latestBreakout.date)}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
-                          <span className={`px-2 py-1 rounded ${daysAgo <= 3 ? 'bg-green-900/50 text-green-300' : daysAgo <= 7 ? 'bg-yellow-900/50 text-yellow-300' : 'bg-slate-700 text-slate-300'}`}>
-                            {daysAgo}d
-                          </span>
+                          {hasBreakout ? (
+                            <span className={`px-2 py-1 rounded ${daysAgo <= 3 ? 'bg-green-900/50 text-green-300' : daysAgo <= 7 ? 'bg-yellow-900/50 text-yellow-300' : daysAgo <= 10 ? 'bg-blue-900/50 text-blue-200' : 'bg-slate-700 text-slate-300'}`}>
+                              {daysAgo}d
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
-                          {formatCurrency(result.latestBreakout.price)}
+                          {hasBreakout ? formatCurrency(result.latestBreakout.price) : '—'}
                         </td>
                         <td className="px-4 py-3 text-sm font-semibold text-right">
-                          <span className={priceChange >= 0 ? 'text-green-400' : 'text-red-400'}>
-                            {formatCurrency(result.latestPrice)}
-                            <span className="text-xs ml-1">({formatPercent(priceChange)})</span>
-                          </span>
+                          {hasBreakout ? (
+                            <span className={priceChange >= 0 ? 'text-green-400' : 'text-red-400'}>
+                              {formatCurrency(result.latestPrice)}
+                              <span className="text-xs ml-1">({formatPercent(priceChange)})</span>
+                            </span>
+                          ) : '—'}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
-                          {(result.latestBreakout.currentWeight * 100).toFixed(1)}%
+                          {hasBreakout ? `${(result.latestBreakout.currentWeight * 100).toFixed(1)}%` : '—'}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
-                          {(result.latestBreakout.lowerWeight * 100).toFixed(1)}%
+                          {hasBreakout ? `${(result.latestBreakout.lowerWeight * 100).toFixed(1)}%` : '—'}
                         </td>
                         <td className="px-4 py-3 text-sm text-green-400 text-right font-semibold">
-                          {(result.latestBreakout.weightDiff * 100).toFixed(1)}%
+                          {hasBreakout ? `${(result.latestBreakout.weightDiff * 100).toFixed(1)}%` : '—'}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
-                          {result.totalSignals}
+                          {hasBreakout ? result.totalSignals : '—'}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 text-left">
-                          <div className="space-y-0.5">
-                            <div>Th:{(result.optimalParams.breakoutThreshold * 100).toFixed(0)}%</div>
-                            <div>LB:{result.optimalParams.lookbackZones}</div>
-                            <div className="text-blue-400 font-medium">SMA:{result.optimalSMAs.period}</div>
-                            <div className={`font-bold ${result.optimalSMAs.pl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              P/L:{result.optimalSMAs.pl.toFixed(1)}%
+                          {hasBreakout ? (
+                            <div className="space-y-0.5">
+                              <div>Th:{(result.optimalParams.breakoutThreshold * 100).toFixed(0)}%</div>
+                              <div>LB:{result.optimalParams.lookbackZones}</div>
+                              <div className="text-blue-400 font-medium">SMA:{result.optimalSMAs.period}</div>
+                              <div className={`font-bold ${result.optimalSMAs.pl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                P/L:{result.optimalSMAs.pl.toFixed(1)}%
+                              </div>
                             </div>
-                          </div>
+                          ) : (
+                            <span className="text-slate-500">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <button
                             onClick={(e) => {
+                              e.stopPropagation()
+                              scanSingle(result.symbol)
+                            }}
+                            className="p-1 text-slate-400 hover:text-emerald-400 hover:bg-emerald-900/20 rounded transition-colors mr-1"
+                            title="Scan this stock"
+                          >
+                            <RefreshCcw className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
                               e.stopPropagation() // Prevent row click
                               setResults(prevResults => prevResults.filter(r => r.symbol !== result.symbol))
+                              setScanQueue(prev => prev.filter(symbol => symbol !== result.symbol))
                             }}
                             className="p-1 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded transition-colors"
                             title="Remove this stock"
