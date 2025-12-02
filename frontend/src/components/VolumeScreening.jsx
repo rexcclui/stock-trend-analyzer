@@ -216,13 +216,50 @@ function removeResultFromCache(symbol) {
   }
 }
 
-function getSlotColor(weight, maxWeight) {
-  // Lower volume = yellow, higher volume = red
-  const lowColor = [250, 204, 21]   // #facc15
-  const highColor = [220, 38, 38]   // #dc2626
-  const ratio = maxWeight > 0 ? Math.min(1, Math.max(0, weight / maxWeight)) : 0
+function getSlotColor(weight) {
+  const colorStops = [
+    { weight: 0, color: [254, 249, 195] },    // Light yellow
+    { weight: 2.5, color: [249, 115, 22] },   // Orange
+    { weight: 5, color: [239, 68, 68] },      // Red
+    { weight: 10, color: [168, 85, 247] },    // Purple
+    { weight: 15, color: [59, 130, 246] },    // Blue
+    { weight: 20, color: [34, 197, 94] }      // Green
+  ]
+
+  const clampWeight = Math.max(0, Math.min(weight ?? 0, 20))
+  const lastStop = colorStops[colorStops.length - 1]
+
+  if (clampWeight >= lastStop.weight) {
+    const luminance = (0.299 * lastStop.color[0] + 0.587 * lastStop.color[1] + 0.114 * lastStop.color[2]) / 255
+    const textColor = luminance > 0.65 ? '#0f172a' : '#f8fafc'
+    return { color: `rgb(${lastStop.color.join(', ')})`, textColor }
+  }
+
+  let lowerStop = colorStops[0]
+  let upperStop = colorStops[1]
+
+  for (let i = 1; i < colorStops.length; i++) {
+    if (clampWeight <= colorStops[i].weight) {
+      lowerStop = colorStops[i - 1]
+      upperStop = colorStops[i]
+      break
+    }
+  }
+
+  const range = upperStop.weight - lowerStop.weight || 1
+  const ratio = Math.min(1, Math.max(0, (clampWeight - lowerStop.weight) / range))
   const mix = (start, end) => Math.round(start + (end - start) * ratio)
-  return `rgb(${mix(lowColor[0], highColor[0])}, ${mix(lowColor[1], highColor[1])}, ${mix(lowColor[2], highColor[2])})`
+
+  const blended = [
+    mix(lowerStop.color[0], upperStop.color[0]),
+    mix(lowerStop.color[1], upperStop.color[1]),
+    mix(lowerStop.color[2], upperStop.color[2])
+  ]
+
+  const luminance = (0.299 * blended[0] + 0.587 * blended[1] + 0.114 * blended[2]) / 255
+  const textColor = luminance > 0.65 ? '#0f172a' : '#f8fafc'
+
+  return { color: `rgb(${blended.join(', ')})`, textColor }
 }
 
 function findSlotIndex(slots, price) {
@@ -304,14 +341,11 @@ function buildLegend(slots, currentIndex) {
   const startIndex = Math.max(0, currentIndex - 5)
   const endIndex = Math.min(slots.length - 1, currentIndex + 5)
   const selected = slots.slice(startIndex, endIndex + 1)
-  const maxWeight = Math.max(...selected.map(slot => slot.weight), 0)
-
   return selected.map((slot, idx) => ({
     ...slot,
     legendIndex: startIndex + idx,
     label: `${slot.weight.toFixed(1)}%`,
-    color: getSlotColor(slot.weight, maxWeight),
-    textColor: slot.weight >= maxWeight * 0.5 ? '#f8fafc' : '#0f172a',
+    ...getSlotColor(slot.weight),
     isCurrent: startIndex + idx === currentIndex
   }))
 }
