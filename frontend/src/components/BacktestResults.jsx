@@ -602,14 +602,26 @@ function BacktestResults({ onStockSelect }) {
     window.dispatchEvent(new CustomEvent('stockHistoryUpdated', { detail: updatedHistory }))
   }
 
-  // Persist backtest results to localStorage
+  // Persist backtest results to localStorage (exclude priceData to save space)
   useEffect(() => {
     if (!hasHydratedCache) return
 
     try {
-      localStorage.setItem(BACKTEST_RESULTS_KEY, JSON.stringify(results))
+      // Exclude priceData from cache to avoid quota exceeded errors
+      // priceData is already cached in apiCache, so we don't need to duplicate it
+      const resultsWithoutPriceData = results.map(result => {
+        const { priceData, ...rest } = result
+        return rest
+      })
+      localStorage.setItem(BACKTEST_RESULTS_KEY, JSON.stringify(resultsWithoutPriceData))
     } catch (e) {
-      console.error('Failed to cache backtest results:', e)
+      if (e.name === 'QuotaExceededError') {
+        console.error('localStorage quota exceeded. Consider clearing old results.')
+        // Optionally clear old data automatically
+        // localStorage.clear()
+      } else {
+        console.error('Failed to cache backtest results:', e)
+      }
     }
   }, [results, hasHydratedCache])
 
