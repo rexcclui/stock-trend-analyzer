@@ -1136,8 +1136,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
   })
 
   const filteredResults = normalizedResults.filter(result => {
-    // Exclude entries with "No data found for symbol:" error
-    if (result.error && result.error.includes('No data found for symbol:')) return false
+    // Exclude any entries with errors
+    if (result.error) return false
     if (showBookmarksOnly && !result.bookmarked) return false
     if (showRecentBreakoutsOnly && !result.isRecentBreakout) return false
     return true
