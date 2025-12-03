@@ -1397,26 +1397,26 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                 <table className="min-w-full divide-y divide-slate-700">
                 <thead className="bg-slate-900 sticky top-0 z-10">
                   <tr>
-                    <th onClick={() => handleSort('bookmark')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">
+                    <th onClick={() => handleSort('bookmark')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Click to bookmark stocks for quick filtering">
                       <span className="flex items-center gap-1">
                         <Bookmark className="w-4 h-4" />
                         {renderSortIndicator('bookmark')}
                       </span>
                     </th>
-                    <th onClick={() => handleSort('symbol')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Symbol {renderSortIndicator('symbol')}</th>
-                    <th onClick={() => handleSort('status')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Status {renderSortIndicator('status')}</th>
-                    <th onClick={() => handleSort('daysAgo')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Days Ago {renderSortIndicator('daysAgo')}</th>
-                    <th onClick={() => handleSort('breakoutPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Breakout Price {renderSortIndicator('breakoutPrice')}</th>
-                    <th onClick={() => handleSort('currentPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Current Price {renderSortIndicator('currentPrice')}</th>
-                    <th onClick={() => handleSort('volWeight')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Vol Weight {renderSortIndicator('volWeight')}</th>
-                    <th onClick={() => handleSort('resistVol')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Resist Vol {renderSortIndicator('resistVol')}</th>
-                    <th onClick={() => handleSort('diff')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Diff {renderSortIndicator('diff')}</th>
-                    <th onClick={() => handleSort('totalSignals')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Total Signals {renderSortIndicator('totalSignals')}</th>
-                    <th onClick={() => handleSort('pl')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">P/L {renderSortIndicator('pl')}</th>
-                    <th onClick={() => handleSort('marketChange')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Market Change {renderSortIndicator('marketChange')}</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Optimal Params</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase">Last Scan</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase">Action</th>
+                    <th onClick={() => handleSort('symbol')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Stock ticker symbol">Symbol {renderSortIndicator('symbol')}</th>
+                    <th onClick={() => handleSort('status')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Backtest scan status: pending, loading, completed, or error">Status {renderSortIndicator('status')}</th>
+                    <th onClick={() => handleSort('daysAgo')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Number of days since the most recent breakout signal">Days Ago {renderSortIndicator('daysAgo')}</th>
+                    <th onClick={() => handleSort('breakoutPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Stock price at the most recent breakout point">Breakout Price {renderSortIndicator('breakoutPrice')}</th>
+                    <th onClick={() => handleSort('currentPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Current stock price with % change from breakout price">Current Price {renderSortIndicator('currentPrice')}</th>
+                    <th onClick={() => handleSort('volWeight')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Volume weight % at current price zone (lower = less resistance)">Vol Weight {renderSortIndicator('volWeight')}</th>
+                    <th onClick={() => handleSort('resistVol')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Maximum volume weight % in zones below current price (resistance level)">Resist Vol {renderSortIndicator('resistVol')}</th>
+                    <th onClick={() => handleSort('diff')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Breakout strength: difference between resistance volume and current volume weight (higher = stronger breakout)">Diff {renderSortIndicator('diff')}</th>
+                    <th onClick={() => handleSort('totalSignals')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Number of trading signals generated by the backtest (closed trades = 1.0, open trades = 0.5)">Total Signals {renderSortIndicator('totalSignals')}</th>
+                    <th onClick={() => handleSort('pl')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Profit/Loss % from the Vol Prf V2 + SMA trading strategy">P/L {renderSortIndicator('pl')}</th>
+                    <th onClick={() => handleSort('marketChange')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Buy-and-hold % change over the entire backtest period (oldest to newest price)">Market Change {renderSortIndicator('marketChange')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase" title="Optimized parameters: Th=Breakout Threshold %, LB=Lookback Zones, SMA=SMA Period">Optimal Params</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase" title="Timestamp of when this backtest was last run (red if >7 days old)">Last Scan</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase" title="Actions: Load in Volume tab, Rescan, Erase results, Remove from table">Action</th>
                   </tr>
                 </thead>
                 <tbody className="bg-slate-800 divide-y divide-slate-700">
