@@ -971,7 +971,17 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
 
   const runBacktest = (symbolOverride = null) => {
     const targetSymbols = symbolOverride ?? symbols
-    const stockList = parseStockSymbols(targetSymbols).filter(symbol => !isDisallowedSymbol(symbol))
+    console.log('[runBacktest] Input:', targetSymbols, 'Type:', typeof targetSymbols)
+    const parsed = parseStockSymbols(targetSymbols)
+    console.log('[runBacktest] Parsed symbols:', parsed)
+    const stockList = parsed.filter(symbol => {
+      const isDisallowed = isDisallowedSymbol(symbol)
+      if (isDisallowed) {
+        console.log('[runBacktest] Filtered out:', symbol, '- 5char?', isInvalidFiveCharSymbol(symbol), 'blocked suffix?', hasBlockedSuffix(symbol), 'has hyphen?', symbol.includes(HYPHEN))
+      }
+      return !isDisallowed
+    })
+    console.log('[runBacktest] Final stock list:', stockList)
 
     if (stockList.length === 0) {
       setError('Please enter at least one stock symbol')
