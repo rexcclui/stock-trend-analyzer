@@ -869,8 +869,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
 
       // If no combination produced >= 4 signals, throw error
       if (!bestResult) {
-        console.warn(`[${symbol}] Failed backtest - ${priceData.length} days of data:`)
-        debugResults.forEach(r => console.warn(`  ${r.params}: ${r.breakouts} breakouts → ${r.signals} signals`))
+        console.log(`[${symbol}] ❌ Failed backtest - ${priceData.length} days of data:`)
+        debugResults.forEach(r => console.log(`  ${r.params}: ${r.breakouts} breakouts → ${r.signals} signals`))
         throw new Error('Excluded: fewer than 4 total signals')
       }
 
