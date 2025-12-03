@@ -1486,7 +1486,13 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                         </td>
                         <td className="px-4 py-3 text-sm text-right font-semibold">
                           {hasBreakout ? (
-                            <span className={result.optimalSMAs.pl >= 0 ? 'text-green-400' : 'text-red-400'}>
+                            <span className={
+                              typeof result.marketChange === 'number' && result.optimalSMAs.pl > result.marketChange
+                                ? 'text-blue-400'
+                                : result.optimalSMAs.pl >= 0
+                                  ? 'text-green-400'
+                                  : 'text-red-400'
+                            }>
                               {formatPercent(result.optimalSMAs.pl)}
                             </span>
                           ) : '—'}
