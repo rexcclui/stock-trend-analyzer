@@ -2622,12 +2622,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
         const totalPL = trades.reduce((sum, trade) => sum + trade.plPercent, 0)
 
+        // Calculate total signals: closed trades = 1.0, open trades = 0.5
+        const closedTrades = trades.filter(t => !t.isOpen)
+        const openTrades = trades.filter(t => t.isOpen)
+        const totalSignals = closedTrades.length + (openTrades.length * 0.5)
+
         if (smaPeriod === 50) {
           console.log(`[SIM-${smaPeriod}] Prices: ${reversedPrices.length}, Breakouts: ${volumeProfileV2Breakouts.length}`)
-          console.log(`[SIM-${smaPeriod}] Trades: ${trades.length}, Total P/L: ${totalPL.toFixed(2)}%`)
+          console.log(`[SIM-${smaPeriod}] Trades: ${trades.length}, Signals: ${totalSignals}, Total P/L: ${totalPL.toFixed(2)}%`)
         }
 
-        return totalPL
+        return { totalPL, totalSignals }
       }
 
       // Test SMA values with proper increments
@@ -2646,10 +2651,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
       const results = []
       for (const smaValue of testValues) {
-        const pl = calculatePLForSMA(smaValue)
-        results.push({ sma: smaValue, pl })
-        if (pl > bestPL) {
-          bestPL = pl
+        const { totalPL, totalSignals } = calculatePLForSMA(smaValue)
+        results.push({ sma: smaValue, pl: totalPL, signals: totalSignals })
+
+        // Only consider SMAs with >= 4 signals, then pick highest P/L
+        if (totalSignals >= 4 && totalPL > bestPL) {
+          bestPL = totalPL
           bestSmaValue = smaValue
         }
       }
@@ -2657,9 +2664,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // Show top 10 results
       const top10 = [...results].sort((a, b) => b.pl - a.pl).slice(0, 10)
       console.log(`[Simulate] Top 10 SMA values:`)
-      top10.forEach((r, i) => console.log(`  ${i + 1}. SMA ${r.sma}: ${r.pl.toFixed(2)}%`))
+      top10.forEach((r, i) => console.log(`  ${i + 1}. SMA ${r.sma}: ${r.pl.toFixed(2)}%, Signals: ${r.signals}`))
 
-      console.log(`[Simulate] Best SMA: ${bestSmaValue} with P&L: ${bestPL.toFixed(2)}%`)
+      console.log(`[Simulate] Best SMA: ${bestSmaValue} with P&L: ${bestPL.toFixed(2)}% (>= 4 signals)`)
 
       // Call the callback with results
       if (onSimulateComplete && bestSmaValue !== null) {
