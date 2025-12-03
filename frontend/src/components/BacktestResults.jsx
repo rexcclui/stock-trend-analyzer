@@ -810,13 +810,47 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         throw new Error('No price data found')
       }
 
-      const optimalParams = optimizeVolPrfV2Params(priceData)
-      const { slots, breakouts } = calculateVolPrfV2Breakouts(priceData, optimalParams)
-      const optimalSMAs = optimizeSMAParams(priceData, slots, breakouts)
+      // Test all parameter combinations to find one with >= 4 signals
+      const paramCombinations = [
+        { breakoutThreshold: 0.05, lookbackZones: 3, resetThreshold: 0.025, timeoutSlots: 5 },
+        { breakoutThreshold: 0.05, lookbackZones: 5, resetThreshold: 0.025, timeoutSlots: 5 },
+        { breakoutThreshold: 0.06, lookbackZones: 4, resetThreshold: 0.03, timeoutSlots: 5 },
+        { breakoutThreshold: 0.06, lookbackZones: 5, resetThreshold: 0.03, timeoutSlots: 5 },
+        { breakoutThreshold: 0.06, lookbackZones: 6, resetThreshold: 0.03, timeoutSlots: 5 },
+        { breakoutThreshold: 0.07, lookbackZones: 5, resetThreshold: 0.035, timeoutSlots: 5 },
+        { breakoutThreshold: 0.08, lookbackZones: 5, resetThreshold: 0.04, timeoutSlots: 7 },
+      ]
 
-      if (optimalSMAs.totalSignals < 4) {
+      let bestResult = null
+      let bestPL = -Infinity
+
+      for (const params of paramCombinations) {
+        const { slots, breakouts } = calculateVolPrfV2Breakouts(priceData, params)
+
+        if (breakouts.length === 0) continue
+
+        const smaResult = optimizeSMAParams(priceData, slots, breakouts)
+
+        // Only consider combinations with >= 4 signals
+        if (smaResult.totalSignals >= 4) {
+          if (smaResult.pl > bestPL) {
+            bestPL = smaResult.pl
+            bestResult = {
+              params,
+              slots,
+              breakouts,
+              smaResult
+            }
+          }
+        }
+      }
+
+      // If no combination produced >= 4 signals, throw error
+      if (!bestResult) {
         throw new Error('Excluded: fewer than 4 total signals')
       }
+
+      const { params: optimalParams, breakouts, smaResult: optimalSMAs } = bestResult
 
       const recentBreakouts = getRecentBreakouts(breakouts, 10)
       const latestBreakout = getLatestBreakout(breakouts)
