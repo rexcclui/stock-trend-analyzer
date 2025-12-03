@@ -1220,7 +1220,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
             <button
               onClick={runBacktest}
               disabled={loading}
-              className="w-full md:w-auto px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+              className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+              title="Scan entered stock symbols"
             >
               {loading ? (
                 <>
@@ -1237,74 +1238,68 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
             <button
               onClick={loadTopSymbols}
               disabled={loadingTopSymbols || loading}
-              className="w-full md:w-auto px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+              className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+              title="Load top 2000 market cap symbols"
             >
               {loadingTopSymbols ? <Loader2 className="w-5 h-5 animate-spin" /> : <DownloadCloud className="w-5 h-5" />}
-              Load 2000
             </button>
             <button
               onClick={scanAllQueued}
               disabled={results.length === 0 || isScanning}
-              className="w-full md:w-auto px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+              className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
               title="Scan only stocks without backtest results"
             >
               <RefreshCcw className="w-5 h-5" />
-              Scan All
             </button>
             <button
               onClick={forceScanAll}
               disabled={results.length === 0 || isScanning}
-              className="w-full md:w-auto px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+              className="p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
               title="Force rescan all stocks (clears existing results)"
             >
               <RotateCw className="w-5 h-5" />
-              Force Scan
             </button>
             <button
               onClick={togglePauseResume}
               disabled={!isScanning}
-              className="w-full md:w-auto px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+              className="p-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+              title={isPaused ? 'Resume scanning' : 'Pause scanning'}
             >
               {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
-              {isPaused ? 'Resume' : 'Pause'}
             </button>
             {results.length > 0 && (
               <>
                 <button
                   onClick={eraseAllResults}
                   disabled={loading}
-                  className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                  className="p-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
                   title="Erase all backtest results"
                 >
                   <Eraser className="w-5 h-5" />
-                  Clear Results
                 </button>
                 <button
                   onClick={clearCachedResults}
                   disabled={loading}
-                  className="px-4 py-2 bg-red-700 text-white rounded-lg hover:bg-red-800 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
-                  title="Remove cached backtests"
+                  className="p-2 bg-red-700 text-white rounded-lg hover:bg-red-800 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                  title="Remove cached backtests from storage"
                 >
                   <Trash2 className="w-5 h-5" />
-                  Clear Storage
                 </button>
                 <button
                   onClick={exportResults}
                   disabled={loading}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                  className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
                   title="Export backtest results to JSON file"
                 >
                   <Download className="w-5 h-5" />
-                  Export
                 </button>
                 <button
                   onClick={() => importInputRef.current?.click()}
                   disabled={loading}
-                  className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                  className="p-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
                   title="Import backtest results from JSON file"
                 >
                   <Upload className="w-5 h-5" />
-                  Import
                 </button>
                 <input
                   ref={importInputRef}
