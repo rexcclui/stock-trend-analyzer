@@ -14,10 +14,31 @@ const HYPHEN = '-'
 
 function computeMarketChange(priceData) {
   if (!Array.isArray(priceData) || priceData.length === 0) return null
-  const firstClose = priceData[0]?.close
-  const lastClose = priceData[priceData.length - 1]?.close
-  if (typeof firstClose !== 'number' || typeof lastClose !== 'number' || firstClose === 0) return null
-  return ((lastClose - firstClose) / firstClose) * 100
+
+  const firstItem = priceData[0]
+  const lastItem = priceData[priceData.length - 1]
+
+  if (!firstItem || !lastItem) return null
+
+  // Determine if data is in chronological or reverse chronological order
+  const firstDate = new Date(firstItem.date)
+  const lastDate = new Date(lastItem.date)
+
+  let oldestPrice, newestPrice
+
+  if (firstDate < lastDate) {
+    // Chronological order: first is oldest, last is newest
+    oldestPrice = firstItem.close
+    newestPrice = lastItem.close
+  } else {
+    // Reverse chronological order: first is newest, last is oldest
+    oldestPrice = lastItem.close
+    newestPrice = firstItem.close
+  }
+
+  if (typeof oldestPrice !== 'number' || typeof newestPrice !== 'number' || oldestPrice === 0) return null
+
+  return ((newestPrice - oldestPrice) / oldestPrice) * 100
 }
 
 function normalizeCachedResults(entries = []) {
