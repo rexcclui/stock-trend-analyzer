@@ -8,7 +8,8 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 // Helper function to parse multiple stock symbols from input
 function parseStockSymbols(input) {
-  if (!input || !input.trim()) return []
+  // Safety check: ensure input is a string
+  if (!input || typeof input !== 'string' || !input.trim()) return []
 
   // Split by comma or space
   const symbols = input.split(/[,\s]+/).filter(s => s.trim())
