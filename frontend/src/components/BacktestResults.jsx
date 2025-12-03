@@ -818,6 +818,11 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         throw new Error('No price data found')
       }
 
+      // Skip stocks with insufficient data for SMA calculation
+      if (priceData.length < 250) {
+        throw new Error(`Insufficient data: only ${priceData.length} days (need 250+)`)
+      }
+
       // Test all parameter combinations to find one with >= 4 signals
       const paramCombinations = [
         { breakoutThreshold: 0.05, lookbackZones: 3, resetThreshold: 0.025, timeoutSlots: 5 },
@@ -831,27 +836,15 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
 
       let bestResult = null
       let bestPL = -Infinity
-      const debugResults = []
 
       for (const params of paramCombinations) {
         const { slots, breakouts } = calculateVolPrfV2Breakouts(priceData, params)
 
         if (breakouts.length === 0) {
-          debugResults.push({
-            params: `Th:${(params.breakoutThreshold * 100).toFixed(0)}% LB:${params.lookbackZones}`,
-            breakouts: 0,
-            signals: 0
-          })
           continue
         }
 
         const smaResult = optimizeSMAParams(priceData, slots, breakouts)
-        debugResults.push({
-          params: `Th:${(params.breakoutThreshold * 100).toFixed(0)}% LB:${params.lookbackZones}`,
-          breakouts: breakouts.length,
-          signals: smaResult.totalSignals,
-          pl: smaResult.pl
-        })
 
         // Only consider combinations with >= 4 signals
         if (smaResult.totalSignals >= 4) {
@@ -869,8 +862,6 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
 
       // If no combination produced >= 4 signals, throw error
       if (!bestResult) {
-        console.log(`[${symbol}] ❌ Failed backtest - ${priceData.length} days of data:`)
-        debugResults.forEach(r => console.log(`  ${r.params}: ${r.breakouts} breakouts → ${r.signals} signals`))
         throw new Error('Excluded: fewer than 4 total signals')
       }
 
