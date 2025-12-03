@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
-import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2 } from 'lucide-react'
+import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2, RotateCw } from 'lucide-react'
 import { apiCache } from '../utils/apiCache'
 import { joinUrl } from '../utils/urlHelper'
 
@@ -872,6 +872,26 @@ function BacktestResults({ onStockSelect }) {
     setIsScanning(true)
   }
 
+  const forceScanAll = () => {
+    if (normalizedResults.length === 0) return
+
+    setResults(prev => pruneDisallowedEntries(prev))
+
+    const allSymbols = pruneDisallowedEntries(normalizedResults)
+      .map(entry => entry.symbol)
+
+    if (allSymbols.length === 0) return
+
+    // Clear all results to pending state before rescanning
+    setResults(prev => prev.map(entry => clearEntryData(entry)))
+
+    setScanQueue(allSymbols)
+    setScanTotal(allSymbols.length)
+    setScanCompleted(0)
+    setIsPaused(false)
+    setIsScanning(true)
+  }
+
   const toggleBookmark = (symbol) => {
     setResults(prev => prev.map(entry => (
       entry.symbol === symbol ? { ...entry, bookmarked: !entry.bookmarked } : entry
@@ -1129,9 +1149,19 @@ function BacktestResults({ onStockSelect }) {
               onClick={scanAllQueued}
               disabled={results.length === 0 || isScanning}
               className="w-full md:w-auto px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+              title="Scan only stocks without backtest results"
             >
               <RefreshCcw className="w-5 h-5" />
               Scan
+            </button>
+            <button
+              onClick={forceScanAll}
+              disabled={results.length === 0 || isScanning}
+              className="w-full md:w-auto px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+              title="Force rescan all stocks (clears existing results)"
+            >
+              <RotateCw className="w-5 h-5" />
+              Force Scan
             </button>
             <button
               onClick={togglePauseResume}
