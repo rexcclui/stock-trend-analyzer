@@ -1275,7 +1275,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
             <button
               onClick={forceScanAll}
               disabled={results.length === 0 || isScanning}
-              className="p-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+              className="p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
               title="Force rescan all stocks (clears existing results)"
             >
               <RotateCw className="w-5 h-5" />
