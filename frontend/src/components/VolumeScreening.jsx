@@ -888,6 +888,9 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
       const bottomResist = findResistance(slots, slotIndex, 'down')
       const upperResist = findResistance(slots, slotIndex, 'up')
 
+      // Get the last data point date
+      const lastDataDate = prices.length > 0 ? prices[prices.length - 1].date : null
+
       return {
         ...entry,
         priceRange: currentRange ? formatPriceRange(currentRange.start, currentRange.end) : '—',
@@ -898,6 +901,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
         bottomResist: formatResistance(currentRange, bottomResist),
         upperResist: formatResistance(currentRange, upperResist),
         breakout: breakout ? (breakout === 'up' ? 'Up' : 'Down') : '—',
+        lastDataDate,
         lastScanAt: new Date().toISOString(),
         status: 'ready',
         error: null,
@@ -1580,7 +1584,12 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
                       </button>
                     </td>
                     <td className="px-4 py-3 text-slate-100 font-medium">{entry.symbol}</td>
-                    <td className="px-4 py-3 text-slate-200">{entry.testedDays}</td>
+                    <td
+                      className="px-4 py-3 text-slate-200"
+                      title={entry.lastDataDate ? `Last data point: ${entry.lastDataDate}` : undefined}
+                    >
+                      {entry.testedDays}
+                    </td>
                     <td className="px-4 py-3 text-slate-200">{entry.slotCount}</td>
                     <td className={`px-4 py-3 text-xs ${isScanStale(entry.lastScanAt) ? 'text-red-400' : 'text-slate-200'}`}>
                       {formatTimestamp(entry.lastScanAt)}

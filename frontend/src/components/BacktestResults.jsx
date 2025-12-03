@@ -1513,7 +1513,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                           {hasBreakout ? (
                             <span
                               className={`px-2 py-1 rounded ${daysAgo <= 3 ? 'bg-green-900/50 text-green-300' : daysAgo <= 7 ? 'bg-yellow-900/50 text-yellow-300' : daysAgo <= 10 ? 'bg-blue-900/50 text-blue-200' : 'bg-slate-700 text-slate-300'}`}
-                              title={formatDate(result.latestBreakout.date)}
+                              title={result.priceData?.length > 0 ? `Breakout: ${formatDate(result.latestBreakout.date)}\nLast data: ${result.priceData[result.priceData.length - 1].date}` : formatDate(result.latestBreakout.date)}
                             >
                               {daysAgo}d
                             </span>
