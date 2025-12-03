@@ -888,8 +888,8 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
       const bottomResist = findResistance(slots, slotIndex, 'down')
       const upperResist = findResistance(slots, slotIndex, 'up')
 
-      // Get the last data point date
-      const lastDataDate = prices.length > 0 ? prices[prices.length - 1].date : null
+      // Get the last data point date (most recent date - prices are in reverse chronological order)
+      const lastDataDate = prices.length > 0 ? prices[0].date : null
 
       return {
         ...entry,
