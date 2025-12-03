@@ -441,8 +441,16 @@ function optimizeSMAParams(prices, slots, breakouts) {
 
   for (const period of testValues) {
     const { totalPL, trades } = calculatePLForSMA(period)
-    results.push({ sma: period, pl: totalPL })
-    if (totalPL > bestPL) {
+
+    // Calculate total signals: closed trades = 1.0, open trades = 0.5
+    const closedTrades = trades.filter(t => !t.isOpen)
+    const openTrades = trades.filter(t => t.isOpen)
+    const totalSignals = closedTrades.length + (openTrades.length * 0.5)
+
+    results.push({ sma: period, pl: totalPL, totalSignals })
+
+    // Only consider SMAs with >= 4 signals, then pick highest P/L
+    if (totalSignals >= 4 && totalPL > bestPL) {
       bestPL = totalPL
       bestSMA = period
       bestTrades = trades
@@ -452,12 +460,12 @@ function optimizeSMAParams(prices, slots, breakouts) {
   // Show top 10 for debugging
   const top10 = [...results].sort((a, b) => b.pl - a.pl).slice(0, 10)
   console.log(`[SMA Optimization] Top 10 SMA values:`)
-  top10.forEach((r, i) => console.log(`  ${i + 1}. SMA ${r.sma}: ${r.pl.toFixed(2)}%`))
+  top10.forEach((r, i) => console.log(`  ${i + 1}. SMA ${r.sma}: ${r.pl.toFixed(2)}%, Signals: ${r.totalSignals}`))
 
-  // Calculate total signals: closed trades = 1.0, open trades = 0.5
-  const closedTrades = bestTrades.filter(t => !t.isOpen)
-  const openTrades = bestTrades.filter(t => t.isOpen)
-  const totalSignals = closedTrades.length + (openTrades.length * 0.5)
+  // Calculate total signals for the selected best SMA
+  const closedTradesForBest = bestTrades.filter(t => !t.isOpen)
+  const openTradesForBest = bestTrades.filter(t => t.isOpen)
+  const totalSignals = closedTradesForBest.length + (openTradesForBest.length * 0.5)
 
   return { period: bestSMA, pl: bestPL, totalSignals }
 }
