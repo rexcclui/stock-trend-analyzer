@@ -64,7 +64,13 @@ function normalizeCachedResults(entries = []) {
 
 // Helper function to parse multiple stock symbols from input
 function parseStockSymbols(input) {
-  if (!input || !input.trim()) return []
+  // Handle non-string inputs
+  if (!input) return []
+  if (typeof input !== 'string') {
+    console.warn('parseStockSymbols received non-string input:', input)
+    return []
+  }
+  if (!input.trim()) return []
 
   // Split by comma or space
   const symbols = input.split(/[,\s]+/).filter(s => s.trim())
