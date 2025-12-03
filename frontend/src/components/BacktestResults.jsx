@@ -498,17 +498,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
       return []
     }
   })
-  const [isScanning, setIsScanning] = useState(() => {
-    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return false
-    try {
-      const saved = localStorage.getItem(SCAN_QUEUE_KEY)
-      if (!saved) return false
-      const parsed = JSON.parse(saved)
-      return Boolean(parsed.isScanning)
-    } catch (e) {
-      return false
-    }
-  })
+  const [isScanning, setIsScanning] = useState(false) // Always start paused on page load
   const [isPaused, setIsPaused] = useState(false)
   const [scanCompleted, setScanCompleted] = useState(() => {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') return 0
