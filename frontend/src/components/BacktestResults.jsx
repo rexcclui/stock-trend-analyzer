@@ -1334,6 +1334,21 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
             >
               {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
             </button>
+            <button
+              onClick={() => importInputRef.current?.click()}
+              disabled={loading}
+              className="p-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+              title="Import backtest results from JSON file"
+            >
+              <Upload className="w-5 h-5" />
+            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".json"
+              onChange={importResults}
+              className="hidden"
+            />
             {results.length > 0 && (
               <>
                 <button
@@ -1360,21 +1375,6 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                 >
                   <Download className="w-5 h-5" />
                 </button>
-                <button
-                  onClick={() => importInputRef.current?.click()}
-                  disabled={loading}
-                  className="p-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-                  title="Import backtest results from JSON file"
-                >
-                  <Upload className="w-5 h-5" />
-                </button>
-                <input
-                  ref={importInputRef}
-                  type="file"
-                  accept=".json"
-                  onChange={importResults}
-                  className="hidden"
-                />
               </>
             )}
           </div>
