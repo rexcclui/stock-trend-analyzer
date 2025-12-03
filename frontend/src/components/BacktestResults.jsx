@@ -418,7 +418,6 @@ function optimizeSMAParams(prices, slots, breakouts) {
     }
 
     const totalPL = trades.reduce((sum, trade) => sum + trade.plPercent, 0)
-    console.log(`[BacktestOptimize SMA-${smaPeriod}] Prices: ${reversedPrices.length}, Breakouts: ${breakouts.length}, Trades: ${trades.length}, P/L: ${totalPL.toFixed(2)}%`)
     return { totalPL, trades }
   }
 
@@ -456,11 +455,6 @@ function optimizeSMAParams(prices, slots, breakouts) {
       bestTrades = trades
     }
   }
-
-  // Show top 10 for debugging
-  const top10 = [...results].sort((a, b) => b.pl - a.pl).slice(0, 10)
-  console.log(`[SMA Optimization] Top 10 SMA values:`)
-  top10.forEach((r, i) => console.log(`  ${i + 1}. SMA ${r.sma}: ${r.pl.toFixed(2)}%, Signals: ${r.totalSignals}`))
 
   // Calculate total signals for the selected best SMA
   const closedTradesForBest = bestTrades.filter(t => !t.isOpen)
@@ -832,19 +826,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
       let bestResult = null
       let bestPL = -Infinity
 
-      console.log(`[${symbol}] Testing ${paramCombinations.length} parameter combinations...`)
-
       for (const params of paramCombinations) {
         const { slots, breakouts } = calculateVolPrfV2Breakouts(priceData, params)
 
         if (breakouts.length === 0) {
-          console.log(`[${symbol}] Th:${(params.breakoutThreshold * 100).toFixed(0)}% LB:${params.lookbackZones} - No breakouts`)
           continue
         }
 
         const smaResult = optimizeSMAParams(priceData, slots, breakouts)
-
-        console.log(`[${symbol}] Th:${(params.breakoutThreshold * 100).toFixed(0)}% LB:${params.lookbackZones} - Breakouts: ${breakouts.length}, SMA: ${smaResult.period}, Signals: ${smaResult.totalSignals}, P/L: ${smaResult.pl.toFixed(2)}%`)
 
         // Only consider combinations with >= 4 signals
         if (smaResult.totalSignals >= 4) {
@@ -862,11 +851,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
 
       // If no combination produced >= 4 signals, throw error
       if (!bestResult) {
-        console.log(`[${symbol}] FAILED - No parameter combination produced >= 4 signals`)
         throw new Error('Excluded: fewer than 4 total signals')
       }
-
-      console.log(`[${symbol}] SUCCESS - Selected Th:${(bestResult.params.breakoutThreshold * 100).toFixed(0)}% LB:${bestResult.params.lookbackZones} with ${bestResult.smaResult.totalSignals} signals and ${bestResult.smaResult.pl.toFixed(2)}% P/L`)
 
       const { params: optimalParams, breakouts, smaResult: optimalSMAs } = bestResult
 

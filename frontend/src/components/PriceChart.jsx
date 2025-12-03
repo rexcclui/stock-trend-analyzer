@@ -2416,17 +2416,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const currentSMA = dateToSMA.get(currentDate)
           const prevSMA = dateToSMA.get(prevPrice.date)
 
-          // Debug logging for SMA slope (log for the actual SMA being used)
-          if (slope !== null) {
-            console.log(`[SELL CHECK SMA-${smaPeriod}] Day ${i}, Date: ${currentDate}, Price: ${currentPrice.toFixed(2)}, SMA: ${currentSMA?.toFixed(2)}, PrevSMA: ${prevSMA?.toFixed(2)}, Slope: ${slope.toFixed(4)}, Holding: ${isHolding}`)
-          }
-
           // If SMA is going down (negative slope), SELL
           if (slope !== null && slope < 0) {
             const sellPrice = currentPrice
             const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
-
-            console.log(`[SELL SIGNAL SMA-${smaPeriod}] Date: ${currentDate}, Price: ${sellPrice}, Slope: ${slope.toFixed(4)}, P/L: ${plPercent.toFixed(2)}%`)
 
             trades.push({
               buyPrice,
@@ -2471,10 +2464,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const closedTrades = trades.filter(t => !t.isOpen)
     const winningTrades = closedTrades.filter(t => t.plPercent > 0).length
     const winRate = closedTrades.length > 0 ? (winningTrades / closedTrades.length) * 100 : 0
-
-    console.log(`[calculateBreakoutPL] Using SMA ${smaPeriod} calculated from ${reversedPrices.length} daily prices (forward chronological order), checking at each daily price`)
-    console.log(`[calculateBreakoutPL] Trades: ${trades.length}, Total P/L: ${totalPL.toFixed(2)}%`)
-    console.log(`[calculateBreakoutPL] Breakouts available: ${volumeProfileV2Breakouts.length}`)
 
     // Calculate market buy-and-hold performance for comparison
     let marketChange = 0
@@ -2543,8 +2532,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const simulatingKey = simulatingKeys[0]
     const smaIndex = simulatingSma[simulatingKey]
     if (smaIndex === undefined || smaIndex === null || smaIndex === true) return
-
-    console.log(`[Simulate] Starting simulation for chart ${chartId}, SMA index ${smaIndex}`)
 
     // Run simulation asynchronously
     setTimeout(() => {
@@ -2627,11 +2614,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const openTrades = trades.filter(t => t.isOpen)
         const totalSignals = closedTrades.length + (openTrades.length * 0.5)
 
-        if (smaPeriod === 50) {
-          console.log(`[SIM-${smaPeriod}] Prices: ${reversedPrices.length}, Breakouts: ${volumeProfileV2Breakouts.length}`)
-          console.log(`[SIM-${smaPeriod}] Trades: ${trades.length}, Signals: ${totalSignals}, Total P/L: ${totalPL.toFixed(2)}%`)
-        }
-
         return { totalPL, totalSignals }
       }
 
@@ -2647,8 +2629,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         else val += 10
       }
 
-      console.log(`[Simulate] Testing ${testValues.length} SMA values...`)
-
       const results = []
       for (const smaValue of testValues) {
         const { totalPL, totalSignals } = calculatePLForSMA(smaValue)
@@ -2660,13 +2640,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           bestSmaValue = smaValue
         }
       }
-
-      // Show top 10 results
-      const top10 = [...results].sort((a, b) => b.pl - a.pl).slice(0, 10)
-      console.log(`[Simulate] Top 10 SMA values:`)
-      top10.forEach((r, i) => console.log(`  ${i + 1}. SMA ${r.sma}: ${r.pl.toFixed(2)}%, Signals: ${r.signals}`))
-
-      console.log(`[Simulate] Best SMA: ${bestSmaValue} with P&L: ${bestPL.toFixed(2)}% (>= 4 signals)`)
 
       // Call the callback with results
       if (onSimulateComplete && bestSmaValue !== null) {
