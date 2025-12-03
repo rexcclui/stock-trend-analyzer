@@ -825,15 +825,27 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
 
       let bestResult = null
       let bestPL = -Infinity
+      const debugResults = []
 
       for (const params of paramCombinations) {
         const { slots, breakouts } = calculateVolPrfV2Breakouts(priceData, params)
 
         if (breakouts.length === 0) {
+          debugResults.push({
+            params: `Th:${(params.breakoutThreshold * 100).toFixed(0)}% LB:${params.lookbackZones}`,
+            breakouts: 0,
+            signals: 0
+          })
           continue
         }
 
         const smaResult = optimizeSMAParams(priceData, slots, breakouts)
+        debugResults.push({
+          params: `Th:${(params.breakoutThreshold * 100).toFixed(0)}% LB:${params.lookbackZones}`,
+          breakouts: breakouts.length,
+          signals: smaResult.totalSignals,
+          pl: smaResult.pl
+        })
 
         // Only consider combinations with >= 4 signals
         if (smaResult.totalSignals >= 4) {
@@ -851,6 +863,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
 
       // If no combination produced >= 4 signals, throw error
       if (!bestResult) {
+        console.warn(`[${symbol}] Failed backtest - ${priceData.length} days of data:`)
+        debugResults.forEach(r => console.warn(`  ${r.params}: ${r.breakouts} breakouts → ${r.signals} signals`))
         throw new Error('Excluded: fewer than 4 total signals')
       }
 
