@@ -1121,9 +1121,9 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
       case 'breakoutPrice':
         return entry.latestBreakout?.price ?? -Infinity
       case 'currentPrice':
-        // Sort by percentage change from breakout price (value in brackets)
+        // Sort by absolute value of percentage change from breakout price (value in brackets)
         if (entry.latestBreakout && entry.latestPrice) {
-          return ((entry.latestPrice - entry.latestBreakout.price) / entry.latestBreakout.price) * 100
+          return Math.abs(((entry.latestPrice - entry.latestBreakout.price) / entry.latestBreakout.price) * 100)
         }
         return -Infinity
       case 'volWeight':
