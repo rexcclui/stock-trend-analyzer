@@ -1383,7 +1383,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <div className="max-h-[520px] overflow-y-auto">
+              <div className="max-h-[780px] overflow-y-auto">
                 <table className="min-w-full divide-y divide-slate-700">
                 <thead className="bg-slate-900 sticky top-0 z-10">
                   <tr>
