@@ -1526,7 +1526,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                                 e.stopPropagation()
                                 onVolumeSelect(result.symbol)
                               }}
-                              className="p-1 text-slate-400 hover:text-cyan-400 hover:bg-cyan-900/20 rounded transition-colors mr-1"
+                              className="p-1 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-900/20 rounded transition-colors mr-1"
                               title="Load in Volume Screening"
                             >
                               <Waves className="w-4 h-4" />
@@ -1537,7 +1537,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                               e.stopPropagation()
                               scanSingle(result.symbol)
                             }}
-                            className="p-1 text-slate-400 hover:text-emerald-400 hover:bg-emerald-900/20 rounded transition-colors mr-1"
+                            className="p-1 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/20 rounded transition-colors mr-1"
                             title="Scan this stock"
                           >
                             <RefreshCcw className="w-4 h-4" />
@@ -1547,7 +1547,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                               e.stopPropagation()
                               eraseResult(result.symbol)
                             }}
-                            className="p-1 text-slate-400 hover:text-blue-300 hover:bg-blue-900/20 rounded transition-colors mr-1"
+                            className="p-1 text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 rounded transition-colors mr-1"
                             title="Erase backtest result"
                           >
                             <Eraser className="w-4 h-4" />
@@ -1558,7 +1558,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                               setResults(prevResults => prevResults.filter(r => r.symbol !== result.symbol))
                               setScanQueue(prev => prev.filter(symbol => symbol !== result.symbol))
                             }}
-                            className="p-1 text-slate-400 hover:text-red-400 hover:bg-red-900/20 rounded transition-colors"
+                            className="p-1 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors"
                             title="Remove this stock"
                           >
                             <X className="w-4 h-4" />
