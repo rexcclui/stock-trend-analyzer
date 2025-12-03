@@ -1447,12 +1447,12 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                           {result.symbol}
                         </td>
                         <td className="px-2 py-3 text-sm max-w-[80px]">
-                          <span className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${status === 'completed' ? 'bg-emerald-900/50 text-emerald-200' : status === 'loading' ? 'bg-amber-900/40 text-amber-200' : status === 'error' ? 'bg-red-900/50 text-red-200' : 'bg-slate-700 text-slate-200'}`}>
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${status === 'completed' ? 'bg-emerald-900/50 text-emerald-200' : status === 'loading' ? 'bg-amber-900/40 text-amber-200' : status === 'error' ? 'bg-red-900/50 text-red-200' : 'bg-slate-700 text-slate-200'}`}
+                            title={result.error || undefined}
+                          >
                             {status === 'completed' ? 'Done' : status === 'loading' ? 'Scanning' : status === 'error' ? 'Error' : 'Pending'}
                           </span>
-                          {result.error && (
-                            <div className="text-[10px] text-red-300 mt-1 leading-tight">{result.error}</div>
-                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
                           {hasBreakout ? (
