@@ -9,12 +9,19 @@ function App() {
   const [activeTab, setActiveTab] = useState('analyze')
   const [selectedSymbol, setSelectedSymbol] = useState('')
   const [selectedParams, setSelectedParams] = useState(null)
+  const [volumeSymbol, setVolumeSymbol] = useState(null)
 
   // Handle clicking on a stock in backtest results
   const handleStockSelect = (symbol, optimalParams) => {
     setSelectedSymbol(symbol)
     setSelectedParams(optimalParams)
     setActiveTab('analyze')
+  }
+
+  // Handle clicking on volume icon in backtest results
+  const handleVolumeSelect = (symbol) => {
+    setVolumeSymbol(symbol)
+    setActiveTab('volume')
   }
 
   return (
@@ -75,10 +82,10 @@ function App() {
               <StockAnalyzer selectedSymbol={selectedSymbol} selectedParams={selectedParams} />
             </div>
             <div style={{ display: activeTab === 'backtest' ? 'block' : 'none' }}>
-              <BacktestResults onStockSelect={handleStockSelect} />
+              <BacktestResults onStockSelect={handleStockSelect} onVolumeSelect={handleVolumeSelect} />
             </div>
             <div style={{ display: activeTab === 'volume' ? 'block' : 'none' }}>
-              <VolumeScreening onStockSelect={handleStockSelect} />
+              <VolumeScreening onStockSelect={handleStockSelect} triggerSymbol={volumeSymbol} onSymbolProcessed={() => setVolumeSymbol(null)} />
             </div>
           </div>
         </div>

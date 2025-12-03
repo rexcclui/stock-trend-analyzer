@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
-import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2, RotateCw } from 'lucide-react'
+import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2, RotateCw, Upload, Download, Filter, Waves } from 'lucide-react'
 import { apiCache } from '../utils/apiCache'
 import { joinUrl } from '../utils/urlHelper'
 
@@ -441,7 +441,7 @@ function optimizeSMAParams(prices, slots, breakouts) {
   return { period: bestSMA, pl: bestPL, totalSignals }
 }
 
-function BacktestResults({ onStockSelect }) {
+function BacktestResults({ onStockSelect, onVolumeSelect }) {
   const [symbols, setSymbols] = useState('')
   const [days, setDays] = useState('1825') // Default to 5Y
   const [loading, setLoading] = useState(false)
@@ -513,8 +513,10 @@ function BacktestResults({ onStockSelect }) {
   })
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false)
+  const [showRecentBreakoutsOnly, setShowRecentBreakoutsOnly] = useState(false)
   const [hasHydratedCache, setHasHydratedCache] = useState(() => initialHydratedResultsRef.current !== null)
   const activeScanSymbolRef = useRef(null)
+  const importInputRef = useRef(null)
 
   // Hydrate cached backtest results after mount before enabling persistence
   useEffect(() => {
@@ -700,6 +702,75 @@ function BacktestResults({ onStockSelect }) {
     setIsPaused(false)
   }
 
+  const exportResults = () => {
+    const dataToExport = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      days,
+      results: results.map(result => ({
+        symbol: result.symbol,
+        status: result.status,
+        latestBreakout: result.latestBreakout,
+        latestPrice: result.latestPrice,
+        optimalParams: result.optimalParams,
+        optimalSMAs: result.optimalSMAs,
+        marketChange: result.marketChange,
+        durationMs: result.durationMs,
+        days: result.days,
+        isRecentBreakout: result.isRecentBreakout,
+        recentBreakout: result.recentBreakout,
+        totalSignals: result.totalSignals,
+        error: result.error,
+        bookmarked: result.bookmarked,
+        lastScanAt: result.lastScanAt
+      }))
+    }
+
+    const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `backtest-results-${new Date().toISOString().split('T')[0]}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const importResults = (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const imported = JSON.parse(e.target.result)
+        if (!imported.results || !Array.isArray(imported.results)) {
+          setError('Invalid import file format')
+          return
+        }
+
+        const importedResults = imported.results.map(result => ({
+          ...result,
+          bookmarked: Boolean(result.bookmarked),
+          status: result.status || 'pending'
+        }))
+
+        setResults(importedResults)
+        setError(null)
+      } catch (err) {
+        console.error('Failed to import results:', err)
+        setError('Failed to import results. Please check the file format.')
+      }
+    }
+    reader.readAsText(file)
+
+    // Reset input so same file can be imported again
+    if (importInputRef.current) {
+      importInputRef.current.value = ''
+    }
+  }
+
   const runBacktestForSymbol = async (symbol) => {
     ensureEntries([symbol])
     setResults(prev => prev.map(entry => (
@@ -762,6 +833,7 @@ function BacktestResults({ onStockSelect }) {
         days,
         isRecentBreakout: Boolean(latestRecentBreakout),
         recentBreakout: latestRecentBreakout,
+        lastScanAt: new Date().toISOString(),
         error: null
       }
 
@@ -978,6 +1050,29 @@ function BacktestResults({ onStockSelect }) {
     return diffDays
   }
 
+  const formatLastScanTime = (isoString) => {
+    if (!isoString) return '—'
+    const date = new Date(isoString)
+    if (isNaN(date.getTime())) return '—'
+
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+
+    return `${month}-${day} ${hours}:${minutes}`
+  }
+
+  const isLastScanOutdated = (isoString) => {
+    if (!isoString) return false
+    const scanDate = new Date(isoString)
+    if (isNaN(scanDate.getTime())) return false
+
+    const now = new Date()
+    const diffDays = (now - scanDate) / (1000 * 60 * 60 * 24)
+    return diffDays > 7
+  }
+
   const normalizedResults = results.map(entry => {
     const computedMarketChange = typeof entry.marketChange === 'number'
       ? entry.marketChange
@@ -991,9 +1086,11 @@ function BacktestResults({ onStockSelect }) {
     }
   })
 
-  const filteredResults = normalizedResults.filter(result => (
-    showBookmarksOnly ? result.bookmarked : true
-  ))
+  const filteredResults = normalizedResults.filter(result => {
+    if (showBookmarksOnly && !result.bookmarked) return false
+    if (showRecentBreakoutsOnly && !result.isRecentBreakout) return false
+    return true
+  })
 
   const handleSort = (key) => {
     setSortConfig(prev => ({
@@ -1152,7 +1249,7 @@ function BacktestResults({ onStockSelect }) {
               title="Scan only stocks without backtest results"
             >
               <RefreshCcw className="w-5 h-5" />
-              Scan
+              Scan All
             </button>
             <button
               onClick={forceScanAll}
@@ -1191,6 +1288,31 @@ function BacktestResults({ onStockSelect }) {
                   <Trash2 className="w-5 h-5" />
                   Clear Storage
                 </button>
+                <button
+                  onClick={exportResults}
+                  disabled={loading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                  title="Export backtest results to JSON file"
+                >
+                  <Download className="w-5 h-5" />
+                  Export
+                </button>
+                <button
+                  onClick={() => importInputRef.current?.click()}
+                  disabled={loading}
+                  className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 disabled:bg-slate-600 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+                  title="Import backtest results from JSON file"
+                >
+                  <Upload className="w-5 h-5" />
+                  Import
+                </button>
+                <input
+                  ref={importInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={importResults}
+                  className="hidden"
+                />
               </>
             )}
           </div>
@@ -1237,13 +1359,22 @@ function BacktestResults({ onStockSelect }) {
           <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
             <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
               <h3 className="text-lg font-semibold text-slate-100">Breakout Signals</h3>
-              <button
-                onClick={() => setShowBookmarksOnly(prev => !prev)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${showBookmarksOnly ? 'border-amber-500 text-amber-200 bg-amber-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
-              >
-                {showBookmarksOnly ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
-                {showBookmarksOnly ? 'Showing Bookmarks' : 'Filter Bookmarks'}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowBookmarksOnly(prev => !prev)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${showBookmarksOnly ? 'border-amber-500 text-amber-200 bg-amber-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
+                >
+                  {showBookmarksOnly ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
+                  {showBookmarksOnly ? 'Showing Bookmarks' : 'Filter Bookmarks'}
+                </button>
+                <button
+                  onClick={() => setShowRecentBreakoutsOnly(prev => !prev)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${showRecentBreakoutsOnly ? 'border-green-500 text-green-200 bg-green-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
+                >
+                  <Filter className="w-4 h-4" />
+                  {showRecentBreakoutsOnly ? 'Showing Recent (≤10d)' : 'Filter Recent Breakouts'}
+                </button>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <div className="max-h-[520px] overflow-y-auto">
@@ -1268,6 +1399,7 @@ function BacktestResults({ onStockSelect }) {
                     <th onClick={() => handleSort('pl')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">P/L {renderSortIndicator('pl')}</th>
                     <th onClick={() => handleSort('marketChange')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none">Market Change {renderSortIndicator('marketChange')}</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase">Optimal Params</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase">Last Scan</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase">Action</th>
                   </tr>
                 </thead>
@@ -1372,6 +1504,30 @@ function BacktestResults({ onStockSelect }) {
                           )}
                         </td>
                         <td className="px-4 py-3 text-center">
+                          {result.lastScanAt ? (
+                            <span
+                              className={`text-xs ${isLastScanOutdated(result.lastScanAt) ? 'text-red-400' : 'text-slate-400'}`}
+                              title={new Date(result.lastScanAt).toLocaleString()}
+                            >
+                              {formatLastScanTime(result.lastScanAt)}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {onVolumeSelect && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onVolumeSelect(result.symbol)
+                              }}
+                              className="p-1 text-slate-400 hover:text-cyan-400 hover:bg-cyan-900/20 rounded transition-colors mr-1"
+                              title="Load in Volume Screening"
+                            >
+                              <Waves className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             onClick={(e) => {
                               e.stopPropagation()

@@ -475,7 +475,7 @@ function hasCloseResistance(bottomResist, upperResist, threshold = 10) {
   return isBottomClose || isUpperClose
 }
 
-function VolumeScreening({ onStockSelect }) {
+function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
   const [symbolInput, setSymbolInput] = useState('')
   const [period, setPeriod] = useState('1825')
   const [stockHistory, setStockHistory] = useState([])
@@ -694,6 +694,49 @@ function VolumeScreening({ onStockSelect }) {
     safeSetItem(VOLUME_SYMBOLS_KEY, JSON.stringify(entries.map(entry => entry.symbol).filter(Boolean)))
     persistReadyResults(entries)
   }, [entries])
+
+  // Handle trigger symbol from backtest results
+  useEffect(() => {
+    if (!triggerSymbol) return
+
+    // Check if symbol already exists in entries
+    const existingEntry = entries.find(entry => entry.symbol === triggerSymbol)
+
+    if (existingEntry) {
+      // Symbol exists, trigger scan for it
+      const loadingEntry = { ...existingEntry, status: 'loading', error: null }
+      setEntries(prev => prev.map(entry =>
+        entry.symbol === triggerSymbol ? loadingEntry : entry
+      ))
+      setScanQueue([loadingEntry])
+      setScanTotal(1)
+      setScanCompleted(0)
+      setIsScanning(true)
+      setIsPaused(false)
+      activeScanIdRef.current = null
+    } else {
+      // Symbol doesn't exist, add it to the top and trigger scan
+      const newEntry = {
+        id: `${triggerSymbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        symbol: triggerSymbol,
+        bookmarked: false,
+        ...baseEntryState,
+        status: 'loading'
+      }
+      setEntries(prev => [newEntry, ...prev])
+      setScanQueue([newEntry])
+      setScanTotal(1)
+      setScanCompleted(0)
+      setIsScanning(true)
+      setIsPaused(false)
+      activeScanIdRef.current = null
+    }
+
+    // Notify parent that symbol has been processed
+    if (onSymbolProcessed) {
+      onSymbolProcessed()
+    }
+  }, [triggerSymbol, onSymbolProcessed])
 
   const saveToHistory = (symbols) => {
     if (!Array.isArray(symbols) || symbols.length === 0) return
