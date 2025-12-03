@@ -1197,7 +1197,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
   }
 
   const sortedResults = [...filteredResults].sort((a, b) => {
-    if (!sortConfig.key) return 0
+    // Don't reorder during scanning to prevent rows from jumping
+    if (isScanning || !sortConfig.key) return 0
     const aVal = getSortableValue(a, sortConfig.key)
     const bVal = getSortableValue(b, sortConfig.key)
     if (aVal === bVal) return 0

@@ -1057,7 +1057,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
   const filteredCount = Math.max(0, entries.length - filteredEntries.length)
   const visibleEntries = filteredEntries
 
-  const sortedEntries = sortConfig.field
+  const sortedEntries = (sortConfig.field && !isScanning)
     ? [...visibleEntries].sort((a, b) => {
       if (sortConfig.field === 'lastScanAt') {
         const timeA = a.lastScanAt ? new Date(a.lastScanAt).getTime() : -Infinity
