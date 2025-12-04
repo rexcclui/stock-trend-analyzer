@@ -296,6 +296,54 @@ function getLatestBreakout(breakouts) {
   return breakouts[breakouts.length - 1]
 }
 
+// Check if a breakout has been closed (sell signal occurred after breakout date)
+function isBreakoutClosed(breakoutDate, prices, smaPeriod) {
+  if (!breakoutDate || !prices || prices.length === 0 || !smaPeriod) return false
+
+  // Prices are in reverse chronological order, reverse for forward-time processing
+  const reversedPrices = [...prices].reverse()
+
+  // Calculate SMA for each date
+  const dateToSMA = new Map()
+  for (let i = 0; i < reversedPrices.length; i++) {
+    if (i < smaPeriod - 1) {
+      dateToSMA.set(reversedPrices[i].date, null)
+    } else {
+      const sum = reversedPrices.slice(i - smaPeriod + 1, i + 1).reduce((acc, p) => acc + p.close, 0)
+      dateToSMA.set(reversedPrices[i].date, sum / smaPeriod)
+    }
+  }
+
+  // Find the breakout index
+  let breakoutIdx = -1
+  for (let i = 0; i < reversedPrices.length; i++) {
+    if (reversedPrices[i].date === breakoutDate) {
+      breakoutIdx = i
+      break
+    }
+  }
+
+  if (breakoutIdx === -1) return false
+
+  // Check for sell signal (SMA slope turning negative) after breakout
+  for (let i = breakoutIdx + 1; i < reversedPrices.length; i++) {
+    const currentDate = reversedPrices[i].date
+    const prevDate = reversedPrices[i - 1].date
+
+    const currentSMA = dateToSMA.get(currentDate)
+    const prevSMA = dateToSMA.get(prevDate)
+
+    if (currentSMA !== null && prevSMA !== null && currentSMA !== undefined && prevSMA !== undefined) {
+      const slope = currentSMA - prevSMA
+      if (slope < 0) {
+        return true  // Sell signal found after breakout
+      }
+    }
+  }
+
+  return false  // No sell signal after breakout
+}
+
 // Optimize Vol Prf V2 parameters by testing combinations
 function optimizeVolPrfV2Params(prices) {
   if (!prices || prices.length === 0) {
@@ -880,11 +928,18 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
       const { params: optimalParams, breakouts, smaResult: optimalSMAs } = bestResult
 
       const recentBreakouts = getRecentBreakouts(breakouts, 10)
-      const latestBreakout = getLatestBreakout(breakouts)
+      let latestBreakout = getLatestBreakout(breakouts)
       const latestRecentBreakout = getLatestBreakout(recentBreakouts)
 
       if (!latestBreakout) {
         throw new Error('No breakout detected')
+      }
+
+      // Check if the latest breakout has been closed by a sell signal
+      // If so, don't show the break price (but still include stock in results)
+      const breakoutClosed = isBreakoutClosed(latestBreakout.date, priceData, optimalSMAs.period)
+      if (breakoutClosed) {
+        latestBreakout = null
       }
 
       // Determine if data is in chronological or reverse chronological order
