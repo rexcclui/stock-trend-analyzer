@@ -298,30 +298,46 @@ function getLatestBreakout(breakouts) {
 
 // Find resistance zones: price zones with volume weight > current weight + 5%
 function findResistanceZones(breakout, slots) {
-  if (!breakout || !slots || slots.length === 0) return null
+  if (!breakout || !slots || slots.length === 0) return { upResist: null, downResist: null }
 
   const slotIdx = breakout.slotIdx
-  if (slotIdx < 0 || slotIdx >= slots.length) return null
+  if (slotIdx < 0 || slotIdx >= slots.length) return { upResist: null, downResist: null }
 
   const slot = slots[slotIdx]
-  if (!slot || !slot.priceZones) return null
+  if (!slot || !slot.priceZones) return { upResist: null, downResist: null }
 
   const currentWeight = breakout.currentWeight
+  const currentPrice = breakout.price
   const threshold = currentWeight + 0.05  // 5% higher
 
-  // Find all zones with volume weight > threshold
-  const resistanceZones = slot.priceZones
-    .filter(zone => zone.volumeWeight > threshold)
-    .map(zone => ({
-      price: (zone.minPrice + zone.maxPrice) / 2,  // midpoint price
-      volumeWeight: zone.volumeWeight
-    }))
-    .sort((a, b) => b.volumeWeight - a.volumeWeight)  // Sort by highest weight first
+  // Find zones with volume weight > threshold, split by position relative to current price
+  const upResistZones = []
+  const downResistZones = []
 
-  if (resistanceZones.length === 0) return null
+  slot.priceZones.forEach(zone => {
+    if (zone.volumeWeight > threshold) {
+      const zoneMidPrice = (zone.minPrice + zone.maxPrice) / 2
+      const zoneData = {
+        price: zoneMidPrice,
+        volumeWeight: zone.volumeWeight
+      }
 
-  // Return the strongest resistance (highest volume weight)
-  return resistanceZones[0]
+      if (zoneMidPrice > currentPrice) {
+        upResistZones.push(zoneData)
+      } else if (zoneMidPrice < currentPrice) {
+        downResistZones.push(zoneData)
+      }
+    }
+  })
+
+  // Sort by highest weight first and take the strongest
+  upResistZones.sort((a, b) => b.volumeWeight - a.volumeWeight)
+  downResistZones.sort((a, b) => b.volumeWeight - a.volumeWeight)
+
+  return {
+    upResist: upResistZones.length > 0 ? upResistZones[0] : null,
+    downResist: downResistZones.length > 0 ? downResistZones[0] : null
+  }
 }
 
 // Check if a breakout has been closed (sell signal occurred after breakout date)
@@ -964,7 +980,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
       }
 
       // Find resistance zones before potentially nullifying latestBreakout
-      const resistanceZone = findResistanceZones(latestBreakout, slots)
+      const { upResist, downResist } = findResistanceZones(latestBreakout, slots)
 
       // Check if the latest breakout has been closed by a sell signal
       // If so, don't show the break price (but still include stock in results)
@@ -1003,7 +1019,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         days,
         isRecentBreakout: Boolean(latestRecentBreakout),
         recentBreakout: latestRecentBreakout,
-        resistanceZone,
+        upResist,
+        downResist,
         lastScanAt: new Date().toISOString(),
         error: null
       }
@@ -1350,8 +1367,10 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         return entry.latestBreakout?.currentWeight ?? -Infinity
       case 'resistVol':
         return entry.latestBreakout?.lowerWeight ?? -Infinity
-      case 'resistanceZone':
-        return entry.resistanceZone?.volumeWeight ?? -Infinity
+      case 'upResist':
+        return entry.upResist?.volumeWeight ?? -Infinity
+      case 'downResist':
+        return entry.downResist?.volumeWeight ?? -Infinity
       case 'diff':
         return entry.latestBreakout?.weightDiff ?? -Infinity
       case 'totalSignals':
@@ -1708,7 +1727,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                     <th onClick={() => handleSort('currentPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Current stock price with % change from breakout price">Current Price {renderSortIndicator('currentPrice')}</th>
                     <th onClick={() => handleSort('volWeight')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Volume weight % at current price zone (lower = less resistance)">Vol% {renderSortIndicator('volWeight')}</th>
                     <th onClick={() => handleSort('resistVol')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Maximum volume weight % in zones below current price (resistance level)">Resist Vol {renderSortIndicator('resistVol')}</th>
-                    <th onClick={() => handleSort('resistanceZone')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Price zones with volume weight >5% higher than current (shows strongest resistance price and volume %)">Resist Px {renderSortIndicator('resistanceZone')}</th>
+                    <th onClick={() => handleSort('upResist')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Price zones ABOVE breakout with volume weight >5% higher than current (strongest resistance)">Up resist {renderSortIndicator('upResist')}</th>
+                    <th onClick={() => handleSort('downResist')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Price zones BELOW breakout with volume weight >5% higher than current (strongest support)">Down resist {renderSortIndicator('downResist')}</th>
                     <th onClick={() => handleSort('diff')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Breakout strength: difference between resistance volume and current volume weight (higher = stronger breakout)">Diff {renderSortIndicator('diff')}</th>
                     <th onClick={() => handleSort('totalSignals')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Number of trading signals generated by the backtest (closed trades = 1.0, open trades = 0.5)">
                       <span className="flex items-center gap-1 justify-end">
@@ -1799,12 +1819,22 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
                           {hasBreakout ? `${(result.latestBreakout.lowerWeight * 100).toFixed(1)}%` : '—'}
                         </td>
-                        <td className="px-4 py-3 text-sm text-amber-400 text-right font-medium">
-                          {result.resistanceZone ? (
+                        <td className="px-4 py-3 text-sm text-red-400 text-right font-medium">
+                          {result.upResist ? (
                             <div className="whitespace-nowrap">
-                              {formatCurrency(result.resistanceZone.price)}
+                              {formatCurrency(result.upResist.price)}
                               <span className="text-slate-400 ml-1">
-                                ({(result.resistanceZone.volumeWeight * 100).toFixed(1)}%)
+                                ({(result.upResist.volumeWeight * 100).toFixed(1)}%)
+                              </span>
+                            </div>
+                          ) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-green-400 text-right font-medium">
+                          {result.downResist ? (
+                            <div className="whitespace-nowrap">
+                              {formatCurrency(result.downResist.price)}
+                              <span className="text-slate-400 ml-1">
+                                ({(result.downResist.volumeWeight * 100).toFixed(1)}%)
                               </span>
                             </div>
                           ) : '—'}
