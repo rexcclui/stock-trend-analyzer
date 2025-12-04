@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star } from 'lucide-react'
+import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
@@ -501,6 +501,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
   const [showDownBreakOnly, setShowDownBreakOnly] = useState(false)
   const [showPotentialBreakOnly, setShowPotentialBreakOnly] = useState(false)
   const [selectedMarkets, setSelectedMarkets] = useState([])
+  const [searchFilter, setSearchFilter] = useState('')
   const [sortConfig, setSortConfig] = useState(defaultSortConfig)
   const activeScanIdRef = useRef(null)
   const importInputRef = useRef(null)
@@ -1060,6 +1061,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
     if (showPotentialBreakOnly && !isPotentialBreak(entry)) return false
     if (!matchesBreakFilters(entry)) return false
     if (selectedMarkets.length > 0 && !selectedMarkets.includes(extractMarket(entry.symbol))) return false
+    if (searchFilter && !entry.symbol.toUpperCase().includes(searchFilter.toUpperCase())) return false
     return true
   })
 
@@ -1469,7 +1471,25 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                value={searchFilter}
+                onChange={(e) => setSearchFilter(e.target.value)}
+                placeholder="Filter symbols..."
+                className="pl-9 pr-3 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-slate-400 text-sm w-48"
+              />
+              {searchFilter && (
+                <button
+                  onClick={() => setSearchFilter('')}
+                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
             {isFiltered && (
               <div className="text-xs text-slate-400 whitespace-nowrap" title="Showing only filtered symbols">
                 Showing {filteredEntries.length} / {entries.length} ({filteredCount} filtered)

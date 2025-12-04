@@ -544,6 +544,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false)
   const [showRecentBreakoutsOnly, setShowRecentBreakoutsOnly] = useState(false)
   const [selectedMarkets, setSelectedMarkets] = useState([])
+  const [searchFilter, setSearchFilter] = useState('')
   const [hasHydratedCache, setHasHydratedCache] = useState(() => initialHydratedResultsRef.current !== null)
   const activeScanSymbolRef = useRef(null)
   const importInputRef = useRef(null)
@@ -1167,6 +1168,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     if (showBookmarksOnly && !result.bookmarked) return false
     if (showRecentBreakoutsOnly && !result.isRecentBreakout) return false
     if (selectedMarkets.length > 0 && !selectedMarkets.includes(result.market)) return false
+    if (searchFilter && !result.symbol.toUpperCase().includes(searchFilter.toUpperCase())) return false
     return true
   })
 
@@ -1450,6 +1452,24 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
             <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
               <h3 className="text-lg font-semibold text-slate-100">Breakout Signals</h3>
               <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchFilter}
+                    onChange={(e) => setSearchFilter(e.target.value)}
+                    placeholder="Filter symbols..."
+                    className="pl-9 pr-3 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-slate-400 text-sm w-48"
+                  />
+                  {searchFilter && (
+                    <button
+                      onClick={() => setSearchFilter('')}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
                 <button
                   onClick={() => setShowBookmarksOnly(prev => !prev)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${showBookmarksOnly ? 'border-amber-500 text-amber-200 bg-amber-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
