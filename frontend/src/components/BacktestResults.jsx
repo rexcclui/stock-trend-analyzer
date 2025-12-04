@@ -887,7 +887,19 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         throw new Error('No breakout detected')
       }
 
-      const latestPrice = priceData[0].close
+      // Determine if data is in chronological or reverse chronological order
+      const firstDate = new Date(priceData[0].date)
+      const lastDate = new Date(priceData[priceData.length - 1].date)
+
+      let latestPrice
+      if (firstDate < lastDate) {
+        // Chronological order: first is oldest, last is newest
+        latestPrice = priceData[priceData.length - 1].close
+      } else {
+        // Reverse chronological order: first is newest, last is oldest
+        latestPrice = priceData[0].close
+      }
+
       const marketChange = computeMarketChange(priceData)
       const durationMs = Date.now() - startTime
 
