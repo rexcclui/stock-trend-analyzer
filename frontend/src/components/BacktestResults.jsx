@@ -577,6 +577,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
   const [days, setDays] = useState('1825') // Default to 5Y
   const [loading, setLoading] = useState(false)
   const [loadingTopSymbols, setLoadingTopSymbols] = useState(false)
+  const [loadingHKSymbols, setLoadingHKSymbols] = useState(false)
   const [error, setError] = useState(null)
   const initialHydratedResultsRef = useRef(null)
   const [results, setResults] = useState(() => {
@@ -1091,6 +1092,36 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     }
   }
 
+  const loadTopHKSymbols = async () => {
+    if (loadingHKSymbols) return
+    setLoadingHKSymbols(true)
+    try {
+      const response = await axios.get(joinUrl(API_URL, '/top-market-cap'), {
+        params: { limit: 500, exchange: 'HKG' }
+      })
+
+      const payload = response.data
+      const symbols = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.symbols)
+          ? payload.symbols
+          : []
+
+      const normalized = symbols
+        .map(item => (typeof item === 'string' ? item : item?.symbol))
+        .filter(Boolean)
+        .map(symbol => symbol.toUpperCase())
+        .filter(symbol => !isDisallowedSymbol(symbol))
+
+      ensureEntries(normalized)
+    } catch (err) {
+      console.error('Failed to load top HK market cap symbols', err)
+      setError('Failed to load top HK market cap symbols')
+    } finally {
+      setLoadingHKSymbols(false)
+    }
+  }
+
   const runBacktest = (symbolOverride = null) => {
     const targetSymbols = symbolOverride ?? symbols
     const stockList = parseStockSymbols(targetSymbols).filter(symbol => !isDisallowedSymbol(symbol))
@@ -1513,6 +1544,15 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
             >
               {loadingTopSymbols ? <Loader2 className="w-5 h-5 animate-spin" /> : <DownloadCloud className="w-5 h-5" />}
               <span className="text-sm font-medium">US2000</span>
+            </button>
+            <button
+              onClick={loadTopHKSymbols}
+              disabled={loadingHKSymbols || loading}
+              className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              title="Load top 500 Hong Kong market cap symbols"
+            >
+              {loadingHKSymbols ? <Loader2 className="w-5 h-5 animate-spin" /> : <DownloadCloud className="w-5 h-5" />}
+              <span className="text-sm font-medium">HK500</span>
             </button>
             <button
               onClick={scanAllQueued}

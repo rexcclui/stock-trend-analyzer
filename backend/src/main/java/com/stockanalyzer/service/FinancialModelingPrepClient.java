@@ -107,7 +107,19 @@ public class FinancialModelingPrepClient {
     }
 
     public List<String> getTopMarketCapSymbols(int limit) throws IOException {
-        String url = String.format("%s/stock-screener?marketCapMoreThan=0&limit=%d&apikey=%s", BASE_URL, limit, apiKey);
+        return getTopMarketCapSymbols(limit, null);
+    }
+
+    public List<String> getTopMarketCapSymbols(int limit, String exchange) throws IOException {
+        StringBuilder urlBuilder = new StringBuilder();
+        urlBuilder.append(String.format("%s/stock-screener?marketCapMoreThan=0&limit=%d", BASE_URL, limit));
+
+        if (exchange != null && !exchange.isEmpty()) {
+            urlBuilder.append(String.format("&exchange=%s", exchange));
+        }
+
+        urlBuilder.append(String.format("&apikey=%s", apiKey));
+        String url = urlBuilder.toString();
 
         try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
             HttpGet request = new HttpGet(url);

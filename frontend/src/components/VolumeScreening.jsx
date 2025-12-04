@@ -491,6 +491,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
   const [stockHistory, setStockHistory] = useState([])
   const [entries, setEntries] = useState([])
   const [loadingTopSymbols, setLoadingTopSymbols] = useState(false)
+  const [loadingHKSymbols, setLoadingHKSymbols] = useState(false)
   const [scanQueue, setScanQueue] = useState([])
   const [isScanning, setIsScanning] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
@@ -870,6 +871,35 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
       console.error('Failed to load top market cap symbols', error)
     } finally {
       setLoadingTopSymbols(false)
+    }
+  }
+
+  const loadTopHKSymbols = async () => {
+    if (loadingHKSymbols) return
+
+    setLoadingHKSymbols(true)
+    try {
+      const response = await axios.get(joinUrl(API_URL, '/top-market-cap'), {
+        params: { limit: 500, exchange: 'HKG' }
+      })
+
+      const payload = response.data
+      const symbols = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.symbols)
+          ? payload.symbols
+          : []
+
+      const normalized = symbols
+        .map(item => (typeof item === 'string' ? item : item?.symbol))
+        .filter(Boolean)
+        .map(symbol => symbol.toUpperCase())
+
+      mergeSymbolsIntoEntries(normalized)
+    } catch (error) {
+      console.error('Failed to load top HK market cap symbols', error)
+    } finally {
+      setLoadingHKSymbols(false)
     }
   }
 
@@ -1425,6 +1455,16 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
             >
               {loadingTopSymbols ? <Loader2 className="w-5 h-5 animate-spin" /> : <DownloadCloud className="w-5 h-5" />}
               US2000
+            </button>
+            <button
+              type="button"
+              onClick={loadTopHKSymbols}
+              disabled={loadingHKSymbols}
+              className="flex-1 lg:flex-none px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+              title="Load top 500 Hong Kong market cap symbols"
+            >
+              {loadingHKSymbols ? <Loader2 className="w-5 h-5 animate-spin" /> : <DownloadCloud className="w-5 h-5" />}
+              HK500
             </button>
             <button
               type="button"

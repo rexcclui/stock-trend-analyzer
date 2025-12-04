@@ -23,9 +23,13 @@ public class TopMarketCapHandler implements RequestHandler<APIGatewayProxyReques
         try {
             Map<String, String> queryParams = input.getQueryStringParameters();
             int limit = 2000;
+            String exchange = null;
 
-            if (queryParams != null && queryParams.get("limit") != null) {
-                limit = Integer.parseInt(queryParams.get("limit"));
+            if (queryParams != null) {
+                if (queryParams.get("limit") != null) {
+                    limit = Integer.parseInt(queryParams.get("limit"));
+                }
+                exchange = queryParams.get("exchange");
             }
 
             if (limit <= 0) {
@@ -38,7 +42,7 @@ public class TopMarketCapHandler implements RequestHandler<APIGatewayProxyReques
             }
 
             FinancialModelingPrepClient fmpClient = new FinancialModelingPrepClient(apiKey);
-            List<String> symbols = fmpClient.getTopMarketCapSymbols(limit);
+            List<String> symbols = fmpClient.getTopMarketCapSymbols(limit, exchange);
 
             Map<String, Object> body = new HashMap<>();
             body.put("symbols", symbols);
