@@ -1224,9 +1224,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     }
   }
 
-  const sortedResults = [...filteredResults].sort((a, b) => {
-    // Don't reorder if no sort key is set (preserve insertion order)
-    if (!sortConfig.key) return 0
+  // Only sort when a sort key is set, otherwise preserve insertion order
+  const sortedResults = !sortConfig.key ? filteredResults : [...filteredResults].sort((a, b) => {
     const aVal = getSortableValue(a, sortConfig.key)
     const bVal = getSortableValue(b, sortConfig.key)
     if (aVal === bVal) return 0
