@@ -887,7 +887,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         throw new Error('No breakout detected')
       }
 
-      const latestPrice = priceData[priceData.length - 1].close
+      const latestPrice = priceData[0].close
       const marketChange = computeMarketChange(priceData)
       const durationMs = Date.now() - startTime
 
