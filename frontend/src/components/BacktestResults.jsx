@@ -1193,6 +1193,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         return entry.symbol ?? ''
       case 'status':
         return entry.status ?? ''
+      case 'dataPoints':
+        return entry.priceData?.length ?? -Infinity
       case 'daysAgo':
         return entry.latestBreakout ? getDaysAgo(entry.latestBreakout.date) : Infinity
       case 'breakoutPrice':
@@ -1496,6 +1498,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                     </th>
                     <th onClick={() => handleSort('symbol')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Stock ticker symbol">Symbol {renderSortIndicator('symbol')}</th>
                     <th onClick={() => handleSort('status')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Backtest scan status: pending, loading, completed, or error">Status {renderSortIndicator('status')}</th>
+                    <th onClick={() => handleSort('dataPoints')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Number of data points (trading days) tested in backtest">Days {renderSortIndicator('dataPoints')}</th>
                     <th onClick={() => handleSort('daysAgo')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Number of days since the most recent breakout signal">Days Ago {renderSortIndicator('daysAgo')}</th>
                     <th onClick={() => handleSort('breakoutPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Stock price at the most recent breakout point">BrkPx {renderSortIndicator('breakoutPrice')}</th>
                     <th onClick={() => handleSort('currentPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Current stock price with % change from breakout price">Current Price {renderSortIndicator('currentPrice')}</th>
@@ -1554,6 +1557,13 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                           >
                             {status === 'completed' ? 'Done' : status === 'loading' ? 'Scanning' : status === 'error' ? 'Error' : 'Pending'}
                           </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-300 text-right">
+                          {result.priceData?.length > 0 ? (
+                            <span className="font-medium">{result.priceData.length}</span>
+                          ) : (
+                            <span className="text-slate-500">—</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
                           {hasBreakout ? (
