@@ -1376,9 +1376,10 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
               onClick={loadTopSymbols}
               disabled={loadingTopSymbols}
               className="flex-1 lg:flex-none px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+              title="Load top 2000 US market cap symbols"
             >
               {loadingTopSymbols ? <Loader2 className="w-5 h-5 animate-spin" /> : <DownloadCloud className="w-5 h-5" />}
-              Load Top 2000
+              US2000
             </button>
             <button
               type="button"
