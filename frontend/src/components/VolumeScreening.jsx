@@ -1071,7 +1071,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
 
       if (searchTerms.length > 0) {
         const symbolUpper = entry.symbol.toUpperCase()
-        const matchesAnyTerm = searchTerms.some(term => symbolUpper.includes(term))
+        const matchesAnyTerm = searchTerms.some(term => symbolUpper === term)
         if (!matchesAnyTerm) return false
       }
     }

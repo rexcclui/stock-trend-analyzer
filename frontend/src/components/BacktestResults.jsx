@@ -1178,7 +1178,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
 
       if (searchTerms.length > 0) {
         const symbolUpper = result.symbol.toUpperCase()
-        const matchesAnyTerm = searchTerms.some(term => symbolUpper.includes(term))
+        const matchesAnyTerm = searchTerms.some(term => symbolUpper === term)
         if (!matchesAnyTerm) return false
       }
     }
