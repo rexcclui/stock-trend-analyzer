@@ -1199,7 +1199,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
   const scanVisible = () => {
     const visibleSymbols = sortedResults.map(r => r.symbol)
     if (visibleSymbols.length === 0) return
-    queueSymbols(visibleSymbols, { startScan: true })
+
+    // Clear existing queue and scan only visible stocks
+    ensureEntries(visibleSymbols)
+    setScanQueue(visibleSymbols)
+    setScanTotal(visibleSymbols.length)
+    setScanCompleted(0)
+    setIsPaused(false)
+    setIsScanning(true)
   }
 
   const eraseVisible = () => {
@@ -1281,6 +1288,18 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     typeof entry.durationMs === 'number' ? sum + entry.durationMs : sum
   , 0)
   const totalDurationDisplay = totalScanDurationMs > 0 ? formatDuration(totalScanDurationMs) : '—'
+
+  // Show loading message while hydrating cache
+  if (!hasHydratedCache) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+          <p className="text-slate-300">Loading cached results...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

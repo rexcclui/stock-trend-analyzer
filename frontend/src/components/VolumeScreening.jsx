@@ -503,6 +503,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
   const [selectedMarkets, setSelectedMarkets] = useState([])
   const [searchFilter, setSearchFilter] = useState('')
   const [sortConfig, setSortConfig] = useState(defaultSortConfig)
+  const [hasHydratedCache, setHasHydratedCache] = useState(false)
   const activeScanIdRef = useRef(null)
   const importInputRef = useRef(null)
 
@@ -615,54 +616,70 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
   }, [])
 
   useEffect(() => {
-    const savedEntries = localStorage.getItem(VOLUME_CACHE_KEY)
-    if (savedEntries) {
-      try {
-        const parsed = JSON.parse(savedEntries)
-        if (Array.isArray(parsed)) {
-          const hydrated = parsed
-            .filter(item => !isDisallowedSymbol(item?.symbol))
-            .map(item => {
-              const cached = hydrateFromResultCache(item.symbol)
-              const merged = { ...baseEntryState, bookmarked: !!item.bookmarked, ...item, ...(cached || {}) }
-              return isEntryFresh(merged) ? merged : clearEntryResults(merged)
-            })
-          if (hydrated.length > 0) {
-            setEntries(hydrated)
-            return
+    const loadCache = async () => {
+      const savedEntries = localStorage.getItem(VOLUME_CACHE_KEY)
+      if (savedEntries) {
+        try {
+          const parsed = JSON.parse(savedEntries)
+          if (Array.isArray(parsed)) {
+            const hydrated = parsed
+              .filter(item => !isDisallowedSymbol(item?.symbol))
+              .map(item => {
+                const cached = hydrateFromResultCache(item.symbol)
+                const merged = { ...baseEntryState, bookmarked: !!item.bookmarked, ...item, ...(cached || {}) }
+                return isEntryFresh(merged) ? merged : clearEntryResults(merged)
+              })
+            if (hydrated.length > 0) {
+              setEntries(hydrated)
+              setHasHydratedCache(true)
+              return
+            }
           }
+        } catch (error) {
+          console.error('Failed to load cached volume entries:', error)
         }
+      }
+
+      try {
+        const savedSymbolsRaw = localStorage.getItem(VOLUME_SYMBOLS_KEY)
+        if (!savedSymbolsRaw) {
+          setHasHydratedCache(true)
+          return
+        }
+
+        const symbols = JSON.parse(savedSymbolsRaw)
+        if (!Array.isArray(symbols)) {
+          setHasHydratedCache(true)
+          return
+        }
+
+        const cleanedSymbols = Array.from(
+          new Set(
+            symbols
+              .filter(symbol => typeof symbol === 'string' && symbol.trim())
+              .map(symbol => symbol.toUpperCase())
+              .filter(symbol => !isDisallowedSymbol(symbol))
+          )
+        )
+        if (cleanedSymbols.length === 0) {
+          setHasHydratedCache(true)
+          return
+        }
+
+        setEntries(cleanedSymbols.map(symbol => ({
+          id: `${symbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+          symbol,
+          bookmarked: false,
+          ...baseEntryState
+        })))
       } catch (error) {
-        console.error('Failed to load cached volume entries:', error)
+        console.error('Failed to load saved volume symbols:', error)
+      } finally {
+        setHasHydratedCache(true)
       }
     }
 
-    try {
-      const savedSymbolsRaw = localStorage.getItem(VOLUME_SYMBOLS_KEY)
-      if (!savedSymbolsRaw) return
-
-      const symbols = JSON.parse(savedSymbolsRaw)
-      if (!Array.isArray(symbols)) return
-
-      const cleanedSymbols = Array.from(
-        new Set(
-          symbols
-            .filter(symbol => typeof symbol === 'string' && symbol.trim())
-            .map(symbol => symbol.toUpperCase())
-            .filter(symbol => !isDisallowedSymbol(symbol))
-        )
-      )
-      if (cleanedSymbols.length === 0) return
-
-      setEntries(cleanedSymbols.map(symbol => ({
-        id: `${symbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-        symbol,
-        bookmarked: false,
-        ...baseEntryState
-      })))
-    } catch (error) {
-      console.error('Failed to load saved volume symbols:', error)
-    }
+    loadCache()
   }, [])
 
   useEffect(() => {
@@ -1325,6 +1342,18 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
       setIsPaused(false)
     }
   }, [isScanning, scanQueue.length])
+
+  // Show loading message while hydrating cache
+  if (!hasHydratedCache) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+          <p className="text-slate-300">Loading cached results...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
