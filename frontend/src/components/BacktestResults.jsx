@@ -1368,8 +1368,6 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         return -Infinity
       case 'volWeight':
         return entry.originalBreakout?.currentWeight ?? -Infinity
-      case 'resistVol':
-        return entry.originalBreakout?.lowerWeight ?? -Infinity
       case 'upResist':
         return entry.upResist?.volumeWeight ?? -Infinity
       case 'downResist':
@@ -1729,7 +1727,6 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                     <th onClick={() => handleSort('breakoutPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Stock price at the most recent breakout point">BrkPx {renderSortIndicator('breakoutPrice')}</th>
                     <th onClick={() => handleSort('currentPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Current stock price with % change from breakout price">Current Price {renderSortIndicator('currentPrice')}</th>
                     <th onClick={() => handleSort('volWeight')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Volume weight % at current price zone (lower = less resistance)">Vol% {renderSortIndicator('volWeight')}</th>
-                    <th onClick={() => handleSort('resistVol')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Maximum volume weight % in zones below current price (resistance level)">Resist Vol {renderSortIndicator('resistVol')}</th>
                     <th onClick={() => handleSort('upResist')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Price zones ABOVE breakout with volume weight >5% higher than current (strongest resistance)">Up resist {renderSortIndicator('upResist')}</th>
                     <th onClick={() => handleSort('downResist')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Price zones BELOW breakout with volume weight >5% higher than current (strongest support)">Down resist {renderSortIndicator('downResist')}</th>
                     <th onClick={() => handleSort('diff')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Breakout strength: difference between resistance volume and current volume weight (higher = stronger breakout)">Diff {renderSortIndicator('diff')}</th>
@@ -1819,9 +1816,6 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
                           {hasData ? `${(result.originalBreakout.currentWeight * 100).toFixed(1)}%` : '—'}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-slate-300 text-right">
-                          {hasData ? `${(result.originalBreakout.lowerWeight * 100).toFixed(1)}%` : '—'}
                         </td>
                         <td className="px-4 py-3 text-sm text-red-400 text-right font-medium">
                           {result.upResist ? (
