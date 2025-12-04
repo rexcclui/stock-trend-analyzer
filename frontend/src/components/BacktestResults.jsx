@@ -1503,7 +1503,38 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
           {/* Results Table */}
           <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
             <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-              <h3 className="text-lg font-semibold text-slate-100">Breakout Signals</h3>
+              <div className="flex items-center gap-3">
+                <h3 className="text-lg font-semibold text-slate-100">Breakout Signals</h3>
+                {sortedResults.length > 0 && (
+                  <div className="flex items-center gap-2 border-l border-slate-600 pl-3">
+                    <span className="text-xs text-slate-400">{sortedResults.length} visible:</span>
+                    <button
+                      onClick={scanVisible}
+                      disabled={isScanning}
+                      className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                      title="Scan all visible stocks"
+                    >
+                      <RefreshCcw className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={eraseVisible}
+                      disabled={isScanning}
+                      className="p-1.5 bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                      title="Erase backtest results for all visible stocks"
+                    >
+                      <Eraser className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={removeVisible}
+                      disabled={isScanning}
+                      className="p-1.5 bg-red-700 text-white rounded-lg hover:bg-red-800 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                      title="Remove all visible stocks from table"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -1557,35 +1588,6 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                 )}
               </div>
             </div>
-            {sortedResults.length > 0 && (
-              <div className="flex items-center gap-2 mb-4 pb-4 border-b border-slate-700">
-                <span className="text-xs text-slate-400">Bulk Actions ({sortedResults.length} visible):</span>
-                <button
-                  onClick={scanVisible}
-                  disabled={isScanning}
-                  className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-                  title="Scan all visible stocks"
-                >
-                  <RefreshCcw className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={eraseVisible}
-                  disabled={isScanning}
-                  className="p-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-                  title="Erase backtest results for all visible stocks"
-                >
-                  <Eraser className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={removeVisible}
-                  disabled={isScanning}
-                  className="p-2 bg-red-700 text-white rounded-lg hover:bg-red-800 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-                  title="Remove all visible stocks from table"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            )}
             <div className="overflow-x-auto">
               <div className="max-h-[780px] overflow-y-auto">
                 <table className="min-w-full divide-y divide-slate-700">
