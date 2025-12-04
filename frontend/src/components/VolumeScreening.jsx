@@ -1061,7 +1061,21 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
     if (showPotentialBreakOnly && !isPotentialBreak(entry)) return false
     if (!matchesBreakFilters(entry)) return false
     if (selectedMarkets.length > 0 && !selectedMarkets.includes(extractMarket(entry.symbol))) return false
-    if (searchFilter && !entry.symbol.toUpperCase().includes(searchFilter.toUpperCase())) return false
+
+    // Support multiple search terms separated by comma or space
+    if (searchFilter) {
+      const searchTerms = searchFilter
+        .split(/[,\s]+/)
+        .map(term => term.trim().toUpperCase())
+        .filter(term => term.length > 0)
+
+      if (searchTerms.length > 0) {
+        const symbolUpper = entry.symbol.toUpperCase()
+        const matchesAnyTerm = searchTerms.some(term => symbolUpper.includes(term))
+        if (!matchesAnyTerm) return false
+      }
+    }
+
     return true
   })
 
@@ -1478,7 +1492,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
                 type="text"
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
-                placeholder="Filter symbols..."
+                placeholder="AAPL, 2628..."
                 className="pl-9 pr-3 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-slate-400 text-sm w-48"
               />
               {searchFilter && (
