@@ -1196,6 +1196,25 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     })
   }
 
+  const scanVisible = () => {
+    const visibleSymbols = sortedResults.map(r => r.symbol)
+    if (visibleSymbols.length === 0) return
+    queueSymbols(visibleSymbols, { startScan: true })
+  }
+
+  const eraseVisible = () => {
+    const visibleSymbols = new Set(sortedResults.map(r => r.symbol))
+    setResults(prev => prev.map(entry =>
+      visibleSymbols.has(entry.symbol) ? clearEntryData(entry) : entry
+    ))
+  }
+
+  const removeVisible = () => {
+    const visibleSymbols = new Set(sortedResults.map(r => r.symbol))
+    setResults(prev => prev.filter(entry => !visibleSymbols.has(entry.symbol)))
+    setScanQueue(prev => prev.filter(symbol => !visibleSymbols.has(symbol)))
+  }
+
   const handleSort = (key) => {
     setSortConfig(prev => ({
       key,
@@ -1519,6 +1538,35 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                 )}
               </div>
             </div>
+            {sortedResults.length > 0 && (
+              <div className="flex items-center gap-2 mb-4 pb-4 border-b border-slate-700">
+                <span className="text-xs text-slate-400">Bulk Actions ({sortedResults.length} visible):</span>
+                <button
+                  onClick={scanVisible}
+                  disabled={isScanning}
+                  className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                  title="Scan all visible stocks"
+                >
+                  <RefreshCcw className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={eraseVisible}
+                  disabled={isScanning}
+                  className="p-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                  title="Erase backtest results for all visible stocks"
+                >
+                  <Eraser className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={removeVisible}
+                  disabled={isScanning}
+                  className="p-2 bg-red-700 text-white rounded-lg hover:bg-red-800 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                  title="Remove all visible stocks from table"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
             <div className="overflow-x-auto">
               <div className="max-h-[780px] overflow-y-auto">
                 <table className="min-w-full divide-y divide-slate-700">
