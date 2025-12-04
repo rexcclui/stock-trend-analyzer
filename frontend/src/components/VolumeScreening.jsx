@@ -63,6 +63,16 @@ function isDisallowedSymbol(symbol) {
   return isInvalidFiveCharSymbol(symbol) || hasBlockedSuffix(symbol) || (typeof symbol === 'string' && symbol.includes(HYPHEN))
 }
 
+// Extract market identifier from stock symbol
+// e.g., "12.HK" -> "HK", "000100.SS" -> "SS", "AAPL" -> "US"
+function extractMarket(symbol) {
+  if (!symbol || typeof symbol !== 'string') return 'US'
+  const dotIndex = symbol.lastIndexOf('.')
+  if (dotIndex === -1) return 'US'
+  const market = symbol.substring(dotIndex + 1).toUpperCase()
+  return market || 'US'
+}
+
 function safeSetItem(key, value) {
   try {
     localStorage.setItem(key, value)
@@ -490,6 +500,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
   const [showUpBreakOnly, setShowUpBreakOnly] = useState(false)
   const [showDownBreakOnly, setShowDownBreakOnly] = useState(false)
   const [showPotentialBreakOnly, setShowPotentialBreakOnly] = useState(false)
+  const [selectedMarkets, setSelectedMarkets] = useState([])
   const [sortConfig, setSortConfig] = useState(defaultSortConfig)
   const activeScanIdRef = useRef(null)
   const importInputRef = useRef(null)
@@ -1048,10 +1059,24 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
     if (showBookmarkedOnly && !entry.bookmarked) return false
     if (showPotentialBreakOnly && !isPotentialBreak(entry)) return false
     if (!matchesBreakFilters(entry)) return false
+    if (selectedMarkets.length > 0 && !selectedMarkets.includes(extractMarket(entry.symbol))) return false
     return true
   })
 
   const filteredEntries = getVisibleEntries()
+
+  // Get unique markets from all entries
+  const availableMarkets = Array.from(new Set(entries.map(e => extractMarket(e.symbol)))).sort()
+
+  const toggleMarketFilter = (market) => {
+    setSelectedMarkets(prev => {
+      if (prev.includes(market)) {
+        return prev.filter(m => m !== market)
+      } else {
+        return [...prev, market]
+      }
+    })
+  }
 
   const isFiltered = filteredEntries.length !== entries.length
   const filteredCount = Math.max(0, entries.length - filteredEntries.length)
@@ -1485,6 +1510,24 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
               />
               Down Break
             </label>
+            {availableMarkets.length > 0 && (
+              <div className="flex items-center gap-2 border border-slate-600 rounded-lg px-3 py-2">
+                <span className="text-sm text-slate-300">Market:</span>
+                {availableMarkets.map(market => (
+                  <button
+                    key={market}
+                    onClick={() => toggleMarketFilter(market)}
+                    className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                      selectedMarkets.includes(market)
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                  >
+                    {market}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
         <div className="overflow-x-auto max-h-[70vh]">

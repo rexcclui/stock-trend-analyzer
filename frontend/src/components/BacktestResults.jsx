@@ -91,6 +91,16 @@ function isDisallowedSymbol(symbol) {
   return isInvalidFiveCharSymbol(symbol) || hasBlockedSuffix(symbol) || (typeof symbol === 'string' && symbol.includes(HYPHEN))
 }
 
+// Extract market identifier from stock symbol
+// e.g., "12.HK" -> "HK", "000100.SS" -> "SS", "AAPL" -> "US"
+function extractMarket(symbol) {
+  if (!symbol || typeof symbol !== 'string') return 'US'
+  const dotIndex = symbol.lastIndexOf('.')
+  if (dotIndex === -1) return 'US'
+  const market = symbol.substring(dotIndex + 1).toUpperCase()
+  return market || 'US'
+}
+
 // Calculate Vol Prf V2 breakouts with configurable parameters
 function calculateVolPrfV2Breakouts(prices, params = {}) {
   const {
@@ -533,6 +543,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false)
   const [showRecentBreakoutsOnly, setShowRecentBreakoutsOnly] = useState(false)
+  const [selectedMarkets, setSelectedMarkets] = useState([])
   const [hasHydratedCache, setHasHydratedCache] = useState(() => initialHydratedResultsRef.current !== null)
   const activeScanSymbolRef = useRef(null)
   const importInputRef = useRef(null)
@@ -1142,17 +1153,32 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
       status: 'completed',
       bookmarked: Boolean(entry.bookmarked),
       marketChange: computedMarketChange,
+      market: extractMarket(entry.symbol),
       ...entry
     }
   })
+
+  // Get unique markets from all results
+  const availableMarkets = Array.from(new Set(normalizedResults.map(r => r.market))).sort()
 
   const filteredResults = normalizedResults.filter(result => {
     // Exclude any entries with errors
     if (result.error) return false
     if (showBookmarksOnly && !result.bookmarked) return false
     if (showRecentBreakoutsOnly && !result.isRecentBreakout) return false
+    if (selectedMarkets.length > 0 && !selectedMarkets.includes(result.market)) return false
     return true
   })
+
+  const toggleMarketFilter = (market) => {
+    setSelectedMarkets(prev => {
+      if (prev.includes(market)) {
+        return prev.filter(m => m !== market)
+      } else {
+        return [...prev, market]
+      }
+    })
+  }
 
   const handleSort = (key) => {
     setSortConfig(prev => ({
@@ -1197,8 +1223,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
   }
 
   const sortedResults = [...filteredResults].sort((a, b) => {
-    // Don't reorder during scanning to prevent rows from jumping
-    if (isScanning || !sortConfig.key) return 0
+    // Don't reorder if no sort key is set (preserve insertion order)
+    if (!sortConfig.key) return 0
     const aVal = getSortableValue(a, sortConfig.key)
     const bVal = getSortableValue(b, sortConfig.key)
     if (aVal === bVal) return 0
@@ -1305,10 +1331,11 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
             <button
               onClick={loadTopSymbols}
               disabled={loadingTopSymbols || loading}
-              className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-              title="Load top 2000 market cap symbols"
+              className="px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              title="Load top 2000 US market cap symbols"
             >
               {loadingTopSymbols ? <Loader2 className="w-5 h-5 animate-spin" /> : <DownloadCloud className="w-5 h-5" />}
+              <span className="text-sm font-medium">US2000</span>
             </button>
             <button
               onClick={scanAllQueued}
@@ -1421,7 +1448,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
           <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
             <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
               <h3 className="text-lg font-semibold text-slate-100">Breakout Signals</h3>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={() => setShowBookmarksOnly(prev => !prev)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${showBookmarksOnly ? 'border-amber-500 text-amber-200 bg-amber-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
@@ -1436,6 +1463,24 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                   <Filter className="w-4 h-4" />
                   {showRecentBreakoutsOnly ? 'Showing Recent (≤10d)' : 'Filter Recent Breakouts'}
                 </button>
+                {availableMarkets.length > 0 && (
+                  <div className="flex items-center gap-2 border border-slate-600 rounded-lg px-3 py-2">
+                    <span className="text-sm text-slate-300">Market:</span>
+                    {availableMarkets.map(market => (
+                      <button
+                        key={market}
+                        onClick={() => toggleMarketFilter(market)}
+                        className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                          selectedMarkets.includes(market)
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                      >
+                        {market}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="overflow-x-auto">
