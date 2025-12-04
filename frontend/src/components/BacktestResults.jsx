@@ -983,10 +983,11 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
       const { upResist, downResist } = findResistanceZones(latestBreakout, slots)
 
       // Check if the latest breakout has been closed by a sell signal
-      // If so, don't show the break price (but still include stock in results)
+      // Store original breakout for reference, but hide break price if closed
+      const originalBreakout = latestBreakout
       const breakoutClosed = isBreakoutClosed(latestBreakout.date, priceData, optimalSMAs.period)
       if (breakoutClosed) {
-        latestBreakout = null
+        latestBreakout = null  // This hides the break price column only
       }
 
       // Determine if data is in chronological or reverse chronological order
@@ -1010,6 +1011,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         status: 'completed',
         totalSignals: optimalSMAs.totalSignals,
         latestBreakout,
+        originalBreakout,  // Always has the breakout data, even if closed
+        breakoutClosed,
         latestPrice,
         priceData,
         optimalParams,
@@ -1354,25 +1357,25 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
       case 'dataPoints':
         return entry.priceData?.length ?? -Infinity
       case 'daysAgo':
-        return entry.latestBreakout ? getDaysAgo(entry.latestBreakout.date) : Infinity
+        return entry.originalBreakout ? getDaysAgo(entry.originalBreakout.date) : Infinity
       case 'breakoutPrice':
         return entry.latestBreakout?.price ?? -Infinity
       case 'currentPrice':
         // Sort by absolute value of percentage change from breakout price (value in brackets)
-        if (entry.latestBreakout && entry.latestPrice) {
-          return Math.abs(((entry.latestPrice - entry.latestBreakout.price) / entry.latestBreakout.price) * 100)
+        if (entry.originalBreakout && entry.latestPrice) {
+          return Math.abs(((entry.latestPrice - entry.originalBreakout.price) / entry.originalBreakout.price) * 100)
         }
         return -Infinity
       case 'volWeight':
-        return entry.latestBreakout?.currentWeight ?? -Infinity
+        return entry.originalBreakout?.currentWeight ?? -Infinity
       case 'resistVol':
-        return entry.latestBreakout?.lowerWeight ?? -Infinity
+        return entry.originalBreakout?.lowerWeight ?? -Infinity
       case 'upResist':
         return entry.upResist?.volumeWeight ?? -Infinity
       case 'downResist':
         return entry.downResist?.volumeWeight ?? -Infinity
       case 'diff':
-        return entry.latestBreakout?.weightDiff ?? -Infinity
+        return entry.originalBreakout?.weightDiff ?? -Infinity
       case 'totalSignals':
         return entry.totalSignals ?? -Infinity
       case 'pl':
@@ -1746,19 +1749,20 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                 <tbody className="bg-slate-800 divide-y divide-slate-700">
                   {sortedResults.map((result, index) => {
                     const hasBreakout = Boolean(result.latestBreakout)
-                    const daysAgo = hasBreakout ? getDaysAgo(result.latestBreakout.date) : null
-                    const priceChange = hasBreakout
-                      ? ((result.latestPrice - result.latestBreakout.price) / result.latestBreakout.price * 100)
+                    const hasData = Boolean(result.originalBreakout)  // Has breakout data (may be closed)
+                    const daysAgo = hasData ? getDaysAgo(result.originalBreakout.date) : null
+                    const priceChange = hasData
+                      ? ((result.latestPrice - result.originalBreakout.price) / result.originalBreakout.price * 100)
                       : null
-                    const isWithinLast10Days = hasBreakout && daysAgo <= 10
-                    const status = result.status || (hasBreakout ? 'completed' : 'pending')
+                    const isWithinLast10Days = hasData && daysAgo <= 10
+                    const status = result.status || (hasData ? 'completed' : 'pending')
 
                     return (
                       <tr
                         key={index}
-                        onClick={() => hasBreakout && onStockSelect && onStockSelect(result.symbol, { ...result.optimalParams, smaPeriods: [result.optimalSMAs?.period], days: result.days })}
-                        className={`transition-colors ${hasBreakout ? 'hover:bg-slate-700 cursor-pointer' : 'opacity-75'} ${isWithinLast10Days ? 'bg-blue-900/20 hover:bg-blue-800/30' : ''}`}
-                        title={hasBreakout ? 'Click to view in Technical Analysis with optimized parameters' : 'Pending scan'}
+                        onClick={() => hasData && onStockSelect && onStockSelect(result.symbol, { ...result.optimalParams, smaPeriods: [result.optimalSMAs?.period], days: result.days })}
+                        className={`transition-colors ${hasData ? 'hover:bg-slate-700 cursor-pointer' : 'opacity-75'} ${isWithinLast10Days ? 'bg-blue-900/20 hover:bg-blue-800/30' : ''}`}
+                        title={hasData ? (result.breakoutClosed ? 'Click to view (breakout closed by sell signal)' : 'Click to view in Technical Analysis with optimized parameters') : 'Pending scan'}
                       >
                         <td className="px-4 py-3 text-sm">
                           <button
@@ -1791,10 +1795,10 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
-                          {hasBreakout ? (
+                          {hasData ? (
                             <span
                               className={`px-2 py-1 rounded ${daysAgo <= 3 ? 'bg-green-900/50 text-green-300' : daysAgo <= 7 ? 'bg-yellow-900/50 text-yellow-300' : daysAgo <= 10 ? 'bg-blue-900/50 text-blue-200' : 'bg-slate-700 text-slate-300'}`}
-                              title={result.priceData?.length > 0 ? `Breakout: ${formatDate(result.latestBreakout.date)}\nLast data: ${result.priceData[0].date}` : formatDate(result.latestBreakout.date)}
+                              title={result.priceData?.length > 0 ? `Breakout: ${formatDate(result.originalBreakout.date)}\nLast data: ${result.priceData[0].date}` : formatDate(result.originalBreakout.date)}
                             >
                               {daysAgo}d
                             </span>
@@ -1806,7 +1810,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                           {hasBreakout ? formatCurrency(result.latestBreakout.price) : '—'}
                         </td>
                         <td className="px-4 py-3 text-sm font-semibold text-right">
-                          {hasBreakout ? (
+                          {hasData ? (
                             <span className={priceChange >= 0 ? 'text-green-400' : 'text-red-400'}>
                               {formatCurrency(result.latestPrice)}
                               <span className="text-xs ml-1">({formatPercent(priceChange)})</span>
@@ -1814,10 +1818,10 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                           ) : '—'}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
-                          {hasBreakout ? `${(result.latestBreakout.currentWeight * 100).toFixed(1)}%` : '—'}
+                          {hasData ? `${(result.originalBreakout.currentWeight * 100).toFixed(1)}%` : '—'}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
-                          {hasBreakout ? `${(result.latestBreakout.lowerWeight * 100).toFixed(1)}%` : '—'}
+                          {hasData ? `${(result.originalBreakout.lowerWeight * 100).toFixed(1)}%` : '—'}
                         </td>
                         <td className="px-4 py-3 text-sm text-red-400 text-right font-medium">
                           {result.upResist ? (
@@ -1840,13 +1844,13 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                           ) : '—'}
                         </td>
                         <td className="px-4 py-3 text-sm text-green-400 text-right font-semibold">
-                          {hasBreakout ? `${(result.latestBreakout.weightDiff * 100).toFixed(1)}%` : '—'}
+                          {hasData ? `${(result.originalBreakout.weightDiff * 100).toFixed(1)}%` : '—'}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
-                          {hasBreakout ? result.totalSignals : '—'}
+                          {hasData ? result.totalSignals : '—'}
                         </td>
                         <td className="px-4 py-3 text-sm text-right font-semibold">
-                          {hasBreakout ? (
+                          {hasData ? (
                             <span className={
                               typeof result.marketChange === 'number' && result.optimalSMAs.pl > result.marketChange
                                 ? 'text-blue-400'
@@ -1866,7 +1870,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                           ) : '—'}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 text-left">
-                          {hasBreakout ? (
+                          {hasData ? (
                             <div className="whitespace-nowrap">
                               Th:{(result.optimalParams.breakoutThreshold * 100).toFixed(0)}% LB:{result.optimalParams.lookbackZones} <span className="text-blue-400 font-medium">SMA:{result.optimalSMAs.period}</span>
                             </div>
