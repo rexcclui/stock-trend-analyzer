@@ -1323,6 +1323,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
               <option value="180">6 Months</option>
               <option value="365">1 Year</option>
               <option value="730">2 Years</option>
+              <option value="1095">3 Years</option>
               <option value="1825">5 Years</option>
             </select>
           </div>
