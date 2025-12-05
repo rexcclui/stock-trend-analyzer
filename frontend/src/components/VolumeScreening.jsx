@@ -925,8 +925,49 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
     const allowedSymbols = symbols.filter(symbol => !isDisallowedSymbol(symbol))
     if (allowedSymbols.length === 0) return
 
+    // Get existing entries before adding new ones
+    const existingKeys = new Set(
+      entries
+        .filter(e => e.period != null)
+        .map(e => getEntryKey(e.symbol, e.period))
+    )
+
+    // Filter to only new symbols that don't exist with current period
+    const newSymbols = allowedSymbols.filter(symbol =>
+      !existingKeys.has(getEntryKey(symbol, period))
+    )
+
     mergeSymbolsIntoEntries(allowedSymbols, { persistHistory: true })
     setSymbolInput('')
+
+    // Automatically scan newly added symbols
+    if (newSymbols.length > 0) {
+      // Small delay to ensure entries are added to state
+      setTimeout(() => {
+        setEntries(prev => {
+          const updatedEntries = prev.map(entry => {
+            if (newSymbols.includes(entry.symbol) && entry.period === period) {
+              return { ...entry, status: 'loading', error: null }
+            }
+            return entry
+          })
+
+          // Add new entries to scan queue
+          const newScanEntries = updatedEntries.filter(entry =>
+            newSymbols.includes(entry.symbol) && entry.period === period && entry.status === 'loading'
+          )
+
+          if (newScanEntries.length > 0) {
+            setScanQueue(prev => [...prev, ...newScanEntries])
+            setScanTotal(total => total + newScanEntries.length)
+            setIsScanning(true)
+            setIsPaused(false)
+          }
+
+          return updatedEntries
+        })
+      }, 50)
+    }
   }
 
   const loadTopSymbols = async () => {
@@ -1574,6 +1615,12 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
               type="text"
               value={symbolInput}
               onChange={(e) => setSymbolInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  addSymbols()
+                }
+              }}
               placeholder="e.g., AAPL, MSFT, TSLA"
               className="w-full px-4 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-slate-400"
             />
