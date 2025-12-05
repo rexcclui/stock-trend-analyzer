@@ -1726,7 +1726,14 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
                   <span className="sr-only">Bookmark</span>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Stock
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('symbol')}
+                    className="inline-flex items-center gap-1 hover:text-slate-100"
+                  >
+                    Stock
+                    {renderSortIndicator('symbol')}
+                  </button>
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Period
