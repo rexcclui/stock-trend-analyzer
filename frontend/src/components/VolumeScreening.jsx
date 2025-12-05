@@ -28,11 +28,38 @@ const defaultSortConfig = {
   direction: 'desc'
 }
 
+// Helper function to process individual stock symbol - convert numbers to .HK format
+function processStockSymbol(symbol) {
+  const trimmed = symbol.trim().toUpperCase()
+  if (!trimmed) return null
+
+  // If it already ends with .HK, just pad the number part
+  if (trimmed.endsWith('.HK')) {
+    const numberPart = trimmed.replace('.HK', '')
+    // Check if it's a pure number
+    if (/^\d+$/.test(numberPart)) {
+      const padded = numberPart.padStart(4, '0')
+      return `${padded}.HK`
+    }
+    // If not a pure number (e.g., has letters), return as is
+    return trimmed
+  }
+
+  // Check if it's a pure number (no .HK suffix)
+  if (/^\d+$/.test(trimmed)) {
+    const padded = trimmed.padStart(4, '0')
+    return `${padded}.HK`
+  }
+
+  // Otherwise, return as is (e.g., AAPL, MSFT, 000100.SS, etc.)
+  return trimmed
+}
+
 function parseStockSymbols(input) {
   if (!input || !input.trim()) return []
   return input
     .split(/[,\s]+/)
-    .map(symbol => symbol.trim().toUpperCase())
+    .map(processStockSymbol)
     .filter(Boolean)
 }
 
