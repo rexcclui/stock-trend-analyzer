@@ -1243,6 +1243,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         .map(item => (typeof item === 'string' ? item : item?.symbol))
         .filter(Boolean)
         .map(symbol => symbol.toUpperCase())
+        .filter(symbol => !/^4\d{3}\.HK$/.test(symbol))
         .filter(symbol => !isDisallowedSymbol(symbol))
 
       ensureEntries(normalized)

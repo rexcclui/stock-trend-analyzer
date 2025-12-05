@@ -1063,6 +1063,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
         .map(item => (typeof item === 'string' ? item : item?.symbol))
         .filter(Boolean)
         .map(symbol => symbol.toUpperCase())
+        .filter(symbol => !/^4\d{3}\.HK$/.test(symbol))
 
       console.log('[HK500] Normalized symbols count:', normalized.length)
       console.log('[HK500] First 10 normalized:', normalized.slice(0, 10))
