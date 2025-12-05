@@ -587,17 +587,38 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
     list.forEach(entry => {
       if (entry.status === 'ready' && isEntryFresh(entry)) {
         const { id, symbol, ...rest } = entry
-        cache[symbol] = {
-          priceRange: rest.priceRange,
-          currentRange: rest.currentRange,
-          testedDays: rest.testedDays,
-          slotCount: rest.slotCount,
-          volumeLegend: rest.volumeLegend,
-          bottomResist: rest.bottomResist,
-          upperResist: rest.upperResist,
-          breakout: rest.breakout,
-          lastScanAt: rest.lastScanAt,
-          status: rest.status
+
+        // Determine if this entry should have full cache
+        const isUpBreak = rest.breakout === 'Up'
+        const isDownBreak = rest.breakout === 'Down'
+        const isPotential = hasCloseResistance(rest.bottomResist, rest.upperResist)
+        const isBookmarked = rest.bookmarked || false
+
+        // Full cache for: bookmarked OR up/down break OR potential break
+        const shouldCacheFull = isBookmarked || isUpBreak || isDownBreak || isPotential
+
+        if (shouldCacheFull) {
+          // Keep all fields for important entries
+          cache[symbol] = {
+            priceRange: rest.priceRange,
+            currentRange: rest.currentRange,
+            testedDays: rest.testedDays,
+            slotCount: rest.slotCount,
+            volumeLegend: rest.volumeLegend,
+            bottomResist: rest.bottomResist,
+            upperResist: rest.upperResist,
+            breakout: rest.breakout,
+            lastScanAt: rest.lastScanAt,
+            status: rest.status,
+            bookmarked: isBookmarked
+          }
+        } else {
+          // Slim cache: only essential fields for non-important entries
+          cache[symbol] = {
+            lastScanAt: rest.lastScanAt,
+            status: rest.status,
+            bookmarked: isBookmarked
+          }
         }
       }
     })

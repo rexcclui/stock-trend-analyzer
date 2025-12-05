@@ -728,18 +728,34 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     window.dispatchEvent(new CustomEvent('stockHistoryUpdated', { detail: updatedHistory }))
   }
 
-  // Persist backtest results to localStorage (exclude priceData to save space)
+  // Persist backtest results to localStorage (selective caching to save space)
   useEffect(() => {
     if (!hasHydratedCache) return
 
     try {
-      // Exclude priceData from cache to avoid quota exceeded errors
-      // priceData is already cached in apiCache, so we don't need to duplicate it
-      const resultsWithoutPriceData = results.map(result => {
+      // Only cache full details for bookmarked or recent breakout rows
+      // Others get minimal cache (symbol, status, lastScanAt, bookmarked)
+      const selectiveResults = results.map(result => {
         const { priceData, ...rest } = result
-        return rest
+
+        // Full cache for: bookmarked OR recent breakout
+        const shouldCacheFull = result.bookmarked || result.isRecentBreakout
+
+        if (shouldCacheFull) {
+          return rest // Keep all fields except priceData
+        }
+
+        // Slim cache: only essential fields for non-important results
+        return {
+          symbol: result.symbol,
+          status: result.status || 'pending',
+          lastScanAt: result.lastScanAt || null,
+          bookmarked: result.bookmarked || false,
+          error: result.error || null
+        }
       })
-      localStorage.setItem(BACKTEST_RESULTS_KEY, JSON.stringify(resultsWithoutPriceData))
+
+      localStorage.setItem(BACKTEST_RESULTS_KEY, JSON.stringify(selectiveResults))
     } catch (e) {
       if (e.name === 'QuotaExceededError') {
         console.error('localStorage quota exceeded. Consider clearing old results.')
