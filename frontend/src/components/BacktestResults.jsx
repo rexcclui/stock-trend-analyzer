@@ -836,20 +836,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
   useEffect(() => {
     if (!lastAddedKey) return
 
-    console.log('[BacktestResults] Attempting to scroll to:', lastAddedKey)
-
     // Use requestAnimationFrame to ensure DOM is ready
     const rafId = requestAnimationFrame(() => {
       const scrollTimer = setTimeout(() => {
         const element = document.querySelector(`[data-entry-key="${lastAddedKey}"]`)
-        console.log('[BacktestResults] Element found:', element)
         if (element) {
           element.scrollIntoView({ behavior: 'auto', block: 'center' })
           // Add blink animation class
           element.classList.add('blink-highlight')
-          console.log('[BacktestResults] Jumped to row and blink added')
-        } else {
-          console.warn('[BacktestResults] Element not found for key:', lastAddedKey)
         }
       }, 200)
 
@@ -874,16 +868,12 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
   }, [lastAddedKey])
 
   const ensureEntries = (symbolList) => {
-    console.log('[BacktestResults] === ensureEntries called ===', symbolList)
     if (!Array.isArray(symbolList) || symbolList.length === 0) {
-      console.log('[BacktestResults] Early return: empty symbolList')
       return
     }
 
     const allowedSymbols = symbolList.filter(symbol => !isDisallowedSymbol(symbol))
-    console.log('[BacktestResults] allowedSymbols:', allowedSymbols, 'current days:', days)
     if (allowedSymbols.length === 0) {
-      console.log('[BacktestResults] Early return: no allowed symbols')
       return
     }
 
@@ -896,7 +886,6 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     const existingSymbols = allowedSymbols.filter(symbol =>
       existingKeys.has(getEntryKey(symbol, days))
     )
-    console.log('[BacktestResults] existingSymbols calculated BEFORE setResults:', existingSymbols)
 
     let firstNewKey = null
 
@@ -936,40 +925,28 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
           }
         })
 
-      console.log('[BacktestResults] newEntries:', newEntries.length)
-
       if (newEntries.length === 0) return prev
 
       return [...prev, ...newEntries]
     })
 
-    console.log('[BacktestResults] After setResults - firstNewKey:', firstNewKey, 'existingSymbols.length:', existingSymbols.length)
-
     // Set the first new entry as last added for auto-scroll (only if new entries were added)
     // Use setTimeout to ensure DOM has updated
     if (firstNewKey) {
-      console.log('[BacktestResults] ✅ New entry, setting lastAddedKey to:', firstNewKey)
       setTimeout(() => {
         setLastAddedKey(firstNewKey)
       }, 150)
     } else if (existingSymbols.length > 0) {
       // Stock already exists - scroll to the existing entry
-      console.log('[BacktestResults] ✅ Stock already exists, finding entry:', existingSymbols)
       const existingEntry = results.find(r =>
         existingSymbols.includes(r.symbol) && r.days === days
       )
-      console.log('[BacktestResults] existingEntry:', existingEntry)
       if (existingEntry) {
         const existingKey = getEntryKey(existingEntry.symbol, existingEntry.days)
-        console.log('[BacktestResults] ✅ Setting lastAddedKey to existing:', existingKey)
         setTimeout(() => {
           setLastAddedKey(existingKey)
         }, 100)
-      } else {
-        console.warn('[BacktestResults] ❌ Existing entry not found in results!')
       }
-    } else {
-      console.log('[BacktestResults] ❌ No action - no new, no existing')
     }
   }
 
