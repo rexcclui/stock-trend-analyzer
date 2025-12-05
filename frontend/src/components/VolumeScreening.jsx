@@ -1344,6 +1344,13 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
         return sortConfig.direction === 'asc' ? diff : -diff
       }
 
+      if (sortConfig.field === 'symbol') {
+        const symbolA = a.symbol?.toUpperCase() || ''
+        const symbolB = b.symbol?.toUpperCase() || ''
+        const diff = symbolA.localeCompare(symbolB)
+        return sortConfig.direction === 'asc' ? diff : -diff
+      }
+
       const weightA = sortConfig.field === 'volumeWeight'
         ? getCurrentVolumeWeight(a)
         : parseResistanceWeight(a[sortConfig.field])
