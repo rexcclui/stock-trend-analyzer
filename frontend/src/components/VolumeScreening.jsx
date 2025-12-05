@@ -935,8 +935,13 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
       !existingKeys.has(getEntryKey(symbol, period))
     )
 
+    // Check if any symbols already exist (for scrolling to existing)
+    const existingSymbols = allowedSymbols.filter(symbol =>
+      existingKeys.has(getEntryKey(symbol, period))
+    )
+
     const firstNewId = mergeSymbolsIntoEntries(allowedSymbols, { persistHistory: true })
-    console.log('[VolumeScreening] addSymbols - firstNewId:', firstNewId, 'newSymbols:', newSymbols)
+    console.log('[VolumeScreening] addSymbols - firstNewId:', firstNewId, 'newSymbols:', newSymbols, 'existingSymbols:', existingSymbols)
     setSymbolInput('')
 
     // Automatically scan newly added symbols
@@ -980,6 +985,18 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
       setTimeout(() => {
         setLastAddedId(firstNewId)
       }, 200)
+    } else if (existingSymbols.length > 0) {
+      // Stock already exists - scroll to the existing entry
+      console.log('[VolumeScreening] Stock already exists, scrolling to existing entry')
+      const existingEntry = entries.find(e =>
+        existingSymbols.includes(e.symbol) && e.period === period
+      )
+      if (existingEntry) {
+        console.log('[VolumeScreening] Found existing entry:', existingEntry.id)
+        setTimeout(() => {
+          setLastAddedId(existingEntry.id)
+        }, 100)
+      }
     }
   }
 
