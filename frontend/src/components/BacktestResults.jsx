@@ -793,6 +793,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         // Slim cache: only essential fields for non-important results
         return {
           symbol: result.symbol,
+          days: result.days,
+          period: result.period,
           status: result.status || 'pending',
           lastScanAt: result.lastScanAt || null,
           bookmarked: result.bookmarked || false,

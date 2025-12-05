@@ -780,6 +780,8 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
       return {
         id,
         symbol,
+        period: entry.period,
+        periodDisplay: entry.periodDisplay,
         status,
         lastScanAt,
         bookmarked: !!bookmarked,
