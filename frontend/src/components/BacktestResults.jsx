@@ -844,10 +844,10 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         const element = document.querySelector(`[data-entry-key="${lastAddedKey}"]`)
         console.log('[BacktestResults] Element found:', element)
         if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          element.scrollIntoView({ behavior: 'auto', block: 'center' })
           // Add blink animation class
           element.classList.add('blink-highlight')
-          console.log('[BacktestResults] Scrolled and blink added')
+          console.log('[BacktestResults] Jumped to row and blink added')
         } else {
           console.warn('[BacktestResults] Element not found for key:', lastAddedKey)
         }

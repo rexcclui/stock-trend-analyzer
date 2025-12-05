@@ -1575,10 +1575,10 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
         const element = document.querySelector(`[data-entry-id="${lastAddedId}"]`)
         console.log('[VolumeScreening] Element found:', element)
         if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          element.scrollIntoView({ behavior: 'auto', block: 'center' })
           // Add blink animation class
           element.classList.add('blink-highlight')
-          console.log('[VolumeScreening] Scrolled and blink added')
+          console.log('[VolumeScreening] Jumped to row and blink added')
         } else {
           console.warn('[VolumeScreening] Element not found for ID:', lastAddedId)
         }
