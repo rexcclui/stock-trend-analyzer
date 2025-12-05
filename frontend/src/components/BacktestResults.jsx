@@ -682,6 +682,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false)
   const [showRecentBreakoutsOnly, setShowRecentBreakoutsOnly] = useState(false)
   const [selectedMarkets, setSelectedMarkets] = useState([])
+  const [selectedPeriods, setSelectedPeriods] = useState([])
   const [searchFilter, setSearchFilter] = useState('')
   const [hasHydratedCache, setHasHydratedCache] = useState(() => initialHydratedResultsRef.current !== null)
   const activeScanSymbolRef = useRef(null)
@@ -1429,12 +1430,16 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
   // Get unique markets from all results
   const availableMarkets = Array.from(new Set(normalizedResults.map(r => r.market))).sort()
 
+  // Get unique periods from all results
+  const availablePeriods = Array.from(new Set(normalizedResults.map(r => r.period).filter(Boolean))).sort()
+
   const filteredResults = normalizedResults.filter(result => {
     // Exclude any entries with errors
     if (result.error) return false
     if (showBookmarksOnly && !result.bookmarked) return false
     if (showRecentBreakoutsOnly && !result.isRecentBreakout) return false
     if (selectedMarkets.length > 0 && !selectedMarkets.includes(result.market)) return false
+    if (selectedPeriods.length > 0 && !selectedPeriods.includes(result.period)) return false
 
     // Support multiple search terms separated by comma or space
     if (searchFilter) {
@@ -1459,6 +1464,16 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         return prev.filter(m => m !== market)
       } else {
         return [...prev, market]
+      }
+    })
+  }
+
+  const togglePeriodFilter = (period) => {
+    setSelectedPeriods(prev => {
+      if (prev.includes(period)) {
+        return prev.filter(p => p !== period)
+      } else {
+        return [...prev, period]
       }
     })
   }
@@ -1860,6 +1875,24 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                         }`}
                       >
                         {market}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {availablePeriods.length > 0 && (
+                  <div className="flex items-center gap-2 border border-slate-600 rounded-lg px-3 py-2">
+                    <span className="text-sm text-slate-300">Period:</span>
+                    {availablePeriods.map(period => (
+                      <button
+                        key={period}
+                        onClick={() => togglePeriodFilter(period)}
+                        className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                          selectedPeriods.includes(period)
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                        }`}
+                      >
+                        {period}
                       </button>
                     ))}
                   </div>

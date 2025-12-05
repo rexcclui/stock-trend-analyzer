@@ -547,6 +547,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
   const [showDownBreakOnly, setShowDownBreakOnly] = useState(false)
   const [showPotentialBreakOnly, setShowPotentialBreakOnly] = useState(false)
   const [selectedMarkets, setSelectedMarkets] = useState([])
+  const [selectedPeriods, setSelectedPeriods] = useState([])
   const [searchFilter, setSearchFilter] = useState('')
   const [sortConfig, setSortConfig] = useState(defaultSortConfig)
   const [hasHydratedCache, setHasHydratedCache] = useState(false)
@@ -1206,6 +1207,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
     if (showPotentialBreakOnly && !isPotentialBreak(entry)) return false
     if (!matchesBreakFilters(entry)) return false
     if (selectedMarkets.length > 0 && !selectedMarkets.includes(extractMarket(entry.symbol))) return false
+    if (selectedPeriods.length > 0 && !selectedPeriods.includes(entry.periodDisplay)) return false
 
     // Support multiple search terms separated by comma or space
     if (searchFilter) {
@@ -1229,12 +1231,25 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
   // Get unique markets from all entries
   const availableMarkets = Array.from(new Set(entries.map(e => extractMarket(e.symbol)))).sort()
 
+  // Get unique periods from all entries
+  const availablePeriods = Array.from(new Set(entries.map(e => e.periodDisplay).filter(Boolean))).sort()
+
   const toggleMarketFilter = (market) => {
     setSelectedMarkets(prev => {
       if (prev.includes(market)) {
         return prev.filter(m => m !== market)
       } else {
         return [...prev, market]
+      }
+    })
+  }
+
+  const togglePeriodFilter = (period) => {
+    setSelectedPeriods(prev => {
+      if (prev.includes(period)) {
+        return prev.filter(p => p !== period)
+      } else {
+        return [...prev, period]
       }
     })
   }
@@ -1739,6 +1754,24 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
                     }`}
                   >
                     {market}
+                  </button>
+                ))}
+              </div>
+            )}
+            {availablePeriods.length > 0 && (
+              <div className="flex items-center gap-2 border border-slate-600 rounded-lg px-3 py-2">
+                <span className="text-sm text-slate-300">Period:</span>
+                {availablePeriods.map(period => (
+                  <button
+                    key={period}
+                    onClick={() => togglePeriodFilter(period)}
+                    className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                      selectedPeriods.includes(period)
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }`}
+                  >
+                    {period}
                   </button>
                 ))}
               </div>
