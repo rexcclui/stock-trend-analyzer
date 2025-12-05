@@ -114,25 +114,41 @@ public class FinancialModelingPrepClient {
         StringBuilder urlBuilder = new StringBuilder();
         urlBuilder.append(String.format("%s/stock-screener?marketCapMoreThan=0&limit=%d", BASE_URL, limit));
 
+        // Try using country filter instead of exchange for Hong Kong
         if (exchange != null && !exchange.isEmpty()) {
-            urlBuilder.append(String.format("&exchange=%s", exchange));
+            if (exchange.equalsIgnoreCase("HKG") || exchange.equalsIgnoreCase("HKSE")) {
+                // Use country filter for Hong Kong
+                urlBuilder.append("&country=HK");
+                System.out.println("Using country filter: HK");
+            } else {
+                // Use exchange filter for others
+                urlBuilder.append(String.format("&exchange=%s", exchange));
+                System.out.println("Using exchange filter: " + exchange);
+            }
         }
 
         urlBuilder.append(String.format("&apikey=%s", apiKey));
         String url = urlBuilder.toString();
+
+        System.out.println("FMP API URL: " + url.replace(apiKey, "***"));
 
         try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
             HttpGet request = new HttpGet(url);
             try (CloseableHttpResponse response = httpClient.execute(request)) {
                 String json = EntityUtils.toString(response.getEntity());
 
+                System.out.println("FMP API Response length: " + json.length());
+
                 Type type = new TypeToken<List<Map<String, Object>>>() {
                 }.getType();
                 List<Map<String, Object>> data = gson.fromJson(json, type);
 
                 if (data == null) {
+                    System.out.println("FMP returned null data");
                     return List.of();
                 }
+
+                System.out.println("FMP returned " + data.size() + " stocks");
 
                 return data.stream()
                         .map(entry -> (String) entry.get("symbol"))
