@@ -889,14 +889,12 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
       return nextEntries
     })
 
-    // Set last added ID for auto-scroll if we added new entries
-    if (firstNewId) {
-      setLastAddedId(firstNewId)
-    }
-
     if (persistHistory) {
       saveToHistory(symbols)
     }
+
+    // Return firstNewId so caller can trigger scroll after state updates
+    return firstNewId
   }
 
   const dropInvalidScanSymbols = (currentEntries) => {
@@ -937,7 +935,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
       !existingKeys.has(getEntryKey(symbol, period))
     )
 
-    mergeSymbolsIntoEntries(allowedSymbols, { persistHistory: true })
+    const firstNewId = mergeSymbolsIntoEntries(allowedSymbols, { persistHistory: true })
     setSymbolInput('')
 
     // Automatically scan newly added symbols
@@ -966,7 +964,19 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
 
           return updatedEntries
         })
+
+        // Trigger scroll after entries are updated and rendered
+        if (firstNewId) {
+          setTimeout(() => {
+            setLastAddedId(firstNewId)
+          }, 100)
+        }
       }, 50)
+    } else if (firstNewId) {
+      // If no scan needed but entry was added, still trigger scroll
+      setTimeout(() => {
+        setLastAddedId(firstNewId)
+      }, 150)
     }
   }
 

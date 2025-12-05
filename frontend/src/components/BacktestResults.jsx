@@ -910,8 +910,11 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     })
 
     // Set the first new entry as last added for auto-scroll (only if new entries were added)
+    // Use setTimeout to ensure DOM has updated
     if (firstNewKey) {
-      setLastAddedKey(firstNewKey)
+      setTimeout(() => {
+        setLastAddedKey(firstNewKey)
+      }, 150)
     }
   }
 
