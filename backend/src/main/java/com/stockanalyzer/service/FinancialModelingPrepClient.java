@@ -14,9 +14,11 @@ import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 public class FinancialModelingPrepClient {
     private static final String BASE_URL = "https://financialmodelingprep.com/api/v3";
+    private static final Pattern EXCLUDED_HK_SYMBOL_PATTERN = Pattern.compile("^4\\d{3}\\.HK$");
     private final String apiKey;
     private final Gson gson;
     private final StockDataCache cache;
@@ -159,7 +161,7 @@ public class FinancialModelingPrepClient {
                 // For Hong Kong exchange request, filter to only .HK symbols
                 if (exchange != null && (exchange.equalsIgnoreCase("HKG") || exchange.equalsIgnoreCase("HKSE"))) {
                     symbols = symbols.stream()
-                            .filter(symbol -> symbol.endsWith(".HK"))
+                            .filter(symbol -> symbol.endsWith(".HK") && !EXCLUDED_HK_SYMBOL_PATTERN.matcher(symbol).matches())
                             .limit(limit)  // Apply limit after filtering
                             .toList();
                     System.out.println("After .HK filtering: " + symbols.size() + " stocks");
