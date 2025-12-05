@@ -931,6 +931,8 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
         params: { limit: 500, exchange: 'HKG' }
       })
 
+      console.log('[HK500] API Response:', response.data)
+
       const payload = response.data
       const symbols = Array.isArray(payload)
         ? payload
@@ -938,12 +940,22 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
           ? payload.symbols
           : []
 
+      console.log('[HK500] Raw symbols count:', symbols.length)
+      console.log('[HK500] First 10 symbols:', symbols.slice(0, 10))
+
       const normalized = symbols
         .map(item => (typeof item === 'string' ? item : item?.symbol))
         .filter(Boolean)
         .map(symbol => symbol.toUpperCase())
 
-      mergeSymbolsIntoEntries(normalized)
+      console.log('[HK500] Normalized symbols count:', normalized.length)
+      console.log('[HK500] First 10 normalized:', normalized.slice(0, 10))
+
+      if (normalized.length > 0) {
+        mergeSymbolsIntoEntries(normalized)
+      } else {
+        console.warn('[HK500] No symbols returned from API')
+      }
     } catch (error) {
       console.error('Failed to load top HK market cap symbols', error)
     } finally {

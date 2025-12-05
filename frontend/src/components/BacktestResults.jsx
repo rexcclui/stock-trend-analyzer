@@ -1143,6 +1143,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         params: { limit: 500, exchange: 'HKG' }
       })
 
+      console.log('[HK500] API Response:', response.data)
+
       const payload = response.data
       const symbols = Array.isArray(payload)
         ? payload
@@ -1150,16 +1152,26 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
           ? payload.symbols
           : []
 
+      console.log('[HK500] Raw symbols count:', symbols.length)
+      console.log('[HK500] First 10 symbols:', symbols.slice(0, 10))
+
       const normalized = symbols
         .map(item => (typeof item === 'string' ? item : item?.symbol))
         .filter(Boolean)
         .map(symbol => symbol.toUpperCase())
         .filter(symbol => !isDisallowedSymbol(symbol))
 
-      ensureEntries(normalized)
+      console.log('[HK500] Normalized symbols count:', normalized.length)
+      console.log('[HK500] First 10 normalized:', normalized.slice(0, 10))
+
+      if (normalized.length === 0) {
+        setError('No HK stocks returned from API. The exchange parameter might be incorrect.')
+      } else {
+        ensureEntries(normalized)
+      }
     } catch (err) {
       console.error('Failed to load top HK market cap symbols', err)
-      setError('Failed to load top HK market cap symbols')
+      setError('Failed to load top HK market cap symbols: ' + (err.response?.data?.error || err.message))
     } finally {
       setLoadingHKSymbols(false)
     }
