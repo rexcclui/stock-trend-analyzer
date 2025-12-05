@@ -623,6 +623,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
   const [loadingTopSymbols, setLoadingTopSymbols] = useState(false)
   const [loadingHKSymbols, setLoadingHKSymbols] = useState(false)
   const [error, setError] = useState(null)
+  const [lastAddedKey, setLastAddedKey] = useState(null)
   const initialHydratedResultsRef = useRef(null)
   const [results, setResults] = useState(() => {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') return []
@@ -828,6 +829,22 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     }
   }, [scanQueue, isScanning, scanCompleted, scanTotal, hasHydratedCache])
 
+  // Auto-scroll to newly added entry
+  useEffect(() => {
+    if (!lastAddedKey) return
+
+    // Small delay to ensure DOM is updated
+    const timer = setTimeout(() => {
+      const element = document.querySelector(`[data-entry-key="${lastAddedKey}"]`)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+      setLastAddedKey(null) // Clear after scrolling
+    }, 100)
+
+    return () => clearTimeout(timer)
+  }, [lastAddedKey])
+
   const ensureEntries = (symbolList) => {
     if (!Array.isArray(symbolList) || symbolList.length === 0) return
 
@@ -859,6 +876,12 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         }))
 
       if (newEntries.length === 0) return prev
+
+      // Set the first new entry as last added for auto-scroll
+      if (newEntries.length > 0) {
+        setLastAddedKey(getEntryKey(newEntries[0].symbol, newEntries[0].days))
+      }
+
       return [...prev, ...newEntries]
     })
   }
@@ -1890,6 +1913,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                     return (
                       <tr
                         key={index}
+                        data-entry-key={getEntryKey(result.symbol, result.days)}
                         onClick={() => hasData && onStockSelect && onStockSelect(result.symbol, { ...result.optimalParams, smaPeriods: [result.optimalSMAs?.period], days: result.days })}
                         className={`transition-colors ${hasData ? 'hover:bg-slate-700 cursor-pointer' : 'opacity-75'} ${isWithinLast10Days ? 'bg-blue-900/20 hover:bg-blue-800/30' : ''}`}
                         title={hasData ? (result.breakoutClosed ? 'Click to view (breakout closed by sell signal)' : 'Click to view in Technical Analysis with optimized parameters') : 'Pending scan'}

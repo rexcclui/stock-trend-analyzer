@@ -550,6 +550,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
   const [searchFilter, setSearchFilter] = useState('')
   const [sortConfig, setSortConfig] = useState(defaultSortConfig)
   const [hasHydratedCache, setHasHydratedCache] = useState(false)
+  const [lastAddedId, setLastAddedId] = useState(null)
   const activeScanIdRef = useRef(null)
   const importInputRef = useRef(null)
 
@@ -849,6 +850,8 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
     const allowedSymbols = symbols.filter(symbol => !isDisallowedSymbol(symbol))
     if (allowedSymbols.length === 0) return
 
+    let firstNewId = null
+
     setEntries(prevEntries => {
       const nextEntries = [...prevEntries]
       // Use symbol+period combination as unique key
@@ -858,8 +861,12 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
         const entryKey = getEntryKey(symbol, period)
         if (!existingKeys.has(entryKey)) {
           const cached = hydrateFromResultCache(symbol)
+          const newId = `${symbol}-${period}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
+          if (!firstNewId) {
+            firstNewId = newId
+          }
           nextEntries.push({
-            id: `${symbol}-${period}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+            id: newId,
             symbol,
             period,
             periodDisplay: formatPeriod(period),
@@ -872,6 +879,11 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
 
       return nextEntries
     })
+
+    // Set last added ID for auto-scroll if we added new entries
+    if (firstNewId) {
+      setLastAddedId(firstNewId)
+    }
 
     if (persistHistory) {
       saveToHistory(symbols)
@@ -1457,6 +1469,19 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
     }
   }, [isScanning, scanQueue.length])
 
+  // Auto-scroll to newly added entry
+  useEffect(() => {
+    if (!lastAddedId) return
+    const timer = setTimeout(() => {
+      const element = document.querySelector(`[data-entry-id="${lastAddedId}"]`)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+      setLastAddedId(null)
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [lastAddedId])
+
   // Show loading message while hydrating cache
   if (!hasHydratedCache) {
     return (
@@ -1808,6 +1833,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
                 displayEntries.map(entry => (
                   <tr
                     key={entry.id}
+                    data-entry-id={entry.id}
                     className="hover:bg-slate-800/60 cursor-pointer"
                     onClick={() => handleRowClick(entry)}
                     title="Click to open in Technical Analysis with Vol Prf V2"
