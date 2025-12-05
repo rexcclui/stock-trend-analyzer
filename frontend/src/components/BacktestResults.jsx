@@ -1115,7 +1115,16 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     if (allowedSymbols.length === 0) return
 
     ensureEntries(allowedSymbols)
+
     if (startScan) {
+      // Mark the entries with current days as 'queued' so scanner knows which ones to process
+      setResults(prev => prev.map(entry => {
+        if (allowedSymbols.includes(entry.symbol) && entry.days === days && entry.status === 'pending') {
+          return { ...entry, status: 'queued' }
+        }
+        return entry
+      }))
+
       setScanQueue(prev => {
         const existing = new Set(prev)
         const merged = [...prev, ...allowedSymbols.filter(symbol => !existing.has(symbol))]
@@ -1295,8 +1304,9 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     const currentSymbol = scanQueue[0]
     if (activeScanSymbolRef.current === currentSymbol) return
 
-    // Find the entry to get its days value (find first pending/loading entry)
-    const entry = results.find(r => r.symbol === currentSymbol && (r.status === 'pending' || r.status === 'loading'))
+    // Find the entry to get its days value (find first queued entry, then fall back to pending/loading)
+    const entry = results.find(r => r.symbol === currentSymbol && r.status === 'queued') ||
+                  results.find(r => r.symbol === currentSymbol && (r.status === 'pending' || r.status === 'loading'))
     if (!entry) return  // Entry might have been removed
 
     activeScanSymbolRef.current = currentSymbol
@@ -1906,10 +1916,10 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                         </td>
                         <td className="px-2 py-3 text-sm max-w-[80px]">
                           <span
-                            className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${status === 'completed' ? 'bg-emerald-900/50 text-emerald-200' : status === 'loading' ? 'bg-amber-900/40 text-amber-200' : status === 'error' ? 'bg-red-900/50 text-red-200' : 'bg-slate-700 text-slate-200'}`}
+                            className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${status === 'completed' ? 'bg-emerald-900/50 text-emerald-200' : status === 'loading' ? 'bg-amber-900/40 text-amber-200' : status === 'queued' ? 'bg-blue-900/40 text-blue-200' : status === 'error' ? 'bg-red-900/50 text-red-200' : 'bg-slate-700 text-slate-200'}`}
                             title={result.error || undefined}
                           >
-                            {status === 'completed' ? 'Done' : status === 'loading' ? 'Scanning' : status === 'error' ? 'Error' : 'Pending'}
+                            {status === 'completed' ? 'Done' : status === 'loading' ? 'Scanning' : status === 'queued' ? 'Queued' : status === 'error' ? 'Error' : 'Pending'}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
