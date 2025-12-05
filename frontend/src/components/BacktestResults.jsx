@@ -836,28 +836,40 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
   useEffect(() => {
     if (!lastAddedKey) return
 
-    // Small delay to ensure DOM is updated
-    const scrollTimer = setTimeout(() => {
-      const element = document.querySelector(`[data-entry-key="${lastAddedKey}"]`)
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        // Add blink animation class
-        element.classList.add('blink-highlight')
-      }
-    }, 100)
+    console.log('[BacktestResults] Attempting to scroll to:', lastAddedKey)
 
-    // Remove blink animation and clear state after 3 seconds
-    const blinkTimer = setTimeout(() => {
-      const element = document.querySelector(`[data-entry-key="${lastAddedKey}"]`)
-      if (element) {
-        element.classList.remove('blink-highlight')
+    // Use requestAnimationFrame to ensure DOM is ready
+    const rafId = requestAnimationFrame(() => {
+      const scrollTimer = setTimeout(() => {
+        const element = document.querySelector(`[data-entry-key="${lastAddedKey}"]`)
+        console.log('[BacktestResults] Element found:', element)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          // Add blink animation class
+          element.classList.add('blink-highlight')
+          console.log('[BacktestResults] Scrolled and blink added')
+        } else {
+          console.warn('[BacktestResults] Element not found for key:', lastAddedKey)
+        }
+      }, 200)
+
+      // Remove blink animation and clear state after 3 seconds
+      const blinkTimer = setTimeout(() => {
+        const element = document.querySelector(`[data-entry-key="${lastAddedKey}"]`)
+        if (element) {
+          element.classList.remove('blink-highlight')
+        }
+        setLastAddedKey(null)
+      }, 3300)
+
+      return () => {
+        clearTimeout(scrollTimer)
+        clearTimeout(blinkTimer)
       }
-      setLastAddedKey(null)
-    }, 3100)
+    })
 
     return () => {
-      clearTimeout(scrollTimer)
-      clearTimeout(blinkTimer)
+      cancelAnimationFrame(rafId)
     }
   }, [lastAddedKey])
 
@@ -868,6 +880,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     if (allowedSymbols.length === 0) return
 
     let firstNewKey = null
+    let existingSymbols = []
 
     setResults(prev => {
       // Use symbol+days combination as unique key to allow same stock with different periods
@@ -877,6 +890,12 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
           .filter(r => r.days != null)
           .map(r => getEntryKey(r.symbol, r.days))
       )
+
+      // Check which symbols already exist
+      existingSymbols = allowedSymbols.filter(symbol =>
+        existingKeys.has(getEntryKey(symbol, days))
+      )
+
       const newEntries = allowedSymbols
         .filter(Boolean)
         .filter(symbol => !existingKeys.has(getEntryKey(symbol, days)))
@@ -912,9 +931,23 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     // Set the first new entry as last added for auto-scroll (only if new entries were added)
     // Use setTimeout to ensure DOM has updated
     if (firstNewKey) {
+      console.log('[BacktestResults] New entry, setting lastAddedKey to:', firstNewKey)
       setTimeout(() => {
         setLastAddedKey(firstNewKey)
       }, 150)
+    } else if (existingSymbols.length > 0) {
+      // Stock already exists - scroll to the existing entry
+      console.log('[BacktestResults] Stock already exists, scrolling to existing entry:', existingSymbols)
+      const existingEntry = results.find(r =>
+        existingSymbols.includes(r.symbol) && r.days === days
+      )
+      if (existingEntry) {
+        const existingKey = getEntryKey(existingEntry.symbol, existingEntry.days)
+        console.log('[BacktestResults] Found existing entry:', existingKey)
+        setTimeout(() => {
+          setLastAddedKey(existingKey)
+        }, 100)
+      }
     }
   }
 
