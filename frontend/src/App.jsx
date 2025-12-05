@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { TrendingUp, BarChart3, Activity, Waves } from 'lucide-react'
+import { TrendingUp, BarChart3, Activity, Waves, Bug } from 'lucide-react'
 import StockAnalyzer from './components/StockAnalyzer'
 import BacktestResults from './components/BacktestResults'
 import VolumeScreening from './components/VolumeScreening'
@@ -10,6 +10,47 @@ function App() {
   const [selectedSymbol, setSelectedSymbol] = useState('')
   const [selectedParams, setSelectedParams] = useState(null)
   const [volumeSymbol, setVolumeSymbol] = useState(null)
+
+  const exportLocalStorage = () => {
+    if (typeof window === 'undefined') return
+
+    const entries = []
+    let totalSizeBytes = 0
+
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i)
+      if (!key) continue
+
+      const value = localStorage.getItem(key) ?? ''
+      const sizeBytes = new Blob([value]).size
+
+      entries.push({ key, value, sizeBytes })
+      totalSizeBytes += sizeBytes
+    }
+
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      totalSizeBytes,
+      entries,
+    }
+
+    const exportName = `localStorage-export-${new Date()
+      .toISOString()
+      .replace(/[:.]/g, '-')}.json`
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json',
+    })
+
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = exportName
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
 
   // Handle clicking on a stock in backtest results
   const handleStockSelect = (symbol, optimalParams) => {
@@ -26,7 +67,7 @@ function App() {
 
   return (
     <div className="min-h-screen p-0 md:p-8">
-      <div className="w-full">
+      <div className="w-full relative">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-4">
@@ -36,6 +77,16 @@ function App() {
             </h1>
           </div>
         </div>
+
+        <button
+          onClick={exportLocalStorage}
+          className="absolute right-0 top-0 flex items-center gap-1 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-md px-2.5 py-1.5 shadow-md transition-colors"
+          title="Export LocalStorage contents"
+          aria-label="Export LocalStorage contents"
+        >
+          <Bug className="w-4 h-4" />
+          Debug export
+        </button>
 
         {/* Tab Navigation */}
         <div className="bg-slate-800 rounded-lg shadow-lg mb-6 border border-slate-700">
