@@ -2040,7 +2040,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
                             <span
                               key={`${entry.id}-${slot.legendIndex}`}
                               title={`${formatPriceRange(slot.start, slot.end)} • ${slot.label}`}
-                              className={`px-2 py-1 text-xs font-semibold rounded-md shadow-sm border border-slate-800/60 ${slot.isCurrent ? 'ring-2 ring-amber-400' : ''
+                              className={`px-1.5 py-1 text-[10px] leading-tight font-semibold rounded-md shadow-sm border border-slate-800/60 text-center min-w-[2.75rem] ${slot.isCurrent ? 'ring-2 ring-amber-400' : ''
                                 }`}
                               style={{
                                 backgroundColor: slot.color,
