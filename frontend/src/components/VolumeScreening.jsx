@@ -1922,9 +1922,6 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
                   </span>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Days
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Px Slots
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
@@ -2010,15 +2007,12 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
                     </td>
                     <td className="px-4 py-3 text-slate-100 font-medium">{entry.symbol}</td>
                     <td className="px-4 py-3 text-center">
-                      <span className="px-2 py-1 rounded bg-purple-900/50 text-purple-200 text-xs font-semibold">
+                      <span
+                        className="px-2 py-1 rounded bg-purple-900/50 text-purple-200 text-xs font-semibold"
+                        title={entry.testedDays && entry.testedDays !== '—' ? `${entry.testedDays} days` : undefined}
+                      >
                         {entry.periodDisplay || formatPeriod(entry.period)}
                       </span>
-                    </td>
-                    <td
-                      className="px-4 py-3 text-slate-200"
-                      title={entry.lastDataDate ? `Last data point: ${entry.lastDataDate}` : undefined}
-                    >
-                      {entry.testedDays}
                     </td>
                     <td className="px-4 py-3 text-slate-200">{entry.slotCount}</td>
                     <td className={`px-4 py-3 text-xs ${isScanStale(entry.lastScanAt) ? 'text-red-400' : 'text-slate-200'}`}>
