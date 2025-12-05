@@ -28,6 +28,24 @@ const defaultSortConfig = {
   direction: 'desc'
 }
 
+// Helper function to convert days to display period (e.g., 1825 -> "5Y")
+function formatPeriod(days) {
+  const daysNum = parseInt(days, 10)
+  if (daysNum >= 3650) return 'Max'
+  if (daysNum >= 1825) return '5Y'
+  if (daysNum >= 1095) return '3Y'
+  if (daysNum >= 730) return '2Y'
+  if (daysNum >= 365) return '1Y'
+  if (daysNum >= 180) return '6M'
+  if (daysNum >= 90) return '3M'
+  return `${daysNum}D`
+}
+
+// Helper function to create unique key for symbol+period combination
+function getEntryKey(symbol, days) {
+  return `${symbol}-${days}`
+}
+
 // Helper function to process individual stock symbol - convert numbers to .HK format
 function processStockSymbol(symbol) {
   const trimmed = symbol.trim().toUpperCase()
@@ -833,16 +851,22 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
 
     setEntries(prevEntries => {
       const nextEntries = [...prevEntries]
+      // Use symbol+period combination as unique key
+      const existingKeys = new Set(nextEntries.map(e => getEntryKey(e.symbol, e.period)))
 
       allowedSymbols.forEach(symbol => {
-        if (!nextEntries.some(entry => entry.symbol === symbol)) {
+        const entryKey = getEntryKey(symbol, period)
+        if (!existingKeys.has(entryKey)) {
           const cached = hydrateFromResultCache(symbol)
           nextEntries.push({
-            id: `${symbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+            id: `${symbol}-${period}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
             symbol,
+            period,
+            periodDisplay: formatPeriod(period),
             bookmarked: false,
             ...(cached || baseEntryState)
           })
+          existingKeys.add(entryKey)
         }
       })
 
