@@ -12,6 +12,23 @@ const INVALID_FIVE_CHAR_LENGTH = 5
 const BLOCKED_SUFFIX = '.TO'
 const HYPHEN = '-'
 
+// Helper function to convert days to display period (e.g., 1825 -> "5Y")
+function formatPeriod(days) {
+  const daysNum = parseInt(days, 10)
+  if (daysNum >= 1825) return '5Y'
+  if (daysNum >= 1095) return '3Y'
+  if (daysNum >= 730) return '2Y'
+  if (daysNum >= 365) return '1Y'
+  if (daysNum >= 180) return '6M'
+  if (daysNum >= 90) return '3M'
+  return `${daysNum}D`
+}
+
+// Helper function to create unique key for symbol+period combination
+function getEntryKey(symbol, days) {
+  return `${symbol}-${days}`
+}
+
 function computeMarketChange(priceData) {
   if (!Array.isArray(priceData) || priceData.length === 0) return null
 
@@ -818,10 +835,11 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     if (allowedSymbols.length === 0) return
 
     setResults(prev => {
-      const existingSymbols = new Set(prev.map(r => r.symbol))
+      // Use symbol+days combination as unique key to allow same stock with different periods
+      const existingKeys = new Set(prev.map(r => getEntryKey(r.symbol, r.days)))
       const newEntries = allowedSymbols
         .filter(Boolean)
-        .filter(symbol => !existingSymbols.has(symbol))
+        .filter(symbol => !existingKeys.has(getEntryKey(symbol, days)))
         .map(symbol => ({
           symbol,
           status: 'pending',
@@ -831,6 +849,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
           optimalParams: null,
           optimalSMAs: null,
           days,
+          period: formatPeriod(days),  // Add period display format
           isRecentBreakout: false,
           recentBreakout: null,
           totalSignals: null,
@@ -938,10 +957,13 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     }
   }
 
-  const runBacktestForSymbol = async (symbol) => {
+  const runBacktestForSymbol = async (symbol, entryDays = null) => {
+    // Use provided entryDays or current days state
+    const targetDays = entryDays || days
+
     ensureEntries([symbol])
     setResults(prev => prev.map(entry => (
-      entry.symbol === symbol
+      entry.symbol === symbol && entry.days === targetDays
         ? { ...entry, status: 'loading', error: null, durationMs: null }
         : entry
     )))
@@ -949,14 +971,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     const startTime = Date.now()
     try {
       const cacheKey = symbol
-      let cachedData = apiCache.get(cacheKey, days)
+      let cachedData = apiCache.get(cacheKey, targetDays)
       let priceData
 
       if (!cachedData) {
         const response = await axios.get(joinUrl(API_URL, '/analyze'), {
-          params: { symbol, days }
+          params: { symbol, days: targetDays }
         })
-        apiCache.set(cacheKey, days, response.data)
+        apiCache.set(cacheKey, targetDays, response.data)
         priceData = response.data.prices
       } else {
         priceData = cachedData.prices
@@ -1063,7 +1085,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         optimalSMAs,
         marketChange,
         durationMs,
-        days,
+        days: targetDays,
+        period: formatPeriod(targetDays),  // Add period display format
         isRecentBreakout: Boolean(latestRecentBreakout),
         recentBreakout: latestRecentBreakout,
         upResist,
@@ -1073,12 +1096,12 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
       }
 
       setResults(prev => prev.map(entry => (
-        entry.symbol === symbol ? completedEntry : entry
+        entry.symbol === symbol && entry.days === targetDays ? completedEntry : entry
       )))
     } catch (err) {
       console.error(`Error processing ${symbol}:`, err)
       setResults(prev => prev.map(entry => (
-        entry.symbol === symbol
+        entry.symbol === symbol && entry.days === targetDays
           ? clearEntryData({ ...entry, durationMs: Date.now() - startTime }, 'error', err.message || 'Failed to run backtest')
           : entry
       )))
@@ -1241,9 +1264,9 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     setIsScanning(true)
   }
 
-  const toggleBookmark = (symbol) => {
+  const toggleBookmark = (symbol, entryDays) => {
     setResults(prev => prev.map(entry => (
-      entry.symbol === symbol ? { ...entry, bookmarked: !entry.bookmarked } : entry
+      entry.symbol === symbol && entry.days === entryDays ? { ...entry, bookmarked: !entry.bookmarked } : entry
     )))
   }
 
@@ -1272,11 +1295,15 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     const currentSymbol = scanQueue[0]
     if (activeScanSymbolRef.current === currentSymbol) return
 
+    // Find the entry to get its days value (find first pending/loading entry)
+    const entry = results.find(r => r.symbol === currentSymbol && (r.status === 'pending' || r.status === 'loading'))
+    if (!entry) return  // Entry might have been removed
+
     activeScanSymbolRef.current = currentSymbol
     setLoading(true)
 
     ; (async () => {
-      await runBacktestForSymbol(currentSymbol)
+      await runBacktestForSymbol(currentSymbol, entry.days)
       setScanCompleted(prev => prev + 1)
       setScanQueue(prev => prev.slice(1))
       activeScanSymbolRef.current = null
@@ -1816,6 +1843,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                       </span>
                     </th>
                     <th onClick={() => handleSort('symbol')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Stock ticker symbol">Symbol {renderSortIndicator('symbol')}</th>
+                    <th onClick={() => handleSort('period')} className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Analysis period (3M, 6M, 1Y, 2Y, 3Y, 5Y)">Period {renderSortIndicator('period')}</th>
                     <th onClick={() => handleSort('status')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Backtest scan status: pending, loading, completed, or error">Status {renderSortIndicator('status')}</th>
                     <th onClick={() => handleSort('dataPoints')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Number of data points (trading days) tested in backtest">Days {renderSortIndicator('dataPoints')}</th>
                     <th onClick={() => handleSort('daysAgo')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Number of days since the most recent breakout signal">Days Ago {renderSortIndicator('daysAgo')}</th>
@@ -1860,7 +1888,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              toggleBookmark(result.symbol)
+                              toggleBookmark(result.symbol, result.days)
                             }}
                             className={`p-1 rounded transition-colors ${result.bookmarked ? 'text-amber-300 hover:text-amber-200 hover:bg-amber-900/30' : 'text-slate-400 hover:text-amber-200 hover:bg-slate-700/70'}`}
                             title={result.bookmarked ? 'Remove bookmark' : 'Bookmark stock'}
@@ -1870,6 +1898,11 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                         </td>
                         <td className="px-4 py-3 text-sm font-bold text-blue-400">
                           {result.symbol}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-center">
+                          <span className="px-2 py-1 rounded bg-purple-900/50 text-purple-200 text-xs font-semibold">
+                            {result.period || formatPeriod(result.days)}
+                          </span>
                         </td>
                         <td className="px-2 py-3 text-sm max-w-[80px]">
                           <span
