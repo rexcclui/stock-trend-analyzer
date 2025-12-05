@@ -857,9 +857,14 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
 
     setEntries(prevEntries => {
       const nextEntries = [...prevEntries]
-      // Use symbol+period combination as unique key
-      const existingKeys = new Set(nextEntries.map(e => getEntryKey(e.symbol, e.period)))
+      // Use symbol+period combination as unique key (filter out entries without period)
+      const existingKeys = new Set(
+        nextEntries
+          .filter(e => e.period != null)
+          .map(e => getEntryKey(e.symbol, e.period))
+      )
 
+      let addedCount = 0
       allowedSymbols.forEach(symbol => {
         const entryKey = getEntryKey(symbol, period)
         if (!existingKeys.has(entryKey)) {
@@ -877,6 +882,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
             ...(cached || baseEntryState)
           })
           existingKeys.add(entryKey)
+          addedCount++
         }
       })
 

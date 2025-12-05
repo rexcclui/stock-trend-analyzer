@@ -867,39 +867,52 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     const allowedSymbols = symbolList.filter(symbol => !isDisallowedSymbol(symbol))
     if (allowedSymbols.length === 0) return
 
+    let firstNewKey = null
+
     setResults(prev => {
       // Use symbol+days combination as unique key to allow same stock with different periods
-      const existingKeys = new Set(prev.map(r => getEntryKey(r.symbol, r.days)))
+      // Filter out entries without days field to handle old cached data
+      const existingKeys = new Set(
+        prev
+          .filter(r => r.days != null)
+          .map(r => getEntryKey(r.symbol, r.days))
+      )
       const newEntries = allowedSymbols
         .filter(Boolean)
         .filter(symbol => !existingKeys.has(getEntryKey(symbol, days)))
-        .map(symbol => ({
-          symbol,
-          status: 'pending',
-          latestBreakout: null,
-          latestPrice: null,
-          priceData: null,
-          optimalParams: null,
-          optimalSMAs: null,
-          days,
-          period: formatPeriod(days),  // Add period display format
-          isRecentBreakout: false,
-          recentBreakout: null,
-          totalSignals: null,
-          error: null,
-          bookmarked: false,
-          marketChange: null
-        }))
+        .map(symbol => {
+          const key = getEntryKey(symbol, days)
+          if (!firstNewKey) {
+            firstNewKey = key
+          }
+          return {
+            symbol,
+            status: 'pending',
+            latestBreakout: null,
+            latestPrice: null,
+            priceData: null,
+            optimalParams: null,
+            optimalSMAs: null,
+            days,
+            period: formatPeriod(days),  // Add period display format
+            isRecentBreakout: false,
+            recentBreakout: null,
+            totalSignals: null,
+            error: null,
+            bookmarked: false,
+            marketChange: null
+          }
+        })
 
       if (newEntries.length === 0) return prev
 
-      // Set the first new entry as last added for auto-scroll
-      if (newEntries.length > 0) {
-        setLastAddedKey(getEntryKey(newEntries[0].symbol, newEntries[0].days))
-      }
-
       return [...prev, ...newEntries]
     })
+
+    // Set the first new entry as last added for auto-scroll (only if new entries were added)
+    if (firstNewKey) {
+      setLastAddedKey(firstNewKey)
+    }
   }
 
   const eraseResult = (symbol) => {
