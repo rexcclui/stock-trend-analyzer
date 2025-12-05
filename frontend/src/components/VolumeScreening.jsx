@@ -1728,6 +1728,9 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Stock
                 </th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                  Period
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Days
                 </th>
@@ -1815,6 +1818,11 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
                       </button>
                     </td>
                     <td className="px-4 py-3 text-slate-100 font-medium">{entry.symbol}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="px-2 py-1 rounded bg-purple-900/50 text-purple-200 text-xs font-semibold">
+                        {entry.periodDisplay || formatPeriod(entry.period)}
+                      </span>
+                    </td>
                     <td
                       className="px-4 py-3 text-slate-200"
                       title={entry.lastDataDate ? `Last data point: ${entry.lastDataDate}` : undefined}
