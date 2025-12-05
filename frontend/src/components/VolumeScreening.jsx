@@ -2054,11 +2054,17 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
                         <span className="text-slate-400">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-200">{entry.priceRange}</td>
-                    <td className={`px-4 py-3 text-slate-200 ${isResistanceClose(entry.bottomResist) ? 'text-sky-400 font-semibold' : ''}`}>
+                    <td className="px-4 py-3 text-slate-200 text-sm">{entry.priceRange}</td>
+                    <td
+                      className={`px-4 py-3 text-slate-200 text-sm ${isResistanceClose(entry.bottomResist) ? 'text-sky-400 font-semibold' : ''}`}
+                      title={entry.bottomResist}
+                    >
                       {entry.bottomResist}
                     </td>
-                    <td className={`px-4 py-3 text-slate-200 ${isResistanceClose(entry.upperResist) ? 'text-sky-400 font-semibold' : ''}`}>
+                    <td
+                      className={`px-4 py-3 text-slate-200 text-sm ${isResistanceClose(entry.upperResist) ? 'text-sky-400 font-semibold' : ''}`}
+                      title={entry.upperResist}
+                    >
                       {entry.upperResist}
                     </td>
                     <td className="px-4 py-3 text-slate-200">{entry.breakout}</td>
