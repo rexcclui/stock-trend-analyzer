@@ -936,6 +936,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
     )
 
     const firstNewId = mergeSymbolsIntoEntries(allowedSymbols, { persistHistory: true })
+    console.log('[VolumeScreening] addSymbols - firstNewId:', firstNewId, 'newSymbols:', newSymbols)
     setSymbolInput('')
 
     // Automatically scan newly added symbols
@@ -967,16 +968,18 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
 
         // Trigger scroll after entries are updated and rendered
         if (firstNewId) {
+          console.log('[VolumeScreening] Setting lastAddedId to:', firstNewId)
           setTimeout(() => {
             setLastAddedId(firstNewId)
-          }, 100)
+          }, 150)
         }
       }, 50)
     } else if (firstNewId) {
       // If no scan needed but entry was added, still trigger scroll
+      console.log('[VolumeScreening] No scan needed, setting lastAddedId to:', firstNewId)
       setTimeout(() => {
         setLastAddedId(firstNewId)
-      }, 150)
+      }, 200)
     }
   }
 
@@ -1547,28 +1550,40 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
   useEffect(() => {
     if (!lastAddedId) return
 
-    // Small delay to ensure DOM is updated
-    const scrollTimer = setTimeout(() => {
-      const element = document.querySelector(`[data-entry-id="${lastAddedId}"]`)
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        // Add blink animation class
-        element.classList.add('blink-highlight')
-      }
-    }, 100)
+    console.log('[VolumeScreening] Attempting to scroll to:', lastAddedId)
 
-    // Remove blink animation and clear state after 3 seconds
-    const blinkTimer = setTimeout(() => {
-      const element = document.querySelector(`[data-entry-id="${lastAddedId}"]`)
-      if (element) {
-        element.classList.remove('blink-highlight')
+    // Use requestAnimationFrame to ensure DOM is ready
+    const rafId = requestAnimationFrame(() => {
+      const scrollTimer = setTimeout(() => {
+        const element = document.querySelector(`[data-entry-id="${lastAddedId}"]`)
+        console.log('[VolumeScreening] Element found:', element)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          // Add blink animation class
+          element.classList.add('blink-highlight')
+          console.log('[VolumeScreening] Scrolled and blink added')
+        } else {
+          console.warn('[VolumeScreening] Element not found for ID:', lastAddedId)
+        }
+      }, 200)
+
+      // Remove blink animation and clear state after 3 seconds
+      const blinkTimer = setTimeout(() => {
+        const element = document.querySelector(`[data-entry-id="${lastAddedId}"]`)
+        if (element) {
+          element.classList.remove('blink-highlight')
+        }
+        setLastAddedId(null)
+      }, 3300)
+
+      return () => {
+        clearTimeout(scrollTimer)
+        clearTimeout(blinkTimer)
       }
-      setLastAddedId(null)
-    }, 3100)
+    })
 
     return () => {
-      clearTimeout(scrollTimer)
-      clearTimeout(blinkTimer)
+      cancelAnimationFrame(rafId)
     }
   }, [lastAddedId])
 
