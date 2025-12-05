@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search } from 'lucide-react'
+import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search, Clock3 } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
@@ -1915,8 +1915,11 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
                     {renderSortIndicator('symbol')}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Period
+                <th className="px-4 py-3 text-center text-xs font-semibold text-slate-300 uppercase tracking-wider" title="Analysis period (3M, 6M, 1Y, 2Y, 3Y, 5Y)">
+                  <span className="inline-flex items-center justify-center gap-1">
+                    <Clock3 className="w-4 h-4" aria-hidden="true" />
+                    <span className="sr-only">Period</span>
+                  </span>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Days

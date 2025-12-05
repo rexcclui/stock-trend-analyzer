@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
-import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2, RotateCw, Upload, Download, Filter, Waves, Hash } from 'lucide-react'
+import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2, RotateCw, Upload, Download, Filter, Waves, Hash, Clock3 } from 'lucide-react'
 import { apiCache } from '../utils/apiCache'
 import { joinUrl } from '../utils/urlHelper'
 
@@ -1981,7 +1981,13 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                       </span>
                     </th>
                     <th onClick={() => handleSort('symbol')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Stock ticker symbol">Symbol {renderSortIndicator('symbol')}</th>
-                    <th onClick={() => handleSort('period')} className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Analysis period (3M, 6M, 1Y, 2Y, 3Y, 5Y)">Period {renderSortIndicator('period')}</th>
+                    <th onClick={() => handleSort('period')} className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Analysis period (3M, 6M, 1Y, 2Y, 3Y, 5Y)">
+                      <span className="inline-flex items-center justify-center gap-1">
+                        <Clock3 className="w-4 h-4" aria-hidden="true" />
+                        <span className="sr-only">Period</span>
+                        {renderSortIndicator('period')}
+                      </span>
+                    </th>
                     <th onClick={() => handleSort('status')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Backtest scan status: pending, loading, completed, or error">Status {renderSortIndicator('status')}</th>
                     <th onClick={() => handleSort('dataPoints')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Number of data points (trading days) tested in backtest">Days {renderSortIndicator('dataPoints')}</th>
                     <th onClick={() => handleSort('daysAgo')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Number of days since the most recent breakout signal">Days Ago {renderSortIndicator('daysAgo')}</th>
