@@ -887,8 +887,18 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
       return
     }
 
+    // Calculate existing symbols BEFORE setResults using current results state
+    const existingKeys = new Set(
+      results
+        .filter(r => r.days != null)
+        .map(r => getEntryKey(r.symbol, r.days))
+    )
+    const existingSymbols = allowedSymbols.filter(symbol =>
+      existingKeys.has(getEntryKey(symbol, days))
+    )
+    console.log('[BacktestResults] existingSymbols calculated BEFORE setResults:', existingSymbols)
+
     let firstNewKey = null
-    let existingSymbols = []
 
     setResults(prev => {
       // Use symbol+days combination as unique key to allow same stock with different periods
@@ -897,11 +907,6 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         prev
           .filter(r => r.days != null)
           .map(r => getEntryKey(r.symbol, r.days))
-      )
-
-      // Check which symbols already exist
-      existingSymbols = allowedSymbols.filter(symbol =>
-        existingKeys.has(getEntryKey(symbol, days))
       )
 
       const newEntries = allowedSymbols
@@ -931,7 +936,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
           }
         })
 
-      console.log('[BacktestResults] newEntries:', newEntries.length, 'existingSymbols:', existingSymbols)
+      console.log('[BacktestResults] newEntries:', newEntries.length)
 
       if (newEntries.length === 0) return prev
 
