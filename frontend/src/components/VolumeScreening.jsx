@@ -11,6 +11,7 @@ const TOP_SYMBOL_CACHE_KEY = 'volumeTopMarketSymbols'
 const CACHE_TTL_MS = 16 * 60 * 60 * 1000
 const RECENT_SCAN_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000
 const TOP_SYMBOL_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 1 month cache for top 2000 symbols
+const STALE_DATA_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000 // 1 month threshold for latest data point
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const INVALID_FIVE_CHAR_LENGTH = 5
 const BLOCKED_SUFFIX = '.TO'
@@ -94,6 +95,15 @@ function formatTimestamp(dateString) {
   const hours = String(parsed.getHours()).padStart(2, '0')
   const minutes = String(parsed.getMinutes()).padStart(2, '0')
   return `${month}-${day} ${hours}:${minutes}`
+}
+
+function isStaleDataDate(dateString) {
+  if (!dateString) return false
+  const parsed = new Date(dateString)
+  const parsedTime = parsed.getTime()
+  if (Number.isNaN(parsedTime)) return false
+
+  return Date.now() - parsedTime > STALE_DATA_THRESHOLD_MS
 }
 
 function isInvalidFiveCharSymbol(symbol) {
@@ -1126,6 +1136,14 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
 
       // Get the last data point date (most recent date - prices are in reverse chronological order)
       const lastDataDate = prices.length > 0 ? prices[0].date : null
+
+      if (isStaleDataDate(lastDataDate)) {
+        return {
+          ...entry,
+          removeRow: true,
+          stopAll: false
+        }
+      }
 
       return {
         ...entry,
