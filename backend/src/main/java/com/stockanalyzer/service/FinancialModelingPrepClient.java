@@ -114,10 +114,10 @@ public class FinancialModelingPrepClient {
         StringBuilder urlBuilder = new StringBuilder();
         urlBuilder.append(String.format("%s/stock-screener?marketCapMoreThan=0&limit=%d", BASE_URL, limit));
 
-        // Try using country filter instead of exchange for Hong Kong
+        // For Hong Kong, use country filter to get HK-based companies
         if (exchange != null && !exchange.isEmpty()) {
             if (exchange.equalsIgnoreCase("HKG") || exchange.equalsIgnoreCase("HKSE")) {
-                // Use country filter for Hong Kong
+                // Use country filter for Hong Kong - we'll filter to .HK symbols below
                 urlBuilder.append("&country=HK");
                 System.out.println("Using country filter: HK");
             } else {
@@ -148,13 +148,24 @@ public class FinancialModelingPrepClient {
                     return List.of();
                 }
 
-                System.out.println("FMP returned " + data.size() + " stocks");
+                System.out.println("FMP returned " + data.size() + " stocks before filtering");
 
-                return data.stream()
+                List<String> symbols = data.stream()
                         .map(entry -> (String) entry.get("symbol"))
                         .filter(Objects::nonNull)
                         .map(String::toUpperCase)
                         .toList();
+
+                // For Hong Kong exchange request, filter to only .HK symbols
+                if (exchange != null && (exchange.equalsIgnoreCase("HKG") || exchange.equalsIgnoreCase("HKSE"))) {
+                    symbols = symbols.stream()
+                            .filter(symbol -> symbol.endsWith(".HK"))
+                            .limit(limit)  // Apply limit after filtering
+                            .toList();
+                    System.out.println("After .HK filtering: " + symbols.size() + " stocks");
+                }
+
+                return symbols;
             }
         }
     }
