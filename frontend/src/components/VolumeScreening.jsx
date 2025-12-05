@@ -1486,17 +1486,33 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
     }
   }, [isScanning, scanQueue.length])
 
-  // Auto-scroll to newly added entry
+  // Auto-scroll to newly added entry and apply blink effect
   useEffect(() => {
     if (!lastAddedId) return
-    const timer = setTimeout(() => {
+
+    // Small delay to ensure DOM is updated
+    const scrollTimer = setTimeout(() => {
       const element = document.querySelector(`[data-entry-id="${lastAddedId}"]`)
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // Add blink animation class
+        element.classList.add('blink-highlight')
+      }
+    }, 100)
+
+    // Remove blink animation and clear state after 3 seconds
+    const blinkTimer = setTimeout(() => {
+      const element = document.querySelector(`[data-entry-id="${lastAddedId}"]`)
+      if (element) {
+        element.classList.remove('blink-highlight')
       }
       setLastAddedId(null)
-    }, 100)
-    return () => clearTimeout(timer)
+    }, 3100)
+
+    return () => {
+      clearTimeout(scrollTimer)
+      clearTimeout(blinkTimer)
+    }
   }, [lastAddedId])
 
   // Show loading message while hydrating cache
@@ -1513,6 +1529,15 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
 
   return (
     <div className="space-y-4">
+      <style>{`
+        @keyframes blinkHighlight {
+          0%, 100% { background-color: transparent; }
+          50% { background-color: rgba(168, 85, 247, 0.3); }
+        }
+        .blink-highlight {
+          animation: blinkHighlight 1s ease-in-out 3;
+        }
+      `}</style>
       <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 space-y-4">
         <div className="flex flex-col lg:flex-row gap-4">
           <div className="flex-1">

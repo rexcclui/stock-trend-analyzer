@@ -832,20 +832,33 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     }
   }, [scanQueue, isScanning, scanCompleted, scanTotal, hasHydratedCache])
 
-  // Auto-scroll to newly added entry
+  // Auto-scroll to newly added entry and apply blink effect
   useEffect(() => {
     if (!lastAddedKey) return
 
     // Small delay to ensure DOM is updated
-    const timer = setTimeout(() => {
+    const scrollTimer = setTimeout(() => {
       const element = document.querySelector(`[data-entry-key="${lastAddedKey}"]`)
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // Add blink animation class
+        element.classList.add('blink-highlight')
       }
-      setLastAddedKey(null) // Clear after scrolling
     }, 100)
 
-    return () => clearTimeout(timer)
+    // Remove blink animation and clear state after 3 seconds
+    const blinkTimer = setTimeout(() => {
+      const element = document.querySelector(`[data-entry-key="${lastAddedKey}"]`)
+      if (element) {
+        element.classList.remove('blink-highlight')
+      }
+      setLastAddedKey(null)
+    }, 3100)
+
+    return () => {
+      clearTimeout(scrollTimer)
+      clearTimeout(blinkTimer)
+    }
   }, [lastAddedKey])
 
   const ensureEntries = (symbolList) => {
@@ -1587,6 +1600,15 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
 
   return (
     <div className="space-y-6">
+      <style>{`
+        @keyframes blinkHighlight {
+          0%, 100% { background-color: transparent; }
+          50% { background-color: rgba(168, 85, 247, 0.3); }
+        }
+        .blink-highlight {
+          animation: blinkHighlight 1s ease-in-out 3;
+        }
+      `}</style>
       {/* Header */}
       <div className="bg-gradient-to-r from-purple-900/50 to-blue-900/50 p-6 rounded-lg border border-purple-700">
         <h2 className="text-2xl font-bold text-white mb-2">Vol Prf V2 + SMA Backtest Scanner</h2>
