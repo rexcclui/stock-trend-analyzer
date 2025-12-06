@@ -1402,13 +1402,13 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
 
   const scrollTableToTop = () => {
     if (!tableScrollRef.current) return
-    tableScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+    tableScrollRef.current.scrollTo({ top: 0, behavior: 'auto' })
     tableScrollRef.current.focus({ preventScroll: true })
   }
 
   const scrollTableToBottom = () => {
     if (!tableScrollRef.current) return
-    tableScrollRef.current.scrollTo({ top: tableScrollRef.current.scrollHeight, behavior: 'smooth' })
+    tableScrollRef.current.scrollTo({ top: tableScrollRef.current.scrollHeight, behavior: 'auto' })
     tableScrollRef.current.focus({ preventScroll: true })
   }
 
@@ -2019,7 +2019,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
           <div
             ref={tableScrollRef}
             tabIndex={0}
-            className="max-h-[70vh] overflow-y-auto scroll-smooth focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60"
+            className="max-h-[70vh] overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60"
           >
           <table className="min-w-full divide-y divide-slate-700">
             <thead className="bg-slate-800 sticky top-0 z-10 shadow-lg">

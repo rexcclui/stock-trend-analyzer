@@ -1589,13 +1589,13 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
 
   const scrollTableToTop = () => {
     if (!tableScrollRef.current) return
-    tableScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+    tableScrollRef.current.scrollTo({ top: 0, behavior: 'auto' })
     tableScrollRef.current.focus({ preventScroll: true })
   }
 
   const scrollTableToBottom = () => {
     if (!tableScrollRef.current) return
-    tableScrollRef.current.scrollTo({ top: tableScrollRef.current.scrollHeight, behavior: 'smooth' })
+    tableScrollRef.current.scrollTo({ top: tableScrollRef.current.scrollHeight, behavior: 'auto' })
     tableScrollRef.current.focus({ preventScroll: true })
   }
 
@@ -2033,7 +2033,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
               <div
                 ref={tableScrollRef}
                 tabIndex={0}
-                className="max-h-[780px] overflow-y-auto scroll-smooth focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 rounded"
+                className="max-h-[780px] overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 rounded"
               >
                 <table className="min-w-full divide-y divide-slate-700">
                 <thead className="bg-slate-900 sticky top-0 z-10">
