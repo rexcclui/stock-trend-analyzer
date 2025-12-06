@@ -820,16 +820,45 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
   useEffect(() => {
     if (!triggerSymbol) return
 
-    const normalizedSymbol = processStockSymbol(triggerSymbol) || triggerSymbol
+    const triggerDays = typeof triggerSymbol === 'object' && triggerSymbol !== null && triggerSymbol.days != null
+      ? String(triggerSymbol.days)
+      : null
+
+    const rawSymbol = typeof triggerSymbol === 'object' && triggerSymbol !== null
+      ? triggerSymbol.symbol
+      : triggerSymbol
+
+    const normalizedSymbol = processStockSymbol(rawSymbol || '') || rawSymbol || triggerSymbol
+    const targetPeriod = triggerDays || period
+
+    // Keep UI period selection in sync with triggered period
+    if (triggerDays && `${period}` !== `${triggerDays}`) {
+      setPeriod(String(triggerDays))
+    }
+
+    if (!normalizedSymbol) {
+      if (onSymbolProcessed) {
+        onSymbolProcessed()
+      }
+      return
+    }
 
     // Check if symbol already exists in entries
-    const existingEntry = entries.find(entry => entry.symbol === normalizedSymbol)
+    const existingEntry = entries.find(entry =>
+      entry.symbol === normalizedSymbol && (!triggerDays || `${entry.period}` === triggerDays)
+    )
 
     if (existingEntry) {
       // Symbol exists, trigger scan for it
-      const loadingEntry = { ...existingEntry, status: 'loading', error: null }
+      const loadingEntry = {
+        ...existingEntry,
+        period: existingEntry.period ?? targetPeriod,
+        periodDisplay: existingEntry.periodDisplay || formatPeriod(targetPeriod),
+        status: 'loading',
+        error: null
+      }
       setEntries(prev => prev.map(entry =>
-        entry.symbol === normalizedSymbol ? loadingEntry : entry
+        entry.id === existingEntry.id ? loadingEntry : entry
       ))
       setScanQueue([loadingEntry])
       setScanTotal(1)
@@ -846,6 +875,8 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
       const newEntry = {
         id: `${normalizedSymbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
         symbol: normalizedSymbol,
+        period: targetPeriod,
+        periodDisplay: formatPeriod(targetPeriod),
         bookmarked: false,
         ...baseEntryState,
         status: 'loading'
@@ -2152,7 +2183,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                       ) : entry.status === 'error' ? (
                         <span className="text-red-400 text-sm">{entry.error || 'Failed to scan'}</span>
                       ) : entry.volumeLegend?.length ? (
-                        <div className="flex flex-wrap gap-1">
+                        <div className="flex flex-wrap gap-0">
                           {entry.volumeLegend.map(slot => (
                             <span
                               key={`${entry.id}-${slot.legendIndex}`}

@@ -61,8 +61,8 @@ function App() {
   }
 
   // Handle clicking on volume icon in backtest results
-  const handleVolumeSelect = (symbol) => {
-    setVolumeSymbol(symbol)
+  const handleVolumeSelect = (symbol, days) => {
+    setVolumeSymbol({ symbol, days })
     setActiveTab('volume')
   }
 
