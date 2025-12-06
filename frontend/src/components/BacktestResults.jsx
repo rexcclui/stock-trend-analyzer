@@ -616,7 +616,7 @@ function optimizeSMAParams(prices, slots, breakouts) {
   return { period: bestSMA, pl: bestPL, totalSignals }
 }
 
-function BacktestResults({ onStockSelect, onVolumeSelect }) {
+function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBacktestProcessed }) {
   const [symbols, setSymbols] = useState('')
   const [days, setDays] = useState('1825') // Default to 5Y
   const [loading, setLoading] = useState(false)
@@ -867,7 +867,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     }
   }, [lastAddedKey])
 
-  const ensureEntries = (symbolList) => {
+  const ensureEntries = (symbolList, targetDays = days) => {
     if (!Array.isArray(symbolList) || symbolList.length === 0) {
       return
     }
@@ -884,7 +884,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         .map(r => getEntryKey(r.symbol, r.days))
     )
     const existingSymbols = allowedSymbols.filter(symbol =>
-      existingKeys.has(getEntryKey(symbol, days))
+      existingKeys.has(getEntryKey(symbol, targetDays))
     )
 
     let firstNewKey = null
@@ -895,14 +895,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
       const existingKeys = new Set(
         prev
           .filter(r => r.days != null)
-          .map(r => getEntryKey(r.symbol, r.days))
-      )
+        .map(r => getEntryKey(r.symbol, r.days))
+    )
 
       const newEntries = allowedSymbols
         .filter(Boolean)
-        .filter(symbol => !existingKeys.has(getEntryKey(symbol, days)))
+        .filter(symbol => !existingKeys.has(getEntryKey(symbol, targetDays)))
         .map(symbol => {
-          const key = getEntryKey(symbol, days)
+          const key = getEntryKey(symbol, targetDays)
           if (!firstNewKey) {
             firstNewKey = key
           }
@@ -914,8 +914,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
             priceData: null,
             optimalParams: null,
             optimalSMAs: null,
-            days,
-            period: formatPeriod(days),  // Add period display format
+            days: targetDays,
+            period: formatPeriod(targetDays),  // Add period display format
             isRecentBreakout: false,
             recentBreakout: null,
             totalSignals: null,
@@ -949,6 +949,25 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
       }
     }
   }
+
+  // Handle symbols sent from Volume Screening to Backtesting
+  useEffect(() => {
+    if (!triggerBacktest || !triggerBacktest.symbol) return
+
+    const targetDays = triggerBacktest.days || days
+    const normalizedSymbol = processStockSymbol(triggerBacktest.symbol) || triggerBacktest.symbol
+
+    if (triggerBacktest.days && `${triggerBacktest.days}` !== `${days}`) {
+      setDays(String(triggerBacktest.days))
+    }
+
+    ensureEntries([normalizedSymbol], targetDays)
+    runBacktestForSymbol(normalizedSymbol, targetDays)
+
+    if (onBacktestProcessed) {
+      onBacktestProcessed()
+    }
+  }, [triggerBacktest, days])
 
   const eraseResult = (symbol) => {
     setResults(prev => prev.map(entry => (
@@ -1048,7 +1067,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     // Use provided entryDays or current days state
     const targetDays = entryDays || days
 
-    ensureEntries([symbol])
+    ensureEntries([symbol], targetDays)
     setResults(prev => prev.map(entry => (
       entry.symbol === symbol && entry.days === targetDays
         ? { ...entry, status: 'loading', error: null, durationMs: null }

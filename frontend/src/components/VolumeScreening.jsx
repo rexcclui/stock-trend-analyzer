@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search, Clock3 } from 'lucide-react'
+import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search, Clock3, BarChart3 } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
@@ -546,7 +546,7 @@ function hasCloseResistance(bottomResist, upperResist, threshold = 10) {
   return isBottomClose || isUpperClose
 }
 
-function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
+function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBacktestSelect }) {
   const [symbolInput, setSymbolInput] = useState('')
   const [period, setPeriod] = useState('1825')
   const [stockHistory, setStockHistory] = useState([])
@@ -819,14 +819,16 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
   useEffect(() => {
     if (!triggerSymbol) return
 
+    const normalizedSymbol = processStockSymbol(triggerSymbol) || triggerSymbol
+
     // Check if symbol already exists in entries
-    const existingEntry = entries.find(entry => entry.symbol === triggerSymbol)
+    const existingEntry = entries.find(entry => entry.symbol === normalizedSymbol)
 
     if (existingEntry) {
       // Symbol exists, trigger scan for it
       const loadingEntry = { ...existingEntry, status: 'loading', error: null }
       setEntries(prev => prev.map(entry =>
-        entry.symbol === triggerSymbol ? loadingEntry : entry
+        entry.symbol === normalizedSymbol ? loadingEntry : entry
       ))
       setScanQueue([loadingEntry])
       setScanTotal(1)
@@ -834,11 +836,15 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
       setIsScanning(true)
       setIsPaused(false)
       activeScanIdRef.current = null
+
+      setTimeout(() => {
+        setLastAddedId(existingEntry.id)
+      }, 120)
     } else {
       // Symbol doesn't exist, add it to the top and trigger scan
       const newEntry = {
-        id: `${triggerSymbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-        symbol: triggerSymbol,
+        id: `${normalizedSymbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        symbol: normalizedSymbol,
         bookmarked: false,
         ...baseEntryState,
         status: 'loading'
@@ -850,6 +856,10 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
       setIsScanning(true)
       setIsPaused(false)
       activeScanIdRef.current = null
+
+      setTimeout(() => {
+        setLastAddedId(newEntry.id)
+      }, 180)
     }
 
     // Notify parent that symbol has been processed
@@ -2109,6 +2119,20 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
                     </td>
                     <td className="px-4 py-3 text-slate-200">{entry.breakout}</td>
                     <td className="px-4 py-3 text-right">
+                      {onBacktestSelect && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setLastAddedId(entry.id)
+                            onBacktestSelect(entry.symbol, entry.period)
+                          }}
+                          className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-blue-300 hover:bg-blue-900/40 transition-colors mr-2"
+                          aria-label={`Load ${entry.symbol} in backtest`}
+                          title="Load in Backtest"
+                        >
+                          <BarChart3 className="w-5 h-5" />
+                        </button>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation()

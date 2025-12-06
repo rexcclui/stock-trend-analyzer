@@ -10,6 +10,7 @@ function App() {
   const [selectedSymbol, setSelectedSymbol] = useState('')
   const [selectedParams, setSelectedParams] = useState(null)
   const [volumeSymbol, setVolumeSymbol] = useState(null)
+  const [backtestSymbol, setBacktestSymbol] = useState(null)
 
   const exportLocalStorage = () => {
     if (typeof window === 'undefined') return
@@ -63,6 +64,11 @@ function App() {
   const handleVolumeSelect = (symbol) => {
     setVolumeSymbol(symbol)
     setActiveTab('volume')
+  }
+
+  const handleBacktestSelect = (symbol, days) => {
+    setBacktestSymbol({ symbol, days })
+    setActiveTab('backtest')
   }
 
   return (
@@ -133,10 +139,20 @@ function App() {
               <StockAnalyzer selectedSymbol={selectedSymbol} selectedParams={selectedParams} />
             </div>
             <div style={{ display: activeTab === 'backtest' ? 'block' : 'none' }}>
-              <BacktestResults onStockSelect={handleStockSelect} onVolumeSelect={handleVolumeSelect} />
+              <BacktestResults
+                onStockSelect={handleStockSelect}
+                onVolumeSelect={handleVolumeSelect}
+                triggerBacktest={backtestSymbol}
+                onBacktestProcessed={() => setBacktestSymbol(null)}
+              />
             </div>
             <div style={{ display: activeTab === 'volume' ? 'block' : 'none' }}>
-              <VolumeScreening onStockSelect={handleStockSelect} triggerSymbol={volumeSymbol} onSymbolProcessed={() => setVolumeSymbol(null)} />
+              <VolumeScreening
+                onStockSelect={handleStockSelect}
+                triggerSymbol={volumeSymbol}
+                onSymbolProcessed={() => setVolumeSymbol(null)}
+                onBacktestSelect={handleBacktestSelect}
+              />
             </div>
           </div>
         </div>
