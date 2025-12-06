@@ -2087,7 +2087,13 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
 
                     const optimalSMAs = result.optimalSMAs
                     const optimalPl = typeof optimalSMAs?.pl === 'number' ? optimalSMAs.pl : null
-                    const smaPeriods = optimalSMAs?.period ? [optimalSMAs.period] : []
+
+                    // Keep SMA overlays in sync with the optimized backtest period when opening the chart
+                    const resolvedSmaPeriod = optimalSMAs?.period
+                      || result.optimalParams?.smaPeriods?.[0]
+                      || result.optimalParams?.smaPeriod
+                      || result.optimalParams?.sma
+                    const smaPeriods = resolvedSmaPeriod ? [resolvedSmaPeriod] : []
 
                     const analyzeParams = {
                       ...(result.optimalParams || {}),
