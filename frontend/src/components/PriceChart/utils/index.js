@@ -5,6 +5,6 @@
 export * from './calculations'
 export * from './channelUtils'
 export * from './channelCalculations'
-export * from './volumeUtils'
-export * from './volumeColors'
+export { calculateVolumeProfile, calculateZoneColors, calculateVolumeRatios, calculateNumZones } from './volumeUtils'
+export { getVolumeColor } from './volumeColors'
 export * from './slopeChannelOptimizer'

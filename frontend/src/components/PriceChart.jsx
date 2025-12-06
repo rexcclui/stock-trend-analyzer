@@ -20,6 +20,8 @@ import {
   CustomBestChannelZoneLines as ImportedCustomBestChannelZoneLines,
   CustomBestChannelStdevLabels as ImportedCustomBestChannelStdevLabels
 } from './PriceChart/components'
+import VolumeLegendPills from './VolumeLegendPills'
+import { getVolumeColor } from './PriceChart/utils'
 
 function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete }) {
   const chartContainerRef = useRef(null)
@@ -83,6 +85,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // Volume Profile V2 hover state
   const [volV2HoveredBar, setVolV2HoveredBar] = useState(null)
   const [volV2SliderDragging, setVolV2SliderDragging] = useState(false)
+
+  // Hovered volume zone pill
+  const [hoveredVolumeLegend, setHoveredVolumeLegend] = useState(null)
 
   // Volume Profile V2 calculated data (only recalculates on manual refresh)
   const [volumeProfileV2Result, setVolumeProfileV2Result] = useState({ slots: [], breakouts: [] })
@@ -3249,6 +3254,73 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
   const handleMouseMove = (e) => {
+    const activePayload = e?.activePayload?.[0]?.payload
+    const hoveredVolumeZone = (() => {
+      const hoveredDate = activePayload?.date
+      const hoveredPrice = activePayload?.close
+
+      if (!hoveredDate || hoveredPrice === undefined || hoveredPrice === null) {
+        return null
+      }
+
+      const buildLegend = (zones, currentIndex, percentKey = 'volumePercent') => {
+        if (!Array.isArray(zones) || zones.length === 0 || currentIndex < 0) return null
+
+        return zones.map((zone, idx) => {
+          const percentValue = percentKey === 'volumeWeight'
+            ? (zone.volumeWeight || 0) * 100
+            : zone[percentKey] || 0
+
+          return {
+            legendIndex: idx,
+            start: zone.minPrice,
+            end: zone.maxPrice,
+            label: `${percentValue.toFixed(1)}%`,
+            color: getVolumeColor(percentValue),
+            textColor: '#0f172a',
+            isCurrent: idx === currentIndex
+          }
+        })
+      }
+
+      if (volumeProfileV2Enabled && volumeProfileV2Data.length > 0) {
+        const matchingSlot = volumeProfileV2Data.find(slot =>
+          hoveredDate >= slot.startDate && hoveredDate <= slot.endDate
+        )
+
+        if (matchingSlot) {
+          const currentZoneIdx = matchingSlot.priceZones.findIndex(zone =>
+            hoveredPrice >= zone.minPrice && hoveredPrice <= zone.maxPrice
+          )
+
+          if (currentZoneIdx >= 0) {
+            return buildLegend(matchingSlot.priceZones, currentZoneIdx, 'volumeWeight')
+          }
+        }
+      }
+
+      if (volumeProfileEnabled && volumeProfiles.length > 0) {
+        const matchingProfile = volumeProfiles.find(profile => {
+          if (!profile.dateRange) return true
+          return hoveredDate >= profile.dateRange.startDate && hoveredDate <= profile.dateRange.endDate
+        }) || volumeProfiles[0]
+
+        if (matchingProfile) {
+          const currentZoneIdx = matchingProfile.zones.findIndex(zone =>
+            hoveredPrice >= zone.minPrice && hoveredPrice <= zone.maxPrice
+          )
+
+          if (currentZoneIdx >= 0) {
+            return buildLegend(matchingProfile.zones, currentZoneIdx)
+          }
+        }
+      }
+
+      return null
+    })()
+
+    setHoveredVolumeLegend(hoveredVolumeZone)
+
     if (e && e.activeLabel) {
       setSyncedMouseDate(e.activeLabel)
     }
@@ -3337,6 +3409,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   const handleMouseLeave = () => {
     setSyncedMouseDate(null)
+    setHoveredVolumeLegend(null)
     // End panning when mouse leaves chart
     if (isPanning) {
       setIsPanning(false)
@@ -4663,7 +4736,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         <ResponsiveContainer>
           <ComposedChart
             data={chartDataWithZones}
-            margin={{ top: 5, right: 0, left: 0, bottom: 5 }}
+            margin={{ top: 5, right: 0, left: 0, bottom: 32 }}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
             onMouseDown={handleMouseDown}
@@ -4686,7 +4759,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             />
             <YAxis domain={['auto', 'auto']} tick={{ fill: '#94a3b8', fontSize: isMobile ? 10 : 12 }} stroke="#475569" width={isMobile ? 40 : 60} />
             <Tooltip content={<CustomTooltip />} />
-            <Legend content={<ImportedCustomLegend
+            <Legend
+              align="center"
+              verticalAlign="bottom"
+              wrapperStyle={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                width: '100%',
+                marginTop: 0,
+                paddingTop: 0
+              }}
+              content={<ImportedCustomLegend
               smaVisibility={smaVisibility}
               onToggleSma={onToggleSma}
               onDeleteSma={onDeleteSma}
@@ -4714,7 +4798,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               isMobile={isMobile}
               displayPrices={displayPrices}
               zoomRange={zoomRange}
-            />} />
+              hoveredVolumeLegend={hoveredVolumeLegend}
+              hoveredVolumeTitleFormatter={(slot) => `$${slot.start?.toFixed(2)} - $${slot.end?.toFixed(2)}`}
+            />}
+            />
             {syncedMouseDate && (
               <ReferenceLine
                 x={syncedMouseDate}

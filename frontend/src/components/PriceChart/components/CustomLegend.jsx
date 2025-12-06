@@ -1,5 +1,6 @@
 import React from 'react'
 import { X, ArrowLeftRight } from 'lucide-react'
+import VolumeLegendPills from '../../VolumeLegendPills'
 
 /**
  * Custom Legend component for the chart
@@ -63,10 +64,12 @@ export const CustomLegend = ({
   volumeProfileV2Enabled,
   isMobile,
   displayPrices,
-  zoomRange
+  zoomRange,
+  hoveredVolumeLegend,
+  hoveredVolumeTitleFormatter
 }) => {
   return (
-    <div className="flex justify-center gap-4 mt-2 flex-wrap">
+    <div className="flex justify-center gap-4 flex-wrap">
       {payload.map((entry, index) => {
         const isSma = entry.dataKey.startsWith('sma')
         const period = isSma ? parseInt(entry.dataKey.replace('sma', '')) : null
@@ -407,6 +410,16 @@ export const CustomLegend = ({
           </div>
         )
       })()}
+
+      {hoveredVolumeLegend?.length > 0 && (
+        <div className="basis-full flex justify-center">
+          <VolumeLegendPills
+            legend={hoveredVolumeLegend}
+            keyPrefix="chart-hover-volume"
+            titleFormatter={hoveredVolumeTitleFormatter}
+          />
+        </div>
+      )}
     </div>
   )
 }
