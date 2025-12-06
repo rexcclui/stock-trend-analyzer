@@ -2085,7 +2085,9 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                     const isWithinLast10Days = hasData && daysAgo <= 10
                     const status = result.status || (hasData ? 'completed' : 'pending')
 
-                    const smaPeriods = result.optimalSMAs?.period ? [result.optimalSMAs.period] : []
+                    const optimalSMAs = result.optimalSMAs
+                    const optimalPl = typeof optimalSMAs?.pl === 'number' ? optimalSMAs.pl : null
+                    const smaPeriods = optimalSMAs?.period ? [optimalSMAs.period] : []
 
                     const analyzeParams = {
                       ...result.optimalParams,
@@ -2194,15 +2196,15 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                           {hasData ? result.totalSignals : '—'}
                         </td>
                         <td className="px-4 py-3 text-sm text-right font-semibold">
-                          {hasData ? (
+                          {hasData && optimalPl !== null ? (
                             <span className={
-                              typeof result.marketChange === 'number' && result.optimalSMAs.pl > result.marketChange
+                              typeof result.marketChange === 'number' && optimalPl > result.marketChange
                                 ? 'text-blue-400'
-                                : result.optimalSMAs.pl >= 0
+                                : optimalPl >= 0
                                   ? 'text-green-400'
                                   : 'text-red-400'
                             }>
-                              {formatPercent(result.optimalSMAs.pl)}
+                              {formatPercent(optimalPl)}
                             </span>
                           ) : '—'}
                         </td>
@@ -2214,9 +2216,9 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                           ) : '—'}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 text-left">
-                          {hasData ? (
+                          {hasData && optimalSMAs ? (
                             <div className="whitespace-nowrap">
-                              Th:{(result.optimalParams.breakoutThreshold * 100).toFixed(0)}% LB:{result.optimalParams.lookbackZones} <span className="text-blue-400 font-medium">SMA:{result.optimalSMAs.period}</span>
+                              Th:{(result.optimalParams.breakoutThreshold * 100).toFixed(0)}% LB:{result.optimalParams.lookbackZones} <span className="text-blue-400 font-medium">SMA:{optimalSMAs.period}</span>
                             </div>
                           ) : (
                             <span className="text-slate-500">—</span>
