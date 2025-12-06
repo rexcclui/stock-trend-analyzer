@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
-import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2, RotateCw, Upload, Download, Filter, Waves, Hash, Clock3 } from 'lucide-react'
+import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2, RotateCw, Upload, Download, Filter, Waves, Hash, Clock3, ChevronsUp, ChevronsDown } from 'lucide-react'
 import { apiCache } from '../utils/apiCache'
 import { joinUrl } from '../utils/urlHelper'
 
@@ -616,7 +616,7 @@ function optimizeSMAParams(prices, slots, breakouts) {
   return { period: bestSMA, pl: bestPL, totalSignals }
 }
 
-function BacktestResults({ onStockSelect, onVolumeSelect }) {
+function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBacktestProcessed }) {
   const [symbols, setSymbols] = useState('')
   const [days, setDays] = useState('1825') // Default to 5Y
   const [loading, setLoading] = useState(false)
@@ -625,6 +625,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
   const [error, setError] = useState(null)
   const [lastAddedKey, setLastAddedKey] = useState(null)
   const initialHydratedResultsRef = useRef(null)
+  const tableScrollRef = useRef(null)
+  const jumpBlinkTimeoutRef = useRef(null)
   const [results, setResults] = useState(() => {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') return []
 
@@ -832,6 +834,12 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     }
   }, [scanQueue, isScanning, scanCompleted, scanTotal, hasHydratedCache])
 
+  useEffect(() => () => {
+    if (jumpBlinkTimeoutRef.current) {
+      clearTimeout(jumpBlinkTimeoutRef.current)
+    }
+  }, [])
+
   // Auto-scroll to newly added entry and apply blink effect
   useEffect(() => {
     if (!lastAddedKey) return
@@ -867,7 +875,33 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     }
   }, [lastAddedKey])
 
-  const ensureEntries = (symbolList) => {
+  const focusAndBlinkRow = (rowElement) => {
+    if (!rowElement) return
+
+    rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    rowElement.classList.add('blink-highlight')
+
+    if (jumpBlinkTimeoutRef.current) {
+      clearTimeout(jumpBlinkTimeoutRef.current)
+    }
+
+    jumpBlinkTimeoutRef.current = setTimeout(() => {
+      rowElement.classList.remove('blink-highlight')
+    }, 1600)
+  }
+
+  const handleJump = (position) => {
+    const scrollContainer = tableScrollRef.current
+    if (!scrollContainer) return
+
+    const rows = scrollContainer.querySelectorAll('tbody tr')
+    if (!rows.length) return
+
+    const targetRow = position === 'top' ? rows[0] : rows[rows.length - 1]
+    focusAndBlinkRow(targetRow)
+  }
+
+  const ensureEntries = (symbolList, targetDays = days) => {
     if (!Array.isArray(symbolList) || symbolList.length === 0) {
       return
     }
@@ -884,7 +918,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         .map(r => getEntryKey(r.symbol, r.days))
     )
     const existingSymbols = allowedSymbols.filter(symbol =>
-      existingKeys.has(getEntryKey(symbol, days))
+      existingKeys.has(getEntryKey(symbol, targetDays))
     )
 
     let firstNewKey = null
@@ -895,14 +929,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
       const existingKeys = new Set(
         prev
           .filter(r => r.days != null)
-          .map(r => getEntryKey(r.symbol, r.days))
-      )
+        .map(r => getEntryKey(r.symbol, r.days))
+    )
 
       const newEntries = allowedSymbols
         .filter(Boolean)
-        .filter(symbol => !existingKeys.has(getEntryKey(symbol, days)))
+        .filter(symbol => !existingKeys.has(getEntryKey(symbol, targetDays)))
         .map(symbol => {
-          const key = getEntryKey(symbol, days)
+          const key = getEntryKey(symbol, targetDays)
           if (!firstNewKey) {
             firstNewKey = key
           }
@@ -914,8 +948,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
             priceData: null,
             optimalParams: null,
             optimalSMAs: null,
-            days,
-            period: formatPeriod(days),  // Add period display format
+            days: targetDays,
+            period: formatPeriod(targetDays),  // Add period display format
             isRecentBreakout: false,
             recentBreakout: null,
             totalSignals: null,
@@ -949,6 +983,25 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
       }
     }
   }
+
+  // Handle symbols sent from Volume Screening to Backtesting
+  useEffect(() => {
+    if (!triggerBacktest || !triggerBacktest.symbol) return
+
+    const targetDays = triggerBacktest.days || days
+    const normalizedSymbol = processStockSymbol(triggerBacktest.symbol) || triggerBacktest.symbol
+
+    if (triggerBacktest.days && `${triggerBacktest.days}` !== `${days}`) {
+      setDays(String(triggerBacktest.days))
+    }
+
+    ensureEntries([normalizedSymbol], targetDays)
+    runBacktestForSymbol(normalizedSymbol, targetDays)
+
+    if (onBacktestProcessed) {
+      onBacktestProcessed()
+    }
+  }, [triggerBacktest, days])
 
   const eraseResult = (symbol) => {
     setResults(prev => prev.map(entry => (
@@ -1048,7 +1101,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
     // Use provided entryDays or current days state
     const targetDays = entryDays || days
 
-    ensureEntries([symbol])
+    ensureEntries([symbol], targetDays)
     setResults(prev => prev.map(entry => (
       entry.symbol === symbol && entry.days === targetDays
         ? { ...entry, status: 'loading', error: null, durationMs: null }
@@ -1243,6 +1296,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
         .map(item => (typeof item === 'string' ? item : item?.symbol))
         .filter(Boolean)
         .map(symbol => symbol.toUpperCase())
+        .filter(symbol => !/^4\d{3}\.HK$/.test(symbol))
         .filter(symbol => !isDisallowedSymbol(symbol))
 
       ensureEntries(normalized)
@@ -1917,6 +1971,23 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
                     </button>
                   )}
                 </div>
+                <div className="flex items-center gap-1 border border-slate-600 rounded-lg px-2 py-1 bg-slate-900/40">
+                  <span className="text-xs text-slate-300">Jump</span>
+                  <button
+                    onClick={() => handleJump('top')}
+                    className="p-1 rounded-md text-slate-200 hover:text-white hover:bg-slate-700 transition-colors"
+                    title="Jump to top row"
+                  >
+                    <ChevronsUp className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleJump('bottom')}
+                    className="p-1 rounded-md text-slate-200 hover:text-white hover:bg-slate-700 transition-colors"
+                    title="Jump to bottom row"
+                  >
+                    <ChevronsDown className="w-4 h-4" />
+                  </button>
+                </div>
                 <button
                   onClick={() => setShowBookmarksOnly(prev => !prev)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${showBookmarksOnly ? 'border-amber-500 text-amber-200 bg-amber-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
@@ -1970,7 +2041,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect }) {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <div className="max-h-[780px] overflow-y-auto">
+              <div className="max-h-[780px] overflow-y-auto" ref={tableScrollRef}>
                 <table className="min-w-full divide-y divide-slate-700">
                 <thead className="bg-slate-900 sticky top-0 z-10">
                   <tr>

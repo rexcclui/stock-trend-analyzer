@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search, Clock3 } from 'lucide-react'
+import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search, Clock3, BarChart3, ChevronsUp, ChevronsDown } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
@@ -11,6 +11,8 @@ const TOP_SYMBOL_CACHE_KEY = 'volumeTopMarketSymbols'
 const CACHE_TTL_MS = 16 * 60 * 60 * 1000
 const RECENT_SCAN_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000
 const TOP_SYMBOL_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 1 month cache for top 2000 symbols
+const STALE_DATA_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000 // 1 month threshold for latest data point
+const ABNORMAL_VOLUME_WEIGHT_THRESHOLD = 80
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const INVALID_FIVE_CHAR_LENGTH = 5
 const BLOCKED_SUFFIX = '.TO'
@@ -94,6 +96,15 @@ function formatTimestamp(dateString) {
   const hours = String(parsed.getHours()).padStart(2, '0')
   const minutes = String(parsed.getMinutes()).padStart(2, '0')
   return `${month}-${day} ${hours}:${minutes}`
+}
+
+function isStaleDataDate(dateString) {
+  if (!dateString) return false
+  const parsed = new Date(dateString)
+  const parsedTime = parsed.getTime()
+  if (Number.isNaN(parsedTime)) return false
+
+  return Date.now() - parsedTime > STALE_DATA_THRESHOLD_MS
 }
 
 function isInvalidFiveCharSymbol(symbol) {
@@ -481,6 +492,11 @@ function getCurrentVolumeWeight(entry) {
   return Number.isFinite(weight) ? weight : null
 }
 
+function isAbnormalVolumeWeight(entry) {
+  const weight = getCurrentVolumeWeight(entry)
+  return weight != null && weight > ABNORMAL_VOLUME_WEIGHT_THRESHOLD
+}
+
 function calculatePercentGap(currentRange, targetRange) {
   if (!currentRange || !targetRange) return null
 
@@ -530,7 +546,7 @@ function hasCloseResistance(bottomResist, upperResist, threshold = 10) {
   return isBottomClose || isUpperClose
 }
 
-function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
+function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBacktestSelect }) {
   const [symbolInput, setSymbolInput] = useState('')
   const [period, setPeriod] = useState('1825')
   const [stockHistory, setStockHistory] = useState([])
@@ -554,6 +570,8 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
   const [lastAddedId, setLastAddedId] = useState(null)
   const activeScanIdRef = useRef(null)
   const importInputRef = useRef(null)
+  const tableScrollRef = useRef(null)
+  const jumpBlinkTimeoutRef = useRef(null)
 
   const baseEntryState = {
     priceRange: '—',
@@ -625,7 +643,8 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
     if (!cached) return null
 
     const hydrated = { ...baseEntryState, ...cached, symbol, status: cached.status || 'ready' }
-    return isEntryFresh(hydrated) ? hydrated : null
+    if (!isEntryFresh(hydrated)) return null
+    return isAbnormalVolumeWeight(hydrated) ? null : hydrated
   }
 
   const persistReadyResults = (list) => {
@@ -633,6 +652,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
 
     list.forEach(entry => {
       if (entry.status === 'ready' && isEntryFresh(entry)) {
+        if (isAbnormalVolumeWeight(entry)) return
         const { id, symbol, ...rest } = entry
 
         // Determine if this entry should have full cache
@@ -696,10 +716,12 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
               .map(item => {
                 const cached = hydrateFromResultCache(item.symbol)
                 const merged = { ...baseEntryState, bookmarked: !!item.bookmarked, ...item, ...(cached || {}) }
+                if (isAbnormalVolumeWeight(merged)) return null
                 return isEntryFresh(merged) ? merged : clearEntryResults(merged)
               })
-            if (hydrated.length > 0) {
-              setEntries(hydrated)
+            const cleanedEntries = hydrated.filter(Boolean)
+            if (cleanedEntries.length > 0) {
+              setEntries(cleanedEntries)
               setHasHydratedCache(true)
               return
             }
@@ -799,14 +821,16 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
   useEffect(() => {
     if (!triggerSymbol) return
 
+    const normalizedSymbol = processStockSymbol(triggerSymbol) || triggerSymbol
+
     // Check if symbol already exists in entries
-    const existingEntry = entries.find(entry => entry.symbol === triggerSymbol)
+    const existingEntry = entries.find(entry => entry.symbol === normalizedSymbol)
 
     if (existingEntry) {
       // Symbol exists, trigger scan for it
       const loadingEntry = { ...existingEntry, status: 'loading', error: null }
       setEntries(prev => prev.map(entry =>
-        entry.symbol === triggerSymbol ? loadingEntry : entry
+        entry.symbol === normalizedSymbol ? loadingEntry : entry
       ))
       setScanQueue([loadingEntry])
       setScanTotal(1)
@@ -814,11 +838,15 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
       setIsScanning(true)
       setIsPaused(false)
       activeScanIdRef.current = null
+
+      setTimeout(() => {
+        setLastAddedId(existingEntry.id)
+      }, 120)
     } else {
       // Symbol doesn't exist, add it to the top and trigger scan
       const newEntry = {
-        id: `${triggerSymbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-        symbol: triggerSymbol,
+        id: `${normalizedSymbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+        symbol: normalizedSymbol,
         bookmarked: false,
         ...baseEntryState,
         status: 'loading'
@@ -830,6 +858,10 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
       setIsScanning(true)
       setIsPaused(false)
       activeScanIdRef.current = null
+
+      setTimeout(() => {
+        setLastAddedId(newEntry.id)
+      }, 180)
     }
 
     // Notify parent that symbol has been processed
@@ -1063,6 +1095,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
         .map(item => (typeof item === 'string' ? item : item?.symbol))
         .filter(Boolean)
         .map(symbol => symbol.toUpperCase())
+        .filter(symbol => !/^4\d{3}\.HK$/.test(symbol))
 
       console.log('[HK500] Normalized symbols count:', normalized.length)
       console.log('[HK500] First 10 normalized:', normalized.slice(0, 10))
@@ -1125,6 +1158,22 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
 
       // Get the last data point date (most recent date - prices are in reverse chronological order)
       const lastDataDate = prices.length > 0 ? prices[0].date : null
+
+      if (isStaleDataDate(lastDataDate)) {
+        return {
+          ...entry,
+          removeRow: true,
+          stopAll: false
+        }
+      }
+
+      if (Number.isFinite(currentRange?.weight) && currentRange.weight > ABNORMAL_VOLUME_WEIGHT_THRESHOLD) {
+        return {
+          ...entry,
+          removeRow: true,
+          stopAll: false
+        }
+      }
 
       return {
         ...entry,
@@ -1570,6 +1619,40 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
     }
   }, [isScanning, scanQueue.length])
 
+  useEffect(() => () => {
+    if (jumpBlinkTimeoutRef.current) {
+      clearTimeout(jumpBlinkTimeoutRef.current)
+    }
+  }, [])
+
+  const focusAndBlinkRow = (rowElement) => {
+    if (!rowElement) return
+
+    rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    rowElement.classList.add('blink-highlight')
+
+    if (jumpBlinkTimeoutRef.current) {
+      clearTimeout(jumpBlinkTimeoutRef.current)
+    }
+
+    jumpBlinkTimeoutRef.current = setTimeout(() => {
+      if (rowElement && rowElement.classList.contains('blink-highlight')) {
+        rowElement.classList.remove('blink-highlight')
+      }
+    }, 1600)
+  }
+
+  const handleJump = (position) => {
+    const container = tableScrollRef.current
+    if (!container) return
+
+    const rows = container.querySelectorAll('tbody tr')
+    if (!rows.length) return
+
+    const targetRow = position === 'top' ? rows[0] : rows[rows.length - 1]
+    focusAndBlinkRow(targetRow)
+  }
+
   // Auto-scroll to newly added entry and apply blink effect
   useEffect(() => {
     if (!lastAddedId) return
@@ -1831,6 +1914,27 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
                 Showing {filteredEntries.length} / {entries.length} ({filteredCount} filtered)
               </div>
             )}
+            <div className="flex items-center gap-1 border border-slate-700 rounded-lg px-2 py-1 bg-slate-900/40">
+              <span className="text-xs text-slate-300">Jump</span>
+              <button
+                type="button"
+                onClick={() => handleJump('top')}
+                className="p-1 rounded-md text-slate-200 hover:text-white hover:bg-slate-700 transition-colors"
+                title="Jump to top row"
+                aria-label="Jump to top row"
+              >
+                <ChevronsUp className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleJump('bottom')}
+                className="p-1 rounded-md text-slate-200 hover:text-white hover:bg-slate-700 transition-colors"
+                title="Jump to bottom row"
+                aria-label="Jump to bottom row"
+              >
+                <ChevronsDown className="w-4 h-4" />
+              </button>
+            </div>
             <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
               <input
                 type="checkbox"
@@ -1840,7 +1944,10 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
               />
               Bookmarked
             </label>
-            <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
+            <label
+              className="inline-flex items-center gap-2 text-sm text-slate-300 select-none"
+              title="Flags symbols whose nearest resistance zone sits within 10% of the current range—useful for spotting potential breaks."
+            >
               <input
                 type="checkbox"
                 checked={showPotentialBreakOnly}
@@ -1905,7 +2012,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
             )}
           </div>
         </div>
-        <div className="overflow-x-auto max-h-[70vh]">
+        <div className="overflow-x-auto max-h-[70vh]" ref={tableScrollRef}>
           <table className="min-w-full divide-y divide-slate-700">
             <thead className="bg-slate-800 sticky top-0 z-10 shadow-lg">
               <tr>
@@ -2039,7 +2146,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
                             <span
                               key={`${entry.id}-${slot.legendIndex}`}
                               title={`${formatPriceRange(slot.start, slot.end)} • ${slot.label}`}
-                              className={`px-2 py-1 text-xs font-semibold rounded-md shadow-sm border border-slate-800/60 ${slot.isCurrent ? 'ring-2 ring-amber-400' : ''
+                              className={`px-1.5 py-1 text-[10px] leading-tight font-semibold rounded-md shadow-sm border border-slate-800/60 text-center min-w-[2.75rem] ${slot.isCurrent ? 'ring-2 ring-amber-400' : ''
                                 }`}
                               style={{
                                 backgroundColor: slot.color,
@@ -2069,6 +2176,20 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
                     </td>
                     <td className="px-4 py-3 text-slate-200">{entry.breakout}</td>
                     <td className="px-4 py-3 text-right">
+                      {onBacktestSelect && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setLastAddedId(entry.id)
+                            onBacktestSelect(entry.symbol, entry.period)
+                          }}
+                          className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-blue-300 hover:bg-blue-900/40 transition-colors mr-2"
+                          aria-label={`Load ${entry.symbol} in backtest`}
+                          title="Load in Backtest"
+                        >
+                          <BarChart3 className="w-5 h-5" />
+                        </button>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
