@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search, Clock3, BarChart3 } from 'lucide-react'
+import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search, Clock3, BarChart3, ChevronUp, ChevronDown, AlertTriangle } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
@@ -568,8 +568,11 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
   const [sortConfig, setSortConfig] = useState(defaultSortConfig)
   const [hasHydratedCache, setHasHydratedCache] = useState(false)
   const [lastAddedId, setLastAddedId] = useState(null)
+  const [toast, setToast] = useState(null)
   const activeScanIdRef = useRef(null)
   const importInputRef = useRef(null)
+  const tableScrollRef = useRef(null)
+  const toastTimerRef = useRef(null)
 
   const baseEntryState = {
     priceRange: '—',
@@ -589,6 +592,16 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     ...entry,
     ...baseEntryState
   })
+
+  const showToast = (message, tone = 'warning') => {
+    if (!message) return
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current)
+    }
+
+    setToast({ message, tone })
+    toastTimerRef.current = setTimeout(() => setToast(null), 4000)
+  }
 
   const clearAllEntries = () => {
     clearResultCache()
@@ -690,6 +703,14 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
 
     saveResultCache(cache)
   }
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     const savedHistory = localStorage.getItem(STOCK_HISTORY_KEY)
@@ -1142,7 +1163,8 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
         return {
           ...entry,
           removeRow: true,
-          stopAll: false
+          stopAll: false,
+          removeReason: 'noVolume'
         }
       }
 
@@ -1161,7 +1183,8 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
         return {
           ...entry,
           removeRow: true,
-          stopAll: false
+          stopAll: false,
+          removeReason: 'staleData'
         }
       }
 
@@ -1169,14 +1192,16 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
         return {
           ...entry,
           removeRow: true,
-          stopAll: false
+          stopAll: false,
+          removeReason: 'abnormalVolume',
+          removalDetails: { weight: currentRange.weight }
         }
       }
 
       return {
         ...entry,
         priceRange: currentRange ? formatPriceRange(currentRange.start, currentRange.end) : '—',
-        currentRange: currentRange ? { start: currentRange.start, end: currentRange.end } : null,
+        currentRange: currentRange ? { start: currentRange.start, end: currentRange.end, weight: currentRange.weight } : null,
         testedDays: period,
         slotCount: slots.length,
         volumeLegend: legend,
@@ -1228,6 +1253,18 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     })
   }
 
+  const handleRemoval = (id, symbol, reason, details = {}) => {
+    setEntries(prev => prev.filter(entry => entry.id !== id))
+    setScanQueue(prev => prev.filter(item => item.id !== id))
+
+    if (reason === 'abnormalVolume') {
+      const formattedWeight = Number.isFinite(details.weight)
+        ? `${details.weight.toFixed(1)}%`
+        : 'high volume weight'
+      showToast(`${symbol} removed due to abnormal volume (${formattedWeight}).`)
+    }
+  }
+
   const clearEntry = (id) => {
     setEntries(prev => prev.map(entry => {
       if (entry.id === id) {
@@ -1271,12 +1308,11 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     )))
 
     const result = await performScan(prepared)
-    const { stopAll, removeRow, ...entryResult } = result || {}
+    const { stopAll, removeRow, removeReason, removalDetails, ...entryResult } = result || {}
 
     if (removeRow) {
       removeResultFromCache(prepared.symbol)
-      setEntries(prev => prev.filter(entry => entry.id !== id))
-      setScanQueue(prev => prev.filter(item => item.id !== id))
+      handleRemoval(id, prepared.symbol, removeReason, removalDetails)
       return
     }
 
@@ -1324,6 +1360,27 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     const matchesDown = showDownBreakOnly && breakout === 'Down'
 
     return matchesUp || matchesDown
+  }
+
+  const getPriceRangeTooltip = (entry) => {
+    if (!entry) return '—'
+
+    const currentSlot = entry.currentRange || entry.volumeLegend?.find(slot => slot.isCurrent)
+    const slotSpan = Number.isFinite(currentSlot?.end) && Number.isFinite(currentSlot?.start)
+      ? currentSlot.end - currentSlot.start
+      : null
+    const spanLabel = Number.isFinite(slotSpan) ? `$${slotSpan.toFixed(2)}` : '—'
+    const shareLabel = Number.isFinite(currentSlot?.weight) ? `${currentSlot.weight.toFixed(1)}%` : '—'
+    const slotCountLabel = Number.isFinite(entry.slotCount)
+      ? entry.slotCount
+      : Array.isArray(entry.volumeLegend)
+        ? entry.volumeLegend.length
+        : '—'
+    const rangeLabel = currentSlot
+      ? formatPriceRange(currentSlot.start, currentSlot.end)
+      : entry.priceRange || '—'
+
+    return `Range: ${rangeLabel} • Slots: ${slotCountLabel} • Span: ${spanLabel} • Current share: ${shareLabel}`
   }
 
   const getVisibleEntries = (sourceEntries = entries) => sourceEntries.filter(entry => {
@@ -1376,6 +1433,18 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
         return [...prev, period]
       }
     })
+  }
+
+  const scrollTableToTop = () => {
+    if (!tableScrollRef.current) return
+    tableScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+    tableScrollRef.current.focus({ preventScroll: true })
+  }
+
+  const scrollTableToBottom = () => {
+    if (!tableScrollRef.current) return
+    tableScrollRef.current.scrollTo({ top: tableScrollRef.current.scrollHeight, behavior: 'smooth' })
+    tableScrollRef.current.focus({ preventScroll: true })
   }
 
   const isFiltered = filteredEntries.length !== entries.length
@@ -1582,11 +1651,11 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
 
       ; (async () => {
         const result = await performScan(current)
-        const { stopAll, removeRow, ...entryResult } = result || {}
+        const { stopAll, removeRow, removeReason, removalDetails, ...entryResult } = result || {}
 
         if (removeRow) {
           removeResultFromCache(current.symbol)
-          setEntries(prev => prev.filter(entry => entry.id !== current.id))
+          handleRemoval(current.id, current.symbol, removeReason, removalDetails)
         } else {
           setEntries(prev => prev.map(entry => (
             entry.id === current.id
@@ -1953,10 +2022,41 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                 ))}
               </div>
             )}
+            <div className="flex items-center gap-1 border border-slate-700 rounded-lg px-2 py-1">
+              <span className="text-xs text-slate-400" title="Visible / total rows">Rows: {visibleEntries.length}/{entries.length}</span>
+              {entries.length !== visibleEntries.length && (
+                <span className="text-[11px] text-amber-300" title="Rows hidden by filters">({entries.length - visibleEntries.length} filtered)</span>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={scrollTableToTop}
+                className="p-2 rounded-lg bg-slate-800 text-slate-200 hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                title="Scroll to top"
+                aria-label="Scroll to top"
+              >
+                <ChevronUp className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={scrollTableToBottom}
+                className="p-2 rounded-lg bg-slate-800 text-slate-200 hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                title="Scroll to bottom"
+                aria-label="Scroll to bottom"
+              >
+                <ChevronDown className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
-        <div className="overflow-x-auto max-h-[70vh]">
-          <table className="min-w-full divide-y divide-slate-700">
+        <div className="overflow-x-auto">
+          <div
+            ref={tableScrollRef}
+            tabIndex={0}
+            className="max-h-[70vh] overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60"
+          >
+            <table className="min-w-full divide-y divide-slate-700">
             <thead className="bg-slate-800 sticky top-0 z-10 shadow-lg">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
@@ -2024,6 +2124,12 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                     {renderSortIndicator('upperResist')}
                   </button>
                 </th>
+                <th
+                  className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider"
+                  title="Flags symbols whose nearest resistance zone sits within 10% of the current range—useful for spotting potential breaks."
+                >
+                  Potential
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Break
                 </th>
@@ -2035,7 +2141,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
             <tbody className="divide-y divide-slate-800">
               {displayEntries.length === 0 ? (
                 <tr>
-                  <td colSpan="11" className="px-4 py-6 text-center text-slate-400">
+                  <td colSpan="12" className="px-4 py-6 text-center text-slate-400">
                     {showUpBreakOnly || showDownBreakOnly || showPotentialBreakOnly || showBookmarkedOnly
                       ? 'No symbols matched the current filters. Disable filters to see all entries.'
                       : 'No symbols added yet. Add stocks above to start screening.'}
@@ -2089,7 +2195,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                             <span
                               key={`${entry.id}-${slot.legendIndex}`}
                               title={`${formatPriceRange(slot.start, slot.end)} • ${slot.label}`}
-                              className={`px-1.5 py-1 text-[10px] leading-tight font-semibold rounded-md shadow-sm border border-slate-800/60 text-center min-w-[2.75rem] ${slot.isCurrent ? 'ring-2 ring-amber-400' : ''
+                              className={`px-1 py-0.5 text-[10px] leading-tight font-semibold rounded-sm shadow-sm border border-slate-800/60 text-center min-w-[2.25rem] ${slot.isCurrent ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-900' : ''
                                 }`}
                               style={{
                                 backgroundColor: slot.color,
@@ -2104,7 +2210,12 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                         <span className="text-slate-400">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-200 text-sm">{entry.priceRange}</td>
+                    <td
+                      className="px-4 py-3 text-slate-200 text-sm"
+                      title={getPriceRangeTooltip(entry)}
+                    >
+                      {entry.priceRange}
+                    </td>
                     <td
                       className={`px-4 py-3 text-slate-200 text-sm ${isResistanceClose(entry.bottomResist) ? 'text-sky-400 font-semibold' : ''}`}
                       title={entry.bottomResist}
@@ -2116,6 +2227,16 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                       title={entry.upperResist}
                     >
                       {entry.upperResist}
+                    </td>
+                    <td className="px-4 py-3 text-slate-200">
+                      {isPotentialBreak(entry) ? (
+                        <span className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-blue-900/30 text-blue-200 text-xs font-semibold border border-blue-700/70">
+                          <span className="w-2 h-2 rounded-full bg-blue-300" aria-hidden="true" />
+                          Potential
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 text-xs">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-slate-200">{entry.breakout}</td>
                     <td className="px-4 py-3 text-right">
@@ -2171,12 +2292,22 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                 ))
               )}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
         <div className="px-4 py-3 border-t border-slate-800 text-right text-xs text-slate-400">
           Selected period: {periods.find(p => p.value === period)?.label || period}
         </div>
       </div>
+
+      {toast && (
+        <div className="fixed top-4 right-4 z-50">
+          <div className="flex items-start gap-2 px-4 py-3 bg-amber-900/90 border border-amber-500/60 rounded-lg shadow-xl text-amber-50 max-w-sm" role="status">
+            <AlertTriangle className="w-5 h-5 mt-0.5" />
+            <div className="text-sm leading-snug">{toast.message}</div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

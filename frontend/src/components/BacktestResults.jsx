@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
-import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2, RotateCw, Upload, Download, Filter, Waves, Hash, Clock3 } from 'lucide-react'
+import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2, RotateCw, Upload, Download, Filter, Waves, Hash, Clock3, ChevronUp, ChevronDown } from 'lucide-react'
 import { apiCache } from '../utils/apiCache'
 import { joinUrl } from '../utils/urlHelper'
 
@@ -687,6 +687,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
   const [hasHydratedCache, setHasHydratedCache] = useState(() => initialHydratedResultsRef.current !== null)
   const activeScanSymbolRef = useRef(null)
   const importInputRef = useRef(null)
+  const tableScrollRef = useRef(null)
 
   // Hydrate cached backtest results after mount before enabling persistence
   useEffect(() => {
@@ -1298,6 +1299,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
         .map(item => (typeof item === 'string' ? item : item?.symbol))
         .filter(Boolean)
         .map(symbol => symbol.toUpperCase())
+        .filter(symbol => !/^4\d{3}\.HK$/.test(symbol))
         .filter(symbol => !isDisallowedSymbol(symbol))
 
       console.log('[HK500] Normalized symbols count:', normalized.length)
@@ -1583,6 +1585,18 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
     const visibleSymbols = new Set(sortedResults.map(r => r.symbol))
     setResults(prev => prev.filter(entry => !visibleSymbols.has(entry.symbol)))
     setScanQueue(prev => prev.filter(symbol => !visibleSymbols.has(symbol)))
+  }
+
+  const scrollTableToTop = () => {
+    if (!tableScrollRef.current) return
+    tableScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+    tableScrollRef.current.focus({ preventScroll: true })
+  }
+
+  const scrollTableToBottom = () => {
+    if (!tableScrollRef.current) return
+    tableScrollRef.current.scrollTo({ top: tableScrollRef.current.scrollHeight, behavior: 'smooth' })
+    tableScrollRef.current.focus({ preventScroll: true })
   }
 
   const handleSort = (key) => {
@@ -1888,6 +1902,12 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
             <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
               <div className="flex items-center gap-3">
                 <h3 className="text-lg font-semibold text-slate-100">Breakout Signals</h3>
+                <div className="text-xs text-slate-400 flex items-center gap-2">
+                  <span title="Visible / total rows">Rows: {filteredResults.length}/{normalizedResults.length}</span>
+                  {normalizedResults.length !== filteredResults.length && (
+                    <span className="text-amber-300" title="Rows hidden by filters">({normalizedResults.length - filteredResults.length} filtered)</span>
+                  )}
+                </div>
                 {sortedResults.length > 0 && (
                   <div className="flex items-center gap-2 border-l border-slate-600 pl-3">
                     <span className="text-xs text-slate-400">{sortedResults.length} visible:</span>
@@ -1919,6 +1939,26 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                 )}
               </div>
               <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1 pr-2 border-r border-slate-700">
+                  <button
+                    onClick={scrollTableToTop}
+                    className="p-1.5 rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                    title="Scroll to top"
+                    aria-label="Scroll table to top"
+                    type="button"
+                  >
+                    <ChevronUp className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={scrollTableToBottom}
+                    className="p-1.5 rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                    title="Scroll to bottom"
+                    aria-label="Scroll table to bottom"
+                    type="button"
+                  >
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+                </div>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
@@ -1990,7 +2030,11 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
               </div>
             </div>
             <div className="overflow-x-auto">
-              <div className="max-h-[780px] overflow-y-auto">
+              <div
+                ref={tableScrollRef}
+                tabIndex={0}
+                className="max-h-[780px] overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60 rounded"
+              >
                 <table className="min-w-full divide-y divide-slate-700">
                 <thead className="bg-slate-900 sticky top-0 z-10">
                   <tr>
@@ -2045,8 +2089,12 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                       <tr
                         key={index}
                         data-entry-key={getEntryKey(result.symbol, result.days)}
-                        onClick={() => hasData && onStockSelect && onStockSelect(result.symbol, { ...result.optimalParams, smaPeriods: [result.optimalSMAs?.period], days: result.days })}
-                        className={`transition-colors ${hasData ? 'hover:bg-slate-700 cursor-pointer' : 'opacity-75'} ${isWithinLast10Days ? 'bg-blue-900/20 hover:bg-blue-800/30' : ''}`}
+                        onClick={() => {
+                          if (hasData && onStockSelect) {
+                            onStockSelect(result.symbol, { ...result.optimalParams, smaPeriods: [result.optimalSMAs?.period], days: result.days })
+                          }
+                        }}
+                        className={`transition-colors cursor-pointer ${hasData ? 'hover:bg-slate-700' : 'opacity-75'} ${isWithinLast10Days ? 'bg-blue-900/20 hover:bg-blue-800/30' : ''}`}
                         title={hasData ? (result.breakoutClosed ? 'Click to view (breakout closed by sell signal)' : 'Click to view in Technical Analysis with optimized parameters') : 'Pending scan'}
                       >
                         <td className="px-4 py-3 text-sm">
