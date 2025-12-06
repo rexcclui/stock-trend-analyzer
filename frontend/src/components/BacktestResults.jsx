@@ -73,6 +73,31 @@ function normalizeCachedResults(entries = []) {
         durationMs: typeof entry.durationMs === 'number' ? entry.durationMs : null
       }
 
+      const hasVolumeWeights =
+        typeof entry?.upResist?.volumeWeight === 'number' &&
+        typeof entry?.downResist?.volumeWeight === 'number'
+
+      if (normalizedEntry.status === 'completed' && !hasVolumeWeights) {
+        return {
+          ...normalizedEntry,
+          status: 'pending',
+          latestBreakout: null,
+          originalBreakout: null,
+          breakoutClosed: false,
+          latestPrice: null,
+          optimalParams: null,
+          optimalSMAs: null,
+          priceData: null,
+          upResist: null,
+          downResist: null,
+          isRecentBreakout: false,
+          recentBreakout: null,
+          totalSignals: null,
+          lastScanAt: null,
+          error: null
+        }
+      }
+
       // Don't clear completed or error results on reload - they should be preserved
       // The < 4 signals check is already enforced during backtest execution
       return normalizedEntry
