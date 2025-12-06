@@ -4762,7 +4762,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             <Legend
               align="center"
               verticalAlign="bottom"
-              wrapperStyle={{ position: 'relative', marginTop: 12 }}
+              wrapperStyle={{ position: 'relative' }}
               content={<ImportedCustomLegend
               smaVisibility={smaVisibility}
               onToggleSma={onToggleSma}

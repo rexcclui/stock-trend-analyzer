@@ -69,7 +69,7 @@ export const CustomLegend = ({
   hoveredVolumeTitleFormatter
 }) => {
   return (
-    <div className="flex justify-center gap-4 mt-2 flex-wrap">
+    <div className="flex justify-center gap-4 flex-wrap">
       {payload.map((entry, index) => {
         const isSma = entry.dataKey.startsWith('sma')
         const period = isSma ? parseInt(entry.dataKey.replace('sma', '')) : null
