@@ -1877,7 +1877,10 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
               />
               Bookmarked
             </label>
-            <label className="inline-flex items-center gap-2 text-sm text-slate-300 select-none">
+            <label
+              className="inline-flex items-center gap-2 text-sm text-slate-300 select-none"
+              title="Flags symbols whose nearest resistance zone sits within 10% of the current range—useful for spotting potential breaks."
+            >
               <input
                 type="checkbox"
                 checked={showPotentialBreakOnly}
