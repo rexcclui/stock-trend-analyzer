@@ -2124,12 +2124,6 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                     {renderSortIndicator('upperResist')}
                   </button>
                 </th>
-                <th
-                  className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider"
-                  title="Flags symbols whose nearest resistance zone sits within 10% of the current range—useful for spotting potential breaks."
-                >
-                  Potential
-                </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Break
                 </th>
@@ -2141,7 +2135,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
             <tbody className="divide-y divide-slate-800">
               {displayEntries.length === 0 ? (
                 <tr>
-                  <td colSpan="12" className="px-4 py-6 text-center text-slate-400">
+                  <td colSpan="11" className="px-4 py-6 text-center text-slate-400">
                     {showUpBreakOnly || showDownBreakOnly || showPotentialBreakOnly || showBookmarkedOnly
                       ? 'No symbols matched the current filters. Disable filters to see all entries.'
                       : 'No symbols added yet. Add stocks above to start screening.'}
@@ -2227,16 +2221,6 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                       title={entry.upperResist}
                     >
                       {entry.upperResist}
-                    </td>
-                    <td className="px-4 py-3 text-slate-200">
-                      {isPotentialBreak(entry) ? (
-                        <span className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-blue-900/30 text-blue-200 text-xs font-semibold border border-blue-700/70">
-                          <span className="w-2 h-2 rounded-full bg-blue-300" aria-hidden="true" />
-                          Potential
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 text-xs">—</span>
-                      )}
                     </td>
                     <td className="px-4 py-3 text-slate-200">{entry.breakout}</td>
                     <td className="px-4 py-3 text-right">

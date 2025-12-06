@@ -2085,13 +2085,22 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                     const isWithinLast10Days = hasData && daysAgo <= 10
                     const status = result.status || (hasData ? 'completed' : 'pending')
 
+                    const smaPeriods = result.optimalSMAs?.period ? [result.optimalSMAs.period] : []
+
+                    const analyzeParams = {
+                      ...result.optimalParams,
+                      smaPeriods,
+                      days: result.days,
+                      forceVolumeProfileV2: true
+                    }
+
                     return (
                       <tr
                         key={index}
                         data-entry-key={getEntryKey(result.symbol, result.days)}
                         onClick={() => {
                           if (hasData && onStockSelect) {
-                            onStockSelect(result.symbol, { ...result.optimalParams, smaPeriods: [result.optimalSMAs?.period], days: result.days })
+                            onStockSelect(result.symbol, analyzeParams)
                           }
                         }}
                         className={`transition-colors cursor-pointer ${hasData ? 'hover:bg-slate-700' : 'opacity-75'} ${isWithinLast10Days ? 'bg-blue-900/20 hover:bg-blue-800/30' : ''}`}
