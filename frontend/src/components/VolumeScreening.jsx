@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
 import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search, Clock3, BarChart3, ChevronUp, ChevronDown } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
+import VolumeLegendPills from './VolumeLegendPills'
 
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
 const VOLUME_CACHE_KEY = 'volumeScreeningEntries'
@@ -820,16 +821,45 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
   useEffect(() => {
     if (!triggerSymbol) return
 
-    const normalizedSymbol = processStockSymbol(triggerSymbol) || triggerSymbol
+    const triggerDays = typeof triggerSymbol === 'object' && triggerSymbol !== null && triggerSymbol.days != null
+      ? String(triggerSymbol.days)
+      : null
+
+    const rawSymbol = typeof triggerSymbol === 'object' && triggerSymbol !== null
+      ? triggerSymbol.symbol
+      : triggerSymbol
+
+    const normalizedSymbol = processStockSymbol(rawSymbol || '') || rawSymbol || triggerSymbol
+    const targetPeriod = triggerDays || period
+
+    // Keep UI period selection in sync with triggered period
+    if (triggerDays && `${period}` !== `${triggerDays}`) {
+      setPeriod(String(triggerDays))
+    }
+
+    if (!normalizedSymbol) {
+      if (onSymbolProcessed) {
+        onSymbolProcessed()
+      }
+      return
+    }
 
     // Check if symbol already exists in entries
-    const existingEntry = entries.find(entry => entry.symbol === normalizedSymbol)
+    const existingEntry = entries.find(entry =>
+      entry.symbol === normalizedSymbol && (!triggerDays || `${entry.period}` === triggerDays)
+    )
 
     if (existingEntry) {
       // Symbol exists, trigger scan for it
-      const loadingEntry = { ...existingEntry, status: 'loading', error: null }
+      const loadingEntry = {
+        ...existingEntry,
+        period: existingEntry.period ?? targetPeriod,
+        periodDisplay: existingEntry.periodDisplay || formatPeriod(targetPeriod),
+        status: 'loading',
+        error: null
+      }
       setEntries(prev => prev.map(entry =>
-        entry.symbol === normalizedSymbol ? loadingEntry : entry
+        entry.id === existingEntry.id ? loadingEntry : entry
       ))
       setScanQueue([loadingEntry])
       setScanTotal(1)
@@ -846,6 +876,8 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
       const newEntry = {
         id: `${normalizedSymbol}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
         symbol: normalizedSymbol,
+        period: targetPeriod,
+        periodDisplay: formatPeriod(targetPeriod),
         bookmarked: false,
         ...baseEntryState,
         status: 'loading'
@@ -2151,26 +2183,15 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                         </div>
                       ) : entry.status === 'error' ? (
                         <span className="text-red-400 text-sm">{entry.error || 'Failed to scan'}</span>
-                      ) : entry.volumeLegend?.length ? (
-                        <div className="flex flex-wrap gap-1">
-                          {entry.volumeLegend.map(slot => (
-                            <span
-                              key={`${entry.id}-${slot.legendIndex}`}
-                              title={`${formatPriceRange(slot.start, slot.end)} • ${slot.label}`}
-                              className={`px-1 py-0.5 text-[10px] leading-tight font-semibold rounded-sm shadow-sm border border-slate-800/60 text-center min-w-[2.25rem] ${slot.isCurrent ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-900' : ''
-                                }`}
-                              style={{
-                                backgroundColor: slot.color,
-                                color: slot.textColor || '#0f172a'
-                              }}
-                            >
-                              {slot.label}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
+                        ) : entry.volumeLegend?.length ? (
+                          <VolumeLegendPills
+                            legend={entry.volumeLegend}
+                            keyPrefix={entry.id}
+                            titleFormatter={(slot) => `${formatPriceRange(slot.start, slot.end)} • ${slot.label}`}
+                          />
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
                     </td>
                     <td
                       className="px-4 py-3 text-slate-200 text-sm"

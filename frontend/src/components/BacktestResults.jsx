@@ -2226,7 +2226,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
-                                onVolumeSelect(result.symbol)
+                                onVolumeSelect(result.symbol, result.days)
                               }}
                               className="p-1 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-900/20 rounded transition-colors mr-1"
                               title="Load in Volume Screening"
