@@ -1792,7 +1792,13 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
               onClick={scanAllQueued}
               disabled={results.length === 0 || isScanning}
               className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-              title="Scan only stocks without backtest results"
+              title={
+                isScanning
+                  ? 'Scanning is in progress — wait to rescan unfinished stocks'
+                  : results.length === 0
+                    ? 'Add stocks first to scan pending results'
+                    : 'Scan only stocks without backtest results'
+              }
             >
               <RefreshCcw className="w-5 h-5" />
             </button>
@@ -1800,7 +1806,13 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
               onClick={forceScanAll}
               disabled={results.length === 0 || isScanning}
               className="p-2 bg-slate-700 text-red-500 rounded-lg hover:bg-slate-600 hover:text-red-400 disabled:bg-slate-600 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors"
-              title="Force rescan all stocks (clears existing results)"
+              title={
+                isScanning
+                  ? 'Scanning is in progress — wait to force a full rescan'
+                  : results.length === 0
+                    ? 'Add stocks first to force a rescan'
+                    : 'Force rescan all stocks (clears existing results)'
+              }
             >
               <RotateCw className="w-5 h-5" />
             </button>
@@ -1808,7 +1820,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
               onClick={togglePauseResume}
               disabled={!isScanning}
               className="p-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-              title={isPaused ? 'Resume scanning' : 'Pause scanning'}
+              title={!isScanning ? 'Start a scan to enable pause/resume' : isPaused ? 'Resume scanning' : 'Pause scanning'}
             >
               {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
             </button>
@@ -1909,31 +1921,31 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                 {sortedResults.length > 0 && (
                   <div className="flex items-center gap-2 border-l border-slate-600 pl-3">
                     <span className="text-xs text-slate-400">{sortedResults.length} visible:</span>
-                    <button
-                      onClick={scanVisible}
-                      disabled={isScanning}
-                      className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-                      title="Scan all visible stocks"
-                    >
-                      <RefreshCcw className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={eraseVisible}
-                      disabled={isScanning}
-                      className="p-1.5 bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-                      title="Erase backtest results for all visible stocks"
-                    >
-                      <Eraser className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={removeVisible}
-                      disabled={isScanning}
-                      className="p-1.5 bg-red-700 text-white rounded-lg hover:bg-red-800 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-                      title="Remove all visible stocks from table"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  <button
+                    onClick={scanVisible}
+                    disabled={isScanning}
+                    className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                    title={isScanning ? 'Scanning is in progress — wait to rescan visible stocks' : 'Scan all visible stocks'}
+                  >
+                    <RefreshCcw className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={eraseVisible}
+                    disabled={isScanning}
+                    className="p-1.5 bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                    title={isScanning ? 'Scanning is in progress — wait to erase visible results' : 'Erase backtest results for all visible stocks'}
+                  >
+                    <Eraser className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={removeVisible}
+                    disabled={isScanning}
+                    className="p-1.5 bg-red-700 text-white rounded-lg hover:bg-red-800 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                    title={isScanning ? 'Scanning is in progress — wait to remove rows' : 'Remove all visible stocks from table'}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
                 )}
               </div>
               <div className="flex items-center gap-2 flex-wrap">
