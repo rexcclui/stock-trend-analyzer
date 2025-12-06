@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search, Clock3, BarChart3 } from 'lucide-react'
+import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search, Clock3, BarChart3, ChevronUp, ChevronDown } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
@@ -570,6 +570,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
   const [lastAddedId, setLastAddedId] = useState(null)
   const activeScanIdRef = useRef(null)
   const importInputRef = useRef(null)
+  const tableScrollRef = useRef(null)
 
   const baseEntryState = {
     priceRange: '—',
@@ -1176,7 +1177,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
       return {
         ...entry,
         priceRange: currentRange ? formatPriceRange(currentRange.start, currentRange.end) : '—',
-        currentRange: currentRange ? { start: currentRange.start, end: currentRange.end } : null,
+        currentRange: currentRange ? { start: currentRange.start, end: currentRange.end, weight: currentRange.weight } : null,
         testedDays: period,
         slotCount: slots.length,
         volumeLegend: legend,
@@ -1326,6 +1327,17 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     return matchesUp || matchesDown
   }
 
+  const getPriceRangeTooltip = (entry) => {
+    if (!entry) return '—'
+
+    const slotSpan = entry.currentRange ? entry.currentRange.end - entry.currentRange.start : null
+    const spanLabel = Number.isFinite(slotSpan) ? `$${slotSpan.toFixed(2)}` : '—'
+    const shareLabel = Number.isFinite(entry.currentRange?.weight) ? `${entry.currentRange.weight.toFixed(1)}%` : '—'
+    const slotCountLabel = entry.slotCount ?? '—'
+
+    return `Range: ${entry.priceRange} • Slots: ${slotCountLabel} • Span: ${spanLabel} • Current share: ${shareLabel}`
+  }
+
   const getVisibleEntries = (sourceEntries = entries) => sourceEntries.filter(entry => {
     if (showBookmarkedOnly && !entry.bookmarked) return false
     if (showPotentialBreakOnly && !isPotentialBreak(entry)) return false
@@ -1376,6 +1388,18 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
         return [...prev, period]
       }
     })
+  }
+
+  const scrollTableToTop = () => {
+    if (!tableScrollRef.current) return
+    tableScrollRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+    tableScrollRef.current.focus({ preventScroll: true })
+  }
+
+  const scrollTableToBottom = () => {
+    if (!tableScrollRef.current) return
+    tableScrollRef.current.scrollTo({ top: tableScrollRef.current.scrollHeight, behavior: 'smooth' })
+    tableScrollRef.current.focus({ preventScroll: true })
   }
 
   const isFiltered = filteredEntries.length !== entries.length
@@ -1953,9 +1977,40 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                 ))}
               </div>
             )}
+            <div className="flex items-center gap-1 border border-slate-700 rounded-lg px-2 py-1">
+              <span className="text-xs text-slate-400" title="Visible / total rows">Rows: {visibleEntries.length}/{entries.length}</span>
+              {entries.length !== visibleEntries.length && (
+                <span className="text-[11px] text-amber-300" title="Rows hidden by filters">({entries.length - visibleEntries.length} filtered)</span>
+              )}
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={scrollTableToTop}
+                className="p-2 rounded-lg bg-slate-800 text-slate-200 hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                title="Scroll to top"
+                aria-label="Scroll to top"
+              >
+                <ChevronUp className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={scrollTableToBottom}
+                className="p-2 rounded-lg bg-slate-800 text-slate-200 hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                title="Scroll to bottom"
+                aria-label="Scroll to bottom"
+              >
+                <ChevronDown className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
-        <div className="overflow-x-auto max-h-[70vh]">
+        <div className="overflow-x-auto">
+          <div
+            ref={tableScrollRef}
+            tabIndex={0}
+            className="max-h-[70vh] overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60"
+          >
           <table className="min-w-full divide-y divide-slate-700">
             <thead className="bg-slate-800 sticky top-0 z-10 shadow-lg">
               <tr>
@@ -2089,7 +2144,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                             <span
                               key={`${entry.id}-${slot.legendIndex}`}
                               title={`${formatPriceRange(slot.start, slot.end)} • ${slot.label}`}
-                              className={`px-1.5 py-1 text-[10px] leading-tight font-semibold rounded-md shadow-sm border border-slate-800/60 text-center min-w-[2.75rem] ${slot.isCurrent ? 'ring-2 ring-amber-400' : ''
+                              className={`px-1 py-0.5 text-[10px] leading-tight font-semibold rounded-sm shadow-sm border border-slate-800/60 text-center min-w-[2.25rem] ${slot.isCurrent ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-900' : ''
                                 }`}
                               style={{
                                 backgroundColor: slot.color,
@@ -2104,7 +2159,12 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                         <span className="text-slate-400">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-200 text-sm">{entry.priceRange}</td>
+                    <td
+                      className="px-4 py-3 text-slate-200 text-sm"
+                      title={getPriceRangeTooltip(entry)}
+                    >
+                      {entry.priceRange}
+                    </td>
                     <td
                       className={`px-4 py-3 text-slate-200 text-sm ${isResistanceClose(entry.bottomResist) ? 'text-sky-400 font-semibold' : ''}`}
                       title={entry.bottomResist}
@@ -2172,6 +2232,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
               )}
             </tbody>
           </table>
+          </div>
         </div>
         <div className="px-4 py-3 border-t border-slate-800 text-right text-xs text-slate-400">
           Selected period: {periods.find(p => p.value === period)?.label || period}
