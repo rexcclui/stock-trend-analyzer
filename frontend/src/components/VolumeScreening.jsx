@@ -1668,7 +1668,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
           element.scrollIntoView({ behavior: 'auto', block: 'center' })
           // Add blink animation class
           element.classList.add('blink-highlight')
-          console.log('[VolumeScreening] Jumped to row and blink added')
+          console.log('[VolumeScreening] Scrolled to row and blink added')
         } else {
           console.warn('[VolumeScreening] Element not found for ID:', lastAddedId)
         }
@@ -1915,13 +1915,12 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
               </div>
             )}
             <div className="flex items-center gap-1 border border-slate-700 rounded-lg px-2 py-1 bg-slate-900/40">
-              <span className="text-xs text-slate-300">Jump</span>
               <button
                 type="button"
                 onClick={() => handleJump('top')}
                 className="p-1 rounded-md text-slate-200 hover:text-white hover:bg-slate-700 transition-colors"
-                title="Jump to top row"
-                aria-label="Jump to top row"
+                title="Scroll to top row"
+                aria-label="Scroll to top row"
               >
                 <ChevronsUp className="w-4 h-4" />
               </button>
@@ -1929,8 +1928,8 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                 type="button"
                 onClick={() => handleJump('bottom')}
                 className="p-1 rounded-md text-slate-200 hover:text-white hover:bg-slate-700 transition-colors"
-                title="Jump to bottom row"
-                aria-label="Jump to bottom row"
+                title="Scroll to bottom row"
+                aria-label="Scroll to bottom row"
               >
                 <ChevronsDown className="w-4 h-4" />
               </button>

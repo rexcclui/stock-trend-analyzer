@@ -1972,18 +1972,17 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                   )}
                 </div>
                 <div className="flex items-center gap-1 border border-slate-600 rounded-lg px-2 py-1 bg-slate-900/40">
-                  <span className="text-xs text-slate-300">Jump</span>
                   <button
                     onClick={() => handleJump('top')}
                     className="p-1 rounded-md text-slate-200 hover:text-white hover:bg-slate-700 transition-colors"
-                    title="Jump to top row"
+                    title="Scroll to top row"
                   >
                     <ChevronsUp className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleJump('bottom')}
                     className="p-1 rounded-md text-slate-200 hover:text-white hover:bg-slate-700 transition-colors"
-                    title="Jump to bottom row"
+                    title="Scroll to bottom row"
                   >
                     <ChevronsDown className="w-4 h-4" />
                   </button>
