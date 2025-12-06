@@ -3263,27 +3263,38 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         return null
       }
 
+      const buildLegend = (zones, currentIndex, percentKey = 'volumePercent') => {
+        if (!Array.isArray(zones) || zones.length === 0 || currentIndex < 0) return null
+
+        return zones.map((zone, idx) => {
+          const percentValue = percentKey === 'volumeWeight'
+            ? (zone.volumeWeight || 0) * 100
+            : zone[percentKey] || 0
+
+          return {
+            legendIndex: idx,
+            start: zone.minPrice,
+            end: zone.maxPrice,
+            label: `${percentValue.toFixed(1)}%`,
+            color: getVolumeColor(percentValue),
+            textColor: '#0f172a',
+            isCurrent: idx === currentIndex
+          }
+        })
+      }
+
       if (volumeProfileV2Enabled && volumeProfileV2Data.length > 0) {
         const matchingSlot = volumeProfileV2Data.find(slot =>
           hoveredDate >= slot.startDate && hoveredDate <= slot.endDate
         )
 
         if (matchingSlot) {
-          const matchingZone = matchingSlot.priceZones.find(zone =>
+          const currentZoneIdx = matchingSlot.priceZones.findIndex(zone =>
             hoveredPrice >= zone.minPrice && hoveredPrice <= zone.maxPrice
           )
 
-          if (matchingZone) {
-            const zonePercent = (matchingZone.volumeWeight || 0) * 100
-            return [{
-              legendIndex: matchingSlot.priceZones.indexOf(matchingZone),
-              start: matchingZone.minPrice,
-              end: matchingZone.maxPrice,
-              label: `${zonePercent.toFixed(1)}%`,
-              color: getVolumeColor(zonePercent),
-              textColor: '#0f172a',
-              isCurrent: true
-            }]
+          if (currentZoneIdx >= 0) {
+            return buildLegend(matchingSlot.priceZones, currentZoneIdx, 'volumeWeight')
           }
         }
       }
@@ -3295,21 +3306,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         }) || volumeProfiles[0]
 
         if (matchingProfile) {
-          const matchingZone = matchingProfile.zones.find(zone =>
+          const currentZoneIdx = matchingProfile.zones.findIndex(zone =>
             hoveredPrice >= zone.minPrice && hoveredPrice <= zone.maxPrice
           )
 
-          if (matchingZone) {
-            const zonePercent = matchingZone.volumePercent || 0
-            return [{
-              legendIndex: matchingProfile.zones.indexOf(matchingZone),
-              start: matchingZone.minPrice,
-              end: matchingZone.maxPrice,
-              label: `${zonePercent.toFixed(1)}%`,
-              color: getVolumeColor(zonePercent),
-              textColor: '#0f172a',
-              isCurrent: true
-            }]
+          if (currentZoneIdx >= 0) {
+            return buildLegend(matchingProfile.zones, currentZoneIdx)
           }
         }
       }
