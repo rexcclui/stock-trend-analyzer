@@ -4736,7 +4736,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         <ResponsiveContainer>
           <ComposedChart
             data={chartDataWithZones}
-            margin={{ top: 5, right: 0, left: 0, bottom: 0 }}
+            margin={{ top: 5, right: 0, left: 0, bottom: 32 }}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
             onMouseDown={handleMouseDown}
@@ -4762,7 +4762,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             <Legend
               align="center"
               verticalAlign="bottom"
-              wrapperStyle={{ position: 'relative', marginTop: 0, paddingTop: 0 }}
+              wrapperStyle={{
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                width: '100%',
+                marginTop: 0,
+                paddingTop: 0
+              }}
               content={<ImportedCustomLegend
               smaVisibility={smaVisibility}
               onToggleSma={onToggleSma}
