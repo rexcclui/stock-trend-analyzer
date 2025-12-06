@@ -98,6 +98,33 @@ function formatTimestamp(dateString) {
   return `${month}-${day} ${hours}:${minutes}`
 }
 
+function buildPriceRangeTooltip(entry) {
+  if (!entry) return undefined
+
+  const parts = []
+  const span = entry.priceSpan
+  const hasSpan = Number.isFinite(span?.min) && Number.isFinite(span?.max)
+  const currentRange = entry.currentRange
+  const hasRange = Number.isFinite(currentRange?.start) && Number.isFinite(currentRange?.end)
+
+  if (entry.slotCount && entry.slotCount !== '—') {
+    parts.push(`Px slots: ${entry.slotCount}`)
+  }
+
+  if (hasSpan) {
+    const spanDelta = span.max - span.min
+    parts.push(`Price span: ${formatPriceRange(span.min, span.max)} (Δ $${spanDelta.toFixed(2)})`)
+
+    if (hasRange && spanDelta > 0) {
+      const rangeWidth = currentRange.end - currentRange.start
+      const pct = (rangeWidth / spanDelta) * 100
+      parts.push(`Current range share: ${pct.toFixed(1)}% of span`)
+    }
+  }
+
+  return parts.length > 0 ? parts.join('\n') : undefined
+}
+
 function isStaleDataDate(dateString) {
   if (!dateString) return false
   const parsed = new Date(dateString)
@@ -144,11 +171,27 @@ function safeSetItem(key, value) {
 function normalizeCachedResult(cached) {
   if (!cached || typeof cached !== 'object') return null
 
+  const normalizePriceSpan = (value) => {
+    if (!value) return null
+    if (Array.isArray(value) && value.length === 2) {
+      const [min, max] = value
+      return Number.isFinite(min) && Number.isFinite(max) ? { min, max } : null
+    }
+
+    if (typeof value === 'object') {
+      const { min, max } = value
+      return Number.isFinite(min) && Number.isFinite(max) ? { min, max } : null
+    }
+
+    return null
+  }
+
   return {
     priceRange: cached.priceRange ?? cached.pr ?? '—',
     currentRange: cached.currentRange ?? cached.cr ?? null,
     testedDays: cached.testedDays ?? cached.td ?? '—',
     slotCount: cached.slotCount ?? cached.sc ?? '—',
+    priceSpan: normalizePriceSpan(cached.priceSpan ?? cached.ps),
     volumeLegend: cached.volumeLegend ?? cached.vl ?? [],
     bottomResist: cached.bottomResist ?? cached.br ?? '—',
     upperResist: cached.upperResist ?? cached.ur ?? '—',
@@ -164,6 +207,7 @@ function compressResultEntry(entry) {
     cr: entry.currentRange,
     td: entry.testedDays,
     sc: entry.slotCount,
+    ps: entry.priceSpan ? [entry.priceSpan.min, entry.priceSpan.max] : null,
     vl: entry.volumeLegend,
     br: entry.bottomResist,
     ur: entry.upperResist,
@@ -398,7 +442,7 @@ function buildVolumeSlots(prices) {
   const priorPoint = sorted[sorted.length - 2]
   const previousPrice = priorPoint?.close ?? priorPoint?.high ?? priorPoint?.low ?? null
 
-  return { slots, lastPrice, previousPrice }
+  return { slots, lastPrice, previousPrice, minLow, maxHigh }
 }
 
 function buildLegend(slots, currentIndex) {
@@ -578,6 +622,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     currentRange: null,
     testedDays: '—',
     slotCount: '—',
+    priceSpan: null,
     volumeLegend: [],
     bottomResist: '—',
     upperResist: '—',
@@ -1148,7 +1193,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
         }
       }
 
-      const { slots, lastPrice, previousPrice } = buildVolumeSlots(prices)
+      const { slots, lastPrice, previousPrice, minLow, maxHigh } = buildVolumeSlots(prices)
       const slotIndex = findSlotIndex(slots, lastPrice)
       const currentRange = slotIndex >= 0 ? slots[slotIndex] : null
       const legend = buildLegend(slots, slotIndex)
@@ -1181,6 +1226,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
         currentRange: currentRange ? { start: currentRange.start, end: currentRange.end } : null,
         testedDays: period,
         slotCount: slots.length,
+        priceSpan: Number.isFinite(minLow) && Number.isFinite(maxHigh) ? { min: minLow, max: maxHigh } : null,
         volumeLegend: legend,
         bottomResist: formatResistance(currentRange, bottomResist),
         upperResist: formatResistance(currentRange, upperResist),
@@ -1205,6 +1251,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
         ...entry,
         priceRange: '—',
         slotCount: '—',
+        priceSpan: null,
         volumeLegend: [],
         bottomResist: '—',
         upperResist: '—',
@@ -2036,9 +2083,6 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                   </span>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Px Slots
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   <button
                     type="button"
                     onClick={() => toggleSort('lastScanAt')}
@@ -2092,7 +2136,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
             <tbody className="divide-y divide-slate-800">
               {displayEntries.length === 0 ? (
                 <tr>
-                  <td colSpan="11" className="px-4 py-6 text-center text-slate-400">
+                  <td colSpan="10" className="px-4 py-6 text-center text-slate-400">
                     {showUpBreakOnly || showDownBreakOnly || showPotentialBreakOnly || showBookmarkedOnly
                       ? 'No symbols matched the current filters. Disable filters to see all entries.'
                       : 'No symbols added yet. Add stocks above to start screening.'}
@@ -2128,7 +2172,6 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                         {entry.periodDisplay || formatPeriod(entry.period)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-200">{entry.slotCount}</td>
                     <td className={`px-4 py-3 text-xs ${isScanStale(entry.lastScanAt) ? 'text-red-400' : 'text-slate-200'}`}>
                       {formatTimestamp(entry.lastScanAt)}
                     </td>
@@ -2161,7 +2204,12 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                         <span className="text-slate-400">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-200 text-sm">{entry.priceRange}</td>
+                    <td
+                      className="px-4 py-3 text-slate-200 text-sm"
+                      title={buildPriceRangeTooltip(entry)}
+                    >
+                      {entry.priceRange}
+                    </td>
                     <td
                       className={`px-4 py-3 text-slate-200 text-sm ${isResistanceClose(entry.bottomResist) ? 'text-sky-400 font-semibold' : ''}`}
                       title={entry.bottomResist}
