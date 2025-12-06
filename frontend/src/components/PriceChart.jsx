@@ -4290,15 +4290,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   return (
     <div ref={chartContainerRef} style={{ width: '100%', height: chartHeight, position: 'relative', cursor: getCursorStyle(), userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', msUserSelect: 'none' }}>
-      {hoveredVolumeLegend && (
-        <div className="absolute left-1/2 -translate-x-1/2 top-2 z-20">
-          <VolumeLegendPills
-            legend={hoveredVolumeLegend}
-            keyPrefix="chart-hover-volume"
-            titleFormatter={(slot) => `$${slot.start?.toFixed(2)} - $${slot.end?.toFixed(2)}`}
-          />
-        </div>
-      )}
       {/* Show loading state if data is not available */}
       {(!prices || !indicators || prices.length === 0 || indicators.length === 0) ? (
         <div className="flex items-center justify-center h-full text-slate-400">
@@ -4796,6 +4787,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               isMobile={isMobile}
               displayPrices={displayPrices}
               zoomRange={zoomRange}
+              hoveredVolumeLegend={hoveredVolumeLegend}
+              hoveredVolumeTitleFormatter={(slot) => `$${slot.start?.toFixed(2)} - $${slot.end?.toFixed(2)}`}
             />} />
             {syncedMouseDate && (
               <ReferenceLine
