@@ -2090,7 +2090,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                     const smaPeriods = optimalSMAs?.period ? [optimalSMAs.period] : []
 
                     const analyzeParams = {
-                      ...result.optimalParams,
+                      ...(result.optimalParams || {}),
                       smaPeriods,
                       days: result.days,
                       forceVolumeProfileV2: true
@@ -2101,7 +2101,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                         key={index}
                         data-entry-key={getEntryKey(result.symbol, result.days)}
                         onClick={() => {
-                          if (hasData && onStockSelect) {
+                          if (onStockSelect) {
                             onStockSelect(result.symbol, analyzeParams)
                           }
                         }}
