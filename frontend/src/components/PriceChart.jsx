@@ -4759,7 +4759,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             />
             <YAxis domain={['auto', 'auto']} tick={{ fill: '#94a3b8', fontSize: isMobile ? 10 : 12 }} stroke="#475569" width={isMobile ? 40 : 60} />
             <Tooltip content={<CustomTooltip />} />
-            <Legend content={<ImportedCustomLegend
+            <Legend
+              align="center"
+              verticalAlign="bottom"
+              wrapperStyle={{ position: 'relative', marginTop: 12 }}
+              content={<ImportedCustomLegend
               smaVisibility={smaVisibility}
               onToggleSma={onToggleSma}
               onDeleteSma={onDeleteSma}
@@ -4789,7 +4793,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               zoomRange={zoomRange}
               hoveredVolumeLegend={hoveredVolumeLegend}
               hoveredVolumeTitleFormatter={(slot) => `$${slot.start?.toFixed(2)} - $${slot.end?.toFixed(2)}`}
-            />} />
+            />}
+            />
             {syncedMouseDate && (
               <ReferenceLine
                 x={syncedMouseDate}
