@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { TrendingUp, BarChart3, Activity, Waves, Bug } from 'lucide-react'
 import StockAnalyzer from './components/StockAnalyzer'
 import BacktestResults from './components/BacktestResults'
@@ -11,6 +11,44 @@ function App() {
   const [selectedParams, setSelectedParams] = useState(null)
   const [volumeSymbol, setVolumeSymbol] = useState(null)
   const [backtestSymbol, setBacktestSymbol] = useState(null)
+  const [localStorageSize, setLocalStorageSize] = useState(null)
+
+  const formatBytes = (bytes) => {
+    if (!bytes) return '0 B'
+    const units = ['B', 'KB', 'MB', 'GB']
+    const exponent = Math.min(
+      Math.floor(Math.log(bytes) / Math.log(1024)),
+      units.length - 1,
+    )
+    const value = bytes / 1024 ** exponent
+    return `${value.toFixed(value >= 10 || value % 1 === 0 ? 0 : 1)} ${units[exponent]}`
+  }
+
+  useEffect(() => {
+    const measure = () => {
+      if (typeof window === 'undefined') return
+
+      try {
+        let totalSizeBytes = 0
+        for (let i = 0; i < localStorage.length; i += 1) {
+          const key = localStorage.key(i)
+          if (!key) continue
+
+          const value = localStorage.getItem(key) ?? ''
+          totalSizeBytes += new Blob([value]).size
+        }
+        setLocalStorageSize(totalSizeBytes)
+      } catch (error) {
+        console.warn('Failed to measure localStorage size', error)
+      }
+    }
+
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(measure, { timeout: 1000 })
+    } else {
+      setTimeout(measure, 0)
+    }
+  }, [])
 
   const exportLocalStorage = () => {
     if (typeof window === 'undefined') return
@@ -91,7 +129,12 @@ function App() {
           aria-label="Export LocalStorage contents"
         >
           <Bug className="w-4 h-4" />
-          Debug export
+          <span className="flex items-center gap-1">
+            Debug export
+            {localStorageSize !== null && (
+              <span className="text-[11px] font-normal text-slate-300">({formatBytes(localStorageSize)})</span>
+            )}
+          </span>
         </button>
 
         {/* Tab Navigation */}
