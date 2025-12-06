@@ -2093,11 +2093,13 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                       || result.optimalParams?.smaPeriods?.[0]
                       || result.optimalParams?.smaPeriod
                       || result.optimalParams?.sma
-                    const smaPeriods = resolvedSmaPeriod ? [resolvedSmaPeriod] : []
+                    const numericSma = resolvedSmaPeriod ? Number(resolvedSmaPeriod) : null
+                    const smaPeriods = numericSma ? [numericSma] : []
 
                     const analyzeParams = {
                       ...(result.optimalParams || {}),
                       smaPeriods,
+                      ...(numericSma ? { sma: numericSma } : {}),
                       days: result.days,
                       forceVolumeProfileV2: true
                     }
