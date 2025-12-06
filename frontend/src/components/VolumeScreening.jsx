@@ -1330,12 +1330,22 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
   const getPriceRangeTooltip = (entry) => {
     if (!entry) return '—'
 
-    const slotSpan = entry.currentRange ? entry.currentRange.end - entry.currentRange.start : null
+    const currentSlot = entry.currentRange || entry.volumeLegend?.find(slot => slot.isCurrent)
+    const slotSpan = Number.isFinite(currentSlot?.end) && Number.isFinite(currentSlot?.start)
+      ? currentSlot.end - currentSlot.start
+      : null
     const spanLabel = Number.isFinite(slotSpan) ? `$${slotSpan.toFixed(2)}` : '—'
-    const shareLabel = Number.isFinite(entry.currentRange?.weight) ? `${entry.currentRange.weight.toFixed(1)}%` : '—'
-    const slotCountLabel = entry.slotCount ?? '—'
+    const shareLabel = Number.isFinite(currentSlot?.weight) ? `${currentSlot.weight.toFixed(1)}%` : '—'
+    const slotCountLabel = Number.isFinite(entry.slotCount)
+      ? entry.slotCount
+      : Array.isArray(entry.volumeLegend)
+        ? entry.volumeLegend.length
+        : '—'
+    const rangeLabel = currentSlot
+      ? formatPriceRange(currentSlot.start, currentSlot.end)
+      : entry.priceRange || '—'
 
-    return `Range: ${entry.priceRange} • Slots: ${slotCountLabel} • Span: ${spanLabel} • Current share: ${shareLabel}`
+    return `Range: ${rangeLabel} • Slots: ${slotCountLabel} • Span: ${spanLabel} • Current share: ${shareLabel}`
   }
 
   const getVisibleEntries = (sourceEntries = entries) => sourceEntries.filter(entry => {
