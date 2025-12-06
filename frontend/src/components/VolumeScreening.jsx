@@ -2122,9 +2122,12 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                           toggleBookmark(entry.id)
                         }}
                         aria-label={entry.bookmarked ? 'Unbookmark' : 'Bookmark'}
-                        className={`p-1 rounded-full hover:bg-slate-800 transition-colors ${entry.bookmarked ? 'text-yellow-400' : 'text-slate-400'}`}
+                        className={`p-1 rounded transition-colors ${entry.bookmarked
+                          ? 'text-amber-300 hover:text-amber-200 hover:bg-amber-900/30'
+                          : 'text-slate-400 hover:text-amber-200 hover:bg-slate-700/70'
+                        }`}
                       >
-                        <Star className="w-5 h-5" fill={entry.bookmarked ? 'currentColor' : 'none'} />
+                        <Star className="w-4 h-4" fill={entry.bookmarked ? 'currentColor' : 'none'} />
                       </button>
                     </td>
                     <td className="px-4 py-3 text-slate-100 font-medium">{entry.symbol}</td>
