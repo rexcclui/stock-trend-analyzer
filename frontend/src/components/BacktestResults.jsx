@@ -2075,15 +2075,24 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                   </tr>
                 </thead>
                 <tbody className="bg-slate-800 divide-y divide-slate-700">
-                  {sortedResults.map((result, index) => {
-                    const hasBreakout = Boolean(result.latestBreakout)
-                    const hasData = Boolean(result.originalBreakout)  // Has breakout data (may be closed)
-                    const daysAgo = hasData ? getDaysAgo(result.originalBreakout.date) : null
-                    const priceChange = hasData
-                      ? ((result.latestPrice - result.originalBreakout.price) / result.originalBreakout.price * 100)
-                      : null
-                    const isWithinLast10Days = hasData && daysAgo <= 10
-                    const status = result.status || (hasData ? 'completed' : 'pending')
+                    {sortedResults.map((result, index) => {
+                      const hasBreakout = Boolean(result.latestBreakout)
+                      const hasData = Boolean(result.originalBreakout)  // Has breakout data (may be closed)
+                      const daysAgo = hasData ? getDaysAgo(result.originalBreakout.date) : null
+                      const priceChange = hasData
+                        ? ((result.latestPrice - result.originalBreakout.price) / result.originalBreakout.price * 100)
+                        : null
+                      const isWithinLast10Days = hasData && daysAgo <= 10
+                      const status = result.status || (hasData ? 'completed' : 'pending')
+                      const plValue = result.optimalSMAs?.pl
+                      const plClassName =
+                        typeof plValue === 'number'
+                          ? typeof result.marketChange === 'number' && plValue > result.marketChange
+                            ? 'text-blue-400'
+                            : plValue >= 0
+                              ? 'text-green-400'
+                              : 'text-red-400'
+                          : 'text-slate-400'
 
                     return (
                       <tr
@@ -2180,23 +2189,17 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
                           {hasData ? result.totalSignals : '—'}
                         </td>
-                        <td className="px-4 py-3 text-sm text-right font-semibold">
-                          {hasData ? (
-                            <span className={
-                              typeof result.marketChange === 'number' && result.optimalSMAs.pl > result.marketChange
-                                ? 'text-blue-400'
-                                : result.optimalSMAs.pl >= 0
-                                  ? 'text-green-400'
-                                  : 'text-red-400'
-                            }>
-                              {formatPercent(result.optimalSMAs.pl)}
-                            </span>
-                          ) : '—'}
-                        </td>
-                        <td className="px-4 py-3 text-sm text-right font-semibold">
-                          {typeof result.marketChange === 'number' ? (
-                            <span className={result.marketChange >= 0 ? 'text-green-300' : 'text-red-300'}>
-                              {formatPercent(result.marketChange)}
+                          <td className="px-4 py-3 text-sm text-right font-semibold">
+                            {hasData && typeof plValue === 'number' ? (
+                              <span className={plClassName}>
+                                {formatPercent(plValue)}
+                              </span>
+                            ) : '—'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right font-semibold">
+                            {typeof result.marketChange === 'number' ? (
+                              <span className={result.marketChange >= 0 ? 'text-green-300' : 'text-red-300'}>
+                                {formatPercent(result.marketChange)}
                             </span>
                           ) : '—'}
                         </td>
