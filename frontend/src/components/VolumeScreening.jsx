@@ -2019,7 +2019,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
           <div
             ref={tableScrollRef}
             tabIndex={0}
-            className="max-h-[70vh] overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60"
+            className="max-h-[70vh] overflow-y-auto scroll-smooth focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/60"
           >
           <table className="min-w-full divide-y divide-slate-700">
             <thead className="bg-slate-800 sticky top-0 z-10 shadow-lg">
