@@ -2114,7 +2114,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                         key={index}
                         data-entry-key={getEntryKey(result.symbol, result.days)}
                         onClick={handleRowClick}
-                        className={`transition-colors ${hasData ? 'hover:bg-slate-700 cursor-pointer' : 'opacity-75'} ${isWithinLast10Days ? 'bg-blue-900/20 hover:bg-blue-800/30' : ''}`}
+                        className={`transition-colors ${hasData ? 'hover:bg-slate-700' : 'opacity-75 hover:bg-slate-700/60'} ${onStockSelect ? 'cursor-pointer' : ''} ${isWithinLast10Days ? 'bg-blue-900/20 hover:bg-blue-800/30' : ''}`}
                         title={hasData ? (result.breakoutClosed ? 'Click to view (breakout closed by sell signal)' : 'Click to view in Technical Analysis with optimized parameters') : 'Pending scan'}
                       >
                         <td className="px-4 py-3 text-sm">
