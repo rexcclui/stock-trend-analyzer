@@ -1918,13 +1918,16 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
           </div>
 
           {/* Results Table */}
-          <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
-            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-              <div className="flex items-center gap-3">
-                <h3 className="text-lg font-semibold text-slate-100">Breakout Signals</h3>
-                {sortedResults.length > 0 && (
-                  <div className="flex items-center gap-2 border-l border-slate-600 pl-3">
-                    <span className="text-xs text-slate-400">{sortedResults.length} visible:</span>
+            <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
+              <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <h3 className="text-lg font-semibold text-slate-100">Breakout Signals</h3>
+                  <div className="flex items-center gap-2 text-xs text-slate-400 border-l border-slate-600 pl-3">
+                    <span className="whitespace-nowrap">Rows: {sortedResults.length} / {normalizedResults.length}</span>
+                  </div>
+                  {sortedResults.length > 0 && (
+                    <div className="flex items-center gap-2 border-l border-slate-600 pl-3">
+                      <span className="text-xs text-slate-400">{sortedResults.length} visible:</span>
                     <button
                       onClick={scanVisible}
                       disabled={isScanning}

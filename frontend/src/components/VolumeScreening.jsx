@@ -1909,6 +1909,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                 </button>
               )}
             </div>
+            <span className="text-xs text-slate-400 whitespace-nowrap">Rows: {visibleEntries.length} / {entries.length}</span>
             {isFiltered && (
               <div className="text-xs text-slate-400 whitespace-nowrap" title="Showing only filtered symbols">
                 Showing {filteredEntries.length} / {entries.length} ({filteredCount} filtered)
