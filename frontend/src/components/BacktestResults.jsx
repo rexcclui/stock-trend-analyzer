@@ -1612,8 +1612,6 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
         return entry.symbol ?? ''
       case 'status':
         return entry.status ?? ''
-      case 'dataPoints':
-        return entry.priceData?.length ?? -Infinity
       case 'daysAgo':
         return entry.originalBreakout ? getDaysAgo(entry.originalBreakout.date) : Infinity
       case 'breakoutPrice':
@@ -2053,7 +2051,6 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                       </span>
                     </th>
                     <th onClick={() => handleSort('status')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Backtest scan status: pending, loading, completed, or error">Status {renderSortIndicator('status')}</th>
-                    <th onClick={() => handleSort('dataPoints')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Number of data points (trading days) tested in backtest">Days {renderSortIndicator('dataPoints')}</th>
                     <th onClick={() => handleSort('daysAgo')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Number of days since the most recent breakout signal">Days Ago {renderSortIndicator('daysAgo')}</th>
                     <th onClick={() => handleSort('breakoutPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Stock price at the most recent breakout point">BrkPx {renderSortIndicator('breakoutPrice')}</th>
                     <th onClick={() => handleSort('currentPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Current stock price with % change from breakout price">Current Price {renderSortIndicator('currentPrice')}</th>
@@ -2085,6 +2082,10 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                       const isWithinLast10Days = hasData && daysAgo <= 10
                       const status = result.status || (hasData ? 'completed' : 'pending')
                       const plValue = result.optimalSMAs?.pl
+                      const periodLabel = result.period || formatPeriod(result.days)
+                      const periodTooltip = result.priceData?.length > 0
+                        ? `${result.days} days (${result.priceData.length} trading days)`
+                        : `${result.days} days (no price data yet)`
                       const plClassName =
                         typeof plValue === 'number'
                           ? typeof result.marketChange === 'number' && plValue > result.marketChange
@@ -2118,8 +2119,11 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                           {result.symbol}
                         </td>
                         <td className="px-4 py-3 text-sm text-center">
-                          <span className="px-2 py-1 rounded bg-purple-900/50 text-purple-200 text-xs font-semibold">
-                            {result.period || formatPeriod(result.days)}
+                          <span
+                            className="px-2 py-1 rounded bg-purple-900/50 text-purple-200 text-xs font-semibold"
+                            title={periodTooltip}
+                          >
+                            {periodLabel}
                           </span>
                         </td>
                         <td className="px-2 py-3 text-sm max-w-[80px]">
@@ -2129,13 +2133,6 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                           >
                             {status === 'completed' ? 'Done' : status === 'loading' ? 'Scanning' : status === 'queued' ? 'Queued' : status === 'error' ? 'Error' : 'Pending'}
                           </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-slate-300 text-right">
-                          {result.priceData?.length > 0 ? (
-                            <span className="font-medium">{result.priceData.length}</span>
-                          ) : (
-                            <span className="text-slate-500">—</span>
-                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
                           {hasData ? (
