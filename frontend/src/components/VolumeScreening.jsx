@@ -1993,11 +1993,11 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                 <span className="text-[11px] text-amber-300" title="Rows hidden by filters">({entries.length - visibleEntries.length} filtered)</span>
               )}
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 pr-2 border-r border-slate-700">
               <button
                 type="button"
                 onClick={scrollTableToTop}
-                className="p-2 rounded-lg bg-slate-800 text-slate-200 hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                className="p-1.5 rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
                 title="Scroll to top"
                 aria-label="Scroll to top"
               >
@@ -2006,7 +2006,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
               <button
                 type="button"
                 onClick={scrollTableToBottom}
-                className="p-2 rounded-lg bg-slate-800 text-slate-200 hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                className="p-1.5 rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
                 title="Scroll to bottom"
                 aria-label="Scroll to bottom"
               >
