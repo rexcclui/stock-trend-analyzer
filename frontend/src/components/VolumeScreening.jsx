@@ -12,6 +12,7 @@ const CACHE_TTL_MS = 16 * 60 * 60 * 1000
 const RECENT_SCAN_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000
 const TOP_SYMBOL_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 1 month cache for top 2000 symbols
 const STALE_DATA_THRESHOLD_MS = 30 * 24 * 60 * 60 * 1000 // 1 month threshold for latest data point
+const ABNORMAL_VOLUME_WEIGHT_THRESHOLD = 80
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const INVALID_FIVE_CHAR_LENGTH = 5
 const BLOCKED_SUFFIX = '.TO'
@@ -491,6 +492,11 @@ function getCurrentVolumeWeight(entry) {
   return Number.isFinite(weight) ? weight : null
 }
 
+function isAbnormalVolumeWeight(entry) {
+  const weight = getCurrentVolumeWeight(entry)
+  return weight != null && weight > ABNORMAL_VOLUME_WEIGHT_THRESHOLD
+}
+
 function calculatePercentGap(currentRange, targetRange) {
   if (!currentRange || !targetRange) return null
 
@@ -635,7 +641,8 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
     if (!cached) return null
 
     const hydrated = { ...baseEntryState, ...cached, symbol, status: cached.status || 'ready' }
-    return isEntryFresh(hydrated) ? hydrated : null
+    if (!isEntryFresh(hydrated)) return null
+    return isAbnormalVolumeWeight(hydrated) ? null : hydrated
   }
 
   const persistReadyResults = (list) => {
@@ -643,6 +650,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
 
     list.forEach(entry => {
       if (entry.status === 'ready' && isEntryFresh(entry)) {
+        if (isAbnormalVolumeWeight(entry)) return
         const { id, symbol, ...rest } = entry
 
         // Determine if this entry should have full cache
@@ -706,10 +714,12 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
               .map(item => {
                 const cached = hydrateFromResultCache(item.symbol)
                 const merged = { ...baseEntryState, bookmarked: !!item.bookmarked, ...item, ...(cached || {}) }
+                if (isAbnormalVolumeWeight(merged)) return null
                 return isEntryFresh(merged) ? merged : clearEntryResults(merged)
               })
-            if (hydrated.length > 0) {
-              setEntries(hydrated)
+            const cleanedEntries = hydrated.filter(Boolean)
+            if (cleanedEntries.length > 0) {
+              setEntries(cleanedEntries)
               setHasHydratedCache(true)
               return
             }
@@ -1138,6 +1148,14 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed }) {
       const lastDataDate = prices.length > 0 ? prices[0].date : null
 
       if (isStaleDataDate(lastDataDate)) {
+        return {
+          ...entry,
+          removeRow: true,
+          stopAll: false
+        }
+      }
+
+      if (Number.isFinite(currentRange?.weight) && currentRange.weight > ABNORMAL_VOLUME_WEIGHT_THRESHOLD) {
         return {
           ...entry,
           removeRow: true,
