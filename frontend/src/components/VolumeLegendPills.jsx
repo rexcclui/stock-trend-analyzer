@@ -12,7 +12,7 @@ function VolumeLegendPills({ legend, keyPrefix = 'legend', titleFormatter = defa
     return null
   }
 
-  const wrapperClassName = ['flex flex-wrap gap-0', className].filter(Boolean).join(' ')
+  const wrapperClassName = ['flex flex-nowrap gap-0 overflow-x-auto', className].filter(Boolean).join(' ')
 
   return (
     <div className={wrapperClassName}>
@@ -20,7 +20,7 @@ function VolumeLegendPills({ legend, keyPrefix = 'legend', titleFormatter = defa
         <span
           key={`${keyPrefix}-${slot?.legendIndex ?? index}`}
           title={titleFormatter(slot)}
-          className={`px-1 py-0.5 text-[10px] leading-tight font-semibold rounded-sm shadow-sm border border-slate-800/60 text-center min-w-[2.25rem] ${slot?.isCurrent ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-900' : ''}`}
+          className={`px-1 py-0.5 text-[10px] leading-tight font-semibold rounded-sm shadow-sm border border-slate-800/60 text-center min-w-[2.25rem] shrink-0 ${slot?.isCurrent ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-slate-900' : ''}`}
           style={{
             backgroundColor: slot?.color,
             color: slot?.textColor || '#0f172a'
