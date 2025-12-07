@@ -2169,17 +2169,19 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                 </div>
                 <button
                   onClick={() => setShowBookmarksOnly(prev => !prev)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${showBookmarksOnly ? 'border-amber-500 text-amber-200 bg-amber-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
+                  className={`flex items-center justify-center p-2 rounded-lg border transition-colors text-sm ${showBookmarksOnly ? 'border-amber-500 text-amber-200 bg-amber-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
+                  title={showBookmarksOnly ? 'Showing bookmarked stocks' : 'Show only bookmarked stocks'}
+                  aria-label={showBookmarksOnly ? 'Showing bookmarked stocks' : 'Show only bookmarked stocks'}
                 >
                   {showBookmarksOnly ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
-                  {showBookmarksOnly ? 'Showing Bookmarks' : 'Filter Bookmarks'}
                 </button>
                 <button
                   onClick={() => setShowRecentBreakoutsOnly(prev => !prev)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${showRecentBreakoutsOnly ? 'border-green-500 text-green-200 bg-green-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
+                  title={showRecentBreakoutsOnly ? 'Showing breakouts from the last 10 days' : 'Show only breakouts from the last 10 days'}
                 >
                   <Filter className="w-4 h-4" />
-                  {showRecentBreakoutsOnly ? 'Showing Recent (≤10d)' : 'Filter Recent Breakouts'}
+                  {showRecentBreakoutsOnly ? 'Recent (≤10d)' : 'Recent Breakouts'}
                 </button>
                 <button
                   onClick={() => setShowPlBeatsMarketOnly(prev => !prev)}
@@ -2187,7 +2189,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                   title="Show only stocks where strategy P/L beats market performance"
                 >
                   <TrendingUp className="w-4 h-4" />
-                  {showPlBeatsMarketOnly ? 'Showing P/L > Mkt%' : 'Filter P/L vs Mkt%'}
+                  {showPlBeatsMarketOnly ? 'P/L > Mkt%' : 'P/L vs Mkt%'}
                 </button>
                 <button
                   onClick={() => setHideLowSignalTrades(prev => !prev)}
@@ -2195,7 +2197,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                   title="Hide trades with fewer than 5 total signals"
                 >
                   <Hash className="w-4 h-4" />
-                  {hideLowSignalTrades ? 'Signals ≥5' : 'Filter Signals <5'}
+                  {hideLowSignalTrades ? 'Signals ≥5' : 'Signals <5'}
                 </button>
                 <button
                   onClick={() => setHideHighVolumeWeight(prev => !prev)}
@@ -2203,7 +2205,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                   title="Hide rows where Vol% exceeds 4%"
                 >
                   <Percent className="w-4 h-4" />
-                  {hideHighVolumeWeight ? 'Vol% ≤4%' : 'Filter Vol% >4%'}
+                  {hideHighVolumeWeight ? 'Vol% ≤4%' : 'Vol% >4%'}
                 </button>
                 <button
                   onClick={() => setHideWeakBreakouts(prev => !prev)}
@@ -2211,7 +2213,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                   title="Hide rows where Diff is below 6%"
                 >
                   <AlertCircle className="w-4 h-4" />
-                  {hideWeakBreakouts ? 'Diff ≥6%' : 'Filter Diff <6%'}
+                  {hideWeakBreakouts ? 'Diff ≥6%' : 'Diff <6%'}
                 </button>
                 {availableMarkets.length > 0 && (
                   <div className="flex items-center gap-2 border border-slate-600 rounded-lg px-3 py-2">
