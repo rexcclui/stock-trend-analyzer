@@ -766,7 +766,9 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
     if (disallowed.size === 0) return currentEntries
 
     setScanQueue(prev => prev.filter(entryKey => {
-      const [symbol] = entryKey.split('-')
+      // Extract symbol from entry key (handle symbols with hyphens)
+      const lastDashIndex = entryKey.lastIndexOf('-')
+      const symbol = entryKey.substring(0, lastDashIndex)
       return !disallowed.has(symbol)
     }))
 
@@ -1503,8 +1505,10 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
     if (activeScanSymbolRef.current === currentEntryKey) return
 
     // Parse the entry key to extract symbol and days
-    const [symbol, daysStr] = currentEntryKey.split('-')
-    const days = parseInt(daysStr, 10)
+    // Use lastIndexOf to handle symbols with hyphens (e.g., BRK-B-1825)
+    const lastDashIndex = currentEntryKey.lastIndexOf('-')
+    const symbol = currentEntryKey.substring(0, lastDashIndex)
+    const days = parseInt(currentEntryKey.substring(lastDashIndex + 1), 10)
 
     // Find the entry matching this symbol-days combination
     const entry = results.find(r => r.symbol === symbol && r.days === days)
