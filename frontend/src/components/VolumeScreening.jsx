@@ -1448,6 +1448,42 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     return parts.length > 0 ? parts.join(' • ') : undefined
   }
 
+  const getResistanceTooltip = (entry, type = 'bottom') => {
+    const value = type === 'upper' ? entry?.upperResist : entry?.bottomResist
+
+    if (!value || value === '—') {
+      return type === 'upper'
+        ? 'No upper resistance zone identified near the current price range yet.'
+        : 'No bottom support zone identified near the current price range yet.'
+    }
+
+    const match = typeof value === 'string'
+      ? value.match(/^(.*) \(([-+]?\d*\.?\d+)%\)$/)
+      : null
+
+    const rangeLabel = match?.[1]?.trim() || value
+    const distance = match?.[2]
+    const numericDistance = Number(distance)
+    const distanceLabel = Number.isFinite(numericDistance)
+      ? `Distance from current range: ${numericDistance}% (${numericDistance >= 0 ? 'above' : 'below'}).`
+      : 'Distance from current range is unavailable.'
+
+    const currentShare = getCurrentVolumeWeight(entry)
+    const volumeLabel = Number.isFinite(currentShare)
+      ? `Current range volume weight: ${currentShare.toFixed(1)}%.`
+      : null
+
+    const base = type === 'upper'
+      ? 'Nearest resistance above the current price range.'
+      : 'Nearest support below the current price range.'
+
+    return [
+      `${base} Zone: ${rangeLabel}.`,
+      distanceLabel,
+      volumeLabel
+    ].filter(Boolean).join(' ')
+  }
+
   const getVisibleEntries = (sourceEntries = entries) => sourceEntries.filter(entry => {
     if (showBookmarkedOnly && !entry.bookmarked) return false
     if (showPotentialBreakOnly && !isPotentialBreak(entry)) return false
@@ -2311,13 +2347,13 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                     </td>
                     <td
                       className={`px-4 py-3 text-slate-200 text-sm ${isResistanceClose(entry.bottomResist) ? 'text-sky-400 font-semibold' : ''}`}
-                      title={entry.bottomResist}
+                      title={getResistanceTooltip(entry, 'bottom')}
                     >
                       {entry.bottomResist}
                     </td>
                     <td
                       className={`px-4 py-3 text-slate-200 text-sm ${isResistanceClose(entry.upperResist) ? 'text-sky-400 font-semibold' : ''}`}
-                      title={entry.upperResist}
+                      title={getResistanceTooltip(entry, 'upper')}
                     >
                       {entry.upperResist}
                     </td>
