@@ -1718,10 +1718,10 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
         }
       `}</style>
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-900/50 to-blue-900/50 p-6 rounded-lg border border-purple-700">
-        <h2 className="text-2xl font-bold text-white mb-2">Vol Prf V2 + SMA Backtest Scanner</h2>
+      <div className="space-y-1">
+        <h2 className="text-2xl font-bold text-white">Vol Prf V2 + SMA Backtest Scanner</h2>
         <p className="text-slate-300">Scan multiple stocks for recent Volume Profile V2 breakouts (last 10 days)</p>
-        <p className="text-xs text-slate-400 mt-1">
+        <p className="text-xs text-slate-400">
           Backtest results and bookmarks are cached locally, so your queued or completed scans reload automatically after refresh.
         </p>
       </div>
