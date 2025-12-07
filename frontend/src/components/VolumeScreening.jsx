@@ -2329,15 +2329,17 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                         </div>
                       ) : entry.status === 'error' ? (
                         <span className="text-red-400 text-sm">{entry.error || 'Failed to scan'}</span>
-                        ) : entry.volumeLegend?.length ? (
-                          <VolumeLegendPills
-                            legend={entry.volumeLegend}
-                            keyPrefix={entry.id}
-                            titleFormatter={(slot) => `${formatPriceRange(slot.start, slot.end)} • ${slot.label}`}
-                          />
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
+                      ) : (
+                        <VolumeLegendPills
+                          legend={entry.volumeLegend}
+                          keyPrefix={entry.id}
+                          titleFormatter={(slot) => (
+                            slot?.isPlaceholder
+                              ? 'N/A volume weight'
+                              : `${formatPriceRange(slot.start, slot.end)} • ${slot.label}`
+                          )}
+                        />
+                      )}
                     </td>
                     <td
                       className="px-4 py-3 text-slate-200 text-sm"
