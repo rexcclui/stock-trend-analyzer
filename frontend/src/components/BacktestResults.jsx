@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
-import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2, RotateCw, Upload, Download, Filter, Waves, Hash, Clock3, ChevronUp, ChevronDown } from 'lucide-react'
+import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2, RotateCw, Upload, Download, Filter, Waves, Hash, Clock3, ChevronUp, ChevronDown, Info } from 'lucide-react'
 import { apiCache } from '../utils/apiCache'
 import { joinUrl } from '../utils/urlHelper'
 
@@ -704,6 +704,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
     }
   })
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' })
+  const [stableRowOrder, setStableRowOrder] = useState([])
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false)
   const [showRecentBreakoutsOnly, setShowRecentBreakoutsOnly] = useState(false)
   const [selectedMarkets, setSelectedMarkets] = useState([])
@@ -713,6 +714,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
   const activeScanSymbolRef = useRef(null)
   const importInputRef = useRef(null)
   const tableScrollRef = useRef(null)
+  const previousSortRef = useRef(sortConfig)
 
   // Hydrate cached backtest results after mount before enabling persistence
   useEffect(() => {
@@ -1670,14 +1672,51 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
     }
   }
 
-  // Only sort when a sort key is set, otherwise preserve insertion order
-  const sortedResults = !sortConfig.key ? filteredResults : [...filteredResults].sort((a, b) => {
+  const compareEntries = (a, b) => {
+    if (!sortConfig.key) return 0
     const aVal = getSortableValue(a, sortConfig.key)
     const bVal = getSortableValue(b, sortConfig.key)
     if (aVal === bVal) return 0
     const direction = sortConfig.direction === 'asc' ? 1 : -1
     return aVal > bVal ? direction : -direction
-  })
+  }
+
+  useEffect(() => {
+    const filteredSymbols = filteredResults.map(r => r.symbol)
+    const sortChanged = previousSortRef.current.key !== sortConfig.key || previousSortRef.current.direction !== sortConfig.direction
+    const symbolSetChanged = filteredSymbols.length !== stableRowOrder.length ||
+      filteredSymbols.some(symbol => !stableRowOrder.includes(symbol))
+
+    if (!sortConfig.key) {
+      if (symbolSetChanged || sortChanged || stableRowOrder.length === 0) {
+        setStableRowOrder(filteredSymbols)
+      }
+    } else if (sortChanged || symbolSetChanged) {
+      const sortedSymbols = [...filteredResults]
+        .sort((a, b) => compareEntries(a, b))
+        .map(r => r.symbol)
+      setStableRowOrder(sortedSymbols)
+    }
+
+    previousSortRef.current = sortConfig
+  }, [filteredResults, sortConfig, stableRowOrder])
+
+  const sortedResults = (() => {
+    if (!sortConfig.key && stableRowOrder.length === 0) return filteredResults
+
+    const symbolToResult = new Map(filteredResults.map(r => [r.symbol, r]))
+    const orderedResults = stableRowOrder
+      .map(symbol => symbolToResult.get(symbol))
+      .filter(Boolean)
+
+    const missingResults = filteredResults.filter(r => !stableRowOrder.includes(r.symbol))
+    if (missingResults.length > 0) {
+      const sortedMissing = sortConfig.key ? [...missingResults].sort(compareEntries) : missingResults
+      return [...orderedResults, ...sortedMissing]
+    }
+
+    return orderedResults.length > 0 ? orderedResults : filteredResults
+  })()
 
   const renderSortIndicator = (key) => {
     if (sortConfig.key !== key) return <ArrowUpDown className="w-4 h-4 inline ml-1 text-slate-500" />
@@ -1719,11 +1758,17 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
       `}</style>
       {/* Header */}
       <div className="space-y-1">
-        <h2 className="text-2xl font-bold text-white">Vol Prf V2 + SMA Backtest Scanner</h2>
-        <p className="text-slate-300">Scan multiple stocks for recent Volume Profile V2 breakouts (last 10 days)</p>
-        <p className="text-xs text-slate-400">
-          Backtest results and bookmarks are cached locally, so your queued or completed scans reload automatically after refresh.
-        </p>
+        <div className="flex items-center gap-2">
+          <h2 className="text-2xl font-bold text-white">Vol Prf V2 + SMA Backtest Scanner</h2>
+          <button
+            type="button"
+            className="text-slate-400 hover:text-slate-200 transition-colors"
+            title="Scan multiple stocks for recent Volume Profile V2 breakouts (last 10 days). Backtest results and bookmarks are cached locally, so your queued or completed scans reload automatically after refresh."
+          >
+            <Info className="w-5 h-5" />
+            <span className="sr-only">Scanner details</span>
+          </button>
+        </div>
       </div>
 
       {/* Search Section */}
