@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
-import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2, RotateCw, Upload, Download, Filter, Waves, Hash, Clock3, ChevronUp, ChevronDown } from 'lucide-react'
+import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2, RotateCw, Upload, Download, Filter, Waves, Hash, Clock3, ChevronUp, ChevronDown, Info } from 'lucide-react'
 import { apiCache } from '../utils/apiCache'
 import { joinUrl } from '../utils/urlHelper'
 
@@ -953,7 +953,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
 
       if (newEntries.length === 0) return prev
 
-      return [...prev, ...newEntries]
+      // Newest entries appear at the top of the table
+      return [...newEntries, ...prev]
     })
 
     // Set the first new entry as last added for auto-scroll (only if new entries were added)
@@ -1370,11 +1371,11 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
   }
 
   const scanAllQueued = () => {
-    if (normalizedResults.length === 0) return
+    if (nonErrorResults.length === 0) return
 
     setResults(prev => pruneDisallowedEntries(prev))
 
-    const pendingSymbols = pruneDisallowedEntries(normalizedResults)
+    const pendingSymbols = pruneDisallowedEntries(nonErrorResults)
       .filter(entry => entry.status !== 'completed')
       .map(entry => entry.symbol)
 
@@ -1388,11 +1389,11 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
   }
 
   const forceScanAll = () => {
-    if (normalizedResults.length === 0) return
+    if (nonErrorResults.length === 0) return
 
     setResults(prev => pruneDisallowedEntries(prev))
 
-    const allSymbols = pruneDisallowedEntries(normalizedResults)
+    const allSymbols = pruneDisallowedEntries(nonErrorResults)
       .map(entry => entry.symbol)
 
     if (allSymbols.length === 0) return
@@ -1535,15 +1536,16 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
     }
   })
 
+  // Remove errored entries from the visible set so counts don't appear filtered on load
+  const nonErrorResults = normalizedResults.filter(result => !result.error)
+
   // Get unique markets from all results
-  const availableMarkets = Array.from(new Set(normalizedResults.map(r => r.market))).sort()
+  const availableMarkets = Array.from(new Set(nonErrorResults.map(r => r.market))).sort()
 
   // Get unique periods from all results
-  const availablePeriods = Array.from(new Set(normalizedResults.map(r => r.period).filter(Boolean))).sort()
+  const availablePeriods = Array.from(new Set(nonErrorResults.map(r => r.period).filter(Boolean))).sort()
 
-  const filteredResults = normalizedResults.filter(result => {
-    // Exclude any entries with errors
-    if (result.error) return false
+  const filteredResults = nonErrorResults.filter(result => {
     if (showBookmarksOnly && !result.bookmarked) return false
     if (showRecentBreakoutsOnly && !result.isRecentBreakout) return false
     if (selectedMarkets.length > 0 && !selectedMarkets.includes(result.market)) return false
@@ -1684,12 +1686,13 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
       : <span className="ml-1 text-slate-300">↓</span>
   }
 
-  const completedResults = normalizedResults.filter(r => r.status === 'completed' && r.latestBreakout)
+  const completedResults = nonErrorResults.filter(r => r.status === 'completed' && r.latestBreakout)
   const recentBreakoutCount = completedResults.filter(r => r.isRecentBreakout).length
-  const totalScanDurationMs = normalizedResults.reduce((sum, entry) =>
+  const totalScanDurationMs = nonErrorResults.reduce((sum, entry) =>
     typeof entry.durationMs === 'number' ? sum + entry.durationMs : sum
   , 0)
   const totalDurationDisplay = totalScanDurationMs > 0 ? formatDuration(totalScanDurationMs) : '—'
+  const isScanActive = isScanning && scanQueue.length > 0
 
   // Show loading message while hydrating cache
   if (!hasHydratedCache) {
@@ -1703,6 +1706,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
     )
   }
 
+  const headerTooltip = `Scan multiple stocks for recent Volume Profile V2 breakouts (last 10 days)\nBacktest results and bookmarks are cached locally, so your queued or completed scans reload automatically after refresh.`
+
   return (
     <div className="space-y-6">
       <style>{`
@@ -1715,12 +1720,18 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
         }
       `}</style>
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-900/50 to-blue-900/50 p-6 rounded-lg border border-purple-700">
-        <h2 className="text-2xl font-bold text-white mb-2">Vol Prf V2 + SMA Backtest Scanner</h2>
-        <p className="text-slate-300">Scan multiple stocks for recent Volume Profile V2 breakouts (last 10 days)</p>
-        <p className="text-xs text-slate-400 mt-1">
-          Backtest results and bookmarks are cached locally, so your queued or completed scans reload automatically after refresh.
-        </p>
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <h2 className="text-2xl font-bold text-white">Vol Prf V2 + SMA Backtest Scanner</h2>
+          <button
+            type="button"
+            className="inline-flex items-center justify-center w-7 h-7 rounded-full border border-slate-700 text-slate-200 hover:border-slate-500 hover:text-white transition-colors"
+            title={headerTooltip}
+            aria-label={headerTooltip}
+          >
+            <Info className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Search Section */}
@@ -1815,10 +1826,10 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
             </button>
             <button
               onClick={scanAllQueued}
-              disabled={results.length === 0 || isScanning}
+              disabled={results.length === 0 || isScanActive}
               className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
               title={
-                isScanning
+                isScanActive
                   ? 'Scanning is in progress — wait to rescan unfinished stocks'
                   : results.length === 0
                     ? 'Add stocks first to scan pending results'
@@ -1829,10 +1840,10 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
             </button>
             <button
               onClick={forceScanAll}
-              disabled={results.length === 0 || isScanning}
+              disabled={results.length === 0 || isScanActive}
               className="p-2 bg-slate-700 text-red-500 rounded-lg hover:bg-slate-600 hover:text-red-400 disabled:bg-slate-600 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors"
               title={
-                isScanning
+                isScanActive
                   ? 'Scanning is in progress — wait to force a full rescan'
                   : results.length === 0
                     ? 'Add stocks first to force a rescan'
@@ -1843,9 +1854,9 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
             </button>
             <button
               onClick={togglePauseResume}
-              disabled={!isScanning}
+              disabled={!isScanActive}
               className="p-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-              title={!isScanning ? 'Start a scan to enable pause/resume' : isPaused ? 'Resume scanning' : 'Pause scanning'}
+              title={!isScanActive ? 'Start a scan to enable pause/resume' : isPaused ? 'Resume scanning' : 'Pause scanning'}
             >
               {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
             </button>
@@ -1904,7 +1915,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
       </div>
 
       {/* Results Section */}
-      {normalizedResults.length > 0 && (
+      {nonErrorResults.length > 0 && (
         <div className="space-y-6">
           {/* Summary Card */}
           <div className="bg-gradient-to-br from-green-900/50 to-green-800/50 p-6 rounded-lg border border-green-700">
@@ -1920,8 +1931,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
               </div>
               <div className="text-sm text-green-200 space-y-1 text-right">
                 <div>Total Duration: {totalDurationDisplay}</div>
-                <div>Queued: {scanCompleted}/{scanTotal || normalizedResults.length}</div>
-                {isScanning && (
+                <div>Queued: {scanCompleted}/{scanTotal || nonErrorResults.length}</div>
+                {isScanActive && (
                   <div className="flex items-center gap-2 justify-end text-amber-200">
                     <Loader2 className="w-4 h-4 animate-spin" />
                     {isPaused ? 'Paused' : 'Scanning'}
@@ -1938,9 +1949,9 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
               <div className="flex items-center gap-3">
                 <h3 className="text-lg font-semibold text-slate-100">Breakout Signals</h3>
                 <div className="text-xs text-slate-400 flex items-center gap-2">
-                  <span title="Visible / total rows">Rows: {filteredResults.length}/{normalizedResults.length}</span>
-                  {normalizedResults.length !== filteredResults.length && (
-                    <span className="text-amber-300" title="Rows hidden by filters">({normalizedResults.length - filteredResults.length} filtered)</span>
+                  <span title="Visible / total rows">Rows: {filteredResults.length}/{nonErrorResults.length}</span>
+                  {nonErrorResults.length !== filteredResults.length && (
+                    <span className="text-amber-300" title="Rows hidden by filters">({nonErrorResults.length - filteredResults.length} filtered)</span>
                   )}
                 </div>
                 {sortedResults.length > 0 && (
@@ -1948,52 +1959,32 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                     <span className="text-xs text-slate-400">{sortedResults.length} visible:</span>
                   <button
                     onClick={scanVisible}
-                    disabled={isScanning}
+                    disabled={isScanActive}
                     className="p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-                    title={isScanning ? 'Scanning is in progress — wait to rescan visible stocks' : 'Scan all visible stocks'}
+                    title={isScanActive ? 'Scanning is in progress — wait to rescan visible stocks' : 'Scan all visible stocks'}
                   >
                     <RefreshCcw className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={eraseVisible}
-                    disabled={isScanning}
+                    disabled={isScanActive}
                     className="p-1.5 bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-                    title={isScanning ? 'Scanning is in progress — wait to erase visible results' : 'Erase backtest results for all visible stocks'}
+                    title={isScanActive ? 'Scanning is in progress — wait to erase visible results' : 'Erase backtest results for all visible stocks'}
                   >
                     <Eraser className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={removeVisible}
-                    disabled={isScanning}
+                    disabled={isScanActive}
                     className="p-1.5 bg-red-700 text-white rounded-lg hover:bg-red-800 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-                    title={isScanning ? 'Scanning is in progress — wait to remove rows' : 'Remove all visible stocks from table'}
+                    title={isScanActive ? 'Scanning is in progress — wait to remove rows' : 'Remove all visible stocks from table'}
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
                 )}
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-1 pr-2 border-r border-slate-700">
-                  <button
-                    onClick={scrollTableToTop}
-                    className="p-1.5 rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-                    title="Scroll to top"
-                    aria-label="Scroll table to top"
-                    type="button"
-                  >
-                    <ChevronUp className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={scrollTableToBottom}
-                    className="p-1.5 rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-                    title="Scroll to bottom"
-                    aria-label="Scroll table to bottom"
-                    type="button"
-                  >
-                    <ChevronDown className="w-4 h-4" />
-                  </button>
-                </div>
+              <div className="flex items-center gap-2 flex-wrap justify-end">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
@@ -2062,6 +2053,26 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                     ))}
                   </div>
                 )}
+                <div className="flex items-center gap-1 pl-2 border-l border-slate-700">
+                  <button
+                    onClick={scrollTableToTop}
+                    className="p-1.5 rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                    title="Scroll to top"
+                    aria-label="Scroll table to top"
+                    type="button"
+                  >
+                    <ChevronUp className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={scrollTableToBottom}
+                    className="p-1.5 rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                    title="Scroll to bottom"
+                    aria-label="Scroll table to bottom"
+                    type="button"
+                  >
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
             <div className="overflow-x-auto">
