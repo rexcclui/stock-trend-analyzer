@@ -832,7 +832,9 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     if (!hasHydratedCache) return
 
     try {
-      // Only cache full details for bookmarked or recent breakout rows
+      // Only cache full details for bookmarked or recent breakout rows.
+      // A "recent breakout" is any completed entry whose latest breakout
+      // happened in the last 10 days (see getRecentBreakouts below).
       // Others get minimal cache (symbol, status, lastScanAt, bookmarked)
       const selectiveResults = results.map(result => {
         const { priceData, ...rest } = result
