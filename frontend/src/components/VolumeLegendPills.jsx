@@ -66,7 +66,7 @@ function VolumeLegendPills({ legend, keyPrefix = 'legend', titleFormatter = defa
         <span
           key={`${keyPrefix}-${slot?.legendIndex ?? index}`}
           title={titleFormatter(slot)}
-          className={`px-2 py-1 text-[10px] leading-tight font-semibold rounded-sm shadow-sm border text-center min-w-[2.75rem] shrink-0 flex flex-col items-center justify-center gap-0.5 ${slot?.isCurrent ? currentClasses : 'border-slate-800/60'} ${slot?.isPlaceholder ? 'border-dashed opacity-70' : ''}`}
+          className={`w-12 min-w-[3rem] max-w-[3rem] px-2 py-1 text-[10px] leading-tight font-semibold rounded-sm shadow-sm border text-center shrink-0 flex flex-col items-center justify-center gap-0.5 overflow-hidden text-ellipsis ${slot?.isCurrent ? currentClasses : 'border-slate-800/60'} ${slot?.isPlaceholder ? 'border-dashed opacity-70' : ''}`}
           style={{
             backgroundColor: slot?.color || '#1f2937',
             color: slot?.textColor || (slot?.isPlaceholder ? '#cbd5e1' : '#0f172a')
