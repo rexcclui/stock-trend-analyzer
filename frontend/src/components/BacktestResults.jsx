@@ -2282,6 +2282,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                               : 'text-red-400'
                           : 'text-slate-400'
 
+                      const upResistTooltip = result.upResist
+                        ? `Upper resistance zone at ${formatCurrency(result.upResist.price)} with ${(result.upResist.volumeWeight * 100).toFixed(1)}% volume weight (higher = stronger resistance)`
+                        : 'No upper resistance zone identified'
+
+                      const downResistTooltip = result.downResist
+                        ? `Bottom support zone at ${formatCurrency(result.downResist.price)} with ${(result.downResist.volumeWeight * 100).toFixed(1)}% volume weight (higher = stronger support)`
+                        : 'No bottom support zone identified'
+
                     return (
                       <tr
                         key={index}
@@ -2355,7 +2363,10 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
                           {hasData ? `${(result.originalBreakout.currentWeight * 100).toFixed(1)}%` : '—'}
                         </td>
-                        <td className="px-4 py-3 text-sm text-red-400 text-right font-medium">
+                        <td
+                          className="px-4 py-3 text-sm text-red-400 text-right font-medium"
+                          title={upResistTooltip}
+                        >
                           {result.upResist ? (
                             <div className="whitespace-nowrap">
                               {formatCurrency(result.upResist.price)}
@@ -2365,7 +2376,10 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                             </div>
                           ) : '—'}
                         </td>
-                        <td className="px-4 py-3 text-sm text-green-400 text-right font-medium">
+                        <td
+                          className="px-4 py-3 text-sm text-green-400 text-right font-medium"
+                          title={downResistTooltip}
+                        >
                           {result.downResist ? (
                             <div className="whitespace-nowrap">
                               {formatCurrency(result.downResist.price)}
