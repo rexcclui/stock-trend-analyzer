@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { TrendingUp, BarChart3, Activity, Waves, Bug } from 'lucide-react'
 import StockAnalyzer from './components/StockAnalyzer'
 import BacktestResults from './components/BacktestResults'
@@ -11,6 +11,33 @@ function App() {
   const [selectedParams, setSelectedParams] = useState(null)
   const [volumeSymbol, setVolumeSymbol] = useState(null)
   const [backtestSymbol, setBacktestSymbol] = useState(null)
+  const [storageUsage, setStorageUsage] = useState(null)
+  const [storageQuota, setStorageQuota] = useState(null)
+
+  useEffect(() => {
+    let isMounted = true
+
+    const loadStorageEstimate = async () => {
+      if (typeof navigator === 'undefined' || !navigator.storage?.estimate) return
+
+      try {
+        const { usage, quota } = await navigator.storage.estimate()
+
+        if (!isMounted) return
+
+        setStorageUsage(usage ?? null)
+        setStorageQuota(quota ?? null)
+      } catch (error) {
+        console.warn('Unable to estimate storage usage', error)
+      }
+    }
+
+    loadStorageEstimate()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   const exportLocalStorage = () => {
     if (typeof window === 'undefined') return
@@ -53,6 +80,19 @@ function App() {
     URL.revokeObjectURL(url)
   }
 
+  const formatBytes = (bytes) => {
+    if (typeof bytes !== 'number' || Number.isNaN(bytes)) return null
+
+    if (bytes < 1024) return `${bytes.toFixed(0)} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+  }
+
+  const storageUsageLabel = formatBytes(storageUsage)
+  const storageQuotaLabel = formatBytes(storageQuota)
+
   // Handle clicking on a stock in backtest results
   const handleStockSelect = (symbol, optimalParams) => {
     setSelectedSymbol(symbol)
@@ -93,6 +133,12 @@ function App() {
           <Bug className="w-4 h-4" />
           Debug export
         </button>
+        {storageUsageLabel && (
+          <div className="absolute right-0 top-10 text-[10px] text-slate-300 bg-slate-800 border border-slate-700 rounded px-2 py-1 shadow-md">
+            LocalStorage size: {storageUsageLabel}
+            {storageQuotaLabel ? ` / ${storageQuotaLabel} quota` : ''}
+          </div>
+        )}
 
         {/* Tab Navigation */}
         <div className="bg-slate-800 rounded-lg shadow-lg mb-6 border border-slate-700">
