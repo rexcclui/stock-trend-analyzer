@@ -2151,7 +2151,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
           <div className="bg-gradient-to-br from-green-900/50 to-green-800/50 p-6 rounded-lg border border-green-700">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-green-300">Recent Breakouts (≤10 days)</p>
+                <p className="text-sm font-medium text-green-300">R. Brkout (≤10 days)</p>
                 <p className="text-3xl font-bold mt-2 text-green-100">
                   {recentBreakoutCount}
                 </p>
@@ -2258,7 +2258,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
                   title={showRecentBreakoutsOnly ? 'Showing breakouts from the last 10 days' : 'Show only breakouts from the last 10 days'}
                 >
                   <Filter className="w-4 h-4" />
-                  {showRecentBreakoutsOnly ? 'Recent (≤10d)' : 'Recent Breakouts'}
+                  {showRecentBreakoutsOnly ? 'Recent (≤10d)' : 'R. Brkout'}
                 </button>
                 <button
                   onClick={() => setShowPlBeatsMarketOnly(prev => !prev)}
@@ -2281,8 +2281,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${hideLowSignalTrades ? 'border-emerald-500 text-emerald-200 bg-emerald-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
                   title="Hide trades with fewer than 5 total signals"
                 >
-                  <Hash className="w-4 h-4" />
-                  {hideLowSignalTrades ? 'Signals ≥5' : 'Signals <5'}
+                  <Filter className="w-4 h-4" />
+                  <span>Signal</span>
                 </button>
                 <button
                   onClick={() => setHideHighVolumeWeight(prev => !prev)}
