@@ -14,7 +14,7 @@ function VolumeLegendPills({ legend, keyPrefix = 'legend', titleFormatter = defa
 
   const wrapperClassName = ['flex flex-nowrap gap-0 overflow-x-auto', className].filter(Boolean).join(' ')
 
-  const currentClasses = 'border-amber-300 ring-2 ring-amber-200 ring-offset-2 ring-offset-slate-900 shadow-lg shadow-amber-300/50 scale-[1.06]'
+  const currentClasses = 'border-sky-300 ring-2 ring-sky-200 ring-offset-2 ring-offset-slate-900 shadow-lg shadow-sky-300/50 scale-[1.06]'
 
   return (
     <div className={wrapperClassName}>
@@ -28,9 +28,6 @@ function VolumeLegendPills({ legend, keyPrefix = 'legend', titleFormatter = defa
             color: slot?.textColor || '#0f172a'
           }}
         >
-          {slot?.isCurrent && (
-            <span className="text-[9px] uppercase tracking-wide text-amber-50/90 drop-shadow">Current</span>
-          )}
           <span className={slot?.isCurrent ? 'text-[11px]' : ''}>{slot?.label}</span>
         </span>
       ))}
