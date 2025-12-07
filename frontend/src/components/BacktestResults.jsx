@@ -942,7 +942,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
           if (!firstNewKey) {
             firstNewKey = key
           }
-          return {
+          const newEntry = {
             symbol,
             status: 'pending',
             latestBreakout: null,
@@ -959,6 +959,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
             bookmarked: false,
             marketChange: null
           }
+          console.log('[ensureEntries] Creating new entry:', { symbol, days: newEntry.days, period: newEntry.period, key })
+          return newEntry
         })
 
       if (newEntries.length === 0) return prev
