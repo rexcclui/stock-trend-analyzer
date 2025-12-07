@@ -673,7 +673,16 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
       const saved = localStorage.getItem(SCAN_QUEUE_KEY)
       if (!saved) return []
       const parsed = JSON.parse(saved)
-      return Array.isArray(parsed.queue) ? parsed.queue : []
+      if (!Array.isArray(parsed.queue)) return []
+
+      return parsed.queue
+        .map(item => {
+          if (typeof item === 'string') return { symbol: item, days }
+          if (Array.isArray(item) && item.length >= 2) return { symbol: item[0], days: item[1] }
+          if (item && typeof item === 'object' && item.symbol) return { symbol: item.symbol, days: item.days || days }
+          return null
+        })
+        .filter(Boolean)
     } catch (e) {
       console.error('Failed to parse cached scan queue:', e)
       return []
@@ -1243,26 +1252,39 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
     }
   }
 
-  const queueSymbols = (symbolList, { startScan = true } = {}) => {
+  const queueSymbols = (symbolList, { startScan = true, targetDays = days } = {}) => {
     if (!Array.isArray(symbolList) || symbolList.length === 0) return
 
-    const allowedSymbols = symbolList.filter(symbol => !isDisallowedSymbol(symbol))
-    if (allowedSymbols.length === 0) return
+    const allowedEntries = symbolList
+      .map(item => ({
+        symbol: typeof item === 'string' ? item : item?.symbol,
+        days: typeof item === 'string' ? targetDays : (item?.days || targetDays)
+      }))
+      .filter(item => item.symbol && !isDisallowedSymbol(item.symbol))
 
-    ensureEntries(allowedSymbols)
+    if (allowedEntries.length === 0) return
+
+    // Ensure entries exist for each symbol+days combination
+    allowedEntries.forEach(entry => ensureEntries([entry.symbol], entry.days))
 
     if (startScan) {
-      // Mark the entries with current days as 'queued' so scanner knows which ones to process
+      const allowedKeys = new Set(allowedEntries.map(e => getEntryKey(e.symbol, e.days)))
+
+      // Mark matching entries as queued to trigger scan
       setResults(prev => prev.map(entry => {
-        if (allowedSymbols.includes(entry.symbol) && entry.days === days && entry.status === 'pending') {
-          return { ...entry, status: 'queued' }
+        const entryKey = getEntryKey(entry.symbol, entry.days)
+        if (allowedKeys.has(entryKey)) {
+          return { ...entry, status: 'queued', error: null }
         }
         return entry
       }))
 
       setScanQueue(prev => {
-        const existing = new Set(prev)
-        const merged = [...prev, ...allowedSymbols.filter(symbol => !existing.has(symbol))]
+        const existingKeys = new Set(prev.map(item => getEntryKey(item.symbol, item.days)))
+        const merged = [
+          ...prev,
+          ...allowedEntries.filter(entry => !existingKeys.has(getEntryKey(entry.symbol, entry.days)))
+        ]
         setScanTotal(merged.length)
         return merged
       })
@@ -1377,14 +1399,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
 
     setResults(prev => pruneDisallowedEntries(prev))
 
-    const pendingSymbols = pruneDisallowedEntries(nonErrorResults)
+    const pendingEntries = pruneDisallowedEntries(nonErrorResults)
       .filter(entry => entry.status !== 'completed')
-      .map(entry => entry.symbol)
+      .map(entry => ({ symbol: entry.symbol, days: entry.days }))
 
-    if (pendingSymbols.length === 0) return
+    if (pendingEntries.length === 0) return
 
-    setScanQueue(pendingSymbols)
-    setScanTotal(pendingSymbols.length)
+    setScanQueue(pendingEntries)
+    setScanTotal(pendingEntries.length)
     setScanCompleted(0)
     setIsPaused(false)
     setIsScanning(true)
@@ -1395,16 +1417,16 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
 
     setResults(prev => pruneDisallowedEntries(prev))
 
-    const allSymbols = pruneDisallowedEntries(nonErrorResults)
-      .map(entry => entry.symbol)
+    const allEntries = pruneDisallowedEntries(nonErrorResults)
+      .map(entry => ({ symbol: entry.symbol, days: entry.days }))
 
-    if (allSymbols.length === 0) return
+    if (allEntries.length === 0) return
 
     // Clear all results to pending state before rescanning
     setResults(prev => prev.map(entry => clearEntryData(entry)))
 
-    setScanQueue(allSymbols)
-    setScanTotal(allSymbols.length)
+    setScanQueue(allEntries)
+    setScanTotal(allEntries.length)
     setScanCompleted(0)
     setIsPaused(false)
     setIsScanning(true)
@@ -1416,8 +1438,16 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
     )))
   }
 
-  const scanSingle = (symbol) => {
-    setScanQueue([symbol])
+  const scanSingle = (symbol, entryDays = days) => {
+    const targetDays = entryDays || days
+
+    setResults(prev => prev.map(entry => (
+      entry.symbol === symbol && entry.days === targetDays
+        ? { ...entry, status: 'queued', error: null }
+        : entry
+    )))
+
+    setScanQueue([{ symbol, days: targetDays }])
     setScanTotal(1)
     setScanCompleted(0)
     setIsPaused(false)
@@ -1438,15 +1468,20 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
       return
     }
 
-    const currentSymbol = scanQueue[0]
-    if (activeScanSymbolRef.current === currentSymbol) return
+    const { symbol: currentSymbol, days: currentDays } = scanQueue[0]
+    const currentKey = getEntryKey(currentSymbol, currentDays)
+
+    if (activeScanSymbolRef.current === currentKey) return
 
     // Find the entry to get its days value (find first queued entry, then fall back to pending/loading)
-    const entry = results.find(r => r.symbol === currentSymbol && r.status === 'queued') ||
-                  results.find(r => r.symbol === currentSymbol && (r.status === 'pending' || r.status === 'loading'))
-    if (!entry) return  // Entry might have been removed
+    const entry = results.find(r => getEntryKey(r.symbol, r.days) === currentKey && r.status === 'queued') ||
+                  results.find(r => getEntryKey(r.symbol, r.days) === currentKey && (r.status === 'pending' || r.status === 'loading'))
+    if (!entry) {
+      setScanQueue(prev => prev.slice(1))
+      return  // Entry might have been removed
+    }
 
-    activeScanSymbolRef.current = currentSymbol
+    activeScanSymbolRef.current = currentKey
     setLoading(true)
 
     ; (async () => {
@@ -2322,7 +2357,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              scanSingle(result.symbol)
+                              scanSingle(result.symbol, result.days)
                             }}
                             className="p-1 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/20 rounded transition-colors mr-1"
                             title="Scan this stock"
@@ -2343,7 +2378,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                             onClick={(e) => {
                               e.stopPropagation() // Prevent row click
                               setResults(prevResults => prevResults.filter(r => r.symbol !== result.symbol))
-                              setScanQueue(prev => prev.filter(symbol => symbol !== result.symbol))
+                              setScanQueue(prev => prev.filter(item => getEntryKey(item.symbol, item.days) !== getEntryKey(result.symbol, result.days)))
                             }}
                             className="p-1 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors"
                             title="Remove this stock"
