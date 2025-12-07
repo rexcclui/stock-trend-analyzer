@@ -640,12 +640,13 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     return Number.isFinite(scannedAt) && Date.now() - scannedAt >= thresholdMs
   }
 
-  const hydrateFromResultCache = (symbol) => {
+  const hydrateFromResultCache = (symbol, period) => {
     const cache = loadResultCache()
-    const cached = cache?.[symbol]
+    const cacheKey = `${symbol}-${period}`
+    const cached = cache?.[cacheKey]
     if (!cached) return null
 
-    const hydrated = { ...baseEntryState, ...cached, symbol, status: cached.status || 'ready' }
+    const hydrated = { ...baseEntryState, ...cached, symbol, period, status: cached.status || 'ready' }
     if (!isEntryFresh(hydrated)) return null
     return isAbnormalVolumeWeight(hydrated) ? null : hydrated
   }
@@ -656,7 +657,8 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     list.forEach(entry => {
       if (entry.status === 'ready' && isEntryFresh(entry)) {
         if (isAbnormalVolumeWeight(entry)) return
-        const { id, symbol, ...rest } = entry
+        const { id, symbol, period, ...rest } = entry
+        const cacheKey = `${symbol}-${period}`
 
         // Determine if this entry should have full cache
         const isUpBreak = rest.breakout === 'Up'
@@ -669,7 +671,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
 
         if (shouldCacheFull) {
           // Keep all fields for important entries
-          cache[symbol] = {
+          cache[cacheKey] = {
             priceRange: rest.priceRange,
             currentRange: rest.currentRange,
             testedDays: rest.testedDays,
@@ -684,7 +686,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
           }
         } else {
           // Slim cache: only essential fields for non-important entries
-          cache[symbol] = {
+          cache[cacheKey] = {
             lastScanAt: rest.lastScanAt,
             status: rest.status,
             bookmarked: isBookmarked
@@ -717,7 +719,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
             const hydrated = parsed
               .filter(item => !isDisallowedSymbol(item?.symbol))
               .map(item => {
-                const cached = hydrateFromResultCache(item.symbol)
+                const cached = hydrateFromResultCache(item.symbol, item.period)
                 const merged = { ...baseEntryState, bookmarked: !!item.bookmarked, ...item, ...(cached || {}) }
                 if (isAbnormalVolumeWeight(merged)) return null
                 return isEntryFresh(merged) ? merged : clearEntryResults(merged)
@@ -934,7 +936,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
       allowedSymbols.forEach(symbol => {
         const entryKey = getEntryKey(symbol, period)
         if (!existingKeys.has(entryKey)) {
-          const cached = hydrateFromResultCache(symbol)
+          const cached = hydrateFromResultCache(symbol, period)
           const newId = `${symbol}-${period}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
           if (!firstNewId) {
             firstNewId = newId
@@ -1211,7 +1213,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
       const response = await axios.get(joinUrl(API_URL, '/analyze'), {
         params: {
           symbol: entry.symbol,
-          days: period
+          days: entry.period
         }
       })
 
@@ -1257,7 +1259,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
         ...entry,
         priceRange: currentRange ? formatPriceRange(currentRange.start, currentRange.end) : '—',
         currentRange: currentRange ? { start: currentRange.start, end: currentRange.end, weight: currentRange.weight } : null,
-        testedDays: period,
+        testedDays: entry.period,
         slotCount: slots.length,
         volumeLegend: legend,
         bottomResist: formatResistance(currentRange, bottomResist),
