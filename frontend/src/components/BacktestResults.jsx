@@ -902,6 +902,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
   }, [lastAddedKey])
 
   const ensureEntries = (symbolList, targetDays = days) => {
+    console.log('[ensureEntries] Called with symbols:', symbolList, 'targetDays:', targetDays, 'current days state:', days)
+
     if (!Array.isArray(symbolList) || symbolList.length === 0) {
       return
     }
