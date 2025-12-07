@@ -2219,7 +2219,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
                       className="p-1.5 bg-cyan-700 text-white rounded-lg hover:bg-cyan-600 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
                       title="Add all visible rows to Volume Screening without scanning"
                     >
-                      <Upload className="w-3.5 h-3.5" />
+                      <Waves className="w-3.5 h-3.5" />
                     </button>
                   )}
                 </div>
