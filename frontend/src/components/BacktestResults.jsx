@@ -729,6 +729,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
   const [selectedPeriods, setSelectedPeriods] = useState([])
   const [searchFilter, setSearchFilter] = useState('')
   const [hasHydratedCache, setHasHydratedCache] = useState(() => initialHydratedResultsRef.current !== null)
+  const [toastMessage, setToastMessage] = useState('')
   const activeScanSymbolRef = useRef(null)
   const importInputRef = useRef(null)
   const tableScrollRef = useRef(null)
@@ -1630,7 +1631,18 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
   })
 
   // Remove errored entries from the visible set so counts don't appear filtered on load
-  const nonErrorResults = normalizedResults.filter(result => !result.error)
+  const lowWinRateRemoved = normalizedResults.filter(result => {
+    if (result.error) return false
+    const winRate = result.optimalSMAs?.winRate
+    return typeof winRate === 'number' && winRate < 60
+  })
+
+  const nonErrorResults = normalizedResults.filter(result => {
+    if (result.error) return false
+    const winRate = result.optimalSMAs?.winRate
+    if (typeof winRate === 'number' && winRate < 60) return false
+    return true
+  })
 
   // Get unique markets from all results
   const availableMarkets = Array.from(new Set(nonErrorResults.map(r => r.market))).sort()
@@ -1650,7 +1662,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
       }
       if (showHighWinRateOnly) {
         const winRate = result.optimalSMAs?.winRate
-        if (typeof winRate !== 'number' || winRate <= 60) return false
+        if (typeof winRate !== 'number' || winRate <= 70) return false
       }
       if (hideLowSignalTrades) {
         if (typeof result.totalSignals !== 'number' || result.totalSignals < 5) return false
@@ -1883,8 +1895,25 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
     )
   }
 
+  useEffect(() => {
+    if (lowWinRateRemoved.length === 0) return
+    const count = lowWinRateRemoved.length
+    const message = `${count} backtest${count === 1 ? '' : 's'} removed for win rate below 60%.`
+    setToastMessage(message)
+    const timeout = setTimeout(() => setToastMessage(''), 4500)
+    return () => clearTimeout(timeout)
+  }, [lowWinRateRemoved.length])
+
   return (
     <div className="space-y-6">
+      {toastMessage && (
+        <div className="fixed top-4 right-4 z-50">
+          <div className="flex items-start gap-3 bg-slate-900 border border-red-500 text-red-100 px-4 py-3 rounded-lg shadow-xl max-w-sm">
+            <AlertCircle className="w-5 h-5 mt-0.5" />
+            <div className="text-sm leading-relaxed">{toastMessage}</div>
+          </div>
+        </div>
+      )}
       <style>{`
         @keyframes blinkHighlight {
           0%, 100% { background-color: transparent; }
@@ -2215,10 +2244,10 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                 <button
                   onClick={() => setShowHighWinRateOnly(prev => !prev)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${showHighWinRateOnly ? 'border-emerald-500 text-emerald-200 bg-emerald-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
-                  title="Show only rows with win rate above 60%"
+                  title="Show only rows with win rate above 70%"
                 >
                   <Target className="w-4 h-4" />
-                  {showHighWinRateOnly ? 'Win% >60' : 'Win% All'}
+                  {showHighWinRateOnly ? 'Win% >70' : 'Win% All'}
                 </button>
                 <button
                   onClick={() => setHideLowSignalTrades(prev => !prev)}
@@ -2378,7 +2407,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                           : 'text-slate-400'
                       const winRateClassName =
                         typeof winRate === 'number'
-                          ? winRate >= 60
+                          ? winRate >= 70
                             ? 'text-emerald-300'
                             : 'text-slate-200'
                           : 'text-slate-400'
