@@ -11,6 +11,7 @@ const SCAN_QUEUE_KEY = 'backtestScanQueue'
 const INVALID_FIVE_CHAR_LENGTH = 5
 const BLOCKED_SUFFIX = '.TO'
 const HYPHEN = '-'
+const DEFAULT_DAYS = 1825
 
 // Helper function to convert days to display period (e.g., 1825 -> "5Y")
 function formatPeriod(days) {
@@ -24,9 +25,15 @@ function formatPeriod(days) {
   return `${daysNum}D`
 }
 
+function normalizeDays(value) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 // Helper function to create unique key for symbol+period combination
 function getEntryKey(symbol, days) {
-  return `${symbol}-${days}`
+  const normalizedDays = normalizeDays(days)
+  return `${symbol}-${normalizedDays ?? days ?? ''}`
 }
 
 function computeMarketChange(priceData) {
@@ -64,8 +71,11 @@ function normalizeCachedResults(entries = []) {
   return entries
     .filter(entry => entry && entry.symbol && !isDisallowedSymbol(entry.symbol))
     .map(entry => {
+      const normalizedDays = normalizeDays(entry.days) ?? DEFAULT_DAYS
       const normalizedEntry = {
         ...entry,
+        days: normalizedDays,
+        period: formatPeriod(normalizedDays),
         status: entry.status === 'loading' ? 'pending' : entry.status || 'pending',
         error: entry.error || null,
         bookmarked: Boolean(entry.bookmarked),
@@ -643,7 +653,7 @@ function optimizeSMAParams(prices, slots, breakouts) {
 
 function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBacktestProcessed }) {
   const [symbols, setSymbols] = useState('')
-  const [days, setDays] = useState('1825') // Default to 5Y
+  const [days, setDays] = useState(DEFAULT_DAYS) // Default to 5Y
   const [loading, setLoading] = useState(false)
   const [loadingTopSymbols, setLoadingTopSymbols] = useState(false)
   const [loadingHKSymbols, setLoadingHKSymbols] = useState(false)
@@ -904,6 +914,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
   const ensureEntries = (symbolList, targetDays = days) => {
     console.log('[ensureEntries] Called with symbols:', symbolList, 'targetDays:', targetDays, 'current days state:', days)
 
+    const resolvedDays = normalizeDays(targetDays) ?? DEFAULT_DAYS
+
     if (!Array.isArray(symbolList) || symbolList.length === 0) {
       return
     }
@@ -920,7 +932,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
         .map(r => getEntryKey(r.symbol, r.days))
     )
     const existingSymbols = allowedSymbols.filter(symbol =>
-      existingKeys.has(getEntryKey(symbol, targetDays))
+      existingKeys.has(getEntryKey(symbol, resolvedDays))
     )
 
     let firstNewKey = null
@@ -931,14 +943,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
       const existingKeys = new Set(
         prev
           .filter(r => r.days != null)
-        .map(r => getEntryKey(r.symbol, r.days))
-    )
+          .map(r => getEntryKey(r.symbol, r.days))
+      )
 
       const newEntries = allowedSymbols
         .filter(Boolean)
-        .filter(symbol => !existingKeys.has(getEntryKey(symbol, targetDays)))
+        .filter(symbol => !existingKeys.has(getEntryKey(symbol, resolvedDays)))
         .map(symbol => {
-          const key = getEntryKey(symbol, targetDays)
+          const key = getEntryKey(symbol, resolvedDays)
           if (!firstNewKey) {
             firstNewKey = key
           }
@@ -950,8 +962,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
             priceData: null,
             optimalParams: null,
             optimalSMAs: null,
-            days: targetDays,
-            period: formatPeriod(targetDays),  // Add period display format
+            days: resolvedDays,
+            period: formatPeriod(resolvedDays),  // Add period display format
             isRecentBreakout: false,
             recentBreakout: null,
             totalSignals: null,
@@ -993,11 +1005,11 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
   useEffect(() => {
     if (!triggerBacktest || !triggerBacktest.symbol) return
 
-    const targetDays = triggerBacktest.days || days
+    const targetDays = normalizeDays(triggerBacktest.days ?? days) ?? DEFAULT_DAYS
     const normalizedSymbol = processStockSymbol(triggerBacktest.symbol) || triggerBacktest.symbol
 
-    if (triggerBacktest.days && `${triggerBacktest.days}` !== `${days}`) {
-      setDays(String(triggerBacktest.days))
+    if (triggerBacktest.days && targetDays !== days) {
+      setDays(targetDays)
     }
 
     ensureEntries([normalizedSymbol], targetDays)
@@ -1104,7 +1116,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
 
   const runBacktestForSymbol = async (symbol, entryDays = null) => {
     // Use provided entryDays or current days state
-    const targetDays = entryDays || days
+    const targetDays = normalizeDays(entryDays ?? days) ?? DEFAULT_DAYS
 
     ensureEntries([symbol], targetDays)
     setResults(prev => prev.map(entry => (
@@ -1888,8 +1900,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
               Analysis Period
             </label>
             <select
-              value={days}
-              onChange={(e) => setDays(e.target.value)}
+              value={String(days)}
+              onChange={(e) => setDays(normalizeDays(e.target.value) ?? DEFAULT_DAYS)}
               className="w-full px-4 py-2 bg-slate-700 border border-slate-600 text-slate-100 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             >
               <option value="90">3 Months</option>
