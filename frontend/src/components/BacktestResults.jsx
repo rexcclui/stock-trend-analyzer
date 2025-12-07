@@ -647,8 +647,10 @@ function optimizeSMAParams(prices, slots, breakouts) {
   const closedTradesForBest = bestTrades.filter(t => !t.isOpen)
   const openTradesForBest = bestTrades.filter(t => t.isOpen)
   const totalSignals = closedTradesForBest.length + (openTradesForBest.length * 0.5)
+  const winningTrades = closedTradesForBest.filter(t => t.plPercent > 0).length
+  const winRate = closedTradesForBest.length > 0 ? (winningTrades / closedTradesForBest.length) * 100 : 0
 
-  return { period: bestSMA, pl: bestPL, totalSignals }
+  return { period: bestSMA, pl: bestPL, totalSignals, winRate }
 }
 
 function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBacktestProcessed }) {
@@ -719,6 +721,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false)
   const [showRecentBreakoutsOnly, setShowRecentBreakoutsOnly] = useState(false)
   const [showPlBeatsMarketOnly, setShowPlBeatsMarketOnly] = useState(false)
+  const [showHighWinRateOnly, setShowHighWinRateOnly] = useState(false)
   const [hideLowSignalTrades, setHideLowSignalTrades] = useState(false)
   const [hideHighVolumeWeight, setHideHighVolumeWeight] = useState(false)
   const [hideWeakBreakouts, setHideWeakBreakouts] = useState(false)
@@ -1645,6 +1648,10 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
           return false
         }
       }
+      if (showHighWinRateOnly) {
+        const winRate = result.optimalSMAs?.winRate
+        if (typeof winRate !== 'number' || winRate <= 60) return false
+      }
       if (hideLowSignalTrades) {
         if (typeof result.totalSignals !== 'number' || result.totalSignals < 5) return false
       }
@@ -1675,7 +1682,19 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
 
       return true
     })
-  }, [nonErrorResults, showBookmarksOnly, showRecentBreakoutsOnly, selectedMarkets, selectedPeriods, searchFilter])
+  }, [
+    nonErrorResults,
+    showBookmarksOnly,
+    showRecentBreakoutsOnly,
+    showPlBeatsMarketOnly,
+    showHighWinRateOnly,
+    hideLowSignalTrades,
+    hideHighVolumeWeight,
+    hideWeakBreakouts,
+    selectedMarkets,
+    selectedPeriods,
+    searchFilter
+  ])
 
   const toggleMarketFilter = (market) => {
     setSelectedMarkets(prev => {
@@ -1768,6 +1787,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
         return entry.originalBreakout?.weightDiff ?? -Infinity
       case 'totalSignals':
         return entry.totalSignals ?? -Infinity
+      case 'winRate':
+        return entry.optimalSMAs?.winRate ?? -Infinity
       case 'pl':
         return entry.optimalSMAs?.pl ?? -Infinity
       case 'marketChange':
@@ -2192,6 +2213,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                   {showPlBeatsMarketOnly ? 'P/L > Mkt%' : 'P/L vs Mkt%'}
                 </button>
                 <button
+                  onClick={() => setShowHighWinRateOnly(prev => !prev)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${showHighWinRateOnly ? 'border-emerald-500 text-emerald-200 bg-emerald-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
+                  title="Show only rows with win rate above 60%"
+                >
+                  <Target className="w-4 h-4" />
+                  {showHighWinRateOnly ? 'Win% >60' : 'Win% All'}
+                </button>
+                <button
                   onClick={() => setHideLowSignalTrades(prev => !prev)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${hideLowSignalTrades ? 'border-emerald-500 text-emerald-200 bg-emerald-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
                   title="Hide trades with fewer than 5 total signals"
@@ -2308,6 +2337,12 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                         {renderSortIndicator('totalSignals')}
                       </span>
                     </th>
+                    <th onClick={() => handleSort('winRate')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Win rate of closed trades for the optimized SMA setup">
+                      <span className="flex items-center gap-1 justify-end">
+                        <Target className="w-4 h-4" />
+                        {renderSortIndicator('winRate')}
+                      </span>
+                    </th>
                     <th onClick={() => handleSort('pl')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Profit/Loss % from the Vol Prf V2 + SMA trading strategy">P/L {renderSortIndicator('pl')}</th>
                     <th onClick={() => handleSort('marketChange')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Buy-and-hold % change over the entire backtest period (oldest to newest price)">Mkt% {renderSortIndicator('marketChange')}</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase" title="Optimized parameters: Th=Breakout Threshold %, LB=Lookback Zones, SMA=SMA Period">Optimal Params</th>
@@ -2328,6 +2363,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                       const isWithinLast10Days = hasData && daysAgo <= 10
                       const status = result.status || (hasData ? 'completed' : 'pending')
                       const plValue = result.optimalSMAs?.pl
+                      const winRate = result.optimalSMAs?.winRate
                       const periodLabel = result.period || formatPeriod(result.days)
                       const periodTooltip = result.priceData?.length > 0
                         ? `${result.days} days (${result.priceData.length} trading days)`
@@ -2336,9 +2372,15 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                         typeof plValue === 'number'
                           ? typeof result.marketChange === 'number' && plValue > result.marketChange
                             ? 'text-blue-400'
-                            : plValue >= 0
-                              ? 'text-green-400'
-                              : 'text-red-400'
+                          : plValue >= 0
+                            ? 'text-green-400'
+                            : 'text-red-400'
+                          : 'text-slate-400'
+                      const winRateClassName =
+                        typeof winRate === 'number'
+                          ? winRate >= 60
+                            ? 'text-emerald-300'
+                            : 'text-slate-200'
                           : 'text-slate-400'
 
                       const upResistTooltip = result.upResist
@@ -2454,17 +2496,24 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                         <td className="px-4 py-3 text-sm text-slate-300 text-right">
                           {hasData ? result.totalSignals : '—'}
                         </td>
-                          <td className="px-4 py-3 text-sm text-right font-semibold">
-                            {hasData && typeof plValue === 'number' ? (
-                              <span className={plClassName}>
-                                {formatPercent(plValue)}
-                              </span>
-                            ) : '—'}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-right font-semibold">
-                            {typeof result.marketChange === 'number' ? (
-                              <span className={result.marketChange >= 0 ? 'text-green-300' : 'text-red-300'}>
-                                {formatPercent(result.marketChange)}
+                        <td className="px-4 py-3 text-sm text-right font-semibold">
+                          {hasData && typeof winRate === 'number' ? (
+                            <span className={winRateClassName}>
+                              {winRate.toFixed(1)}%
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right font-semibold">
+                          {hasData && typeof plValue === 'number' ? (
+                            <span className={plClassName}>
+                              {formatPercent(plValue)}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-right font-semibold">
+                          {typeof result.marketChange === 'number' ? (
+                            <span className={result.marketChange >= 0 ? 'text-green-300' : 'text-red-300'}>
+                              {formatPercent(result.marketChange)}
                             </span>
                           ) : '—'}
                         </td>
