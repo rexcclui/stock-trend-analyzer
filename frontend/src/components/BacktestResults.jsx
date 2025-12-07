@@ -775,6 +775,23 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     error: errorMsg
   })
 
+  const hasHighConvictionPerformance = (entry) => {
+    const winRate = entry?.optimalSMAs?.winRate
+    const pl = entry?.optimalSMAs?.pl
+    const totalSignals = entry?.totalSignals
+
+    return (
+      typeof winRate === 'number' && winRate > 75 &&
+      typeof pl === 'number' && pl > 100 &&
+      typeof totalSignals === 'number' && totalSignals > 7
+    )
+  }
+
+  const hasStrongBreakoutDiff = (entry) => {
+    const weightDiff = entry?.originalBreakout?.weightDiff
+    return typeof weightDiff === 'number' && weightDiff * 100 > 8
+  }
+
   const pruneDisallowedEntries = (currentEntries = []) => {
     const disallowed = new Set(
       currentEntries
@@ -832,7 +849,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     if (!hasHydratedCache) return
 
     try {
-      // Only cache full details for bookmarked or recent breakout rows.
+      // Only cache full details for bookmarked, recent breakout, or
+      // top-performing rows (high winrate/pl/signals or strong Diff).
       // A "recent breakout" is any completed entry whose latest breakout
       // happened in the last 10 days (see getRecentBreakouts below).
       // Others get minimal cache (symbol, status, lastScanAt, bookmarked)
@@ -840,7 +858,11 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
         const { priceData, ...rest } = result
 
         // Full cache for: bookmarked OR recent breakout
-        const shouldCacheFull = result.bookmarked || result.isRecentBreakout
+        const shouldCacheFull =
+          result.bookmarked ||
+          result.isRecentBreakout ||
+          hasHighConvictionPerformance(result) ||
+          hasStrongBreakoutDiff(result)
 
         if (shouldCacheFull) {
           return rest // Keep all fields except priceData
