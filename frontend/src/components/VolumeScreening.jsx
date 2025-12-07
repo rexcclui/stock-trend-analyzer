@@ -1378,7 +1378,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
 
   const handleRowClick = (entry) => {
     if (!onStockSelect) return
-    onStockSelect(entry.symbol, { days: period, forceVolumeProfileV2: true })
+    onStockSelect(entry.symbol, { days: entry.period, forceVolumeProfileV2: true })
   }
 
   const handleHistoryClick = (symbol) => {
