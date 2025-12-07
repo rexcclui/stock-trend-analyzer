@@ -1932,8 +1932,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
 
   useEffect(() => {
     if (lowWinRateRemoved.length === 0) return
-    const count = lowWinRateRemoved.length
-    const message = `${count} backtest${count === 1 ? '' : 's'} removed for win rate below 60%.`
+    const removedNames = lowWinRateRemoved
+      .map(entry => {
+        const periodLabel = entry.period || formatPeriod(entry.days)
+        return periodLabel ? `${entry.symbol} (${periodLabel})` : entry.symbol
+      })
+    const preview = removedNames.slice(0, 3).join(', ')
+    const suffix = removedNames.length > 3 ? ` +${removedNames.length - 3} more` : ''
+    const message = `${preview}${suffix} removed for win rate below 60%.`
     showToast(message)
   }, [lowWinRateRemoved.length])
 
