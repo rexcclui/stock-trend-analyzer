@@ -7,13 +7,13 @@ function defaultTitleFormatter(slot) {
   if (slot?.start != null && slot?.end != null) {
     return `${slot.start} - ${slot.end}`
   }
-  return slot?.label || 'N/A'
+  return slot?.label || '—'
 }
 
 function buildPlaceholder(index) {
   return {
     legendIndex: `placeholder-${index}`,
-    label: 'N/A',
+    label: '—',
     color: '#1f2937',
     textColor: '#cbd5e1',
     isPlaceholder: true

@@ -2217,7 +2217,6 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                 </button>
                 {availableMarkets.length > 0 && (
                   <div className="flex items-center gap-2 border border-slate-600 rounded-lg px-3 py-2">
-                    <span className="text-sm text-slate-300">Market:</span>
                     {availableMarkets.map(market => (
                       <button
                         key={market}
@@ -2235,7 +2234,6 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                 )}
                 {availablePeriods.length > 0 && (
                   <div className="flex items-center gap-2 border border-slate-600 rounded-lg px-3 py-2">
-                    <span className="text-sm text-slate-300">Period:</span>
                     {availablePeriods.map(period => (
                       <button
                         key={period}

@@ -2335,7 +2335,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                           keyPrefix={entry.id}
                           titleFormatter={(slot) => (
                             slot?.isPlaceholder
-                              ? 'N/A volume weight'
+                              ? 'Volume weight unavailable'
                               : `${formatPriceRange(slot.start, slot.end)} • ${slot.label}`
                           )}
                         />
