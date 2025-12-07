@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
 public class FinancialModelingPrepClient {
     private static final String BASE_URL = "https://financialmodelingprep.com/api/v3";
     private static final Pattern EXCLUDED_HK_SYMBOL_PATTERN = Pattern.compile("^4\\d{3}\\.HK$");
-    private static final Pattern EXCLUDED_CN_SYMBOL_PATTERN = Pattern.compile("^3\\d{4}\\.(SZ|SS)$");
+    private static final Pattern EXCLUDED_CN_SYMBOL_PATTERN = Pattern.compile("^3\\d{5}\\.(SZ|SS)$");
     private final String apiKey;
     private final Gson gson;
     private final StockDataCache cache;
@@ -184,8 +184,8 @@ public class FinancialModelingPrepClient {
         // Calculate how many stocks to fetch from each exchange
         int perExchange = limit / 2; // 200 from Shanghai, 200 from Shenzhen
 
-        // Fetch from Shanghai Exchange
-        List<String> shanghaiSymbols = fetchSymbolsByExchange("SSE", perExchange, ".SS");
+        // Fetch from Shanghai Exchange (try SHH code for FMP API)
+        List<String> shanghaiSymbols = fetchSymbolsByExchange("SHH", perExchange, ".SS");
         System.out.println("Fetched " + shanghaiSymbols.size() + " symbols from Shanghai");
 
         // Fetch from Shenzhen Exchange

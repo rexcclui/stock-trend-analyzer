@@ -1371,7 +1371,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
         .map(item => (typeof item === 'string' ? item : item?.symbol))
         .filter(Boolean)
         .map(symbol => symbol.toUpperCase())
-        .filter(symbol => !/^3\d{4}\.(SZ|SS)$/.test(symbol))
+        .filter(symbol => !/^3\d{5}\.(SZ|SS)$/.test(symbol))
         .filter(symbol => !isDisallowedSymbol(symbol))
 
       console.log('[CN500] Normalized symbols count:', normalized.length)
