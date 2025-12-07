@@ -730,6 +730,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
   const [searchFilter, setSearchFilter] = useState('')
   const [hasHydratedCache, setHasHydratedCache] = useState(() => initialHydratedResultsRef.current !== null)
   const [toastMessage, setToastMessage] = useState('')
+  const toastTimeoutRef = useRef(null)
   const activeScanSymbolRef = useRef(null)
   const importInputRef = useRef(null)
   const tableScrollRef = useRef(null)
@@ -1912,13 +1913,28 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     )
   }
 
+  const showToast = (message) => {
+    setToastMessage(message)
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current)
+    }
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastMessage('')
+      toastTimeoutRef.current = null
+    }, 4500)
+  }
+
+  useEffect(() => () => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current)
+    }
+  }, [])
+
   useEffect(() => {
     if (lowWinRateRemoved.length === 0) return
     const count = lowWinRateRemoved.length
     const message = `${count} backtest${count === 1 ? '' : 's'} removed for win rate below 60%.`
-    setToastMessage(message)
-    const timeout = setTimeout(() => setToastMessage(''), 4500)
-    return () => clearTimeout(timeout)
+    showToast(message)
   }, [lowWinRateRemoved.length])
 
   return (
@@ -2633,6 +2649,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
                               const entryKey = getEntryKey(result.symbol, result.days)
                               setResults(prevResults => prevResults.filter(r => getEntryKey(r.symbol, r.days) !== entryKey))
                               setScanQueue(prev => prev.filter(key => key !== entryKey))
+                              showToast(`${result.symbol} (${periodLabel}) removed from table.`)
                             }}
                             className="p-1 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors"
                             title="Remove this stock"
