@@ -647,6 +647,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
   const [loading, setLoading] = useState(false)
   const [loadingTopSymbols, setLoadingTopSymbols] = useState(false)
   const [loadingHKSymbols, setLoadingHKSymbols] = useState(false)
+  const [loadingCNSymbols, setLoadingCNSymbols] = useState(false)
   const [error, setError] = useState(null)
   const [lastAddedKey, setLastAddedKey] = useState(null)
   const initialHydratedResultsRef = useRef(null)
@@ -1346,6 +1347,49 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
     }
   }
 
+  const loadTopCNSymbols = async () => {
+    if (loadingCNSymbols) return
+    setLoadingCNSymbols(true)
+    try {
+      const response = await axios.get(joinUrl(API_URL, '/top-market-cap'), {
+        params: { limit: 400, exchange: 'CN' }
+      })
+
+      console.log('[CN500] API Response:', response.data)
+
+      const payload = response.data
+      const symbols = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.symbols)
+          ? payload.symbols
+          : []
+
+      console.log('[CN500] Raw symbols count:', symbols.length)
+      console.log('[CN500] First 10 symbols:', symbols.slice(0, 10))
+
+      const normalized = symbols
+        .map(item => (typeof item === 'string' ? item : item?.symbol))
+        .filter(Boolean)
+        .map(symbol => symbol.toUpperCase())
+        .filter(symbol => !/^3\d{4}\.(SZ|SS)$/.test(symbol))
+        .filter(symbol => !isDisallowedSymbol(symbol))
+
+      console.log('[CN500] Normalized symbols count:', normalized.length)
+      console.log('[CN500] First 10 normalized:', normalized.slice(0, 10))
+
+      if (normalized.length === 0) {
+        setError('No Chinese stocks returned from API. The exchange parameter might be incorrect.')
+      } else {
+        ensureEntries(normalized)
+      }
+    } catch (err) {
+      console.error('Failed to load top CN market cap symbols', err)
+      setError('Failed to load top CN market cap symbols: ' + (err.response?.data?.error || err.message))
+    } finally {
+      setLoadingCNSymbols(false)
+    }
+  }
+
   const runBacktest = (symbolOverride = null) => {
     const targetSymbols = symbolOverride ?? symbols
     const stockList = parseStockSymbols(targetSymbols).filter(symbol => !isDisallowedSymbol(symbol))
@@ -1860,6 +1904,15 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
             >
               {loadingHKSymbols ? <Loader2 className="w-5 h-5 animate-spin" /> : <DownloadCloud className="w-5 h-5" />}
               <span className="text-sm font-medium">HK500</span>
+            </button>
+            <button
+              onClick={loadTopCNSymbols}
+              disabled={loadingCNSymbols || loading}
+              className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              title="Load top 400 Chinese market cap symbols (200 Shanghai + 200 Shenzhen, excluding 3xxxxx stocks)"
+            >
+              {loadingCNSymbols ? <Loader2 className="w-5 h-5 animate-spin" /> : <DownloadCloud className="w-5 h-5" />}
+              <span className="text-sm font-medium">CN500</span>
             </button>
             <button
               onClick={scanAllQueued}

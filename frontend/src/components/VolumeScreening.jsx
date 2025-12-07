@@ -554,6 +554,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
   const [entries, setEntries] = useState([])
   const [loadingTopSymbols, setLoadingTopSymbols] = useState(false)
   const [loadingHKSymbols, setLoadingHKSymbols] = useState(false)
+  const [loadingCNSymbols, setLoadingCNSymbols] = useState(false)
   const [scanQueue, setScanQueue] = useState([])
   const [isScanning, setIsScanning] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
@@ -1144,6 +1145,48 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
       console.error('Failed to load top HK market cap symbols', error)
     } finally {
       setLoadingHKSymbols(false)
+    }
+  }
+
+  const loadTopCNSymbols = async () => {
+    if (loadingCNSymbols) return
+
+    setLoadingCNSymbols(true)
+    try {
+      const response = await axios.get(joinUrl(API_URL, '/top-market-cap'), {
+        params: { limit: 400, exchange: 'CN' }
+      })
+
+      console.log('[CN500] API Response:', response.data)
+
+      const payload = response.data
+      const symbols = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.symbols)
+          ? payload.symbols
+          : []
+
+      console.log('[CN500] Raw symbols count:', symbols.length)
+      console.log('[CN500] First 10 symbols:', symbols.slice(0, 10))
+
+      const normalized = symbols
+        .map(item => (typeof item === 'string' ? item : item?.symbol))
+        .filter(Boolean)
+        .map(symbol => symbol.toUpperCase())
+        .filter(symbol => !/^3\d{4}\.(SZ|SS)$/.test(symbol))
+
+      console.log('[CN500] Normalized symbols count:', normalized.length)
+      console.log('[CN500] First 10 normalized:', normalized.slice(0, 10))
+
+      if (normalized.length > 0) {
+        mergeSymbolsIntoEntries(normalized)
+      } else {
+        console.warn('[CN500] No symbols returned from API')
+      }
+    } catch (error) {
+      console.error('Failed to load top CN market cap symbols', error)
+    } finally {
+      setLoadingCNSymbols(false)
     }
   }
 
@@ -1890,6 +1933,16 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
             >
               {loadingHKSymbols ? <Loader2 className="w-5 h-5 animate-spin" /> : <DownloadCloud className="w-5 h-5" />}
               HK500
+            </button>
+            <button
+              type="button"
+              onClick={loadTopCNSymbols}
+              disabled={loadingCNSymbols}
+              className="flex-1 lg:flex-none px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+              title="Load top 400 Chinese market cap symbols (200 Shanghai + 200 Shenzhen, excluding 3xxxxx stocks)"
+            >
+              {loadingCNSymbols ? <Loader2 className="w-5 h-5 animate-spin" /> : <DownloadCloud className="w-5 h-5" />}
+              CN500
             </button>
             <button
               type="button"

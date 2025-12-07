@@ -19,6 +19,7 @@ import java.util.regex.Pattern;
 public class FinancialModelingPrepClient {
     private static final String BASE_URL = "https://financialmodelingprep.com/api/v3";
     private static final Pattern EXCLUDED_HK_SYMBOL_PATTERN = Pattern.compile("^4\\d{3}\\.HK$");
+    private static final Pattern EXCLUDED_CN_SYMBOL_PATTERN = Pattern.compile("^3\\d{4}\\.(SZ|SS)$");
     private final String apiKey;
     private final Gson gson;
     private final StockDataCache cache;
@@ -113,6 +114,11 @@ public class FinancialModelingPrepClient {
     }
 
     public List<String> getTopMarketCapSymbols(int limit, String exchange) throws IOException {
+        // For Chinese exchanges, fetch from both Shanghai and Shenzhen
+        if (exchange != null && (exchange.equalsIgnoreCase("CN") || exchange.equalsIgnoreCase("CHINA"))) {
+            return getTopChineseSymbols(limit);
+        }
+
         StringBuilder urlBuilder = new StringBuilder();
         urlBuilder.append(String.format("%s/stock-screener?marketCapMoreThan=0&limit=%d", BASE_URL, limit));
 
@@ -166,6 +172,72 @@ public class FinancialModelingPrepClient {
                             .toList();
                     System.out.println("After .HK filtering: " + symbols.size() + " stocks");
                 }
+
+                return symbols;
+            }
+        }
+    }
+
+    private List<String> getTopChineseSymbols(int limit) throws IOException {
+        System.out.println("Fetching top Chinese stocks from Shanghai and Shenzhen exchanges");
+
+        // Calculate how many stocks to fetch from each exchange
+        int perExchange = limit / 2; // 200 from Shanghai, 200 from Shenzhen
+
+        // Fetch from Shanghai Exchange
+        List<String> shanghaiSymbols = fetchSymbolsByExchange("SSE", perExchange, ".SS");
+        System.out.println("Fetched " + shanghaiSymbols.size() + " symbols from Shanghai");
+
+        // Fetch from Shenzhen Exchange
+        List<String> shenzhenSymbols = fetchSymbolsByExchange("SHZ", perExchange, ".SZ");
+        System.out.println("Fetched " + shenzhenSymbols.size() + " symbols from Shenzhen");
+
+        // Combine both lists
+        java.util.List<String> combined = new java.util.ArrayList<>();
+        combined.addAll(shanghaiSymbols);
+        combined.addAll(shenzhenSymbols);
+
+        System.out.println("Total Chinese symbols after combining: " + combined.size());
+
+        return combined;
+    }
+
+    private List<String> fetchSymbolsByExchange(String exchange, int limit, String suffix) throws IOException {
+        StringBuilder urlBuilder = new StringBuilder();
+        urlBuilder.append(String.format("%s/stock-screener?marketCapMoreThan=0&limit=%d", BASE_URL, limit * 2)); // Fetch more to account for filtering
+        urlBuilder.append(String.format("&exchange=%s", exchange));
+        urlBuilder.append(String.format("&apikey=%s", apiKey));
+
+        String url = urlBuilder.toString();
+        System.out.println("FMP API URL for " + exchange + ": " + url.replace(apiKey, "***"));
+
+        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+            HttpGet request = new HttpGet(url);
+            try (CloseableHttpResponse response = httpClient.execute(request)) {
+                String json = EntityUtils.toString(response.getEntity());
+
+                Type type = new TypeToken<List<Map<String, Object>>>() {
+                }.getType();
+                List<Map<String, Object>> data = gson.fromJson(json, type);
+
+                if (data == null) {
+                    System.out.println("FMP returned null data for " + exchange);
+                    return List.of();
+                }
+
+                System.out.println("FMP returned " + data.size() + " stocks for " + exchange + " before filtering");
+
+                // Filter to only symbols with the correct suffix and exclude 3xxxxx symbols
+                List<String> symbols = data.stream()
+                        .map(entry -> (String) entry.get("symbol"))
+                        .filter(Objects::nonNull)
+                        .map(String::toUpperCase)
+                        .filter(symbol -> symbol.endsWith(suffix))
+                        .filter(symbol -> !EXCLUDED_CN_SYMBOL_PATTERN.matcher(symbol).matches())
+                        .limit(limit)
+                        .toList();
+
+                System.out.println("After filtering for " + exchange + ": " + symbols.size() + " stocks");
 
                 return symbols;
             }
