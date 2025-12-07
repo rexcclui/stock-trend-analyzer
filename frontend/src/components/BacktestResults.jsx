@@ -718,6 +718,10 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
   const [stableRowOrder, setStableRowOrder] = useState([])
   const [showBookmarksOnly, setShowBookmarksOnly] = useState(false)
   const [showRecentBreakoutsOnly, setShowRecentBreakoutsOnly] = useState(false)
+  const [showPlBeatsMarketOnly, setShowPlBeatsMarketOnly] = useState(false)
+  const [hideLowSignalTrades, setHideLowSignalTrades] = useState(false)
+  const [hideHighVolumeWeight, setHideHighVolumeWeight] = useState(false)
+  const [hideWeakBreakouts, setHideWeakBreakouts] = useState(false)
   const [selectedMarkets, setSelectedMarkets] = useState([])
   const [selectedPeriods, setSelectedPeriods] = useState([])
   const [searchFilter, setSearchFilter] = useState('')
@@ -1635,6 +1639,23 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
     return nonErrorResults.filter(result => {
       if (showBookmarksOnly && !result.bookmarked) return false
       if (showRecentBreakoutsOnly && !result.isRecentBreakout) return false
+      if (showPlBeatsMarketOnly) {
+        const plValue = result.optimalSMAs?.pl
+        if (typeof plValue !== 'number' || typeof result.marketChange !== 'number' || plValue <= result.marketChange) {
+          return false
+        }
+      }
+      if (hideLowSignalTrades) {
+        if (typeof result.totalSignals !== 'number' || result.totalSignals < 5) return false
+      }
+      if (hideHighVolumeWeight) {
+        const currentWeight = result.originalBreakout?.currentWeight
+        if (typeof currentWeight !== 'number' || currentWeight > 0.04) return false
+      }
+      if (hideWeakBreakouts) {
+        const weightDiff = result.originalBreakout?.weightDiff
+        if (typeof weightDiff !== 'number' || weightDiff * 100 < 6) return false
+      }
       if (selectedMarkets.length > 0 && !selectedMarkets.includes(result.market)) return false
       if (selectedPeriods.length > 0 && !selectedPeriods.includes(result.period)) return false
 
@@ -1818,6 +1839,11 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
 
   const completedResults = nonErrorResults.filter(r => r.status === 'completed' && r.latestBreakout)
   const recentBreakoutCount = completedResults.filter(r => r.isRecentBreakout).length
+  const recentThreeDayBreakoutCount = completedResults.filter(r => {
+    const breakoutDate = r.originalBreakout?.date || r.latestBreakout?.date
+    if (!breakoutDate) return false
+    return getDaysAgo(breakoutDate) <= 3
+  }).length
   const totalScanDurationMs = nonErrorResults.reduce((sum, entry) =>
     typeof entry.durationMs === 'number' ? sum + entry.durationMs : sum
   , 0)
@@ -2062,6 +2088,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                 <p className="text-3xl font-bold mt-2 text-green-100">
                   {recentBreakoutCount}
                 </p>
+                <p className="text-sm mt-1 text-green-200">≤3 days: {recentThreeDayBreakoutCount}</p>
                 <p className="text-sm mt-1 text-green-300">
                   From {completedResults.length} stocks with detected breakouts
                 </p>
@@ -2083,11 +2110,11 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
           {/* Results Table */}
           <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
             <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-              <div className="flex items-center gap-3">
-                <h3 className="text-lg font-semibold text-slate-100">Breakout Signals</h3>
-                <div className="text-xs text-slate-400 flex items-center gap-2">
-                  <span title="Visible / total rows">Rows: {filteredResults.length}/{nonErrorResults.length}</span>
-                  {nonErrorResults.length !== filteredResults.length && (
+            <div className="flex items-center gap-3">
+              <h3 className="text-lg font-semibold text-slate-100">Breakout Signals</h3>
+              <div className="text-xs text-slate-400 flex items-center gap-2">
+                <span title="Visible / total rows">Rows: {filteredResults.length}/{nonErrorResults.length}</span>
+                {nonErrorResults.length !== filteredResults.length && (
                     <span className="text-amber-300" title="Rows hidden by filters">({nonErrorResults.length - filteredResults.length} filtered)</span>
                   )}
                 </div>
@@ -2153,6 +2180,38 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                 >
                   <Filter className="w-4 h-4" />
                   {showRecentBreakoutsOnly ? 'Showing Recent (≤10d)' : 'Filter Recent Breakouts'}
+                </button>
+                <button
+                  onClick={() => setShowPlBeatsMarketOnly(prev => !prev)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${showPlBeatsMarketOnly ? 'border-blue-500 text-blue-200 bg-blue-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
+                  title="Show only stocks where strategy P/L beats market performance"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  {showPlBeatsMarketOnly ? 'Showing P/L > Mkt%' : 'Filter P/L vs Mkt%'}
+                </button>
+                <button
+                  onClick={() => setHideLowSignalTrades(prev => !prev)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${hideLowSignalTrades ? 'border-emerald-500 text-emerald-200 bg-emerald-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
+                  title="Hide trades with fewer than 5 total signals"
+                >
+                  <Hash className="w-4 h-4" />
+                  {hideLowSignalTrades ? 'Signals ≥5' : 'Filter Signals <5'}
+                </button>
+                <button
+                  onClick={() => setHideHighVolumeWeight(prev => !prev)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${hideHighVolumeWeight ? 'border-purple-500 text-purple-200 bg-purple-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
+                  title="Hide rows where Vol% exceeds 4%"
+                >
+                  <Percent className="w-4 h-4" />
+                  {hideHighVolumeWeight ? 'Vol% ≤4%' : 'Filter Vol% >4%'}
+                </button>
+                <button
+                  onClick={() => setHideWeakBreakouts(prev => !prev)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${hideWeakBreakouts ? 'border-red-500 text-red-200 bg-red-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
+                  title="Hide rows where Diff is below 6%"
+                >
+                  <AlertCircle className="w-4 h-4" />
+                  {hideWeakBreakouts ? 'Diff ≥6%' : 'Filter Diff <6%'}
                 </button>
                 {availableMarkets.length > 0 && (
                   <div className="flex items-center gap-2 border border-slate-600 rounded-lg px-3 py-2">
