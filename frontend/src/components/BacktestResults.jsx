@@ -2257,6 +2257,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                     {sortedResults.map((result, index) => {
                       const hasBreakout = Boolean(result.latestBreakout)
                       const hasData = Boolean(result.originalBreakout)  // Has breakout data (may be closed)
+                      const hasParams = Boolean(result.optimalParams)
+                      const hasOptimalSMAs = Boolean(result.optimalSMAs)
                       const daysAgo = hasData ? getDaysAgo(result.originalBreakout.date) : null
                       const priceChange = hasData
                         ? ((result.latestPrice - result.originalBreakout.price) / result.originalBreakout.price * 100)
@@ -2281,7 +2283,15 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                       <tr
                         key={index}
                         data-entry-key={getEntryKey(result.symbol, result.days)}
-                        onClick={() => hasData && onStockSelect && onStockSelect(result.symbol, { ...result.optimalParams, smaPeriods: [result.optimalSMAs?.period], days: result.days })}
+                        onClick={() => {
+                          if (!hasData || !hasParams || !onStockSelect) return
+
+                          onStockSelect(result.symbol, {
+                            ...result.optimalParams,
+                            smaPeriods: [result.optimalSMAs?.period],
+                            days: result.days
+                          })
+                        }}
                         className={`transition-colors ${hasData ? 'hover:bg-slate-700 cursor-pointer' : 'opacity-75'} ${isWithinLast10Days ? 'bg-blue-900/20 hover:bg-blue-800/30' : ''}`}
                         title={hasData ? (result.breakoutClosed ? 'Click to view (breakout closed by sell signal)' : 'Click to view in Technical Analysis with optimized parameters') : 'Pending scan'}
                       >
@@ -2383,7 +2393,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                           ) : '—'}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400 text-left">
-                          {hasData ? (
+                          {hasData && hasParams && hasOptimalSMAs ? (
                             <div className="whitespace-nowrap">
                               Th:{(result.optimalParams.breakoutThreshold * 100).toFixed(0)}% LB:{result.optimalParams.lookbackZones} <span className="text-blue-400 font-medium">SMA:{result.optimalSMAs.period}</span>
                             </div>
