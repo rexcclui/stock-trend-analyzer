@@ -1256,9 +1256,9 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
     ensureEntries(allowedSymbols)
 
     if (startScan) {
-      // Mark the entries with current days as 'queued' so scanner knows which ones to process
+      // Mark ALL entries matching these symbols as 'queued', regardless of days value
       setResults(prev => prev.map(entry => {
-        if (allowedSymbols.includes(entry.symbol) && entry.days === days && entry.status === 'pending') {
+        if (allowedSymbols.includes(entry.symbol) && entry.status === 'pending') {
           return { ...entry, status: 'queued' }
         }
         return entry
@@ -1266,7 +1266,12 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
 
       setScanQueue(prev => {
         const existing = new Set(prev)
-        const newEntryKeys = allowedSymbols.map(symbol => getEntryKey(symbol, days))
+        // Queue ALL entries with these symbols, using each entry's specific days
+        const entriesToQueue = results.filter(r =>
+          allowedSymbols.includes(r.symbol) &&
+          (r.status === 'pending' || r.status === 'queued')
+        )
+        const newEntryKeys = entriesToQueue.map(entry => getEntryKey(entry.symbol, entry.days))
         const merged = [...prev, ...newEntryKeys.filter(key => !existing.has(key))]
         setScanTotal(merged.length)
         return merged
