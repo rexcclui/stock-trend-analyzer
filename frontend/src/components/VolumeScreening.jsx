@@ -1390,6 +1390,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     setIsPaused(prev => !prev)
   }
 
+  const hasScanResult = (entry) => entry?.status === 'ready' && !!entry?.lastScanAt
   const isPotentialBreak = (entry) => hasCloseResistance(entry.bottomResist, entry.upperResist)
   const isResistanceClose = (value) => {
     const parsed = parseResistanceWeight(value)
@@ -1486,7 +1487,10 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
 
   const getVisibleEntries = (sourceEntries = entries) => sourceEntries.filter(entry => {
     if (showBookmarkedOnly && !entry.bookmarked) return false
-    if (showPotentialBreakOnly && !isPotentialBreak(entry)) return false
+    if (showPotentialBreakOnly) {
+      if (!hasScanResult(entry)) return false
+      if (!isPotentialBreak(entry)) return false
+    }
     if (!matchesBreakFilters(entry)) return false
     if (selectedMarkets.length > 0 && !selectedMarkets.includes(extractMarket(entry.symbol))) return false
     if (selectedPeriods.length > 0 && !selectedPeriods.includes(entry.periodDisplay)) return false
