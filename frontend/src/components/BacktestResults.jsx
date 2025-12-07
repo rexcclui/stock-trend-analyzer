@@ -765,7 +765,10 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
 
     if (disallowed.size === 0) return currentEntries
 
-    setScanQueue(prev => prev.filter(symbol => !disallowed.has(symbol)))
+    setScanQueue(prev => prev.filter(entryKey => {
+      const [symbol] = entryKey.split('-')
+      return !disallowed.has(symbol)
+    }))
 
     return currentEntries.filter(entry => !disallowed.has(entry.symbol))
   }
@@ -1263,7 +1266,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
 
       setScanQueue(prev => {
         const existing = new Set(prev)
-        const merged = [...prev, ...allowedSymbols.filter(symbol => !existing.has(symbol))]
+        const newEntryKeys = allowedSymbols.map(symbol => getEntryKey(symbol, days))
+        const merged = [...prev, ...newEntryKeys.filter(key => !existing.has(key))]
         setScanTotal(merged.length)
         return merged
       })
@@ -1423,7 +1427,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
 
     const pendingSymbols = pruneDisallowedEntries(nonErrorResults)
       .filter(entry => entry.status !== 'completed')
-      .map(entry => entry.symbol)
+      .map(entry => getEntryKey(entry.symbol, entry.days))
 
     if (pendingSymbols.length === 0) return
 
@@ -1440,7 +1444,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
     setResults(prev => pruneDisallowedEntries(prev))
 
     const allSymbols = pruneDisallowedEntries(nonErrorResults)
-      .map(entry => entry.symbol)
+      .map(entry => getEntryKey(entry.symbol, entry.days))
 
     if (allSymbols.length === 0) return
 
@@ -1460,8 +1464,9 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
     )))
   }
 
-  const scanSingle = (symbol) => {
-    setScanQueue([symbol])
+  const scanSingle = (symbol, days) => {
+    const entryKey = getEntryKey(symbol, days)
+    setScanQueue([entryKey])
     setScanTotal(1)
     setScanCompleted(0)
     setIsPaused(false)
@@ -1482,19 +1487,22 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
       return
     }
 
-    const currentSymbol = scanQueue[0]
-    if (activeScanSymbolRef.current === currentSymbol) return
+    const currentEntryKey = scanQueue[0]
+    if (activeScanSymbolRef.current === currentEntryKey) return
 
-    // Find the entry to get its days value (find first queued entry, then fall back to pending/loading)
-    const entry = results.find(r => r.symbol === currentSymbol && r.status === 'queued') ||
-                  results.find(r => r.symbol === currentSymbol && (r.status === 'pending' || r.status === 'loading'))
+    // Parse the entry key to extract symbol and days
+    const [symbol, daysStr] = currentEntryKey.split('-')
+    const days = parseInt(daysStr, 10)
+
+    // Find the entry matching this symbol-days combination
+    const entry = results.find(r => r.symbol === symbol && r.days === days)
     if (!entry) return  // Entry might have been removed
 
-    activeScanSymbolRef.current = currentSymbol
+    activeScanSymbolRef.current = currentEntryKey
     setLoading(true)
 
     ; (async () => {
-      await runBacktestForSymbol(currentSymbol, entry.days)
+      await runBacktestForSymbol(symbol, days)
       setScanCompleted(prev => prev + 1)
       setScanQueue(prev => prev.slice(1))
       activeScanSymbolRef.current = null
@@ -2375,7 +2383,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              scanSingle(result.symbol)
+                              scanSingle(result.symbol, result.days)
                             }}
                             className="p-1 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-900/20 rounded transition-colors mr-1"
                             title="Scan this stock"
