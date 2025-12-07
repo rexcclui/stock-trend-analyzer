@@ -1771,11 +1771,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
     // Use entry keys (symbol-days) instead of just symbols to handle duplicate symbols with different periods
     const filteredKeys = filteredResults.map(r => getEntryKey(r.symbol, r.days))
     const sortChanged = previousSortRef.current.key !== sortConfig.key || previousSortRef.current.direction !== sortConfig.direction
-    const keySetChanged = filteredKeys.length !== stableRowOrder.length ||
-      filteredKeys.some(key => !stableRowOrder.includes(key))
+    const arraysMatch =
+      filteredKeys.length === stableRowOrder.length &&
+      filteredKeys.every((key, index) => key === stableRowOrder[index])
+    const keySetChanged = !arraysMatch
 
     if (!sortConfig.key) {
-      if (keySetChanged || sortChanged || stableRowOrder.length === 0) {
+      const hasKeys = filteredKeys.length > 0
+      if ((keySetChanged && hasKeys) || sortChanged || (stableRowOrder.length === 0 && hasKeys)) {
         setStableRowOrder(filteredKeys)
       }
     } else if (sortChanged || keySetChanged) {
