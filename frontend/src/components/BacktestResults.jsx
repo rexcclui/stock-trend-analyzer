@@ -852,7 +852,10 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
           status: result.status || 'pending',
           lastScanAt: result.lastScanAt || null,
           bookmarked: result.bookmarked || false,
-          error: result.error || null
+          error: result.error || null,
+          marketChange: typeof result.marketChange === 'number' ? result.marketChange : null,
+          durationMs: typeof result.durationMs === 'number' ? result.durationMs : null,
+          latestPrice: typeof result.latestPrice === 'number' ? result.latestPrice : null
         }
       })
 
