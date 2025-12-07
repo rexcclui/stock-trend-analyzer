@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import axios from 'axios'
 import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2, RotateCw, Upload, Download, Filter, Waves, Hash, Clock3, ChevronUp, ChevronDown, Info } from 'lucide-react'
 import { apiCache } from '../utils/apiCache'
@@ -1619,28 +1619,30 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
   // Get unique periods from all results
   const availablePeriods = Array.from(new Set(nonErrorResults.map(r => r.period).filter(Boolean))).sort()
 
-  const filteredResults = nonErrorResults.filter(result => {
-    if (showBookmarksOnly && !result.bookmarked) return false
-    if (showRecentBreakoutsOnly && !result.isRecentBreakout) return false
-    if (selectedMarkets.length > 0 && !selectedMarkets.includes(result.market)) return false
-    if (selectedPeriods.length > 0 && !selectedPeriods.includes(result.period)) return false
+  const filteredResults = useMemo(() => {
+    return nonErrorResults.filter(result => {
+      if (showBookmarksOnly && !result.bookmarked) return false
+      if (showRecentBreakoutsOnly && !result.isRecentBreakout) return false
+      if (selectedMarkets.length > 0 && !selectedMarkets.includes(result.market)) return false
+      if (selectedPeriods.length > 0 && !selectedPeriods.includes(result.period)) return false
 
-    // Support multiple search terms separated by comma or space
-    if (searchFilter) {
-      const searchTerms = searchFilter
-        .split(/[,\s]+/)
-        .map(term => term.trim().toUpperCase())
-        .filter(term => term.length > 0)
+      // Support multiple search terms separated by comma or space
+      if (searchFilter) {
+        const searchTerms = searchFilter
+          .split(/[,\s]+/)
+          .map(term => term.trim().toUpperCase())
+          .filter(term => term.length > 0)
 
-      if (searchTerms.length > 0) {
-        const symbolUpper = result.symbol.toUpperCase()
-        const matchesAnyTerm = searchTerms.some(term => symbolUpper === term)
-        if (!matchesAnyTerm) return false
+        if (searchTerms.length > 0) {
+          const symbolUpper = result.symbol.toUpperCase()
+          const matchesAnyTerm = searchTerms.some(term => symbolUpper === term)
+          if (!matchesAnyTerm) return false
+        }
       }
-    }
 
-    return true
-  })
+      return true
+    })
+  }, [nonErrorResults, showBookmarksOnly, showRecentBreakoutsOnly, selectedMarkets, selectedPeriods, searchFilter])
 
   const toggleMarketFilter = (market) => {
     setSelectedMarkets(prev => {
