@@ -14,21 +14,53 @@ function App() {
   const [storageUsage, setStorageUsage] = useState(null)
   const [storageQuota, setStorageQuota] = useState(null)
 
+  const measureLocalStorageUsage = () => {
+    if (typeof window === 'undefined' || !window.localStorage) return null
+
+    try {
+      let totalSizeBytes = 0
+
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i)
+        if (!key) continue
+
+        const value = localStorage.getItem(key) ?? ''
+        totalSizeBytes += new Blob([key, value]).size
+      }
+
+      return totalSizeBytes
+    } catch (error) {
+      console.warn('Unable to measure LocalStorage usage', error)
+      return null
+    }
+  }
+
   useEffect(() => {
     let isMounted = true
 
     const loadStorageEstimate = async () => {
-      if (typeof navigator === 'undefined' || !navigator.storage?.estimate) return
+      let usage = null
+      let quota = null
 
-      try {
-        const { usage, quota } = await navigator.storage.estimate()
+      if (typeof navigator !== 'undefined' && navigator.storage?.estimate) {
+        try {
+          const estimate = await navigator.storage.estimate()
+          if (!isMounted) return
 
-        if (!isMounted) return
+          usage = typeof estimate.usage === 'number' && estimate.usage > 0 ? estimate.usage : null
+          quota = typeof estimate.quota === 'number' ? estimate.quota : null
+        } catch (error) {
+          console.warn('Unable to estimate storage usage', error)
+        }
+      }
 
-        setStorageUsage(usage ?? null)
-        setStorageQuota(quota ?? null)
-      } catch (error) {
-        console.warn('Unable to estimate storage usage', error)
+      if (!usage) {
+        usage = measureLocalStorageUsage()
+      }
+
+      if (isMounted) {
+        setStorageUsage(usage)
+        setStorageQuota(quota && quota < 2 * 1024 * 1024 * 1024 ? quota : null)
       }
     }
 
