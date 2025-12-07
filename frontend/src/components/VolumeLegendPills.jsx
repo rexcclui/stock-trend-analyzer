@@ -12,7 +12,7 @@ function VolumeLegendPills({ legend, keyPrefix = 'legend', titleFormatter = defa
     return null
   }
 
-  const wrapperClassName = ['flex flex-nowrap gap-0 overflow-x-auto', className].filter(Boolean).join(' ')
+  const wrapperClassName = ['flex flex-nowrap gap-0 overflow-x-auto no-scrollbar', className].filter(Boolean).join(' ')
 
   const currentClasses = 'border-sky-300 ring-2 ring-sky-200 ring-offset-2 ring-offset-slate-900 shadow-lg shadow-sky-300/50 scale-[1.06]'
 
