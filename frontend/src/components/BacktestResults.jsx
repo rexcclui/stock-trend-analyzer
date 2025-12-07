@@ -1771,7 +1771,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
     }
 
     previousSortRef.current = sortConfig
-  }, [filteredResults, sortConfig, stableRowOrder])
+  }, [filteredResults, sortConfig])  // Removed stableRowOrder from dependencies to prevent infinite loop
 
   const sortedResults = (() => {
     if (!sortConfig.key && stableRowOrder.length === 0) return filteredResults
