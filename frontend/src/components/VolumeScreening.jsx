@@ -567,11 +567,13 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
   const [selectedPeriods, setSelectedPeriods] = useState([])
   const [searchFilter, setSearchFilter] = useState('')
   const [sortConfig, setSortConfig] = useState(defaultSortConfig)
+  const [stableRowOrder, setStableRowOrder] = useState([])
   const [hasHydratedCache, setHasHydratedCache] = useState(false)
   const [lastAddedId, setLastAddedId] = useState(null)
   const activeScanIdRef = useRef(null)
   const importInputRef = useRef(null)
   const tableScrollRef = useRef(null)
+  const previousSortRef = useRef(sortConfig)
 
   const baseEntryState = {
     priceRange: '—',
@@ -1469,37 +1471,73 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
   const filteredCount = Math.max(0, entries.length - filteredEntries.length)
   const visibleEntries = filteredEntries
 
-  const sortedEntries = sortConfig.field
-    ? [...visibleEntries].sort((a, b) => {
-      if (sortConfig.field === 'lastScanAt') {
-        const timeA = a.lastScanAt ? new Date(a.lastScanAt).getTime() : -Infinity
-        const timeB = b.lastScanAt ? new Date(b.lastScanAt).getTime() : -Infinity
-        const diff = timeA - timeB
-        return sortConfig.direction === 'asc' ? diff : -diff
-      }
+  const compareEntries = (a, b) => {
+    if (!sortConfig.field) return 0
 
-      if (sortConfig.field === 'symbol') {
-        const symbolA = a.symbol?.toUpperCase() || ''
-        const symbolB = b.symbol?.toUpperCase() || ''
-        const diff = symbolA.localeCompare(symbolB)
-        return sortConfig.direction === 'asc' ? diff : -diff
-      }
-
-      const weightA = sortConfig.field === 'volumeWeight'
-        ? getCurrentVolumeWeight(a)
-        : parseResistanceWeight(a[sortConfig.field])
-      const weightB = sortConfig.field === 'volumeWeight'
-        ? getCurrentVolumeWeight(b)
-        : parseResistanceWeight(b[sortConfig.field])
-
-      if (weightA == null && weightB == null) return 0
-      if (weightA == null) return 1
-      if (weightB == null) return -1
-
-      const diff = weightA - weightB
+    if (sortConfig.field === 'lastScanAt') {
+      const timeA = a.lastScanAt ? new Date(a.lastScanAt).getTime() : -Infinity
+      const timeB = b.lastScanAt ? new Date(b.lastScanAt).getTime() : -Infinity
+      const diff = timeA - timeB
       return sortConfig.direction === 'asc' ? diff : -diff
-    })
-    : visibleEntries
+    }
+
+    if (sortConfig.field === 'symbol') {
+      const symbolA = a.symbol?.toUpperCase() || ''
+      const symbolB = b.symbol?.toUpperCase() || ''
+      const diff = symbolA.localeCompare(symbolB)
+      return sortConfig.direction === 'asc' ? diff : -diff
+    }
+
+    const weightA = sortConfig.field === 'volumeWeight'
+      ? getCurrentVolumeWeight(a)
+      : parseResistanceWeight(a[sortConfig.field])
+    const weightB = sortConfig.field === 'volumeWeight'
+      ? getCurrentVolumeWeight(b)
+      : parseResistanceWeight(b[sortConfig.field])
+
+    if (weightA == null && weightB == null) return 0
+    if (weightA == null) return 1
+    if (weightB == null) return -1
+
+    const diff = weightA - weightB
+    return sortConfig.direction === 'asc' ? diff : -diff
+  }
+
+  useEffect(() => {
+    const visibleIds = visibleEntries.map(entry => entry.id)
+    const sortChanged = previousSortRef.current.field !== sortConfig.field || previousSortRef.current.direction !== sortConfig.direction
+    const idSetChanged = visibleIds.length !== stableRowOrder.length || visibleIds.some(id => !stableRowOrder.includes(id))
+
+    if (!sortConfig.field) {
+      if (idSetChanged || sortChanged || stableRowOrder.length === 0) {
+        setStableRowOrder(visibleIds)
+      }
+    } else if (sortChanged || idSetChanged) {
+      const sortedIds = [...visibleEntries]
+        .sort((a, b) => compareEntries(a, b))
+        .map(entry => entry.id)
+      setStableRowOrder(sortedIds)
+    }
+
+    previousSortRef.current = sortConfig
+  }, [visibleEntries, sortConfig, stableRowOrder])
+
+  const sortedEntries = (() => {
+    if (!sortConfig.field && stableRowOrder.length === 0) return visibleEntries
+
+    const idToEntry = new Map(visibleEntries.map(entry => [entry.id, entry]))
+    const orderedEntries = stableRowOrder
+      .map(id => idToEntry.get(id))
+      .filter(Boolean)
+
+    const missingEntries = visibleEntries.filter(entry => !stableRowOrder.includes(entry.id))
+    if (missingEntries.length > 0) {
+      const sortedMissing = sortConfig.field ? [...missingEntries].sort(compareEntries) : missingEntries
+      return [...orderedEntries, ...sortedMissing]
+    }
+
+    return orderedEntries.length > 0 ? orderedEntries : visibleEntries
+  })()
 
   const displayEntries = sortedEntries
 
