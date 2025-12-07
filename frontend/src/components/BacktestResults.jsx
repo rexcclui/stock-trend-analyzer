@@ -1756,20 +1756,21 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
   }
 
   useEffect(() => {
-    const filteredSymbols = filteredResults.map(r => r.symbol)
+    // Use entry keys (symbol-days) instead of just symbols to handle duplicate symbols with different periods
+    const filteredKeys = filteredResults.map(r => getEntryKey(r.symbol, r.days))
     const sortChanged = previousSortRef.current.key !== sortConfig.key || previousSortRef.current.direction !== sortConfig.direction
-    const symbolSetChanged = filteredSymbols.length !== stableRowOrder.length ||
-      filteredSymbols.some(symbol => !stableRowOrder.includes(symbol))
+    const keySetChanged = filteredKeys.length !== stableRowOrder.length ||
+      filteredKeys.some(key => !stableRowOrder.includes(key))
 
     if (!sortConfig.key) {
-      if (symbolSetChanged || sortChanged || stableRowOrder.length === 0) {
-        setStableRowOrder(filteredSymbols)
+      if (keySetChanged || sortChanged || stableRowOrder.length === 0) {
+        setStableRowOrder(filteredKeys)
       }
-    } else if (sortChanged || symbolSetChanged) {
-      const sortedSymbols = [...filteredResults]
+    } else if (sortChanged || keySetChanged) {
+      const sortedKeys = [...filteredResults]
         .sort((a, b) => compareEntries(a, b))
-        .map(r => r.symbol)
-      setStableRowOrder(sortedSymbols)
+        .map(r => getEntryKey(r.symbol, r.days))
+      setStableRowOrder(sortedKeys)
     }
 
     previousSortRef.current = sortConfig
@@ -1778,12 +1779,13 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
   const sortedResults = (() => {
     if (!sortConfig.key && stableRowOrder.length === 0) return filteredResults
 
-    const symbolToResult = new Map(filteredResults.map(r => [r.symbol, r]))
+    // Use entry key (symbol-days) instead of just symbol to handle duplicate symbols with different periods
+    const keyToResult = new Map(filteredResults.map(r => [getEntryKey(r.symbol, r.days), r]))
     const orderedResults = stableRowOrder
-      .map(symbol => symbolToResult.get(symbol))
+      .map(key => keyToResult.get(key))
       .filter(Boolean)
 
-    const missingResults = filteredResults.filter(r => !stableRowOrder.includes(r.symbol))
+    const missingResults = filteredResults.filter(r => !stableRowOrder.includes(getEntryKey(r.symbol, r.days)))
     if (missingResults.length > 0) {
       const sortedMissing = sortConfig.key ? [...missingResults].sort(compareEntries) : missingResults
       return [...orderedResults, ...sortedMissing]
