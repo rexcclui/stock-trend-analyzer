@@ -919,15 +919,15 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     let firstNewId = null
 
     setEntries(prevEntries => {
-      const nextEntries = [...prevEntries]
       // Use symbol+period combination as unique key (filter out entries without period)
       const existingKeys = new Set(
-        nextEntries
+        prevEntries
           .filter(e => e.period != null)
           .map(e => getEntryKey(e.symbol, e.period))
       )
 
-      let addedCount = 0
+      const newEntries = []
+
       allowedSymbols.forEach(symbol => {
         const entryKey = getEntryKey(symbol, period)
         if (!existingKeys.has(entryKey)) {
@@ -936,7 +936,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
           if (!firstNewId) {
             firstNewId = newId
           }
-          nextEntries.push({
+          newEntries.push({
             id: newId,
             symbol,
             period,
@@ -945,11 +945,13 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
             ...(cached || baseEntryState)
           })
           existingKeys.add(entryKey)
-          addedCount++
         }
       })
 
-      return nextEntries
+      if (newEntries.length === 0) return prevEntries
+
+      // New entries should appear at the top of the table
+      return [...newEntries, ...prevEntries]
     })
 
     if (persistHistory) {
@@ -1380,6 +1382,25 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     return `Range: ${rangeLabel} • Slots: ${slotCountLabel} • Span: ${spanLabel} • Current share: ${shareLabel}`
   }
 
+  const getPeriodTooltip = (entry) => {
+    if (!entry) return undefined
+
+    const parts = []
+    if (entry.testedDays && entry.testedDays !== '—') {
+      parts.push(`${entry.testedDays} days`)
+    }
+
+    const slotLabel = Number.isFinite(entry.slotCount)
+      ? entry.slotCount
+      : Array.isArray(entry.volumeLegend)
+        ? entry.volumeLegend.length
+        : entry.slotCount
+
+    parts.push(`Slots: ${slotLabel ?? '—'}`)
+
+    return parts.length > 0 ? parts.join(' • ') : undefined
+  }
+
   const getVisibleEntries = (sourceEntries = entries) => sourceEntries.filter(entry => {
     if (showBookmarkedOnly && !entry.bookmarked) return false
     if (showPotentialBreakOnly && !isPotentialBreak(entry)) return false
@@ -1448,7 +1469,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
   const filteredCount = Math.max(0, entries.length - filteredEntries.length)
   const visibleEntries = filteredEntries
 
-  const sortedEntries = (sortConfig.field && !isScanning)
+  const sortedEntries = sortConfig.field
     ? [...visibleEntries].sort((a, b) => {
       if (sortConfig.field === 'lastScanAt') {
         const timeA = a.lastScanAt ? new Date(a.lastScanAt).getTime() : -Infinity
@@ -2076,9 +2097,6 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                   </span>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Px Slots
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   <button
                     type="button"
                     onClick={() => toggleSort('lastScanAt')}
@@ -2132,7 +2150,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
             <tbody className="divide-y divide-slate-800">
               {displayEntries.length === 0 ? (
                 <tr>
-                  <td colSpan="11" className="px-4 py-6 text-center text-slate-400">
+                  <td colSpan="10" className="px-4 py-6 text-center text-slate-400">
                     {showUpBreakOnly || showDownBreakOnly || showPotentialBreakOnly || showBookmarkedOnly
                       ? 'No symbols matched the current filters. Disable filters to see all entries.'
                       : 'No symbols added yet. Add stocks above to start screening.'}
@@ -2166,12 +2184,11 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                     <td className="px-4 py-3 text-center">
                       <span
                         className="px-2 py-1 rounded bg-purple-900/50 text-purple-200 text-xs font-semibold"
-                        title={entry.testedDays && entry.testedDays !== '—' ? `${entry.testedDays} days` : undefined}
+                        title={getPeriodTooltip(entry)}
                       >
                         {entry.periodDisplay || formatPeriod(entry.period)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-200">{entry.slotCount}</td>
                     <td className={`px-4 py-3 text-xs ${isScanStale(entry.lastScanAt) ? 'text-red-400' : 'text-slate-200'}`}>
                       {formatTimestamp(entry.lastScanAt)}
                     </td>
