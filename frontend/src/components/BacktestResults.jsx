@@ -87,7 +87,7 @@ function normalizeCachedResults(entries = []) {
         typeof entry?.upResist?.volumeWeight === 'number' &&
         typeof entry?.downResist?.volumeWeight === 'number'
 
-      if (normalizedEntry.status === 'completed' && !hasVolumeWeights) {
+      if (normalizedEntry.status === 'completed' && !hasVolumeWeights && !normalizedEntry.bookmarked && !normalizedEntry.isRecentBreakout) {
         return {
           ...normalizedEntry,
           status: 'pending',
