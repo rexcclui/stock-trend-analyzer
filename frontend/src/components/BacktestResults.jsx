@@ -1008,9 +1008,9 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
     }
   }, [triggerBacktest, days])
 
-  const eraseResult = (symbol) => {
+  const eraseResult = (symbol, days) => {
     setResults(prev => prev.map(entry => (
-      entry.symbol === symbol ? clearEntryData(entry) : entry
+      entry.symbol === symbol && entry.days === days ? clearEntryData(entry) : entry
     )))
   }
 
@@ -2417,7 +2417,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              eraseResult(result.symbol)
+                              eraseResult(result.symbol, result.days)
                             }}
                             className="p-1 text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 rounded transition-colors mr-1"
                             title="Erase backtest result"
@@ -2427,8 +2427,9 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                           <button
                             onClick={(e) => {
                               e.stopPropagation() // Prevent row click
-                              setResults(prevResults => prevResults.filter(r => r.symbol !== result.symbol))
-                              setScanQueue(prev => prev.filter(symbol => symbol !== result.symbol))
+                              const entryKey = getEntryKey(result.symbol, result.days)
+                              setResults(prevResults => prevResults.filter(r => getEntryKey(r.symbol, r.days) !== entryKey))
+                              setScanQueue(prev => prev.filter(key => key !== entryKey))
                             }}
                             className="p-1 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded transition-colors"
                             title="Remove this stock"
