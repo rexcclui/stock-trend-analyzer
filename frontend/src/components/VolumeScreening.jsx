@@ -547,7 +547,7 @@ function hasCloseResistance(bottomResist, upperResist, threshold = 10) {
   return isBottomClose || isUpperClose
 }
 
-function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBacktestSelect }) {
+function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBacktestSelect, bulkImport, onImportProcessed }) {
   const [symbolInput, setSymbolInput] = useState('')
   const [period, setPeriod] = useState('1825')
   const [stockHistory, setStockHistory] = useState([])
@@ -906,6 +906,18 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     }
   }, [triggerSymbol, onSymbolProcessed])
 
+  useEffect(() => {
+    if (!bulkImport || !Array.isArray(bulkImport.entries)) return
+
+    if (bulkImport.entries.length > 0) {
+      mergeSymbolPeriodEntries(bulkImport.entries)
+    }
+
+    if (onImportProcessed) {
+      onImportProcessed()
+    }
+  }, [bulkImport, onImportProcessed])
+
   const saveToHistory = (symbols) => {
     if (!Array.isArray(symbols) || symbols.length === 0) return
     const uniqueSymbols = Array.from(new Set(symbols.filter(Boolean)))
@@ -965,6 +977,63 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
 
     // Return firstNewId so caller can trigger scroll after state updates
     return firstNewId
+  }
+
+  const mergeSymbolPeriodEntries = (items) => {
+    if (!Array.isArray(items) || items.length === 0) return
+
+    let firstNewId = null
+
+    setEntries(prevEntries => {
+      const existingKeys = new Set(
+        prevEntries
+          .filter(e => e.period != null)
+          .map(e => getEntryKey(e.symbol, e.period))
+      )
+
+      const newEntries = []
+
+      items.forEach(item => {
+        if (!item) return
+
+        const normalizedSymbol = processStockSymbol(item.symbol || '')
+        const targetPeriod = item.days ?? item.period ?? period
+
+        if (!normalizedSymbol || targetPeriod == null || isDisallowedSymbol(normalizedSymbol)) return
+
+        const normalizedPeriod = String(targetPeriod)
+        const entryKey = getEntryKey(normalizedSymbol, normalizedPeriod)
+
+        if (existingKeys.has(entryKey)) return
+
+        const cached = hydrateFromResultCache(normalizedSymbol, normalizedPeriod)
+        const newId = `${normalizedSymbol}-${normalizedPeriod}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`
+        if (!firstNewId) {
+          firstNewId = newId
+        }
+
+        newEntries.push({
+          id: newId,
+          symbol: normalizedSymbol,
+          period: normalizedPeriod,
+          periodDisplay: formatPeriod(normalizedPeriod),
+          bookmarked: false,
+          ...(cached || baseEntryState)
+        })
+
+        existingKeys.add(entryKey)
+      })
+
+      if (newEntries.length === 0) return prevEntries
+
+      return [...newEntries, ...prevEntries]
+    })
+
+    if (firstNewId) {
+      setTimeout(() => {
+        setLastAddedId(firstNewId)
+      }, 150)
+    }
   }
 
   const dropInvalidScanSymbols = (currentEntries) => {

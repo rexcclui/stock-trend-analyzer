@@ -11,6 +11,7 @@ function App() {
   const [selectedParams, setSelectedParams] = useState(null)
   const [volumeSymbol, setVolumeSymbol] = useState(null)
   const [backtestSymbol, setBacktestSymbol] = useState(null)
+  const [volumeImport, setVolumeImport] = useState(null)
   const [storageUsage, setStorageUsage] = useState(null)
   const [storageQuota, setStorageQuota] = useState(null)
 
@@ -138,9 +139,20 @@ function App() {
     setActiveTab('volume')
   }
 
+  const handleVolumeBulkAdd = (entries) => {
+    if (!Array.isArray(entries) || entries.length === 0) return
+
+    setVolumeImport({ entries, timestamp: Date.now() })
+    setActiveTab('volume')
+  }
+
   const handleBacktestSelect = (symbol, days) => {
     setBacktestSymbol({ symbol, days })
     setActiveTab('backtest')
+  }
+
+  const handleVolumeImportProcessed = () => {
+    setVolumeImport(null)
   }
 
   return (
@@ -220,6 +232,7 @@ function App() {
               <BacktestResults
                 onStockSelect={handleStockSelect}
                 onVolumeSelect={handleVolumeSelect}
+                onVolumeBulkAdd={handleVolumeBulkAdd}
                 triggerBacktest={backtestSymbol}
                 onBacktestProcessed={() => setBacktestSymbol(null)}
               />
@@ -230,6 +243,8 @@ function App() {
                 triggerSymbol={volumeSymbol}
                 onSymbolProcessed={() => setVolumeSymbol(null)}
                 onBacktestSelect={handleBacktestSelect}
+                bulkImport={volumeImport}
+                onImportProcessed={handleVolumeImportProcessed}
               />
             </div>
           </div>

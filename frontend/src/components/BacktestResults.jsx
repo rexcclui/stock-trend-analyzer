@@ -653,7 +653,7 @@ function optimizeSMAParams(prices, slots, breakouts) {
   return { period: bestSMA, pl: bestPL, totalSignals, winRate }
 }
 
-function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBacktestProcessed }) {
+function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, triggerBacktest, onBacktestProcessed }) {
   const [symbols, setSymbols] = useState('')
   const [days, setDays] = useState(DEFAULT_DAYS) // Default to 5Y
   const [loading, setLoading] = useState(false)
@@ -1754,6 +1754,23 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
     setScanQueue(prev => prev.filter(symbol => !visibleSymbols.has(symbol)))
   }
 
+  const addVisibleToVolumeScreen = () => {
+    if (!onVolumeBulkAdd || sortedResults.length === 0) return
+
+    const uniqueEntries = Array.from(
+      new Map(
+        sortedResults.map(result => [
+          getEntryKey(result.symbol, result.days),
+          { symbol: result.symbol, days: result.days }
+        ])
+      ).values()
+    )
+
+    if (uniqueEntries.length === 0) return
+
+    onVolumeBulkAdd(uniqueEntries)
+  }
+
   const scrollTableToTop = () => {
     if (!tableScrollRef.current) return
     tableScrollRef.current.scrollTo({ top: 0, behavior: 'auto' })
@@ -2195,6 +2212,16 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
+                  {onVolumeBulkAdd && (
+                    <button
+                      onClick={addVisibleToVolumeScreen}
+                      disabled={sortedResults.length === 0}
+                      className="p-1.5 bg-cyan-700 text-white rounded-lg hover:bg-cyan-600 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                      title="Add all visible rows to Volume Screening without scanning"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
                 )}
               </div>
