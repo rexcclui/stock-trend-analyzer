@@ -1976,27 +1976,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                 </div>
                 )}
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center gap-1 pr-2 border-r border-slate-700">
-                  <button
-                    onClick={scrollTableToTop}
-                    className="p-1.5 rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-                    title="Scroll to top"
-                    aria-label="Scroll table to top"
-                    type="button"
-                  >
-                    <ChevronUp className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={scrollTableToBottom}
-                    className="p-1.5 rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-                    title="Scroll to bottom"
-                    aria-label="Scroll table to bottom"
-                    type="button"
-                  >
-                    <ChevronDown className="w-4 h-4" />
-                  </button>
-                </div>
+              <div className="flex items-center gap-2 flex-wrap justify-end">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
@@ -2065,6 +2045,26 @@ function BacktestResults({ onStockSelect, onVolumeSelect, triggerBacktest, onBac
                     ))}
                   </div>
                 )}
+                <div className="flex items-center gap-1 pl-2 border-l border-slate-700">
+                  <button
+                    onClick={scrollTableToTop}
+                    className="p-1.5 rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                    title="Scroll to top"
+                    aria-label="Scroll table to top"
+                    type="button"
+                  >
+                    <ChevronUp className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={scrollTableToBottom}
+                    className="p-1.5 rounded-lg bg-slate-700 text-slate-200 hover:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                    title="Scroll to bottom"
+                    aria-label="Scroll table to bottom"
+                    type="button"
+                  >
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
             <div className="overflow-x-auto">
