@@ -1207,6 +1207,12 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
         { breakoutThreshold: 0.08, lookbackZones: 5, resetThreshold: 0.04, timeoutSlots: 7 },
       ]
 
+      const passesSelectionFilters = (candidate) => {
+        const winRate = candidate.optimalSMAs?.winRate
+        if (typeof winRate !== 'number' || winRate < 60) return false
+        return meetsPerformanceThresholds(candidate)
+      }
+
       let bestResult = null
       let bestPL = -Infinity
 
@@ -1220,6 +1226,21 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
         const smaResult = optimizeSMAParams(priceData, slots, breakouts)
 
         // Only consider combinations with >= 4 signals
+        const candidateLatestBreakout = getLatestBreakout(breakouts)
+        const candidateResult = {
+          symbol,
+          status: 'completed',
+          days: targetDays,
+          totalSignals: smaResult.totalSignals,
+          optimalSMAs: smaResult,
+          latestBreakout: candidateLatestBreakout,
+          originalBreakout: candidateLatestBreakout
+        }
+
+        if (!passesSelectionFilters(candidateResult)) {
+          continue
+        }
+
         if (smaResult.totalSignals >= 4) {
           if (smaResult.pl > bestPL) {
             bestPL = smaResult.pl
@@ -1233,9 +1254,11 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
         }
       }
 
-      // If no combination produced >= 4 signals, throw error
+      // If no combination passed selection filters, remove the entry entirely
       if (!bestResult) {
-        throw new Error('Excluded: fewer than 4 total signals')
+        setResults(prev => prev.filter(entry => !(entry.symbol === symbol && entry.days === targetDays)))
+        setScanQueue(prev => prev.filter(queuedSymbol => queuedSymbol !== symbol))
+        return
       }
 
       const { params: optimalParams, breakouts, slots, smaResult: optimalSMAs } = bestResult
