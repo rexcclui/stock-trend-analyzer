@@ -12,6 +12,10 @@ const INVALID_FIVE_CHAR_LENGTH = 5
 const BLOCKED_SUFFIX = '.TO'
 const HYPHEN = '-'
 const DEFAULT_DAYS = 1825
+const MIN_ANNUAL_PL_PERCENT = 15
+const MIN_TOTAL_SIGNALS = 5
+const MIN_ANNUAL_SIGNALS = 1.2
+const MAX_SIGNAL_AGE_DAYS = 700
 
 // Helper function to convert days to display period (e.g., 1825 -> "5Y")
 function formatPeriod(days) {
@@ -87,7 +91,7 @@ function normalizeCachedResults(entries = []) {
         typeof entry?.upResist?.volumeWeight === 'number' &&
         typeof entry?.downResist?.volumeWeight === 'number'
 
-      if (normalizedEntry.status === 'completed' && !hasVolumeWeights) {
+      if (normalizedEntry.status === 'completed' && !hasVolumeWeights && !normalizedEntry.bookmarked && !normalizedEntry.isRecentBreakout) {
         return {
           ...normalizedEntry,
           status: 'pending',
@@ -775,6 +779,23 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     error: errorMsg
   })
 
+  const hasHighConvictionPerformance = (entry) => {
+    const winRate = entry?.optimalSMAs?.winRate
+    const pl = entry?.optimalSMAs?.pl
+    const totalSignals = entry?.totalSignals
+
+    return (
+      typeof winRate === 'number' && winRate > 75 &&
+      typeof pl === 'number' && pl > 100 &&
+      typeof totalSignals === 'number' && totalSignals > 7
+    )
+  }
+
+  const hasStrongBreakoutDiff = (entry) => {
+    const weightDiff = entry?.originalBreakout?.weightDiff
+    return typeof weightDiff === 'number' && weightDiff * 100 > 8
+  }
+
   const pruneDisallowedEntries = (currentEntries = []) => {
     const disallowed = new Set(
       currentEntries
@@ -832,13 +853,20 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     if (!hasHydratedCache) return
 
     try {
-      // Only cache full details for bookmarked or recent breakout rows
+      // Only cache full details for bookmarked, recent breakout, or
+      // top-performing rows (high winrate/pl/signals or strong Diff).
+      // A "recent breakout" is any completed entry whose latest breakout
+      // happened in the last 10 days (see getRecentBreakouts below).
       // Others get minimal cache (symbol, status, lastScanAt, bookmarked)
       const selectiveResults = results.map(result => {
         const { priceData, ...rest } = result
 
         // Full cache for: bookmarked OR recent breakout
-        const shouldCacheFull = result.bookmarked || result.isRecentBreakout
+        const shouldCacheFull =
+          result.bookmarked ||
+          result.isRecentBreakout ||
+          hasHighConvictionPerformance(result) ||
+          hasStrongBreakoutDiff(result)
 
         if (shouldCacheFull) {
           return rest // Keep all fields except priceData
@@ -852,7 +880,10 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
           status: result.status || 'pending',
           lastScanAt: result.lastScanAt || null,
           bookmarked: result.bookmarked || false,
-          error: result.error || null
+          error: result.error || null,
+          marketChange: typeof result.marketChange === 'number' ? result.marketChange : null,
+          durationMs: typeof result.durationMs === 'number' ? result.durationMs : null,
+          latestPrice: typeof result.latestPrice === 'number' ? result.latestPrice : null
         }
       })
 
@@ -1594,6 +1625,37 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     return diffDays
   }
 
+  const meetsPerformanceThresholds = (result) => {
+    if (result.status !== 'completed') return true
+
+    const normalizedDays = normalizeDays(result.days) ?? DEFAULT_DAYS
+    const periodYears = normalizedDays / 365
+    if (!Number.isFinite(periodYears) || periodYears <= 0) return false
+
+    const plValue = result.optimalSMAs?.pl
+    const minPlRequired = MIN_ANNUAL_PL_PERCENT * periodYears
+    if (typeof plValue !== 'number' || plValue < minPlRequired) return false
+
+    const signals = typeof result.totalSignals === 'number'
+      ? result.totalSignals
+      : typeof result.optimalSMAs?.totalSignals === 'number'
+        ? result.optimalSMAs.totalSignals
+        : null
+
+    if (typeof signals !== 'number' || signals < MIN_TOTAL_SIGNALS) return false
+
+    const avgSignalsPerYear = signals / periodYears
+    if (!Number.isFinite(avgSignalsPerYear) || avgSignalsPerYear < MIN_ANNUAL_SIGNALS) return false
+
+    const lastSignalDate = result.originalBreakout?.date || result.latestBreakout?.date
+    if (lastSignalDate) {
+      const lastSignalAge = getDaysAgo(lastSignalDate)
+      if (Number.isFinite(lastSignalAge) && lastSignalAge > MAX_SIGNAL_AGE_DAYS) return false
+    }
+
+    return true
+  }
+
   const formatLastScanTime = (isoString) => {
     if (!isoString) return '—'
     const date = new Date(isoString)
@@ -1638,10 +1700,18 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     return typeof winRate === 'number' && winRate < 60
   })
 
+  const performanceRemoved = normalizedResults.filter(result => {
+    if (result.error) return false
+    const winRate = result.optimalSMAs?.winRate
+    if (typeof winRate === 'number' && winRate < 60) return false
+    return !meetsPerformanceThresholds(result)
+  })
+
   const nonErrorResults = normalizedResults.filter(result => {
     if (result.error) return false
     const winRate = result.optimalSMAs?.winRate
     if (typeof winRate === 'number' && winRate < 60) return false
+    if (!meetsPerformanceThresholds(result)) return false
     return true
   })
 
@@ -1924,6 +1994,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     }, 4500)
   }
 
+  const dismissToast = () => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current)
+      toastTimeoutRef.current = null
+    }
+    setToastMessage('')
+  }
+
   useEffect(() => () => {
     if (toastTimeoutRef.current) {
       clearTimeout(toastTimeoutRef.current)
@@ -1931,17 +2009,24 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
   }, [])
 
   useEffect(() => {
-    if (lowWinRateRemoved.length === 0) return
-    const removedNames = lowWinRateRemoved
+    const removalSources = [
+      { entries: lowWinRateRemoved, reason: 'win rate below 60%.' },
+      { entries: performanceRemoved, reason: 'P/L or signal thresholds.' }
+    ]
+
+    const firstRemoval = removalSources.find(source => source.entries.length > 0)
+    if (!firstRemoval) return
+
+    const removedNames = firstRemoval.entries
       .map(entry => {
         const periodLabel = entry.period || formatPeriod(entry.days)
         return periodLabel ? `${entry.symbol} (${periodLabel})` : entry.symbol
       })
     const preview = removedNames.slice(0, 3).join(', ')
     const suffix = removedNames.length > 3 ? ` +${removedNames.length - 3} more` : ''
-    const message = `${preview}${suffix} removed for win rate below 60%.`
+    const message = `${preview}${suffix} removed for ${firstRemoval.reason}`
     showToast(message)
-  }, [lowWinRateRemoved.length])
+  }, [lowWinRateRemoved.length, performanceRemoved.length])
 
   return (
     <div className="space-y-6">
@@ -1949,7 +2034,15 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
         <div className="fixed top-4 right-4 z-50">
           <div className="flex items-start gap-3 bg-slate-900 border border-red-500 text-red-100 px-4 py-3 rounded-lg shadow-xl max-w-sm">
             <AlertCircle className="w-5 h-5 mt-0.5" />
-            <div className="text-sm leading-relaxed">{toastMessage}</div>
+            <div className="text-sm leading-relaxed flex-1">{toastMessage}</div>
+            <button
+              type="button"
+              onClick={dismissToast}
+              className="ml-2 text-slate-400 hover:text-slate-200 transition-colors"
+              aria-label="Dismiss notification"
+            >
+              ×
+            </button>
           </div>
         </div>
       )}

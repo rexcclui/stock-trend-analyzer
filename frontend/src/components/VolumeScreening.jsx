@@ -670,18 +670,9 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
         const shouldCacheFull = isBookmarked || isUpBreak || isDownBreak || isPotential
 
         if (shouldCacheFull) {
-          // Keep all fields for important entries
+          // Keep all fields for important entries (excluding identifiers)
           cache[cacheKey] = {
-            priceRange: rest.priceRange,
-            currentRange: rest.currentRange,
-            testedDays: rest.testedDays,
-            slotCount: rest.slotCount,
-            volumeLegend: rest.volumeLegend,
-            bottomResist: rest.bottomResist,
-            upperResist: rest.upperResist,
-            breakout: rest.breakout,
-            lastScanAt: rest.lastScanAt,
-            status: rest.status,
+            ...rest,
             bookmarked: isBookmarked
           }
         } else {
