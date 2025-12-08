@@ -454,6 +454,7 @@ function isBreakoutClosed(breakoutDate, prices, smaPeriod) {
   if (breakoutIdx === -1) return false
 
   // Check for sell signal (SMA slope turning negative) after breakout
+  let prevSlope = null
   for (let i = breakoutIdx + 1; i < reversedPrices.length; i++) {
     const currentDate = reversedPrices[i].date
     const prevDate = reversedPrices[i - 1].date
@@ -463,9 +464,10 @@ function isBreakoutClosed(breakoutDate, prices, smaPeriod) {
 
     if (currentSMA !== null && prevSMA !== null && currentSMA !== undefined && prevSMA !== undefined) {
       const slope = currentSMA - prevSMA
-      if (slope < 0) {
+      if (prevSlope !== null && prevSlope >= 0 && slope < 0) {
         return true  // Sell signal found after breakout
       }
+      prevSlope = slope
     }
   }
 
@@ -570,6 +572,7 @@ function optimizeSMAParams(prices, slots, breakouts) {
     const trades = []
     let isHolding = false
     let buyPrice = null
+    let prevSlopeWhileHolding = null
 
     // Iterate through daily prices in forward chronological order for simulation
     for (let i = 0; i < reversedPrices.length; i++) {
@@ -583,6 +586,7 @@ function optimizeSMAParams(prices, slots, breakouts) {
       if (breakoutDates.has(currentDate) && !isHolding) {
         isHolding = true
         buyPrice = currentPrice
+        prevSlopeWhileHolding = null
       }
       // Sell when SMA slope turns negative
       else if (isHolding && i > 0) {
@@ -590,12 +594,17 @@ function optimizeSMAParams(prices, slots, breakouts) {
         if (prevPrice) {
           const slope = getSMASlope(currentDate, prevPrice.date)
 
-          if (slope !== null && slope < 0) {
+          if (slope !== null && prevSlopeWhileHolding !== null && prevSlopeWhileHolding >= 0 && slope < 0) {
             const sellPrice = currentPrice
             const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
             trades.push({ plPercent })
             isHolding = false
             buyPrice = null
+            prevSlopeWhileHolding = null
+          }
+
+          if (slope !== null) {
+            prevSlopeWhileHolding = slope
           }
         }
       }
