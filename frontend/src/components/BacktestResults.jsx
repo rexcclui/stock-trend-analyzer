@@ -1256,6 +1256,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
 
       // If no combination passed selection filters, remove the entry entirely
       if (!bestResult) {
+        const periodLabel = formatPeriod(targetDays)
+        showToast(`${symbol}${periodLabel ? ` (${periodLabel})` : ''} removed: no simulation met performance filters.`)
         setResults(prev => prev.filter(entry => !(entry.symbol === symbol && entry.days === targetDays)))
         setScanQueue(prev => prev.filter(queuedSymbol => queuedSymbol !== symbol))
         return
