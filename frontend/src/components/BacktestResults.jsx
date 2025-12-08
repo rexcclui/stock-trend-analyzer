@@ -1859,6 +1859,17 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     setScanQueue(prev => prev.filter(symbol => !visibleSymbols.has(symbol)))
   }
 
+  const bookmarkVisible = () => {
+    if (sortedResults.length === 0) return
+
+    const visibleKeys = new Set(sortedResults.map(result => getEntryKey(result.symbol, result.days)))
+    setResults(prev => prev.map(entry => (
+      visibleKeys.has(getEntryKey(entry.symbol, entry.days))
+        ? { ...entry, bookmarked: true }
+        : entry
+    )))
+  }
+
   const addVisibleToVolumeScreen = () => {
     if (!onVolumeBulkAdd || sortedResults.length === 0) return
 
@@ -2352,6 +2363,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
                     title={isScanActive ? 'Scanning is in progress — wait to erase visible results' : 'Erase backtest results for all visible stocks'}
                   >
                     <Eraser className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={bookmarkVisible}
+                    disabled={sortedResults.length === 0}
+                    className="p-1.5 bg-amber-800 text-white rounded-lg hover:bg-amber-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                    title={sortedResults.length === 0 ? 'No visible rows to bookmark' : 'Bookmark all visible rows'}
+                  >
+                    <BookmarkCheck className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={removeVisible}
