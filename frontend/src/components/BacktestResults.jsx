@@ -380,7 +380,8 @@ function getLatestBreakout(breakouts) {
 }
 
 // Find resistance zones: price zones with volume weight > current weight + 5%
-function findResistanceZones(breakout, slots) {
+// Zones are classified relative to the latest market price (not the breakout price)
+function findResistanceZones(breakout, slots, referencePrice) {
   if (!breakout || !slots || slots.length === 0) return { upResist: null, downResist: null }
 
   const slotIdx = breakout.slotIdx
@@ -390,7 +391,7 @@ function findResistanceZones(breakout, slots) {
   if (!slot || !slot.priceZones) return { upResist: null, downResist: null }
 
   const currentWeight = breakout.currentWeight
-  const currentPrice = breakout.price
+  const currentPrice = typeof referencePrice === 'number' ? referencePrice : breakout.price
   const threshold = currentWeight + 0.05  // 5% higher
 
   // Find zones with volume weight > threshold, split by position relative to current price
@@ -1242,18 +1243,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
         throw new Error('No breakout detected')
       }
 
-      // Find resistance zones before potentially nullifying latestBreakout
-      const { upResist, downResist } = findResistanceZones(latestBreakout, slots)
-
-      // Check if the latest breakout has been closed by a sell signal
-      // Store original breakout for reference, but hide break price if closed
-      const originalBreakout = latestBreakout
-      const breakoutClosed = isBreakoutClosed(latestBreakout.date, priceData, optimalSMAs.period)
-      if (breakoutClosed) {
-        latestBreakout = null  // This hides the break price column only
-      }
-
-      // Determine if data is in chronological or reverse chronological order
+      // Determine if data is in chronological or reverse chronological order to get latest market price
       const firstDate = new Date(priceData[0].date)
       const lastDate = new Date(priceData[priceData.length - 1].date)
 
@@ -1264,6 +1254,17 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
       } else {
         // Reverse chronological order: first is newest, last is oldest
         latestPrice = priceData[0].close
+      }
+
+      // Find resistance zones before potentially nullifying latestBreakout
+      const { upResist, downResist } = findResistanceZones(latestBreakout, slots, latestPrice)
+
+      // Check if the latest breakout has been closed by a sell signal
+      // Store original breakout for reference, but hide break price if closed
+      const originalBreakout = latestBreakout
+      const breakoutClosed = isBreakoutClosed(latestBreakout.date, priceData, optimalSMAs.period)
+      if (breakoutClosed) {
+        latestBreakout = null  // This hides the break price column only
       }
 
       const marketChange = computeMarketChange(priceData)
@@ -2499,8 +2500,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
                     <th onClick={() => handleSort('breakoutPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Stock price at the most recent breakout point">BrkPx {renderSortIndicator('breakoutPrice')}</th>
                     <th onClick={() => handleSort('currentPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Current stock price with % change from breakout price">Current Price {renderSortIndicator('currentPrice')}</th>
                     <th onClick={() => handleSort('volWeight')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Volume weight % at current price zone (lower = less resistance)">Vol% {renderSortIndicator('volWeight')}</th>
-                    <th onClick={() => handleSort('upResist')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Price zones ABOVE breakout with volume weight >5% higher than current (strongest resistance)">Up resist {renderSortIndicator('upResist')}</th>
-                    <th onClick={() => handleSort('downResist')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Price zones BELOW breakout with volume weight >5% higher than current (strongest support)">Down resist {renderSortIndicator('downResist')}</th>
+                    <th onClick={() => handleSort('upResist')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Price zones ABOVE the latest price with volume weight >5% higher than current (strongest resistance)">Up resist {renderSortIndicator('upResist')}</th>
+                    <th onClick={() => handleSort('downResist')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Price zones BELOW the latest price with volume weight >5% higher than current (strongest support)">Down resist {renderSortIndicator('downResist')}</th>
                     <th onClick={() => handleSort('diff')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Breakout strength: difference between resistance volume and current volume weight (higher = stronger breakout)">Diff {renderSortIndicator('diff')}</th>
                     <th onClick={() => handleSort('totalSignals')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Number of trading signals generated by the backtest (closed trades = 1.0, open trades = 0.5)">
                       <span className="flex items-center gap-1 justify-end">
