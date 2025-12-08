@@ -867,18 +867,21 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
       const selectiveResults = results.map(result => {
         const { priceData, ...rest } = result
 
-        // Full cache for: bookmarked OR recent breakout
+        // Full cache for: any completed entry, bookmarked, recent breakout,
+        // or high-performing rows so table data survives reloads without
+        // rerunning scans. Price data is still omitted to save space.
         const shouldCacheFull =
+          result.status === 'completed' ||
           result.bookmarked ||
           result.isRecentBreakout ||
           hasHighConvictionPerformance(result) ||
           hasStrongBreakoutDiff(result)
 
         if (shouldCacheFull) {
-          return rest // Keep all fields except priceData
+          return rest
         }
 
-        // Slim cache: only essential fields for non-important results
+        // Slim cache: only essential fields for pending/error results
         return {
           symbol: result.symbol,
           days: result.days,
