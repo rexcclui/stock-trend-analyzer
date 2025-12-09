@@ -560,6 +560,16 @@ function getPreviousSlotComparison(entry) {
   }
 }
 
+function getPreviousSlotWeightDiff(entry) {
+  const current = entry?.currentRange
+  const previous = entry?.previousRange
+
+  if (!current || !previous) return null
+  if (!Number.isFinite(current.weight) || !Number.isFinite(previous.weight)) return null
+
+  return current.weight - previous.weight
+}
+
 function formatPreviousSlotDiff(entry) {
   const comparison = getPreviousSlotComparison(entry)
   if (!comparison) return '—'
@@ -620,11 +630,10 @@ function getVolumeDiffClass(entry, direction = 'up') {
 
   const magnitude = Math.abs(diff)
 
-  if (magnitude > 15) return 'text-rose-300 font-bold'
-  if (magnitude > 12) return 'text-red-200 font-bold'
-  if (magnitude > 10) return 'text-orange-300 font-semibold'
-  if (magnitude > 8) return 'text-amber-300 font-semibold'
-  if (magnitude > 6) return 'text-amber-200 font-semibold'
+  if (magnitude > 15) return 'text-rose-400 font-bold'
+  if (magnitude > 10) return 'text-red-400 font-bold'
+  if (magnitude > 8) return 'text-orange-400 font-semibold'
+  if (magnitude > 6) return 'text-amber-300 font-semibold'
 
   return ''
 }
@@ -1782,15 +1791,8 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     }
 
     if (sortConfig.field === 'prevSlotDelta') {
-      const getValue = (entry) => {
-        const comparison = getPreviousSlotComparison(entry)
-        if (!comparison || !Number.isFinite(comparison.weightDiff)) return null
-
-        return comparison.weightDiff
-      }
-
-      const diffA = getValue(a)
-      const diffB = getValue(b)
+      const diffA = getPreviousSlotWeightDiff(a)
+      const diffB = getPreviousSlotWeightDiff(b)
 
       if (diffA == null && diffB == null) return 0
       if (diffA == null) return 1
