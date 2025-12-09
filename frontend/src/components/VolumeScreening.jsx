@@ -31,6 +31,11 @@ const defaultSortConfig = {
   direction: 'desc'
 }
 
+const PRICE_RANGE_TOOLTIP = 'Current price slot range, span, and volume share within the tested period.'
+const BOTTOM_RESIST_TOOLTIP = 'Nearest support zone below the current price range; distance uses % gap from the current slot.'
+const UPPER_RESIST_TOOLTIP = 'Nearest resistance zone above the current price range; distance uses % gap from the current slot.'
+const BREAK_TOOLTIP = 'Breakout direction detected for the current slot (Up, Down, or Potential).'
+
 // Helper function to convert days to display period (e.g., 1825 -> "5Y")
 function formatPeriod(days) {
   const daysNum = parseInt(days, 10)
@@ -485,6 +490,18 @@ function parseResistanceWeight(resistanceValue) {
   if (!match) return null
   const parsed = parseFloat(match[1])
   return Number.isFinite(parsed) ? Math.abs(parsed) : null
+}
+
+function parsePriceRangeMid(rangeValue) {
+  if (typeof rangeValue !== 'string') return null
+  const match = rangeValue.replaceAll(',', '').match(/\$?(-?\d*\.?\d+)\s*-\s*\$?(-?\d*\.?\d+)/)
+  if (!match) return null
+
+  const start = parseFloat(match[1])
+  const end = parseFloat(match[2])
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null
+
+  return (start + end) / 2
 }
 
 function getCurrentVolumeWeight(entry) {
@@ -1507,27 +1524,6 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     return matchesUp || matchesDown
   }
 
-  const getPriceRangeTooltip = (entry) => {
-    if (!entry) return '—'
-
-    const currentSlot = entry.currentRange || entry.volumeLegend?.find(slot => slot.isCurrent)
-    const slotSpan = Number.isFinite(currentSlot?.end) && Number.isFinite(currentSlot?.start)
-      ? currentSlot.end - currentSlot.start
-      : null
-    const spanLabel = Number.isFinite(slotSpan) ? `$${slotSpan.toFixed(2)}` : '—'
-    const shareLabel = Number.isFinite(currentSlot?.weight) ? `${currentSlot.weight.toFixed(1)}%` : '—'
-    const slotCountLabel = Number.isFinite(entry.slotCount)
-      ? entry.slotCount
-      : Array.isArray(entry.volumeLegend)
-        ? entry.volumeLegend.length
-        : '—'
-    const rangeLabel = currentSlot
-      ? formatPriceRange(currentSlot.start, currentSlot.end)
-      : entry.priceRange || '—'
-
-    return `Range: ${rangeLabel} • Slots: ${slotCountLabel} • Span: ${spanLabel} • Current share: ${shareLabel}`
-  }
-
   const getPeriodTooltip = (entry) => {
     if (!entry) return undefined
 
@@ -1545,42 +1541,6 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     parts.push(`Slots: ${slotLabel ?? '—'}`)
 
     return parts.length > 0 ? parts.join(' • ') : undefined
-  }
-
-  const getResistanceTooltip = (entry, type = 'bottom') => {
-    const value = type === 'upper' ? entry?.upperResist : entry?.bottomResist
-
-    if (!value || value === '—') {
-      return type === 'upper'
-        ? 'No upper resistance zone identified near the current price range yet.'
-        : 'No bottom support zone identified near the current price range yet.'
-    }
-
-    const match = typeof value === 'string'
-      ? value.match(/^(.*) \(([-+]?\d*\.?\d+)%\)$/)
-      : null
-
-    const rangeLabel = match?.[1]?.trim() || value
-    const distance = match?.[2]
-    const numericDistance = Number(distance)
-    const distanceLabel = Number.isFinite(numericDistance)
-      ? `Distance from current range: ${numericDistance}% (${numericDistance >= 0 ? 'above' : 'below'}).`
-      : 'Distance from current range is unavailable.'
-
-    const currentShare = getCurrentVolumeWeight(entry)
-    const volumeLabel = Number.isFinite(currentShare)
-      ? `Current range volume weight: ${currentShare.toFixed(1)}%.`
-      : null
-
-    const base = type === 'upper'
-      ? 'Nearest resistance above the current price range.'
-      : 'Nearest support below the current price range.'
-
-    return [
-      `${base} Zone: ${rangeLabel}.`,
-      distanceLabel,
-      volumeLabel
-    ].filter(Boolean).join(' ')
   }
 
   const getVisibleEntries = (sourceEntries = entries) => sourceEntries.filter(entry => {
@@ -1668,6 +1628,43 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
       const symbolA = a.symbol?.toUpperCase() || ''
       const symbolB = b.symbol?.toUpperCase() || ''
       const diff = symbolA.localeCompare(symbolB)
+      return sortConfig.direction === 'asc' ? diff : -diff
+    }
+
+    if (sortConfig.field === 'breakout') {
+      const rank = (value) => {
+        if (value === 'Up') return 3
+        if (value === 'Down') return 2
+        if (value === 'Potential') return 1
+        return 0
+      }
+
+      const diff = rank(a.breakout) - rank(b.breakout)
+      return sortConfig.direction === 'asc' ? diff : -diff
+    }
+
+    if (sortConfig.field === 'volumeDiffUp' || sortConfig.field === 'volumeDiffDown') {
+      const direction = sortConfig.field === 'volumeDiffUp' ? 'up' : 'down'
+      const diffA = getNeighborVolumeDiff(a, direction)?.diff
+      const diffB = getNeighborVolumeDiff(b, direction)?.diff
+
+      if (diffA == null && diffB == null) return 0
+      if (diffA == null) return 1
+      if (diffB == null) return -1
+
+      const diff = diffA - diffB
+      return sortConfig.direction === 'asc' ? diff : -diff
+    }
+
+    if (sortConfig.field === 'priceRange') {
+      const midA = parsePriceRangeMid(a.priceRange)
+      const midB = parsePriceRangeMid(b.priceRange)
+
+      if (midA == null && midB == null) return 0
+      if (midA == null) return 1
+      if (midB == null) return -1
+
+      const diff = midA - midB
       return sortConfig.direction === 'asc' ? diff : -diff
     }
 
@@ -2347,26 +2344,47 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                     {renderSortIndicator('volumeWeight')}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider" title="Volume weight difference to the next upper price slot">
-                  <span className="inline-flex items-center gap-1">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('volumeDiffUp')}
+                    className="inline-flex items-center gap-1 hover:text-slate-100"
+                    title="Volume weight difference to the next upper price slot"
+                  >
                     <ChevronUp className="w-4 h-4" aria-hidden="true" />
                     V.Diff%
-                  </span>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider" title="Volume weight difference to the next lower price slot">
-                  <span className="inline-flex items-center gap-1">
-                    <ChevronDown className="w-4 h-4" aria-hidden="true" />
-                    V.Diff%
-                  </span>
+                    {renderSortIndicator('volumeDiffUp')}
+                  </button>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Px Range
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('volumeDiffDown')}
+                    className="inline-flex items-center gap-1 hover:text-slate-100"
+                    title="Volume weight difference to the next lower price slot"
+                  >
+                    <ChevronDown className="w-4 h-4" aria-hidden="true" />
+                    V.Diff%
+                    {renderSortIndicator('volumeDiffDown')}
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('priceRange')}
+                    className="inline-flex items-center gap-1 hover:text-slate-100"
+                    title={PRICE_RANGE_TOOLTIP}
+                  >
+                    Px Range
+                    {renderSortIndicator('priceRange')}
+                  </button>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   <button
                     type="button"
                     onClick={() => toggleSort('bottomResist')}
                     className="inline-flex items-center gap-1 hover:text-slate-100"
+                    title={BOTTOM_RESIST_TOOLTIP}
                   >
                     Bottom Resist
                     {renderSortIndicator('bottomResist')}
@@ -2377,13 +2395,21 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                     type="button"
                     onClick={() => toggleSort('upperResist')}
                     className="inline-flex items-center gap-1 hover:text-slate-100"
+                    title={UPPER_RESIST_TOOLTIP}
                   >
                     Upper Resist
                     {renderSortIndicator('upperResist')}
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Break
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider" title={BREAK_TOOLTIP}>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('breakout')}
+                    className="inline-flex items-center gap-1 hover:text-slate-100"
+                  >
+                    Break
+                    {renderSortIndicator('breakout')}
+                  </button>
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Actions
@@ -2469,19 +2495,16 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                     </td>
                     <td
                       className="px-4 py-3 text-slate-200 text-sm"
-                      title={getPriceRangeTooltip(entry)}
                     >
                       {entry.priceRange}
                     </td>
                     <td
                       className={`px-4 py-3 text-slate-200 text-sm ${isResistanceClose(entry.bottomResist) ? 'text-sky-400 font-semibold' : ''}`}
-                      title={getResistanceTooltip(entry, 'bottom')}
                     >
                       {entry.bottomResist}
                     </td>
                     <td
                       className={`px-4 py-3 text-slate-200 text-sm ${isResistanceClose(entry.upperResist) ? 'text-sky-400 font-semibold' : ''}`}
-                      title={getResistanceTooltip(entry, 'upper')}
                     >
                       {entry.upperResist}
                     </td>
