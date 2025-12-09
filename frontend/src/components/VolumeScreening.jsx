@@ -350,6 +350,19 @@ function findSlotIndex(slots, price) {
   return -1
 }
 
+function findPreviousDistinctSlot(prices, slots, currentSlotIndex) {
+  for (let i = prices.length - 2; i >= 0; i -= 1) {
+    const price = prices[i]
+    const refPrice = price.close ?? price.high ?? price.low
+    const candidateIdx = findSlotIndex(slots, refPrice)
+    if (candidateIdx >= 0 && candidateIdx !== currentSlotIndex) {
+      return { price: refPrice, slotIndex: candidateIdx }
+    }
+  }
+
+  return { price: null, slotIndex: -1 }
+}
+
 function buildVolumeSlots(prices) {
   if (!Array.isArray(prices) || prices.length === 0) {
     return { slots: [], lastPrice: null, previousPrice: null, currentSlotIndex: -1, previousSlotIndex: -1 }
@@ -407,18 +420,8 @@ function buildVolumeSlots(prices) {
   const lastPrice = lastPoint?.close ?? lastPoint?.high ?? lastPoint?.low ?? null
   const currentSlotIndex = findSlotIndex(slots, lastPrice)
 
-  let previousPrice = null
-  let previousSlotIndex = -1
-  for (let i = sorted.length - 2; i >= 0; i -= 1) {
-    const price = sorted[i]
-    const refPrice = price.close ?? price.high ?? price.low
-    const candidateIdx = findSlotIndex(slots, refPrice)
-    if (candidateIdx >= 0 && candidateIdx !== currentSlotIndex) {
-      previousPrice = refPrice
-      previousSlotIndex = candidateIdx
-      break
-    }
-  }
+  const { price: previousPrice, slotIndex: previousSlotIndex } =
+    findPreviousDistinctSlot(sorted, slots, currentSlotIndex)
 
   return { slots, lastPrice, previousPrice, currentSlotIndex, previousSlotIndex }
 }
