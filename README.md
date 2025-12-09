@@ -323,6 +323,14 @@ curl "https://your-api-url.amazonaws.com/prod/top-market-cap?limit=2000"
    - Maximum drawdown
    - Trade-by-trade history
 
+#### Why some backtests get hidden
+- The table automatically drops weak results so you only see stronger candidates. Rows are removed if the win rate falls below 60% **or** if they fail the performance check below.
+- Performance check (uses the run’s selected period to annualize requirements):
+- **Profit & Loss**: At least **10% P/L per year** (e.g., ~50% total for 5Y, 10% for 1Y, ~2.5% for 3M).
+  - **Signal depth**: At least **5 signals** across the run **and** an average of **1.2 signals per year** (prevents sparse histories from showing up).
+  - **Signal freshness**: The most recent breakout/signal must be within the last **700 days**; older runs are hidden.
+- Error rows are left untouched so you can diagnose failures; all other rows must satisfy the above to stay visible after a run or reload.
+
 ## Technical Indicators Explained
 
 ### SMA (Simple Moving Average)

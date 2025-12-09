@@ -2371,6 +2371,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     let buyPrice = null
     let buyDate = null
     let buySlotIdx = null
+    let prevSlopeWhileHolding = null
 
     // Create a map of breakout dates for quick lookup
     const breakoutDates = new Set(volumeProfileV2Breakouts.map(b => b.date))
@@ -2412,6 +2413,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         isHolding = true
         buyPrice = currentPrice
         buyDate = currentDate
+        prevSlopeWhileHolding = null
       }
       // If holding, check SMA slope for SELL signal
       else if (isHolding && i > 0) {
@@ -2422,7 +2424,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           const prevSMA = dateToSMA.get(prevPrice.date)
 
           // If SMA is going down (negative slope), SELL
-          if (slope !== null && slope < 0) {
+          if (slope !== null && prevSlopeWhileHolding !== null && prevSlopeWhileHolding >= 0 && slope < 0) {
             const sellPrice = currentPrice
             const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
 
@@ -2443,6 +2445,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             isHolding = false
             buyPrice = null
             buyDate = null
+            prevSlopeWhileHolding = null
+          }
+
+          if (slope !== null) {
+            prevSlopeWhileHolding = slope
           }
         }
       }
@@ -2575,6 +2582,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         let isHolding = false
         let buyPrice = null
         let buyDate = null
+        let prevSlopeWhileHolding = null
 
         // Iterate through daily prices in forward chronological order
         for (let i = 0; i < reversedPrices.length; i++) {
@@ -2588,17 +2596,22 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             isHolding = true
             buyPrice = currentPrice
             buyDate = currentDate
+            prevSlopeWhileHolding = null
           } else if (isHolding && i > 0) {
             const prevPrice = reversedPrices[i - 1]
             if (prevPrice) {
               const slope = getSMASlope(currentDate, prevPrice.date)
-              if (slope !== null && slope < 0) {
+              if (slope !== null && prevSlopeWhileHolding !== null && prevSlopeWhileHolding >= 0 && slope < 0) {
                 const sellPrice = currentPrice
                 const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
                 trades.push({ plPercent })
                 isHolding = false
                 buyPrice = null
                 buyDate = null
+                prevSlopeWhileHolding = null
+              }
+              if (slope !== null) {
+                prevSlopeWhileHolding = slope
               }
             }
           }
