@@ -505,9 +505,11 @@ function findResistance(slots, currentIndex, direction = 'down') {
 
 function parseResistanceWeight(resistanceValue) {
   if (typeof resistanceValue !== 'string') return null
-  const match = resistanceValue.match(/\(([-+]?\d*\.?\d+)%\)/)
-  if (!match) return null
-  const parsed = parseFloat(match[1])
+  const matches = [...resistanceValue.matchAll(/([-+]?\d*\.?\d+)%/g)]
+  if (matches.length === 0) return null
+
+  const target = matches.length >= 2 ? matches[1][1] : matches[0][1]
+  const parsed = parseFloat(target)
   return Number.isFinite(parsed) ? Math.abs(parsed) : null
 }
 
