@@ -534,31 +534,6 @@ function getNeighborVolumeDiff(entry, direction = 'up') {
   }
 }
 
-function formatVolumeDiff(entry, direction = 'up') {
-  const result = getNeighborVolumeDiff(entry, direction)
-  if (!result) return undefined
-
-  const sign = result.diff > 0 ? '+' : ''
-  return `${sign}${result.diff.toFixed(1)}%`
-}
-
-function getVolumeDiffClass(entry, direction = 'up') {
-  const diff = getNeighborVolumeDiff(entry, direction)?.diff
-  if (diff == null) return ''
-
-  return Math.abs(diff) > 5 ? 'text-amber-300 font-semibold' : ''
-}
-
-function getVolumeDiffTooltip(entry, direction = 'up') {
-  const result = getNeighborVolumeDiff(entry, direction)
-  if (!result) return undefined
-
-  const neighborRange = formatPriceRange(result.neighbor.start, result.neighbor.end)
-  const currentRange = formatPriceRange(result.current.start, result.current.end)
-  const directionLabel = direction === 'up' ? 'next upper' : 'next lower'
-  return `${directionLabel} slot ${neighborRange} @ ${result.neighbor.weight.toFixed(1)}% versus current ${currentRange} @ ${result.current.weight.toFixed(1)}%`
-}
-
 function getPreviousSlotComparison(entry) {
   const current = entry?.currentRange
   const previous = entry?.previousRange
