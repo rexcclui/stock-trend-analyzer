@@ -621,6 +621,7 @@ function getVolumeDiffClass(entry, direction = 'up') {
   const magnitude = Math.abs(diff)
 
   if (magnitude > 15) return 'text-rose-300 font-bold'
+  if (magnitude > 12) return 'text-red-200 font-bold'
   if (magnitude > 10) return 'text-orange-300 font-semibold'
   if (magnitude > 8) return 'text-amber-300 font-semibold'
   if (magnitude > 6) return 'text-amber-200 font-semibold'
@@ -2647,18 +2648,6 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                           )}
                         />
                       )}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-slate-200 text-sm ${getVolumeDiffClass(entry, 'down')}`}
-                      title={getVolumeDiffTooltip(entry, 'down')}
-                    >
-                      {formatVolumeDiff(entry, 'down') ?? '—'}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-slate-200 text-sm ${getVolumeDiffClass(entry, 'up')}`}
-                      title={getVolumeDiffTooltip(entry, 'up')}
-                    >
-                      {formatVolumeDiff(entry, 'up') ?? '—'}
                     </td>
                     <td
                       className={`px-4 py-3 text-slate-200 text-sm ${getVolumeDiffClass(entry, 'down')}`}
