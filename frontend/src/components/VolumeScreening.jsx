@@ -352,7 +352,7 @@ function findSlotIndex(slots, price) {
 
 function buildVolumeSlots(prices) {
   if (!Array.isArray(prices) || prices.length === 0) {
-    return { slots: [], lastPrice: null, previousPrice: null }
+    return { slots: [], lastPrice: null, previousPrice: null, currentSlotIndex: -1, previousSlotIndex: -1 }
   }
 
   const sorted = [...prices].sort((a, b) => new Date(a.date) - new Date(b.date))
@@ -405,10 +405,22 @@ function buildVolumeSlots(prices) {
 
   const lastPoint = sorted[sorted.length - 1]
   const lastPrice = lastPoint?.close ?? lastPoint?.high ?? lastPoint?.low ?? null
-  const priorPoint = sorted[sorted.length - 2]
-  const previousPrice = priorPoint?.close ?? priorPoint?.high ?? priorPoint?.low ?? null
+  const currentSlotIndex = findSlotIndex(slots, lastPrice)
 
-  return { slots, lastPrice, previousPrice }
+  let previousPrice = null
+  let previousSlotIndex = -1
+  for (let i = sorted.length - 2; i >= 0; i -= 1) {
+    const price = sorted[i]
+    const refPrice = price.close ?? price.high ?? price.low
+    const candidateIdx = findSlotIndex(slots, refPrice)
+    if (candidateIdx >= 0 && candidateIdx !== currentSlotIndex) {
+      previousPrice = refPrice
+      previousSlotIndex = candidateIdx
+      break
+    }
+  }
+
+  return { slots, lastPrice, previousPrice, currentSlotIndex, previousSlotIndex }
 }
 
 function buildLegend(slots, currentIndex) {
@@ -1447,10 +1459,9 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
         }
       }
 
-      const { slots, lastPrice, previousPrice } = buildVolumeSlots(prices)
-      const slotIndex = findSlotIndex(slots, lastPrice)
+      const { slots, lastPrice, previousPrice, currentSlotIndex, previousSlotIndex } = buildVolumeSlots(prices)
+      const slotIndex = currentSlotIndex >= 0 ? currentSlotIndex : findSlotIndex(slots, lastPrice)
       const currentRange = slotIndex >= 0 ? slots[slotIndex] : null
-      const previousSlotIndex = findSlotIndex(slots, previousPrice)
       const previousRange = previousSlotIndex >= 0 ? slots[previousSlotIndex] : null
       const legend = buildLegend(slots, slotIndex)
       const breakout = detectBreakout(slots, slotIndex, lastPrice, previousPrice)
