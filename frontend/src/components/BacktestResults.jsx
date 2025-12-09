@@ -16,10 +16,6 @@ const MIN_ANNUAL_PL_PERCENT = 10
 const MIN_TOTAL_SIGNALS = 5
 const MIN_ANNUAL_SIGNALS = 1.2
 const MAX_SIGNAL_AGE_DAYS = 700
-const MIN_ANNUAL_PL_PERCENT = 10
-const MIN_TOTAL_SIGNALS = 5
-const MIN_ANNUAL_SIGNALS = 1.2
-const MAX_SIGNAL_AGE_DAYS = 700
 
 // Helper function to convert days to display period (e.g., 1825 -> "5Y")
 function formatPeriod(days) {
