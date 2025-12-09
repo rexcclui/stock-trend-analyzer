@@ -12,6 +12,10 @@ const INVALID_FIVE_CHAR_LENGTH = 5
 const BLOCKED_SUFFIX = '.TO'
 const HYPHEN = '-'
 const DEFAULT_DAYS = 1825
+const MIN_ANNUAL_PL_PERCENT = 10
+const MIN_TOTAL_SIGNALS = 5
+const MIN_ANNUAL_SIGNALS = 1.2
+const MAX_SIGNAL_AGE_DAYS = 700
 
 // Helper function to convert days to display period (e.g., 1825 -> "5Y")
 function formatPeriod(days) {
@@ -87,7 +91,7 @@ function normalizeCachedResults(entries = []) {
         typeof entry?.upResist?.volumeWeight === 'number' &&
         typeof entry?.downResist?.volumeWeight === 'number'
 
-      if (normalizedEntry.status === 'completed' && !hasVolumeWeights) {
+      if (normalizedEntry.status === 'completed' && !hasVolumeWeights && !normalizedEntry.bookmarked && !normalizedEntry.isRecentBreakout) {
         return {
           ...normalizedEntry,
           status: 'pending',
@@ -376,7 +380,8 @@ function getLatestBreakout(breakouts) {
 }
 
 // Find resistance zones: price zones with volume weight > current weight + 5%
-function findResistanceZones(breakout, slots) {
+// Zones are classified relative to the latest market price (not the breakout price)
+function findResistanceZones(breakout, slots, referencePrice) {
   if (!breakout || !slots || slots.length === 0) return { upResist: null, downResist: null }
 
   const slotIdx = breakout.slotIdx
@@ -386,7 +391,7 @@ function findResistanceZones(breakout, slots) {
   if (!slot || !slot.priceZones) return { upResist: null, downResist: null }
 
   const currentWeight = breakout.currentWeight
-  const currentPrice = breakout.price
+  const currentPrice = typeof referencePrice === 'number' ? referencePrice : breakout.price
   const threshold = currentWeight + 0.05  // 5% higher
 
   // Find zones with volume weight > threshold, split by position relative to current price
@@ -449,6 +454,7 @@ function isBreakoutClosed(breakoutDate, prices, smaPeriod) {
   if (breakoutIdx === -1) return false
 
   // Check for sell signal (SMA slope turning negative) after breakout
+  let prevSlope = null
   for (let i = breakoutIdx + 1; i < reversedPrices.length; i++) {
     const currentDate = reversedPrices[i].date
     const prevDate = reversedPrices[i - 1].date
@@ -458,9 +464,10 @@ function isBreakoutClosed(breakoutDate, prices, smaPeriod) {
 
     if (currentSMA !== null && prevSMA !== null && currentSMA !== undefined && prevSMA !== undefined) {
       const slope = currentSMA - prevSMA
-      if (slope < 0) {
+      if (prevSlope !== null && prevSlope >= 0 && slope < 0) {
         return true  // Sell signal found after breakout
       }
+      prevSlope = slope
     }
   }
 
@@ -565,6 +572,7 @@ function optimizeSMAParams(prices, slots, breakouts) {
     const trades = []
     let isHolding = false
     let buyPrice = null
+    let prevSlopeWhileHolding = null
 
     // Iterate through daily prices in forward chronological order for simulation
     for (let i = 0; i < reversedPrices.length; i++) {
@@ -578,6 +586,7 @@ function optimizeSMAParams(prices, slots, breakouts) {
       if (breakoutDates.has(currentDate) && !isHolding) {
         isHolding = true
         buyPrice = currentPrice
+        prevSlopeWhileHolding = null
       }
       // Sell when SMA slope turns negative
       else if (isHolding && i > 0) {
@@ -585,12 +594,17 @@ function optimizeSMAParams(prices, slots, breakouts) {
         if (prevPrice) {
           const slope = getSMASlope(currentDate, prevPrice.date)
 
-          if (slope !== null && slope < 0) {
+          if (slope !== null && prevSlopeWhileHolding !== null && prevSlopeWhileHolding >= 0 && slope < 0) {
             const sellPrice = currentPrice
             const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
             trades.push({ plPercent })
             isHolding = false
             buyPrice = null
+            prevSlopeWhileHolding = null
+          }
+
+          if (slope !== null) {
+            prevSlopeWhileHolding = slope
           }
         }
       }
@@ -763,17 +777,39 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     ...entry,
     status,
     latestBreakout: null,
+    originalBreakout: null,
+    breakoutClosed: false,
     latestPrice: null,
     priceData: null,
     optimalParams: null,
     optimalSMAs: null,
     marketChange: null,
+    upResist: null,
+    downResist: null,
+    lastScanAt: null,
     isRecentBreakout: false,
     recentBreakout: null,
     totalSignals: null,
     durationMs: entry.durationMs ?? null,
     error: errorMsg
   })
+
+  const hasHighConvictionPerformance = (entry) => {
+    const winRate = entry?.optimalSMAs?.winRate
+    const pl = entry?.optimalSMAs?.pl
+    const totalSignals = entry?.totalSignals
+
+    return (
+      typeof winRate === 'number' && winRate > 75 &&
+      typeof pl === 'number' && pl > 100 &&
+      typeof totalSignals === 'number' && totalSignals > 7
+    )
+  }
+
+  const hasStrongBreakoutDiff = (entry) => {
+    const weightDiff = entry?.originalBreakout?.weightDiff
+    return typeof weightDiff === 'number' && weightDiff * 100 > 8
+  }
 
   const pruneDisallowedEntries = (currentEntries = []) => {
     const disallowed = new Set(
@@ -832,19 +868,29 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     if (!hasHydratedCache) return
 
     try {
-      // Only cache full details for bookmarked or recent breakout rows
+      // Only cache full details for bookmarked, recent breakout, or
+      // top-performing rows (high winrate/pl/signals or strong Diff).
+      // A "recent breakout" is any completed entry whose latest breakout
+      // happened in the last 10 days (see getRecentBreakouts below).
       // Others get minimal cache (symbol, status, lastScanAt, bookmarked)
       const selectiveResults = results.map(result => {
         const { priceData, ...rest } = result
 
-        // Full cache for: bookmarked OR recent breakout
-        const shouldCacheFull = result.bookmarked || result.isRecentBreakout
+        // Full cache for: any completed entry, bookmarked, recent breakout,
+        // or high-performing rows so table data survives reloads without
+        // rerunning scans. Price data is still omitted to save space.
+        const shouldCacheFull =
+          result.status === 'completed' ||
+          result.bookmarked ||
+          result.isRecentBreakout ||
+          hasHighConvictionPerformance(result) ||
+          hasStrongBreakoutDiff(result)
 
         if (shouldCacheFull) {
-          return rest // Keep all fields except priceData
+          return rest
         }
 
-        // Slim cache: only essential fields for non-important results
+        // Slim cache: only essential fields for pending/error results
         return {
           symbol: result.symbol,
           days: result.days,
@@ -852,7 +898,10 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
           status: result.status || 'pending',
           lastScanAt: result.lastScanAt || null,
           bookmarked: result.bookmarked || false,
-          error: result.error || null
+          error: result.error || null,
+          marketChange: typeof result.marketChange === 'number' ? result.marketChange : null,
+          durationMs: typeof result.durationMs === 'number' ? result.durationMs : null,
+          latestPrice: typeof result.latestPrice === 'number' ? result.latestPrice : null
         }
       })
 
@@ -1170,6 +1219,12 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
         { breakoutThreshold: 0.08, lookbackZones: 5, resetThreshold: 0.04, timeoutSlots: 7 },
       ]
 
+      const passesSelectionFilters = (candidate) => {
+        const winRate = candidate.optimalSMAs?.winRate
+        if (typeof winRate !== 'number' || winRate < 60) return false
+        return meetsPerformanceThresholds(candidate)
+      }
+
       let bestResult = null
       let bestPL = -Infinity
 
@@ -1183,6 +1238,21 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
         const smaResult = optimizeSMAParams(priceData, slots, breakouts)
 
         // Only consider combinations with >= 4 signals
+        const candidateLatestBreakout = getLatestBreakout(breakouts)
+        const candidateResult = {
+          symbol,
+          status: 'completed',
+          days: targetDays,
+          totalSignals: smaResult.totalSignals,
+          optimalSMAs: smaResult,
+          latestBreakout: candidateLatestBreakout,
+          originalBreakout: candidateLatestBreakout
+        }
+
+        if (!passesSelectionFilters(candidateResult)) {
+          continue
+        }
+
         if (smaResult.totalSignals >= 4) {
           if (smaResult.pl > bestPL) {
             bestPL = smaResult.pl
@@ -1196,9 +1266,13 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
         }
       }
 
-      // If no combination produced >= 4 signals, throw error
+      // If no combination passed selection filters, remove the entry entirely
       if (!bestResult) {
-        throw new Error('Excluded: fewer than 4 total signals')
+        const periodLabel = formatPeriod(targetDays)
+        showToast(`${symbol}${periodLabel ? ` (${periodLabel})` : ''} removed: no simulation met performance filters.`)
+        setResults(prev => prev.filter(entry => !(entry.symbol === symbol && entry.days === targetDays)))
+        setScanQueue(prev => prev.filter(queuedSymbol => queuedSymbol !== symbol))
+        return
       }
 
       const { params: optimalParams, breakouts, slots, smaResult: optimalSMAs } = bestResult
@@ -1211,18 +1285,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
         throw new Error('No breakout detected')
       }
 
-      // Find resistance zones before potentially nullifying latestBreakout
-      const { upResist, downResist } = findResistanceZones(latestBreakout, slots)
-
-      // Check if the latest breakout has been closed by a sell signal
-      // Store original breakout for reference, but hide break price if closed
-      const originalBreakout = latestBreakout
-      const breakoutClosed = isBreakoutClosed(latestBreakout.date, priceData, optimalSMAs.period)
-      if (breakoutClosed) {
-        latestBreakout = null  // This hides the break price column only
-      }
-
-      // Determine if data is in chronological or reverse chronological order
+      // Determine if data is in chronological or reverse chronological order to get latest market price
       const firstDate = new Date(priceData[0].date)
       const lastDate = new Date(priceData[priceData.length - 1].date)
 
@@ -1233,6 +1296,17 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
       } else {
         // Reverse chronological order: first is newest, last is oldest
         latestPrice = priceData[0].close
+      }
+
+      // Find resistance zones before potentially nullifying latestBreakout
+      const { upResist, downResist } = findResistanceZones(latestBreakout, slots, latestPrice)
+
+      // Check if the latest breakout has been closed by a sell signal
+      // Store original breakout for reference, but hide break price if closed
+      const originalBreakout = latestBreakout
+      const breakoutClosed = isBreakoutClosed(latestBreakout.date, priceData, optimalSMAs.period)
+      if (breakoutClosed) {
+        latestBreakout = null  // This hides the break price column only
       }
 
       const marketChange = computeMarketChange(priceData)
@@ -1594,6 +1668,37 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     return diffDays
   }
 
+  const meetsPerformanceThresholds = (result) => {
+    if (result.status !== 'completed') return true
+
+    const normalizedDays = normalizeDays(result.days) ?? DEFAULT_DAYS
+    const periodYears = normalizedDays / 365
+    if (!Number.isFinite(periodYears) || periodYears <= 0) return false
+
+    const plValue = result.optimalSMAs?.pl
+    const minPlRequired = MIN_ANNUAL_PL_PERCENT * periodYears
+    if (typeof plValue !== 'number' || plValue < minPlRequired) return false
+
+    const signals = typeof result.totalSignals === 'number'
+      ? result.totalSignals
+      : typeof result.optimalSMAs?.totalSignals === 'number'
+        ? result.optimalSMAs.totalSignals
+        : null
+
+    if (typeof signals !== 'number' || signals < MIN_TOTAL_SIGNALS) return false
+
+    const avgSignalsPerYear = signals / periodYears
+    if (!Number.isFinite(avgSignalsPerYear) || avgSignalsPerYear < MIN_ANNUAL_SIGNALS) return false
+
+    const lastSignalDate = result.originalBreakout?.date || result.latestBreakout?.date
+    if (lastSignalDate) {
+      const lastSignalAge = getDaysAgo(lastSignalDate)
+      if (Number.isFinite(lastSignalAge) && lastSignalAge > MAX_SIGNAL_AGE_DAYS) return false
+    }
+
+    return true
+  }
+
   const formatLastScanTime = (isoString) => {
     if (!isoString) return '—'
     const date = new Date(isoString)
@@ -1638,10 +1743,18 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     return typeof winRate === 'number' && winRate < 60
   })
 
+  const performanceRemoved = normalizedResults.filter(result => {
+    if (result.error) return false
+    const winRate = result.optimalSMAs?.winRate
+    if (typeof winRate === 'number' && winRate < 60) return false
+    return !meetsPerformanceThresholds(result)
+  })
+
   const nonErrorResults = normalizedResults.filter(result => {
     if (result.error) return false
     const winRate = result.optimalSMAs?.winRate
     if (typeof winRate === 'number' && winRate < 60) return false
+    if (!meetsPerformanceThresholds(result)) return false
     return true
   })
 
@@ -1753,6 +1866,17 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     const visibleSymbols = new Set(sortedResults.map(r => r.symbol))
     setResults(prev => prev.filter(entry => !visibleSymbols.has(entry.symbol)))
     setScanQueue(prev => prev.filter(symbol => !visibleSymbols.has(symbol)))
+  }
+
+  const bookmarkVisible = () => {
+    if (sortedResults.length === 0) return
+
+    const visibleKeys = new Set(sortedResults.map(result => getEntryKey(result.symbol, result.days)))
+    setResults(prev => prev.map(entry => (
+      visibleKeys.has(getEntryKey(entry.symbol, entry.days))
+        ? { ...entry, bookmarked: true }
+        : entry
+    )))
   }
 
   const addVisibleToVolumeScreen = () => {
@@ -1924,6 +2048,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     }, 4500)
   }
 
+  const dismissToast = () => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current)
+      toastTimeoutRef.current = null
+    }
+    setToastMessage('')
+  }
+
   useEffect(() => () => {
     if (toastTimeoutRef.current) {
       clearTimeout(toastTimeoutRef.current)
@@ -1931,17 +2063,24 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
   }, [])
 
   useEffect(() => {
-    if (lowWinRateRemoved.length === 0) return
-    const removedNames = lowWinRateRemoved
+    const removalSources = [
+      { entries: lowWinRateRemoved, reason: 'win rate below 60%.' },
+      { entries: performanceRemoved, reason: 'P/L or signal thresholds.' }
+    ]
+
+    const firstRemoval = removalSources.find(source => source.entries.length > 0)
+    if (!firstRemoval) return
+
+    const removedNames = firstRemoval.entries
       .map(entry => {
         const periodLabel = entry.period || formatPeriod(entry.days)
         return periodLabel ? `${entry.symbol} (${periodLabel})` : entry.symbol
       })
     const preview = removedNames.slice(0, 3).join(', ')
     const suffix = removedNames.length > 3 ? ` +${removedNames.length - 3} more` : ''
-    const message = `${preview}${suffix} removed for win rate below 60%.`
+    const message = `${preview}${suffix} removed for ${firstRemoval.reason}`
     showToast(message)
-  }, [lowWinRateRemoved.length])
+  }, [lowWinRateRemoved.length, performanceRemoved.length])
 
   return (
     <div className="space-y-6">
@@ -1949,7 +2088,15 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
         <div className="fixed top-4 right-4 z-50">
           <div className="flex items-start gap-3 bg-slate-900 border border-red-500 text-red-100 px-4 py-3 rounded-lg shadow-xl max-w-sm">
             <AlertCircle className="w-5 h-5 mt-0.5" />
-            <div className="text-sm leading-relaxed">{toastMessage}</div>
+            <div className="text-sm leading-relaxed flex-1">{toastMessage}</div>
+            <button
+              type="button"
+              onClick={dismissToast}
+              className="ml-2 text-slate-400 hover:text-slate-200 transition-colors"
+              aria-label="Dismiss notification"
+            >
+              ×
+            </button>
           </div>
         </div>
       )}
@@ -2227,6 +2374,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
                     <Eraser className="w-3.5 h-3.5" />
                   </button>
                   <button
+                    onClick={bookmarkVisible}
+                    disabled={sortedResults.length === 0}
+                    className="p-1.5 bg-amber-800 text-white rounded-lg hover:bg-amber-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                    title={sortedResults.length === 0 ? 'No visible rows to bookmark' : 'Bookmark all visible rows'}
+                  >
+                    <BookmarkCheck className="w-3.5 h-3.5" />
+                  </button>
+                  <button
                     onClick={removeVisible}
                     disabled={isScanActive}
                     className="p-1.5 bg-red-700 text-white rounded-lg hover:bg-red-800 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
@@ -2406,8 +2561,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
                     <th onClick={() => handleSort('breakoutPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Stock price at the most recent breakout point">BrkPx {renderSortIndicator('breakoutPrice')}</th>
                     <th onClick={() => handleSort('currentPrice')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Current stock price with % change from breakout price">Current Price {renderSortIndicator('currentPrice')}</th>
                     <th onClick={() => handleSort('volWeight')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Volume weight % at current price zone (lower = less resistance)">Vol% {renderSortIndicator('volWeight')}</th>
-                    <th onClick={() => handleSort('upResist')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Price zones ABOVE breakout with volume weight >5% higher than current (strongest resistance)">Up resist {renderSortIndicator('upResist')}</th>
-                    <th onClick={() => handleSort('downResist')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Price zones BELOW breakout with volume weight >5% higher than current (strongest support)">Down resist {renderSortIndicator('downResist')}</th>
+                    <th onClick={() => handleSort('upResist')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Price zones ABOVE the latest price with volume weight >5% higher than current (strongest resistance)">Up resist {renderSortIndicator('upResist')}</th>
+                    <th onClick={() => handleSort('downResist')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Price zones BELOW the latest price with volume weight >5% higher than current (strongest support)">Down resist {renderSortIndicator('downResist')}</th>
                     <th onClick={() => handleSort('diff')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Breakout strength: difference between resistance volume and current volume weight (higher = stronger breakout)">Diff {renderSortIndicator('diff')}</th>
                     <th onClick={() => handleSort('totalSignals')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Number of trading signals generated by the backtest (closed trades = 1.0, open trades = 0.5)">
                       <span className="flex items-center gap-1 justify-end">
