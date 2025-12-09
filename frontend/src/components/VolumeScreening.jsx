@@ -534,51 +534,6 @@ function getNeighborVolumeDiff(entry, direction = 'up') {
   }
 }
 
-function formatVolumeDiff(entry, direction = 'up') {
-  const result = getNeighborVolumeDiff(entry, direction)
-  if (!result) return undefined
-
-  const sign = result.diff > 0 ? '+' : ''
-  return `${sign}${result.diff.toFixed(1)}%`
-}
-
-function getVolumeDiffClass(entry, direction = 'up') {
-  const diff = getNeighborVolumeDiff(entry, direction)?.diff
-  if (diff == null) return ''
-
-  return Math.abs(diff) > 5 ? 'text-amber-300 font-semibold' : ''
-}
-
-function getVolumeDiffTooltip(entry, direction = 'up') {
-  const result = getNeighborVolumeDiff(entry, direction)
-  if (!result) return undefined
-
-  const neighborRange = formatPriceRange(result.neighbor.start, result.neighbor.end)
-  const currentRange = formatPriceRange(result.current.start, result.current.end)
-  const directionLabel = direction === 'up' ? 'next upper' : 'next lower'
-  return `${directionLabel} slot ${neighborRange} @ ${result.neighbor.weight.toFixed(1)}% versus current ${currentRange} @ ${result.current.weight.toFixed(1)}%`
-}
-
-function getNeighborVolumeDiff(entry, direction = 'up') {
-  const legend = Array.isArray(entry?.volumeLegend) ? entry.volumeLegend : []
-  const currentIdx = legend.findIndex(slot => slot?.isCurrent)
-  if (currentIdx === -1) return null
-
-  const neighborIdx = direction === 'up' ? currentIdx + 1 : currentIdx - 1
-  const neighbor = legend[neighborIdx]
-  const current = legend[currentIdx]
-
-  if (!neighbor || !Number.isFinite(neighbor?.weight) || !Number.isFinite(current?.weight)) {
-    return null
-  }
-
-  return {
-    diff: neighbor.weight - current.weight,
-    current,
-    neighbor
-  }
-}
-
 function getPreviousSlotComparison(entry) {
   const current = entry?.currentRange
   const previous = entry?.previousRange
@@ -666,6 +621,7 @@ function getVolumeDiffClass(entry, direction = 'up') {
   const magnitude = Math.abs(diff)
 
   if (magnitude > 15) return 'text-rose-300 font-bold'
+  if (magnitude > 12) return 'text-red-200 font-bold'
   if (magnitude > 10) return 'text-orange-300 font-semibold'
   if (magnitude > 8) return 'text-amber-300 font-semibold'
   if (magnitude > 6) return 'text-amber-200 font-semibold'
@@ -1828,10 +1784,9 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     if (sortConfig.field === 'prevSlotDelta') {
       const getValue = (entry) => {
         const comparison = getPreviousSlotComparison(entry)
-        if (!comparison) return null
-        if (Number.isFinite(comparison.weightDiff)) return comparison.weightDiff
-        if (Number.isFinite(comparison.pricePct)) return comparison.pricePct
-        return null
+        if (!comparison || !Number.isFinite(comparison.weightDiff)) return null
+
+        return comparison.weightDiff
       }
 
       const diffA = getValue(a)
@@ -2571,36 +2526,6 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                   <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     <button
                       type="button"
-                      onClick={() => toggleSort('priceRange')}
-                      className="inline-flex items-center gap-1 hover:text-slate-100"
-                      title={PRICE_RANGE_TOOLTIP}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => toggleSort('volumeDiffDown')}
-                        className="inline-flex items-center gap-1 hover:text-slate-100"
-                        title="Volume weight difference to the next lower price slot"
-                      >
-                        <ArrowDownToLine className="w-4 h-4" aria-hidden="true" />
-                        V.Diff%
-                        {renderSortIndicator('volumeDiffDown')}
-                      </button>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                    <button
-                      type="button"
-                      onClick={() => toggleSort('volumeDiffUp')}
-                      className="inline-flex items-center gap-1 hover:text-slate-100"
-                      title="Volume weight difference to the next upper price slot"
-                    >
-                      <ArrowUpToLine className="w-4 h-4" aria-hidden="true" />
-                      V.Diff%
-                      {renderSortIndicator('volumeDiffUp')}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                    <button
-                      type="button"
                       onClick={() => toggleSort('prevSlotDelta')}
                       className="inline-flex items-center gap-1 hover:text-slate-100"
                       title="Change from the previous volume slot to the current one (weight and price midpoint)"
@@ -2619,37 +2544,30 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                       Px Range
                       {renderSortIndicator('priceRange')}
                     </button>
-                    {renderSortIndicator('priceRange')}
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  <button
-                    type="button"
-                    onClick={() => toggleSort('bottomResist')}
-                    className="inline-flex items-center gap-1 hover:text-slate-100"
-                    title={BOTTOM_RESIST_TOOLTIP}
-                  >
-                    Bottom Resist
-                    {renderSortIndicator('bottomResist')}
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  <button
-                    type="button"
-                    onClick={() => toggleSort('upperResist')}
-                    className="inline-flex items-center gap-1 hover:text-slate-100"
-                    title={UPPER_RESIST_TOOLTIP}
-                  >
-                    Upper Resist
-                    {renderSortIndicator('upperResist')}
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider" title={BREAK_TOOLTIP} title={BREAK_TOOLTIP}>
-                  <button
-                    type="button"
-                    onClick={() => toggleSort('breakout')}
-                    className="inline-flex items-center gap-1 hover:text-slate-100"
-                  >
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('bottomResist')}
+                      className="inline-flex items-center gap-1 hover:text-slate-100"
+                      title={BOTTOM_RESIST_TOOLTIP}
+                    >
+                      Bottom Resist
+                      {renderSortIndicator('bottomResist')}
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('upperResist')}
+                      className="inline-flex items-center gap-1 hover:text-slate-100"
+                      title={UPPER_RESIST_TOOLTIP}
+                    >
+                      Upper Resist
+                      {renderSortIndicator('upperResist')}
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider" title={BREAK_TOOLTIP}>
                     <button
                       type="button"
                       onClick={() => toggleSort('breakout')}
@@ -2659,14 +2577,12 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                       <span className="sr-only">Break</span>
                       {renderSortIndicator('breakout')}
                     </button>
-                    {renderSortIndicator('breakout')}
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
             <tbody className="divide-y divide-slate-800">
               {displayEntries.length === 0 ? (
                 <tr>
@@ -2731,18 +2647,6 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                           )}
                         />
                       )}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-slate-200 text-sm ${getVolumeDiffClass(entry, 'down')}`}
-                      title={getVolumeDiffTooltip(entry, 'down')}
-                    >
-                      {formatVolumeDiff(entry, 'down') ?? '—'}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-slate-200 text-sm ${getVolumeDiffClass(entry, 'up')}`}
-                      title={getVolumeDiffTooltip(entry, 'up')}
-                    >
-                      {formatVolumeDiff(entry, 'up') ?? '—'}
                     </td>
                     <td
                       className={`px-4 py-3 text-slate-200 text-sm ${getVolumeDiffClass(entry, 'down')}`}
