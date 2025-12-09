@@ -493,6 +493,44 @@ function getCurrentVolumeWeight(entry) {
   return Number.isFinite(weight) ? weight : null
 }
 
+function getNeighborVolumeDiff(entry, direction = 'up') {
+  const legend = Array.isArray(entry?.volumeLegend) ? entry.volumeLegend : []
+  const currentIdx = legend.findIndex(slot => slot?.isCurrent)
+  if (currentIdx === -1) return null
+
+  const neighborIdx = direction === 'up' ? currentIdx + 1 : currentIdx - 1
+  const neighbor = legend[neighborIdx]
+  const current = legend[currentIdx]
+
+  if (!neighbor || !Number.isFinite(neighbor?.weight) || !Number.isFinite(current?.weight)) {
+    return null
+  }
+
+  return {
+    diff: neighbor.weight - current.weight,
+    current,
+    neighbor
+  }
+}
+
+function formatVolumeDiff(entry, direction = 'up') {
+  const result = getNeighborVolumeDiff(entry, direction)
+  if (!result) return '—'
+
+  const sign = result.diff > 0 ? '+' : ''
+  return `${sign}${result.diff.toFixed(1)}%`
+}
+
+function getVolumeDiffTooltip(entry, direction = 'up') {
+  const result = getNeighborVolumeDiff(entry, direction)
+  if (!result) return undefined
+
+  const neighborRange = formatPriceRange(result.neighbor.start, result.neighbor.end)
+  const currentRange = formatPriceRange(result.current.start, result.current.end)
+  const directionLabel = direction === 'up' ? 'next upper' : 'next lower'
+  return `${directionLabel} slot ${neighborRange} @ ${result.neighbor.weight.toFixed(1)}% versus current ${currentRange} @ ${result.current.weight.toFixed(1)}%`
+}
+
 function isAbnormalVolumeWeight(entry) {
   const weight = getCurrentVolumeWeight(entry)
   return weight != null && weight > ABNORMAL_VOLUME_WEIGHT_THRESHOLD
@@ -2309,6 +2347,18 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                     {renderSortIndicator('volumeWeight')}
                   </button>
                 </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider" title="Volume weight difference to the next upper price slot">
+                  <span className="inline-flex items-center gap-1">
+                    <ChevronUp className="w-4 h-4" aria-hidden="true" />
+                    V.Diff%
+                  </span>
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider" title="Volume weight difference to the next lower price slot">
+                  <span className="inline-flex items-center gap-1">
+                    <ChevronDown className="w-4 h-4" aria-hidden="true" />
+                    V.Diff%
+                  </span>
+                </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   Px Range
                 </th>
@@ -2343,7 +2393,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
             <tbody className="divide-y divide-slate-800">
               {displayEntries.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="px-4 py-6 text-center text-slate-400">
+                  <td colSpan="12" className="px-4 py-6 text-center text-slate-400">
                     {showUpBreakOnly || showDownBreakOnly || showPotentialBreakOnly || showBookmarkedOnly
                       ? 'No symbols matched the current filters. Disable filters to see all entries.'
                       : 'No symbols added yet. Add stocks above to start screening.'}
@@ -2404,6 +2454,18 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                           )}
                         />
                       )}
+                    </td>
+                    <td
+                      className="px-4 py-3 text-slate-200 text-sm"
+                      title={getVolumeDiffTooltip(entry, 'up')}
+                    >
+                      {formatVolumeDiff(entry, 'up')}
+                    </td>
+                    <td
+                      className="px-4 py-3 text-slate-200 text-sm"
+                      title={getVolumeDiffTooltip(entry, 'down')}
+                    >
+                      {formatVolumeDiff(entry, 'down')}
                     </td>
                     <td
                       className="px-4 py-3 text-slate-200 text-sm"
