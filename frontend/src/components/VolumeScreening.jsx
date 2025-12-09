@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search, Clock3, BarChart3, ChevronUp, ChevronDown } from 'lucide-react'
+import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search, Clock3, BarChart3, ArrowUpToLine, ArrowDownToLine } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 import VolumeLegendPills from './VolumeLegendPills'
 
@@ -2282,7 +2282,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                 title="Scroll to top"
                 aria-label="Scroll to top"
               >
-                <ChevronUp className="w-4 h-4" />
+                <ArrowUpToLine className="w-4 h-4" />
               </button>
               <button
                 type="button"
@@ -2291,7 +2291,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                 title="Scroll to bottom"
                 aria-label="Scroll to bottom"
               >
-                <ChevronDown className="w-4 h-4" />
+                <ArrowDownToLine className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -2351,7 +2351,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                     className="inline-flex items-center gap-1 hover:text-slate-100"
                     title="Volume weight difference to the next upper price slot"
                   >
-                    <ChevronUp className="w-4 h-4" aria-hidden="true" />
+                    <ArrowUpToLine className="w-4 h-4" aria-hidden="true" />
                     V.Diff%
                     {renderSortIndicator('volumeDiffUp')}
                   </button>
@@ -2363,7 +2363,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                     className="inline-flex items-center gap-1 hover:text-slate-100"
                     title="Volume weight difference to the next lower price slot"
                   >
-                    <ChevronDown className="w-4 h-4" aria-hidden="true" />
+                    <ArrowDownToLine className="w-4 h-4" aria-hidden="true" />
                     V.Diff%
                     {renderSortIndicator('volumeDiffDown')}
                   </button>
