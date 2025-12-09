@@ -532,10 +532,17 @@ function getNeighborVolumeDiff(entry, direction = 'up') {
 
 function formatVolumeDiff(entry, direction = 'up') {
   const result = getNeighborVolumeDiff(entry, direction)
-  if (!result) return '—'
+  if (!result) return undefined
 
   const sign = result.diff > 0 ? '+' : ''
   return `${sign}${result.diff.toFixed(1)}%`
+}
+
+function getVolumeDiffClass(entry, direction = 'up') {
+  const diff = getNeighborVolumeDiff(entry, direction)?.diff
+  if (diff == null) return ''
+
+  return Math.abs(diff) > 5 ? 'text-amber-300 font-semibold' : ''
 }
 
 function getVolumeDiffTooltip(entry, direction = 'up') {
@@ -2347,18 +2354,6 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   <button
                     type="button"
-                    onClick={() => toggleSort('volumeDiffUp')}
-                    className="inline-flex items-center gap-1 hover:text-slate-100"
-                    title="Volume weight difference to the next upper price slot"
-                  >
-                    <ArrowUpToLine className="w-4 h-4" aria-hidden="true" />
-                    V.Diff%
-                    {renderSortIndicator('volumeDiffUp')}
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  <button
-                    type="button"
                     onClick={() => toggleSort('volumeDiffDown')}
                     className="inline-flex items-center gap-1 hover:text-slate-100"
                     title="Volume weight difference to the next lower price slot"
@@ -2366,6 +2361,18 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                     <ArrowDownToLine className="w-4 h-4" aria-hidden="true" />
                     V.Diff%
                     {renderSortIndicator('volumeDiffDown')}
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('volumeDiffUp')}
+                    className="inline-flex items-center gap-1 hover:text-slate-100"
+                    title="Volume weight difference to the next upper price slot"
+                  >
+                    <ArrowUpToLine className="w-4 h-4" aria-hidden="true" />
+                    V.Diff%
+                    {renderSortIndicator('volumeDiffUp')}
                   </button>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
@@ -2482,16 +2489,16 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                       )}
                     </td>
                     <td
-                      className="px-4 py-3 text-slate-200 text-sm"
-                      title={getVolumeDiffTooltip(entry, 'up')}
-                    >
-                      {formatVolumeDiff(entry, 'up')}
-                    </td>
-                    <td
-                      className="px-4 py-3 text-slate-200 text-sm"
+                      className={`px-4 py-3 text-slate-200 text-sm ${getVolumeDiffClass(entry, 'down')}`}
                       title={getVolumeDiffTooltip(entry, 'down')}
                     >
-                      {formatVolumeDiff(entry, 'down')}
+                      {formatVolumeDiff(entry, 'down') ?? '—'}
+                    </td>
+                    <td
+                      className={`px-4 py-3 text-slate-200 text-sm ${getVolumeDiffClass(entry, 'up')}`}
+                      title={getVolumeDiffTooltip(entry, 'up')}
+                    >
+                      {formatVolumeDiff(entry, 'up') ?? '—'}
                     </td>
                     <td
                       className="px-4 py-3 text-slate-200 text-sm"
