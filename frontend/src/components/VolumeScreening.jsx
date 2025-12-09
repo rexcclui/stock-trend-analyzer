@@ -1784,10 +1784,9 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     if (sortConfig.field === 'prevSlotDelta') {
       const getValue = (entry) => {
         const comparison = getPreviousSlotComparison(entry)
-        if (!comparison) return null
-        if (Number.isFinite(comparison.weightDiff)) return comparison.weightDiff
-        if (Number.isFinite(comparison.pricePct)) return comparison.pricePct
-        return null
+        if (!comparison || !Number.isFinite(comparison.weightDiff)) return null
+
+        return comparison.weightDiff
       }
 
       const diffA = getValue(a)
