@@ -559,26 +559,6 @@ function getVolumeDiffTooltip(entry, direction = 'up') {
   return `${directionLabel} slot ${neighborRange} @ ${result.neighbor.weight.toFixed(1)}% versus current ${currentRange} @ ${result.current.weight.toFixed(1)}%`
 }
 
-function getNeighborVolumeDiff(entry, direction = 'up') {
-  const legend = Array.isArray(entry?.volumeLegend) ? entry.volumeLegend : []
-  const currentIdx = legend.findIndex(slot => slot?.isCurrent)
-  if (currentIdx === -1) return null
-
-  const neighborIdx = direction === 'up' ? currentIdx + 1 : currentIdx - 1
-  const neighbor = legend[neighborIdx]
-  const current = legend[currentIdx]
-
-  if (!neighbor || !Number.isFinite(neighbor?.weight) || !Number.isFinite(current?.weight)) {
-    return null
-  }
-
-  return {
-    diff: neighbor.weight - current.weight,
-    current,
-    neighbor
-  }
-}
-
 function getPreviousSlotComparison(entry) {
   const current = entry?.currentRange
   const previous = entry?.previousRange
