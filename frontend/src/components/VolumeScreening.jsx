@@ -2526,36 +2526,6 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                   <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     <button
                       type="button"
-                      onClick={() => toggleSort('priceRange')}
-                      className="inline-flex items-center gap-1 hover:text-slate-100"
-                      title={PRICE_RANGE_TOOLTIP}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => toggleSort('volumeDiffDown')}
-                        className="inline-flex items-center gap-1 hover:text-slate-100"
-                        title="Volume weight difference to the next lower price slot"
-                      >
-                        <ArrowDownToLine className="w-4 h-4" aria-hidden="true" />
-                        V.Diff%
-                        {renderSortIndicator('volumeDiffDown')}
-                      </button>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                    <button
-                      type="button"
-                      onClick={() => toggleSort('volumeDiffUp')}
-                      className="inline-flex items-center gap-1 hover:text-slate-100"
-                      title="Volume weight difference to the next upper price slot"
-                    >
-                      <ArrowUpToLine className="w-4 h-4" aria-hidden="true" />
-                      V.Diff%
-                      {renderSortIndicator('volumeDiffUp')}
-                    </button>
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                    <button
-                      type="button"
                       onClick={() => toggleSort('prevSlotDelta')}
                       className="inline-flex items-center gap-1 hover:text-slate-100"
                       title="Change from the previous volume slot to the current one (weight and price midpoint)"
@@ -2574,37 +2544,30 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                       Px Range
                       {renderSortIndicator('priceRange')}
                     </button>
-                    {renderSortIndicator('priceRange')}
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  <button
-                    type="button"
-                    onClick={() => toggleSort('bottomResist')}
-                    className="inline-flex items-center gap-1 hover:text-slate-100"
-                    title={BOTTOM_RESIST_TOOLTIP}
-                  >
-                    Bottom Resist
-                    {renderSortIndicator('bottomResist')}
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  <button
-                    type="button"
-                    onClick={() => toggleSort('upperResist')}
-                    className="inline-flex items-center gap-1 hover:text-slate-100"
-                    title={UPPER_RESIST_TOOLTIP}
-                  >
-                    Upper Resist
-                    {renderSortIndicator('upperResist')}
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider" title={BREAK_TOOLTIP} title={BREAK_TOOLTIP}>
-                  <button
-                    type="button"
-                    onClick={() => toggleSort('breakout')}
-                    className="inline-flex items-center gap-1 hover:text-slate-100"
-                  >
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('bottomResist')}
+                      className="inline-flex items-center gap-1 hover:text-slate-100"
+                      title={BOTTOM_RESIST_TOOLTIP}
+                    >
+                      Bottom Resist
+                      {renderSortIndicator('bottomResist')}
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('upperResist')}
+                      className="inline-flex items-center gap-1 hover:text-slate-100"
+                      title={UPPER_RESIST_TOOLTIP}
+                    >
+                      Upper Resist
+                      {renderSortIndicator('upperResist')}
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider" title={BREAK_TOOLTIP}>
                     <button
                       type="button"
                       onClick={() => toggleSort('breakout')}
@@ -2614,14 +2577,12 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                       <span className="sr-only">Break</span>
                       {renderSortIndicator('breakout')}
                     </button>
-                    {renderSortIndicator('breakout')}
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
             <tbody className="divide-y divide-slate-800">
               {displayEntries.length === 0 ? (
                 <tr>
