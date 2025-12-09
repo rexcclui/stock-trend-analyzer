@@ -577,14 +577,12 @@ function getPreviousSlotComparison(entry) {
   }
 }
 
-function getPreviousSlotWeightDiff(entry) {
-  const current = entry?.currentRange
-  const previous = entry?.previousRange
+function getPreviousSlotPricePctMagnitude(entry) {
+  const comparison = getPreviousSlotComparison(entry)
+  if (!comparison) return null
 
-  if (!current || !previous) return null
-  if (!Number.isFinite(current.weight) || !Number.isFinite(previous.weight)) return null
-
-  return current.weight - previous.weight
+  const { pricePct } = comparison
+  return Number.isFinite(pricePct) ? Math.abs(pricePct) : null
 }
 
 function formatPreviousSlotDiff(entry) {
@@ -1807,8 +1805,8 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     }
 
     if (sortConfig.field === 'prevSlotDelta') {
-      const diffA = getPreviousSlotWeightDiff(a)
-      const diffB = getPreviousSlotWeightDiff(b)
+      const diffA = getPreviousSlotPricePctMagnitude(a)
+      const diffB = getPreviousSlotPricePctMagnitude(b)
 
       if (diffA == null && diffB == null) return 0
       if (diffA == null) return 1
