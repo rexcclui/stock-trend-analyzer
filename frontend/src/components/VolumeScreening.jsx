@@ -618,7 +618,14 @@ function getVolumeDiffClass(entry, direction = 'up') {
   const diff = getNeighborVolumeDiff(entry, direction)?.diff
   if (diff == null) return ''
 
-  return Math.abs(diff) > 5 ? 'text-amber-300 font-semibold' : ''
+  const magnitude = Math.abs(diff)
+
+  if (magnitude > 15) return 'text-rose-300 font-bold'
+  if (magnitude > 10) return 'text-orange-300 font-semibold'
+  if (magnitude > 8) return 'text-amber-300 font-semibold'
+  if (magnitude > 6) return 'text-amber-200 font-semibold'
+
+  return ''
 }
 
 function getVolumeDiffTooltip(entry, direction = 'up') {
