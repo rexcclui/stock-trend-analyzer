@@ -16,6 +16,10 @@ const MIN_ANNUAL_PL_PERCENT = 10
 const MIN_TOTAL_SIGNALS = 5
 const MIN_ANNUAL_SIGNALS = 1.2
 const MAX_SIGNAL_AGE_DAYS = 700
+const MIN_ANNUAL_PL_PERCENT = 10
+const MIN_TOTAL_SIGNALS = 5
+const MIN_ANNUAL_SIGNALS = 1.2
+const MAX_SIGNAL_AGE_DAYS = 700
 
 // Helper function to convert days to display period (e.g., 1825 -> "5Y")
 function formatPeriod(days) {
@@ -91,7 +95,7 @@ function normalizeCachedResults(entries = []) {
         typeof entry?.upResist?.volumeWeight === 'number' &&
         typeof entry?.downResist?.volumeWeight === 'number'
 
-      if (normalizedEntry.status === 'completed' && !hasVolumeWeights && !normalizedEntry.bookmarked && !normalizedEntry.isRecentBreakout && !normalizedEntry.bookmarked && !normalizedEntry.isRecentBreakout) {
+      if (normalizedEntry.status === 'completed' && !hasVolumeWeights && !normalizedEntry.bookmarked && !normalizedEntry.isRecentBreakout && !normalizedEntry.bookmarked && !normalizedEntry.isRecentBreakout && !normalizedEntry.bookmarked && !normalizedEntry.isRecentBreakout) {
         return {
           ...normalizedEntry,
           status: 'pending',
@@ -872,10 +876,6 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
       // top-performing rows (high winrate/pl/signals or strong Diff).
       // A "recent breakout" is any completed entry whose latest breakout
       // happened in the last 10 days (see getRecentBreakouts below).
-      // Only cache full details for bookmarked, recent breakout, or
-      // top-performing rows (high winrate/pl/signals or strong Diff).
-      // A "recent breakout" is any completed entry whose latest breakout
-      // happened in the last 10 days (see getRecentBreakouts below).
       // Others get minimal cache (symbol, status, lastScanAt, bookmarked)
       const selectiveResults = results.map(result => {
         const { priceData, ...rest } = result
@@ -884,13 +884,9 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
         // or high-performing rows so table data survives reloads without
         // rerunning scans. Price data is still omitted to save space.
         const shouldCacheFull =
-
           result.status === 'completed' ||
           result.bookmarked ||
-
           result.isRecentBreakout ||
-          hasHighConvictionPerformance(result) ||
-          hasStrongBreakoutDiff(result) ||
           hasHighConvictionPerformance(result) ||
           hasStrongBreakoutDiff(result)
 
@@ -2390,6 +2386,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
                       <BookmarkCheck className="w-3.5 h-3.5" />
                     </button>
                     <button
+                      onClick={bookmarkVisible}
+                      disabled={sortedResults.length === 0}
+                      className="p-1.5 bg-amber-800 text-white rounded-lg hover:bg-amber-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                      title={sortedResults.length === 0 ? 'No visible rows to bookmark' : 'Bookmark all visible rows'}
+                    >
+                      <BookmarkCheck className="w-3.5 h-3.5" />
+                    </button>
+                    <button
                       onClick={removeVisible}
                       disabled={isScanActive}
                       className="p-1.5 bg-red-700 text-white rounded-lg hover:bg-red-800 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
@@ -2492,8 +2496,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
                         key={market}
                         onClick={() => toggleMarketFilter(market)}
                         className={`px-2 py-1 rounded text-xs font-medium transition-colors ${selectedMarkets.includes(market)
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                           }`}
                       >
                         {market}
@@ -2508,8 +2512,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
                         key={period}
                         onClick={() => togglePeriodFilter(period)}
                         className={`px-2 py-1 rounded text-xs font-medium transition-colors ${selectedPeriods.includes(period)
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
                           }`}
                       >
                         {period}
