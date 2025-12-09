@@ -2421,7 +2421,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                 <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
                   <span className="sr-only">Bookmark</span>
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                <th className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider w-28">
                   <button
                     type="button"
                     onClick={() => toggleSort('symbol')}
@@ -2531,7 +2531,8 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                     onClick={() => toggleSort('breakout')}
                     className="inline-flex items-center gap-1 hover:text-slate-100"
                   >
-                    Break
+                    <Activity className="w-4 h-4" aria-hidden="true" />
+                    <span className="sr-only">Break</span>
                     {renderSortIndicator('breakout')}
                   </button>
                 </th>
@@ -2573,7 +2574,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                         <Star className="w-4 h-4" fill={entry.bookmarked ? 'currentColor' : 'none'} />
                       </button>
                     </td>
-                    <td className="px-4 py-3 text-slate-100 font-medium">{entry.symbol}</td>
+                    <td className="px-3 py-3 text-slate-100 font-medium whitespace-nowrap w-28">{entry.symbol}</td>
                     <td className="px-4 py-3 text-center">
                       <span
                         className="px-2 py-1 rounded bg-purple-900/50 text-purple-200 text-xs font-semibold"
