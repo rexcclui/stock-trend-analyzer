@@ -679,7 +679,7 @@ function meetsPotentialBreakCriteria(entry) {
     upperDiff != null &&
     upperDiff < 0 &&
     Number.isFinite(prevPricePct) &&
-    prevPricePct < 0
+    prevPricePct > 0
 
   const hasBreakDownPattern =
     upperDiff != null &&
@@ -687,7 +687,7 @@ function meetsPotentialBreakCriteria(entry) {
     lowerDiff != null &&
     lowerDiff < 0 &&
     Number.isFinite(prevPricePct) &&
-    prevPricePct > 0
+    prevPricePct < 0
 
   return hasLowCurrentWeight && hasPrevWeightDrop && (hasBreakUpPattern || hasBreakDownPattern)
 }
