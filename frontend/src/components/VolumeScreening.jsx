@@ -1756,6 +1756,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
   const isFiltered = filteredEntries.length !== entries.length
   const filteredCount = Math.max(0, entries.length - filteredEntries.length)
   const visibleEntries = filteredEntries
+  const allVisibleBookmarked = visibleEntries.length > 0 && visibleEntries.every(entry => entry.bookmarked)
 
   const compareEntries = (a, b) => {
     if (!sortConfig.field) return 0
@@ -1918,6 +1919,16 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
       const direction = prev.field === field && prev.direction === 'desc' ? 'asc' : 'desc'
       return { field, direction }
     })
+  }
+
+  const toggleBookmarkVisibleEntries = () => {
+    if (visibleEntries.length === 0) return
+    const visibleIds = new Set(visibleEntries.map(entry => entry.id))
+    setEntries(prev => prev.map(entry => (
+      visibleIds.has(entry.id)
+        ? { ...entry, bookmarked: !allVisibleBookmarked }
+        : entry
+    )))
   }
 
   const renderSortIndicator = (field) => {
@@ -2496,7 +2507,18 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
               <thead className="bg-slate-800 sticky top-0 z-10 shadow-lg">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                    <span className="sr-only">Bookmark</span>
+                    <button
+                      type="button"
+                      onClick={toggleBookmarkVisibleEntries}
+                      className={`inline-flex items-center justify-center rounded-lg p-2 transition-colors ${allVisibleBookmarked
+                        ? 'text-amber-300 hover:text-amber-200 hover:bg-amber-900/30'
+                        : 'text-slate-400 hover:text-amber-200 hover:bg-slate-700/70'
+                        }`}
+                      title={allVisibleBookmarked ? 'Remove bookmarks from visible rows' : 'Bookmark all visible rows'}
+                      aria-label={allVisibleBookmarked ? 'Remove bookmarks from visible rows' : 'Bookmark all visible rows'}
+                    >
+                      <Star className="w-4 h-4" fill={allVisibleBookmarked ? 'currentColor' : 'none'} />
+                    </button>
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider w-28">
                     <button
