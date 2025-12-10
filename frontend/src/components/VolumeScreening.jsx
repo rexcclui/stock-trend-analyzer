@@ -669,13 +669,13 @@ function meetsPotentialBreakCriteria(entry) {
   const lowerDiff = getNeighborVolumeDiff(entry, 'down')?.diff
   const upperDiff = getNeighborVolumeDiff(entry, 'up')?.diff
 
-  const hasLowCurrentWeight = currentWeight != null && currentWeight < 8
-  const hasPrevWeightDrop = Number.isFinite(prevComparison?.weightDiff) && prevComparison.weightDiff < -8
+  const hasLowCurrentWeight = currentWeight != null && currentWeight < 6
+  const hasPrevWeightDrop = Number.isFinite(prevComparison?.weightDiff) && prevComparison.weightDiff < -6
   const prevPricePct = prevComparison?.pricePct
 
   const hasBreakUpPattern =
     lowerDiff != null &&
-    lowerDiff > 8 &&
+    lowerDiff > 6 &&
     upperDiff != null &&
     upperDiff < 0 &&
     Number.isFinite(prevPricePct) &&
@@ -683,7 +683,7 @@ function meetsPotentialBreakCriteria(entry) {
 
   const hasBreakDownPattern =
     upperDiff != null &&
-    upperDiff > 8 &&
+    upperDiff > 6 &&
     lowerDiff != null &&
     lowerDiff < 0 &&
     Number.isFinite(prevPricePct) &&
@@ -2396,7 +2396,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
             </label>
             <label
               className="inline-flex items-center gap-2 text-sm text-slate-300 select-none"
-              title="Flags symbols with asymmetric volume gaps (≥8%), weak current volume (<8%), and a heavy previous zone drop (<-8%) that hint at potential breaks."
+              title="Flags symbols with asymmetric volume gaps (≥6%), weak current volume (<6%), and a heavy previous zone drop (<-6%) that hint at potential breaks."
             >
               <input
                 type="checkbox"
