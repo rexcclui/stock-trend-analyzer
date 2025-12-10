@@ -663,6 +663,35 @@ function getVolumeDiffTooltip(entry, direction = 'up') {
   return `${directionLabel} slot ${neighborRange} @ ${result.neighbor.weight.toFixed(1)}% versus current ${currentRange} @ ${result.current.weight.toFixed(1)}%`
 }
 
+function meetsPotentialBreakCriteria(entry) {
+  const currentWeight = getCurrentVolumeWeight(entry)
+  const prevComparison = getPreviousSlotComparison(entry)
+  const lowerDiff = getNeighborVolumeDiff(entry, 'down')?.diff
+  const upperDiff = getNeighborVolumeDiff(entry, 'up')?.diff
+
+  const hasLowCurrentWeight = currentWeight != null && currentWeight < 8
+  const hasPrevWeightDrop = Number.isFinite(prevComparison?.weightDiff) && prevComparison.weightDiff < -8
+  const prevPricePct = prevComparison?.pricePct
+
+  const hasBreakUpPattern =
+    lowerDiff != null &&
+    lowerDiff > 8 &&
+    upperDiff != null &&
+    upperDiff < 0 &&
+    Number.isFinite(prevPricePct) &&
+    prevPricePct < 0
+
+  const hasBreakDownPattern =
+    upperDiff != null &&
+    upperDiff > 8 &&
+    lowerDiff != null &&
+    lowerDiff < 0 &&
+    Number.isFinite(prevPricePct) &&
+    prevPricePct > 0
+
+  return hasLowCurrentWeight && hasPrevWeightDrop && (hasBreakUpPattern || hasBreakDownPattern)
+}
+
 function isAbnormalVolumeWeight(entry) {
   const weight = getCurrentVolumeWeight(entry)
   return weight != null && weight > ABNORMAL_VOLUME_WEIGHT_THRESHOLD
@@ -705,16 +734,6 @@ function formatResistance(currentRange, resistance) {
 
   const sign = diff > 0 ? '+' : ''
   return `${resistance.range} (${sign}${diff.toFixed(1)}%)`
-}
-
-function hasCloseResistance(bottomResist, upperResist, threshold = 10) {
-  const bottomWeight = parseResistanceWeight(bottomResist)
-  const upperWeight = parseResistanceWeight(upperResist)
-
-  const isBottomClose = bottomWeight != null && bottomWeight < threshold
-  const isUpperClose = upperWeight != null && upperWeight < threshold
-
-  return isBottomClose || isUpperClose
 }
 
 function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBacktestSelect, bulkImport, onImportProcessed }) {
@@ -835,7 +854,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
         // Determine if this entry should have full cache
         const isUpBreak = rest.breakout === 'Up'
         const isDownBreak = rest.breakout === 'Down'
-        const isPotential = hasCloseResistance(rest.bottomResist, rest.upperResist)
+        const isPotential = meetsPotentialBreakCriteria(rest)
         const isBookmarked = rest.bookmarked || false
 
         // Full cache for: bookmarked OR up/down break OR potential break
@@ -1630,7 +1649,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
   }
 
   const hasScanResult = (entry) => entry?.status === 'ready' && !!entry?.lastScanAt
-  const isPotentialBreak = (entry) => hasCloseResistance(entry.bottomResist, entry.upperResist)
+  const isPotentialBreak = (entry) => meetsPotentialBreakCriteria(entry)
   const isResistanceClose = (value) => {
     const parsed = parseResistanceWeight(value)
     return parsed != null && parsed < 10
@@ -2377,7 +2396,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
             </label>
             <label
               className="inline-flex items-center gap-2 text-sm text-slate-300 select-none"
-              title="Flags symbols whose nearest resistance zone sits within 10% of the current range—useful for spotting potential breaks."
+              title="Flags symbols with asymmetric volume gaps (≥8%), weak current volume (<8%), and a heavy previous zone drop (<-8%) that hint at potential breaks."
             >
               <input
                 type="checkbox"
