@@ -4,6 +4,7 @@ import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Setting
 import PriceChart from './PriceChart'
 import IndicatorsChart from './IndicatorsChart'
 import SignalsList from './SignalsList'
+import VolumeBreakthroughPanel from './VolumeBreakthroughPanel'
 import { apiCache } from '../utils/apiCache'
 import { joinUrl } from '../utils/urlHelper'
 
@@ -2048,6 +2049,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                     prices={chart.data.prices}
                     indicators={chart.data.indicators}
                     signals={chart.data.signals}
+                    volumeProfile={chart.data.volumeProfile}
                     syncedMouseDate={syncedMouseDate}
                     setSyncedMouseDate={setSyncedMouseDate}
                     smaPeriods={chart.smaPeriods}
@@ -2252,6 +2254,11 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                   </div>
                 )}
               </div>
+
+              {/* Volume Breakthrough Analysis */}
+              {!chart.collapsed && chart.data.volumeProfile && (
+                <VolumeBreakthroughPanel volumeProfile={chart.data.volumeProfile} />
+              )}
 
               {/* Technical Indicators */}
               {!chart.collapsed && (chart.showRSI || chart.showMACD) && (
