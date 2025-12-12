@@ -55,22 +55,33 @@ public class AnalyzeStockHandler implements RequestHandler<APIGatewayProxyReques
 
             // Detect signals
             SignalDetectionService signalService = new SignalDetectionService();
-            List<Signal> signals = signalService.detectSignals(prices, indicators);
+            List<Signal> regularSignals = signalService.detectSignals(prices, indicators);
+
+            // Detect volume breakthrough signals
+            List<Signal> volumeSignals = signalService.detectVolumeBreakthroughSignals(prices, indicators);
+
+            // Combine signals (prioritizing higher confidence)
+            List<Signal> allSignals = combineSignals(regularSignals, volumeSignals);
+
+            // Build volume profile for latest data
+            VolumeProfileService volumeProfileService = new VolumeProfileService();
+            VolumeProfile volumeProfile = volumeProfileService.buildVolumeProfile(prices);
 
             // Determine trend
             String trend = analysisService.determineTrend(indicators);
 
             // Generate recommendation
-            String recommendation = signalService.generateRecommendation(signals, trend);
+            String recommendation = signalService.generateRecommendation(allSignals, trend);
 
             // Build response
             AnalysisResponse analysisResponse = new AnalysisResponse();
             analysisResponse.setSymbol(symbol.toUpperCase());
             analysisResponse.setPrices(prices);
             analysisResponse.setIndicators(indicators);
-            analysisResponse.setSignals(signals);
+            analysisResponse.setSignals(allSignals);
             analysisResponse.setTrend(trend);
             analysisResponse.setRecommendation(recommendation);
+            analysisResponse.setVolumeProfile(volumeProfile);
 
             response.setStatusCode(200);
             response.setBody(gson.toJson(analysisResponse));
@@ -83,6 +94,29 @@ public class AnalyzeStockHandler implements RequestHandler<APIGatewayProxyReques
         }
 
         return response;
+    }
+
+    /**
+     * Combine regular and volume signals, prioritizing higher confidence
+     */
+    private List<Signal> combineSignals(List<Signal> regular, List<Signal> volume) {
+        Map<String, Signal> signalMap = new HashMap<>();
+
+        // Add regular signals
+        for (Signal signal : regular) {
+            signalMap.put(signal.getDate(), signal);
+        }
+
+        // Add or replace with volume signals (if higher confidence)
+        for (Signal signal : volume) {
+            Signal existing = signalMap.get(signal.getDate());
+            if (existing == null || signal.getConfidence() > existing.getConfidence()) {
+                signalMap.put(signal.getDate(), signal);
+            }
+        }
+
+        // Convert back to list (maintaining original order from prices)
+        return new java.util.ArrayList<>(signalMap.values());
     }
 
     private APIGatewayProxyResponseEvent createErrorResponse(int statusCode, String message) {

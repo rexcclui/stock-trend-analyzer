@@ -3,11 +3,15 @@ package com.stockanalyzer.service;
 import com.stockanalyzer.model.Signal;
 import com.stockanalyzer.model.StockPrice;
 import com.stockanalyzer.model.TechnicalIndicators;
+import com.stockanalyzer.model.VolumeProfile;
+import com.stockanalyzer.model.VolumeBreakthroughSignal;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class SignalDetectionService {
+
+    private final VolumeProfileService volumeProfileService = new VolumeProfileService();
 
     public List<Signal> detectSignals(List<StockPrice> prices, List<TechnicalIndicators> indicators) {
         List<Signal> signals = new ArrayList<>();
@@ -135,5 +139,106 @@ public class SignalDetectionService {
         } else {
             return "HOLD - Mixed signals, wait for clearer direction";
         }
+    }
+
+    /**
+     * Detect volume breakthrough signals with technical indicator filters
+     * Combines volume profile analysis with trend/momentum filters
+     */
+    public List<Signal> detectVolumeBreakthroughSignals(
+            List<StockPrice> prices,
+            List<TechnicalIndicators> indicators
+    ) {
+        List<Signal> signals = new ArrayList<>();
+
+        if (prices == null || prices.size() < 20 || indicators == null) {
+            return signals;
+        }
+
+        // Scan through each day to detect breakthroughs
+        for (int i = 20; i < prices.size(); i++) {
+            StockPrice current = prices.get(i);
+            TechnicalIndicators currentInd = indicators.get(i);
+
+            // Build volume profile up to this date (walk-forward)
+            List<StockPrice> historyUpToDate = prices.subList(0, i + 1);
+            VolumeProfile dailyProfile = volumeProfileService.buildVolumeProfile(historyUpToDate);
+
+            // Detect if this day shows breakthrough
+            VolumeBreakthroughSignal volumeSignal = volumeProfileService.detectBreakthrough(
+                    dailyProfile,
+                    current.getDate(),
+                    current.getClose()
+            );
+
+            if (volumeSignal == null) {
+                continue;  // No breakthrough detected
+            }
+
+            // FILTER 1: Only take BUY signals in uptrend, SELL in downtrend
+            boolean isBullishTrend = currentInd.getSma50() > 0 && currentInd.getSma200() > 0 &&
+                                     currentInd.getSma50() > currentInd.getSma200();
+            boolean isBearishTrend = currentInd.getSma50() > 0 && currentInd.getSma200() > 0 &&
+                                     currentInd.getSma50() < currentInd.getSma200();
+
+            if (volumeSignal.getType() == Signal.Type.BUY && !isBullishTrend) {
+                continue;  // Skip counter-trend BUY
+            }
+            if (volumeSignal.getType() == Signal.Type.SELL && !isBearishTrend) {
+                continue;  // Skip counter-trend SELL
+            }
+
+            // FILTER 2: RSI not extreme
+            if (volumeSignal.getType() == Signal.Type.BUY && currentInd.getRsi() > 70) {
+                continue;  // Skip overbought
+            }
+            if (volumeSignal.getType() == Signal.Type.SELL && currentInd.getRsi() < 30) {
+                continue;  // Skip oversold
+            }
+
+            // FILTER 3: Volume confirmation (today's volume > recent average)
+            double avgVolume = calculateAverageVolume(prices, i, 20);
+            if (current.getVolume() < avgVolume * 1.3) {
+                continue;  // Insufficient volume confirmation
+            }
+
+            // FILTER 4: MACD supporting (optional boost)
+            boolean macdSupports = (volumeSignal.getType() == Signal.Type.BUY)
+                    ? currentInd.getMacd() > currentInd.getMacdSignal()
+                    : currentInd.getMacd() < currentInd.getMacdSignal();
+
+            // Boost confidence if MACD confirms
+            double finalConfidence = volumeSignal.getConfidence();
+            if (macdSupports) {
+                finalConfidence = Math.min(0.95, finalConfidence + 0.05);
+            }
+
+            // Create signal
+            signals.add(new Signal(
+                    current.getDate(),
+                    volumeSignal.getType(),
+                    current.getClose(),
+                    volumeSignal.getReason(),
+                    finalConfidence
+            ));
+        }
+
+        return signals;
+    }
+
+    /**
+     * Calculate average volume over lookback period
+     */
+    private double calculateAverageVolume(List<StockPrice> prices, int endIndex, int lookback) {
+        int startIndex = Math.max(0, endIndex - lookback);
+        double totalVolume = 0.0;
+        int count = 0;
+
+        for (int i = startIndex; i <= endIndex; i++) {
+            totalVolume += prices.get(i).getVolume();
+            count++;
+        }
+
+        return count > 0 ? totalVolume / count : 0.0;
     }
 }

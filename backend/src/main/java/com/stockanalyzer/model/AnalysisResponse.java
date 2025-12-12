@@ -16,4 +16,5 @@ public class AnalysisResponse {
     private List<Signal> signals;
     private String trend;
     private String recommendation;
+    private VolumeProfile volumeProfile;  // Volume profile analysis
 }
