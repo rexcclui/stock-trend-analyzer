@@ -3,7 +3,10 @@ import React from 'react'
 /**
  * Custom component to render Volume Profile V3 - Windowed analysis with break detection
  * Displays volume profile bars with dynamic price ranges per window (15-20 zones based on data points / 15)
- * Detects breaks when volume weight < 10% and 8% less than any of previous 5 zones
+ * Detects breaks when:
+ * - Volume weight < 10% AND 8% less than any of previous 5 zones
+ * - Break up: previous high-volume zone has lower price than current zone
+ * - Break down: previous high-volume zone has higher price than current zone
  * Shows break up/down arrows and resets window after break
  *
  * @param {Object} props - Component props

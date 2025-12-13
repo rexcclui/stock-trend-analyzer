@@ -2497,8 +2497,15 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 }
 
                 // Break condition: current weight < 10% AND 8% less than any of previous 5 zones
+                // Price direction check:
+                // - For break up: previous zone must be lower (prevZoneIdx < currentZoneIdx)
+                // - For break down: previous zone must be higher (prevZoneIdx > currentZoneIdx)
+                const isPriceMovingUp = prevZoneIdx < currentZoneIdx
+                const isPriceMovingDown = prevZoneIdx > currentZoneIdx
+
                 if (currentWeight < BREAK_VOLUME_THRESHOLD &&
-                    weightDiff >= BREAK_DIFF_THRESHOLD) {
+                    weightDiff >= BREAK_DIFF_THRESHOLD &&
+                    (isPriceMovingUp || isPriceMovingDown)) {
                   breakConditionMet = true
                   break
                 }
@@ -2506,8 +2513,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             }
 
             if (breakConditionMet) {
-              // Determine if it's an up or down break based on price movement
-              const isUpBreak = currentZoneIdx > numPriceZones / 2
+              // Determine if it's an up or down break based on price movement from previous zone
+              const isUpBreak = bestPrevZoneIdx < currentZoneIdx
 
               // Find the zone with MAXIMUM volume weight (the volume-concentrated zone)
               // This is the strongest support/resistance level in the current window
