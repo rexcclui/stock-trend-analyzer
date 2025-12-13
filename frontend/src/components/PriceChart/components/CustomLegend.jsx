@@ -482,7 +482,7 @@ export const CustomLegend = ({
       })()}
 
       {hoveredVolumeLegend?.length > 0 && (
-        <div className="basis-full flex justify-center">
+        <div className="flex justify-center">
           <VolumeLegendPills
             legend={hoveredVolumeLegend}
             keyPrefix="chart-hover-volume"
