@@ -2482,6 +2482,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               // Determine if it's an up or down break based on price movement
               const isUpBreak = currentZoneIdx > NUM_PRICE_ZONES / 2
 
+              // The support/resistance level is the boundary between the concentrated zone and breakout zone
+              // For upbreak: it's the top of the previous (concentrated) zone = bottom of current zone
+              // For downbreak: it's the bottom of the previous (concentrated) zone = top of current zone
+              const supportLevel = isUpBreak ? currentZone.minPrice : currentZone.maxPrice
+
               breaks.push({
                 date: dataPoint.date,
                 price: currentPrice,
@@ -2489,7 +2494,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 currentWeight: currentWeight,
                 prevWeight: prevWeight,
                 weightDiff: prevWeight - currentWeight,
-                windowIndex: windows.length
+                windowIndex: windows.length,
+                supportLevel: supportLevel, // Price level to monitor for failed breakout
+                concentratedZoneIdx: prevZoneIdx, // Index of the high-volume zone
+                breakoutZoneIdx: currentZoneIdx // Index of the low-volume breakout zone
               })
 
               breakDetected = true
@@ -2686,7 +2694,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return { trades, totalPL, winRate, closedTradeCount: closedTrades.length, sellSignals, smaUsed: smaKey, marketChange }
   }
 
-  // Calculate P&L for Vol Prf V3 based on breakup/breakdown signals and stop-loss
+  // Calculate P&L for Vol Prf V3 based on breakup/breakdown signals and support level breach
   const calculateV3PL = () => {
     if (volumeProfileV3Breaks.length === 0) {
       return { trades: [], totalPL: 0, winRate: 0, tradingSignals: 0, buySignals: [], sellSignals: [], marketChange: 0 }
@@ -2698,6 +2706,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     let isHolding = false
     let buyPrice = null
     let buyDate = null
+    let supportLevel = null // Track the support level from the breakup
 
     // Get all prices in forward chronological order
     const reversedPrices = [...prices].reverse()
@@ -2714,8 +2723,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const currentPrice = currentPoint.close
       const currentDate = currentPoint.date
 
-      // Check for stop-loss: if holding and price dropped below buy price, sell
-      if (isHolding && currentPrice < buyPrice) {
+      // Check for support level breach: if holding and price dropped below support level, sell
+      // The support level is the top of the volume-concentrated range before the breakup
+      if (isHolding && supportLevel !== null && currentPrice < supportLevel) {
         const sellPrice = currentPrice
         const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
 
@@ -2725,19 +2735,20 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           sellPrice,
           sellDate: currentDate,
           plPercent,
-          isStopLoss: true
+          isSupportBreach: true
         })
 
         sellSignals.push({
           date: currentDate,
           price: sellPrice,
-          isStopLoss: true
+          isSupportBreach: true
         })
 
         // Reset state
         isHolding = false
         buyPrice = null
         buyDate = null
+        supportLevel = null
       }
 
       // Check for break signals at this point
@@ -2749,9 +2760,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             isHolding = true
             buyPrice = breakSignal.price
             buyDate = breakSignal.date
+            supportLevel = breakSignal.supportLevel // Store the support level to monitor
             buySignals.push({
               date: breakSignal.date,
-              price: breakSignal.price
+              price: breakSignal.price,
+              supportLevel: breakSignal.supportLevel
             })
           }
           // If consecutive breakup (already holding), ignore it
@@ -2767,19 +2780,20 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               sellPrice,
               sellDate: breakSignal.date,
               plPercent,
-              isStopLoss: false
+              isSupportBreach: false
             })
 
             sellSignals.push({
               date: breakSignal.date,
               price: sellPrice,
-              isStopLoss: false
+              isSupportBreach: false
             })
 
             // Reset state
             isHolding = false
             buyPrice = null
             buyDate = null
+            supportLevel = null
           }
           // If breakdown without holding, ignore it
         }
