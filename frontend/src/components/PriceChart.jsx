@@ -2482,10 +2482,25 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               // Determine if it's an up or down break based on price movement
               const isUpBreak = currentZoneIdx > NUM_PRICE_ZONES / 2
 
-              // The support/resistance level is the boundary between the concentrated zone and breakout zone
-              // For upbreak: it's the top of the previous (concentrated) zone = bottom of current zone
-              // For downbreak: it's the bottom of the previous (concentrated) zone = top of current zone
-              const supportLevel = isUpBreak ? currentZone.minPrice : currentZone.maxPrice
+              // Find the zone with MAXIMUM volume weight (the volume-concentrated zone)
+              // This is the strongest support/resistance level in the current window
+              let maxWeight = 0
+              let maxWeightZone = null
+              let maxWeightZoneIdx = -1
+
+              priceZones.forEach((zone, idx) => {
+                if (zone.volumeWeight > maxWeight) {
+                  maxWeight = zone.volumeWeight
+                  maxWeightZone = zone
+                  maxWeightZoneIdx = idx
+                }
+              })
+
+              // Support level is the top of the heaviest volume zone (for upbreak)
+              // This represents where the most volume concentration occurred before the breakout
+              const supportLevel = isUpBreak ?
+                (maxWeightZone ? maxWeightZone.maxPrice : currentZone.minPrice) :
+                (maxWeightZone ? maxWeightZone.minPrice : currentZone.maxPrice)
 
               breaks.push({
                 date: dataPoint.date,
@@ -2496,8 +2511,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 weightDiff: prevWeight - currentWeight,
                 windowIndex: windows.length,
                 supportLevel: supportLevel, // Price level to monitor for failed breakout
-                concentratedZoneIdx: prevZoneIdx, // Index of the high-volume zone
-                breakoutZoneIdx: currentZoneIdx // Index of the low-volume breakout zone
+                concentratedZoneIdx: maxWeightZoneIdx, // Index of the heaviest volume zone
+                breakoutZoneIdx: currentZoneIdx, // Index of the low-volume breakout zone
+                maxVolumeWeight: maxWeight // Track the max volume weight
               })
 
               breakDetected = true
