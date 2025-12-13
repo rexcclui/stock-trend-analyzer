@@ -197,34 +197,68 @@ const GradientLineWithArrows = ({ xScale, yScale, data, xKey, yKey }) => {
 }
 
 /**
- * Calculate color based on daily percentage change
- * Maps from red (negative) to green (positive)
- * @param {number} percentChange - Daily percentage change
- * @param {number} minChange - Minimum change in dataset
- * @param {number} maxChange - Maximum change in dataset
+ * Calculate Simple Moving Average for volume
+ * @param {Array} data - Array of data points with volume
+ * @param {number} period - SMA period
+ * @returns {Array} Array with SMA values
+ */
+const calculateVolumeSMA = (data, period) => {
+  return data.map((point, index) => {
+    if (index < period - 1) {
+      // For early points, use all available data up to current point
+      const slice = data.slice(0, index + 1)
+      const sum = slice.reduce((acc, p) => acc + p.volume, 0)
+      return sum / slice.length
+    } else {
+      // Calculate SMA for the period
+      const slice = data.slice(index - period + 1, index + 1)
+      const sum = slice.reduce((acc, p) => acc + p.volume, 0)
+      return sum / period
+    }
+  })
+}
+
+/**
+ * Calculate color based on chronological position in data
+ * Maps from light blue (earliest) → deep blue → purple → red → orange → yellow (latest)
+ * @param {number} position - Position in the data array (0 to length-1)
+ * @param {number} totalLength - Total number of data points
  * @returns {string} RGB color string
  */
-const getColorFromPercentChange = (percentChange, minChange, maxChange) => {
-  // Normalize the percent change to 0-1 range
-  const range = maxChange - minChange
-  const normalized = range > 0 ? (percentChange - minChange) / range : 0.5
+const getColorFromPosition = (position, totalLength) => {
+  // Normalize position to 0-1 range
+  const t = totalLength > 1 ? position / (totalLength - 1) : 0
 
-  // Map to color: 0 (red) -> 0.5 (yellow) -> 1 (green)
-  let r, g, b
+  // Define color stops: light blue → deep blue → purple → red → orange → yellow
+  const colorStops = [
+    { pos: 0.0, rgb: [135, 206, 235] },  // Light blue
+    { pos: 0.2, rgb: [30, 58, 138] },    // Deep blue
+    { pos: 0.4, rgb: [147, 51, 234] },   // Purple
+    { pos: 0.6, rgb: [239, 68, 68] },    // Red
+    { pos: 0.8, rgb: [249, 115, 22] },   // Orange
+    { pos: 1.0, rgb: [252, 211, 77] }    // Yellow
+  ]
 
-  if (normalized < 0.5) {
-    // Red to yellow
-    const t = normalized * 2
-    r = 255
-    g = Math.round(255 * t)
-    b = 0
-  } else {
-    // Yellow to green
-    const t = (normalized - 0.5) * 2
-    r = Math.round(255 * (1 - t))
-    g = 255
-    b = 0
+  // Find the two color stops to interpolate between
+  let lowerStop = colorStops[0]
+  let upperStop = colorStops[colorStops.length - 1]
+
+  for (let i = 0; i < colorStops.length - 1; i++) {
+    if (t >= colorStops[i].pos && t <= colorStops[i + 1].pos) {
+      lowerStop = colorStops[i]
+      upperStop = colorStops[i + 1]
+      break
+    }
   }
+
+  // Calculate interpolation factor between the two stops
+  const range = upperStop.pos - lowerStop.pos
+  const factor = range > 0 ? (t - lowerStop.pos) / range : 0
+
+  // Interpolate RGB values
+  const r = Math.round(lowerStop.rgb[0] + (upperStop.rgb[0] - lowerStop.rgb[0]) * factor)
+  const g = Math.round(lowerStop.rgb[1] + (upperStop.rgb[1] - lowerStop.rgb[1]) * factor)
+  const b = Math.round(lowerStop.rgb[2] + (upperStop.rgb[2] - lowerStop.rgb[2]) * factor)
 
   return `rgb(${r}, ${g}, ${b})`
 }
@@ -244,6 +278,9 @@ const PriceVolumeChart = ({ prices, zoomRange }) => {
     const end = zoomRange?.end || prices.length
     const zoomedPrices = prices.slice(start, end)
 
+    // Calculate SMA3 for volume smoothing
+    const volumeSMA3 = calculateVolumeSMA(zoomedPrices, 3)
+
     // Calculate daily percentage change for each data point
     const dataWithChange = zoomedPrices.map((price, index) => {
       let dailyChange = 0
@@ -255,15 +292,10 @@ const PriceVolumeChart = ({ prices, zoomRange }) => {
       return {
         date: price.date,
         close: price.close,
-        volume: price.volume,
+        volume: volumeSMA3[index], // Use SMA3 smoothed volume instead of raw volume
         dailyChange,
       }
     })
-
-    // Calculate min and max daily change for color mapping
-    const changes = dataWithChange.map(d => d.dailyChange)
-    const minChange = Math.min(...changes)
-    const maxChange = Math.max(...changes)
 
     // Calculate price range for X-axis domain
     const closePrices = dataWithChange.map(d => d.close)
@@ -271,10 +303,11 @@ const PriceVolumeChart = ({ prices, zoomRange }) => {
     const maxPrice = Math.max(...closePrices)
     const priceRange = [minPrice * 0.9, maxPrice * 1.1]
 
-    // Add color to each data point
-    const finalData = dataWithChange.map(d => ({
+    // Add color to each data point based on chronological position
+    const totalLength = dataWithChange.length
+    const finalData = dataWithChange.map((d, index) => ({
       ...d,
-      color: getColorFromPercentChange(d.dailyChange, minChange, maxChange),
+      color: getColorFromPosition(index, totalLength),
     }))
 
     return { displayData: finalData, priceRange }
@@ -306,9 +339,9 @@ const PriceVolumeChart = ({ prices, zoomRange }) => {
           <YAxis
             dataKey="volume"
             type="number"
-            name="Volume"
+            name="Volume (SMA3)"
             stroke="#94a3b8"
-            label={{ value: 'Volume', angle: -90, position: 'insideLeft', fill: '#94a3b8' }}
+            label={{ value: 'Volume (SMA3)', angle: -90, position: 'insideLeft', fill: '#94a3b8' }}
             tickFormatter={(value) => {
               if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`
               if (value >= 1000) return `${(value / 1000).toFixed(1)}K`
@@ -364,14 +397,17 @@ const PriceVolumeChart = ({ prices, zoomRange }) => {
           </div>
         </div>
         <div className="flex items-center gap-2 text-sm">
-          <span className="text-slate-400">Point Color (Daily % Change):</span>
+          <span className="text-slate-400">Chronological Color:</span>
           <div className="flex items-center gap-1">
-            <span className="text-red-500 font-semibold">Negative</span>
-            <div className="w-32 h-3 rounded" style={{
-              background: 'linear-gradient(to right, rgb(255,0,0), rgb(255,255,0), rgb(0,255,0))'
+            <span className="font-semibold" style={{ color: 'rgb(135, 206, 235)' }}>Light Blue</span>
+            <div className="w-48 h-3 rounded" style={{
+              background: 'linear-gradient(to right, rgb(135,206,235), rgb(30,58,138), rgb(147,51,234), rgb(239,68,68), rgb(249,115,22), rgb(252,211,77))'
             }}></div>
-            <span className="text-green-500 font-semibold">Positive</span>
+            <span className="font-semibold" style={{ color: 'rgb(252, 211, 77)' }}>Yellow</span>
           </div>
+        </div>
+        <div className="text-xs text-slate-400">
+          Volume: 3-period SMA smoothing applied
         </div>
       </div>
     </div>
