@@ -291,7 +291,7 @@ const PriceVolumeChart = ({ prices, zoomRange }) => {
   return (
     <div className="w-full">
       <h3 className="text-lg font-semibold mb-4 text-slate-100">Price-Volume Analysis</h3>
-      <ResponsiveContainer width="100%" height={400}>
+      <ResponsiveContainer width="100%" height={800}>
         <LineChart data={displayData} margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
           <XAxis
