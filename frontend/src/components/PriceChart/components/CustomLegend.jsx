@@ -32,6 +32,7 @@ import VolumeLegendPills from '../../VolumeLegendPills'
  * @param {Function} props.setManualChannels - Setter for manual channels array
  * @param {Function} props.extendManualChannel - Function to extend manual channel
  * @param {boolean} props.volumeProfileV2Enabled - Whether volume profile V2 is enabled
+ * @param {boolean} props.volumeProfileV3Enabled - Whether volume profile V3 is enabled
  * @param {boolean} props.isMobile - Whether the view is mobile
  * @param {Array} props.displayPrices - Price data for display
  * @param {Object} props.zoomRange - Current zoom range {start, end}
@@ -62,6 +63,7 @@ export const CustomLegend = ({
   setManualChannels,
   extendManualChannel,
   volumeProfileV2Enabled,
+  volumeProfileV3Enabled,
   isMobile,
   displayPrices,
   zoomRange,
@@ -395,6 +397,74 @@ export const CustomLegend = ({
                     background: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
                     opacity: opacity,
                     border: '1px solid rgba(59, 130, 246, 0.5)',
+                    borderRadius: '2px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <span style={{ fontSize: '8px', color: '#f1f5f9', fontWeight: 700, textShadow: '0 0 2px rgba(0,0,0,0.8)' }}>
+                      {step.label}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* Volume Profile V3 Color Legend - inline with other legends (desktop only) */}
+      {volumeProfileV3Enabled && !isMobile && (() => {
+        // Generate color blocks for specific volume weight breakpoints
+        const legendSteps = [
+          { weight: 0.02, label: '2%' },
+          { weight: 0.04, label: '4%' },
+          { weight: 0.06, label: '6%' },
+          { weight: 0.08, label: '8%' },
+          { weight: 0.10, label: '10%' },
+          { weight: 0.12, label: '12%' },
+          { weight: 0.15, label: '15%' },
+          { weight: 0.18, label: '18%' },
+          { weight: 0.20, label: '20%' },
+          { weight: 0.22, label: '22%' },
+          { weight: 0.24, label: '24%' },
+          { weight: 0.25, label: '25%+' }
+        ]
+
+        return (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+            padding: '8px 12px',
+            background: 'rgba(16, 185, 129, 0.1)',
+            border: '1px solid rgba(16, 185, 129, 0.3)',
+            borderRadius: '8px',
+            backdropFilter: 'blur(4px)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+              <span style={{ fontSize: '11px', color: '#10b981', fontWeight: 700 }}>
+                V3 Volume Weight %
+              </span>
+              <span style={{ fontSize: '10px', color: '#6ee7b7', fontWeight: 600 }}>
+                10 cumulative zones
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+              {legendSteps.map((step, idx) => {
+                const normalizedWeight = Math.min(1, step.weight / 0.25)
+                const hue = Math.floor(normalizedWeight * 240)
+                const saturation = 90 + (normalizedWeight * 10)
+                const lightness = 60 - (normalizedWeight * 30)
+                const opacity = 0.2 + (Math.pow(normalizedWeight, 0.5) * 0.75)
+
+                return (
+                  <div key={idx} style={{
+                    width: '32px',
+                    height: '20px',
+                    background: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+                    opacity: opacity,
+                    border: '1px solid rgba(16, 185, 129, 0.5)',
                     borderRadius: '2px',
                     display: 'flex',
                     alignItems: 'center',

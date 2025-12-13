@@ -3481,6 +3481,27 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         })
       }
 
+      // Check Vol Prf V3 first (highest priority)
+      if (volumeProfileV3Enabled && volumeProfileV3Data.length > 0) {
+        // Find the window that contains this date
+        for (const window of volumeProfileV3Data) {
+          if (!window.dataPoints || window.dataPoints.length === 0) continue
+
+          // Find the data point for this date
+          const dataPoint = window.dataPoints.find(point => point.date === hoveredDate)
+
+          if (dataPoint && dataPoint.priceZones) {
+            const currentZoneIdx = dataPoint.priceZones.findIndex(zone =>
+              hoveredPrice >= zone.minPrice && hoveredPrice <= zone.maxPrice
+            )
+
+            if (currentZoneIdx >= 0) {
+              return buildLegend(dataPoint.priceZones, currentZoneIdx, 'volumeWeight')
+            }
+          }
+        }
+      }
+
       if (volumeProfileV2Enabled && volumeProfileV2Data.length > 0) {
         const matchingSlot = volumeProfileV2Data.find(slot =>
           hoveredDate >= slot.startDate && hoveredDate <= slot.endDate
@@ -4993,6 +5014,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               setManualChannels={setManualChannels}
               extendManualChannel={extendManualChannel}
               volumeProfileV2Enabled={volumeProfileV2Enabled}
+              volumeProfileV3Enabled={volumeProfileV3Enabled}
               isMobile={isMobile}
               displayPrices={displayPrices}
               zoomRange={zoomRange}
