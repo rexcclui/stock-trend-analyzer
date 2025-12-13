@@ -2380,19 +2380,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
       if (windowData.length === 0) break
 
-      // Find price range for this window
-      const windowPrices = windowData.map(p => p.close)
-      const minPrice = Math.min(...windowPrices)
-      const maxPrice = Math.max(...windowPrices)
-      const priceRange = maxPrice - minPrice
-
-      if (priceRange === 0) {
-        currentWindowStart = currentWindowEnd
-        continue
-      }
-
-      const priceZoneHeight = priceRange / NUM_PRICE_ZONES
-
       // Process each data point in the window to detect breaks
       const windowPoints = []
       let breakDetected = false
@@ -2403,8 +2390,34 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
         // Calculate volume distribution across all 10 price zones for current cumulative data
         const cumulativeData = windowData.slice(0, i + 1)
-        const priceZones = []
 
+        // Calculate min/max from CUMULATIVE data (not entire window)
+        const cumulativePrices = cumulativeData.map(p => p.close)
+        const minPrice = Math.min(...cumulativePrices)
+        const maxPrice = Math.max(...cumulativePrices)
+        const priceRange = maxPrice - minPrice
+
+        // Skip if no price movement yet
+        if (priceRange === 0) {
+          windowPoints.push({
+            date: dataPoint.date,
+            price: dataPoint.close,
+            volume: dataPoint.volume || 0,
+            priceZones: [{
+              minPrice: minPrice,
+              maxPrice: minPrice,
+              volume: dataPoint.volume || 0,
+              volumeWeight: 1.0
+            }],
+            currentZoneIdx: 0
+          })
+          continue
+        }
+
+        const priceZoneHeight = priceRange / NUM_PRICE_ZONES
+
+        // Create 10 price zones based on cumulative range
+        const priceZones = []
         for (let j = 0; j < NUM_PRICE_ZONES; j++) {
           priceZones.push({
             minPrice: minPrice + (j * priceZoneHeight),
@@ -2488,8 +2501,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         startDate: windowData[0].date,
         endDate: windowData[windowData.length - 1].date,
         dataPoints: windowPoints,
-        minPrice: minPrice,
-        maxPrice: maxPrice,
         breakDetected: breakDetected
       })
 
