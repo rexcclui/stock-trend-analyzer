@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Customized } from 'recharts'
 
 /**
  * Custom tooltip for the Price-Volume chart
@@ -46,6 +46,122 @@ const CustomDot = (props) => {
       strokeWidth={1}
       opacity={0.9}
     />
+  )
+}
+
+/**
+ * Interpolate between two colors
+ */
+const interpolateColor = (color1, color2, factor) => {
+  // Extract RGB values from rgb(r, g, b) string
+  const extractRGB = (colorStr) => {
+    const match = colorStr.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/)
+    return match ? [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])] : [0, 0, 0]
+  }
+
+  const [r1, g1, b1] = extractRGB(color1)
+  const [r2, g2, b2] = extractRGB(color2)
+
+  const r = Math.round(r1 + (r2 - r1) * factor)
+  const g = Math.round(g1 + (g2 - g1) * factor)
+  const b = Math.round(b1 + (b2 - b1) * factor)
+
+  return `rgb(${r}, ${g}, ${b})`
+}
+
+/**
+ * Custom gradient line segments with directional arrows
+ */
+const GradientLineWithArrows = ({ xScale, yScale, data, xKey, yKey }) => {
+  if (!data || data.length < 2 || !xScale || !yScale) return null
+
+  // Generate line segments with gradients
+  const segments = []
+  const arrows = []
+
+  for (let i = 0; i < data.length - 1; i++) {
+    const current = data[i]
+    const next = data[i + 1]
+
+    const x1 = xScale(current[xKey])
+    const y1 = yScale(current[yKey])
+    const x2 = xScale(next[xKey])
+    const y2 = yScale(next[yKey])
+
+    // Skip if coordinates are invalid
+    if (isNaN(x1) || isNaN(y1) || isNaN(x2) || isNaN(y2)) continue
+
+    // Create gradient ID for this segment
+    const gradientId = `gradient-${i}`
+    const color1 = current.color || '#64748b'
+    const color2 = next.color || '#64748b'
+
+    segments.push(
+      <g key={`segment-${i}`}>
+        <defs>
+          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor={color1} stopOpacity={0.8} />
+            <stop offset="100%" stopColor={color2} stopOpacity={0.8} />
+          </linearGradient>
+        </defs>
+        <line
+          x1={x1}
+          y1={y1}
+          x2={x2}
+          y2={y2}
+          stroke={`url(#${gradientId})`}
+          strokeWidth={3}
+          strokeLinecap="round"
+        />
+      </g>
+    )
+
+    // Add arrow every 5 segments or at the last segment
+    if (i % 5 === 0 || i === data.length - 2) {
+      const dx = x2 - x1
+      const dy = y2 - y1
+      const angle = Math.atan2(dy, dx)
+
+      // Position arrow at midpoint
+      const midX = (x1 + x2) / 2
+      const midY = (y1 + y2) / 2
+
+      // Arrow size
+      const arrowSize = 8
+
+      // Calculate arrow points
+      const arrowPoints = [
+        [midX, midY],
+        [
+          midX - arrowSize * Math.cos(angle - Math.PI / 6),
+          midY - arrowSize * Math.sin(angle - Math.PI / 6)
+        ],
+        [
+          midX - arrowSize * Math.cos(angle + Math.PI / 6),
+          midY - arrowSize * Math.sin(angle + Math.PI / 6)
+        ]
+      ]
+
+      const midColor = interpolateColor(color1, color2, 0.5)
+
+      arrows.push(
+        <polygon
+          key={`arrow-${i}`}
+          points={arrowPoints.map(p => p.join(',')).join(' ')}
+          fill={midColor}
+          stroke="#1e293b"
+          strokeWidth={0.5}
+          opacity={0.9}
+        />
+      )
+    }
+  }
+
+  return (
+    <g>
+      {segments}
+      {arrows}
+    </g>
   )
 }
 
@@ -169,11 +285,28 @@ const PriceVolumeChart = ({ prices, zoomRange }) => {
             }}
           />
           <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} />
+          {/* Custom gradient line with arrows */}
+          <Customized
+            component={({ xAxisMap, yAxisMap, ...props }) => {
+              const xScale = xAxisMap?.[0]?.scale
+              const yScale = yAxisMap?.[0]?.scale
+              return (
+                <GradientLineWithArrows
+                  xScale={xScale}
+                  yScale={yScale}
+                  data={displayData}
+                  xKey="close"
+                  yKey="volume"
+                />
+              )
+            }}
+          />
+          {/* Dots on top of the line */}
           <Line
             type="monotone"
             dataKey="volume"
-            stroke="#64748b"
-            strokeWidth={2}
+            stroke="none"
+            strokeWidth={0}
             dot={<CustomDot />}
             activeDot={{ r: 6 }}
             isAnimationActive={false}
