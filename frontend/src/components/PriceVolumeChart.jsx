@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ZAxis } from 'recharts'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 /**
  * Custom tooltip for the Price-Volume chart
@@ -26,6 +26,26 @@ const CustomTooltip = ({ active, payload }) => {
         </p>
       </div>
     </div>
+  )
+}
+
+/**
+ * Custom Dot component with color based on daily change
+ */
+const CustomDot = (props) => {
+  const { cx, cy, payload } = props
+  if (!payload || cx === undefined || cy === undefined) return null
+
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={4}
+      fill={payload.color}
+      stroke="#1e293b"
+      strokeWidth={1}
+      opacity={0.9}
+    />
   )
 }
 
@@ -69,8 +89,8 @@ const getColorFromPercentChange = (percentChange, minChange, maxChange) => {
  */
 const PriceVolumeChart = ({ prices, zoomRange }) => {
   // Calculate display data with zoom range applied
-  const displayData = useMemo(() => {
-    if (!prices || prices.length === 0) return []
+  const { displayData, priceRange } = useMemo(() => {
+    if (!prices || prices.length === 0) return { displayData: [], priceRange: [0, 100] }
 
     // Apply zoom range
     const start = zoomRange?.start || 0
@@ -98,11 +118,19 @@ const PriceVolumeChart = ({ prices, zoomRange }) => {
     const minChange = Math.min(...changes)
     const maxChange = Math.max(...changes)
 
+    // Calculate price range for X-axis domain
+    const closePrices = dataWithChange.map(d => d.close)
+    const minPrice = Math.min(...closePrices)
+    const maxPrice = Math.max(...closePrices)
+    const priceRange = [minPrice * 0.9, maxPrice * 1.1]
+
     // Add color to each data point
-    return dataWithChange.map(d => ({
+    const finalData = dataWithChange.map(d => ({
       ...d,
       color: getColorFromPercentChange(d.dailyChange, minChange, maxChange),
     }))
+
+    return { displayData: finalData, priceRange }
   }, [prices, zoomRange])
 
   if (!prices || prices.length === 0) {
@@ -117,19 +145,20 @@ const PriceVolumeChart = ({ prices, zoomRange }) => {
     <div className="w-full">
       <h3 className="text-lg font-semibold mb-4 text-slate-100">Price-Volume Analysis</h3>
       <ResponsiveContainer width="100%" height={400}>
-        <ScatterChart margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
+        <LineChart data={displayData} margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
           <XAxis
-            type="number"
             dataKey="close"
+            type="number"
             name="Price"
+            domain={priceRange}
             stroke="#94a3b8"
             label={{ value: 'Price ($)', position: 'insideBottom', offset: -10, fill: '#94a3b8' }}
             tickFormatter={(value) => `$${value.toFixed(2)}`}
           />
           <YAxis
-            type="number"
             dataKey="volume"
+            type="number"
             name="Volume"
             stroke="#94a3b8"
             label={{ value: 'Volume', angle: -90, position: 'insideLeft', fill: '#94a3b8' }}
@@ -139,38 +168,38 @@ const PriceVolumeChart = ({ prices, zoomRange }) => {
               return value.toString()
             }}
           />
-          <ZAxis range={[50, 200]} />
           <Tooltip content={<CustomTooltip />} cursor={{ strokeDasharray: '3 3' }} />
-          <Scatter
-            data={displayData}
-            fill="#8884d8"
-            shape={(props) => {
-              const { cx, cy, fill, payload } = props
-              return (
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={4}
-                  fill={payload.color}
-                  stroke="#1e293b"
-                  strokeWidth={1}
-                  opacity={0.8}
-                />
-              )
-            }}
+          <Line
+            type="monotone"
+            dataKey="volume"
+            stroke="#64748b"
+            strokeWidth={2}
+            dot={<CustomDot />}
+            activeDot={{ r: 6 }}
+            isAnimationActive={false}
           />
-        </ScatterChart>
+        </LineChart>
       </ResponsiveContainer>
 
-      {/* Color legend */}
-      <div className="mt-4 flex items-center justify-center gap-2 text-sm">
-        <span className="text-slate-400">Daily Change:</span>
-        <div className="flex items-center gap-1">
-          <span className="text-red-500 font-semibold">Very Red</span>
-          <div className="w-32 h-3 rounded" style={{
-            background: 'linear-gradient(to right, rgb(255,0,0), rgb(255,255,0), rgb(0,255,0))'
-          }}></div>
-          <span className="text-green-500 font-semibold">Very Green</span>
+      {/* Direction indicator and color legend */}
+      <div className="mt-4 flex flex-col items-center gap-3">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-slate-400">Direction:</span>
+          <div className="flex items-center gap-1 px-3 py-1 bg-slate-700 rounded">
+            <span className="text-slate-300">Old Date</span>
+            <span className="text-slate-400 mx-2">→</span>
+            <span className="text-slate-300">Latest Date</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-slate-400">Daily Change:</span>
+          <div className="flex items-center gap-1">
+            <span className="text-red-500 font-semibold">Very Red</span>
+            <div className="w-32 h-3 rounded" style={{
+              background: 'linear-gradient(to right, rgb(255,0,0), rgb(255,255,0), rgb(0,255,0))'
+            }}></div>
+            <span className="text-green-500 font-semibold">Very Green</span>
+          </div>
         </div>
       </div>
     </div>
