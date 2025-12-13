@@ -219,46 +219,43 @@ const calculateVolumeSMA = (data, period) => {
 }
 
 /**
- * Calculate color based on chronological position in data
- * Maps from light blue (earliest) → deep blue → purple → red → orange → yellow (latest)
- * @param {number} position - Position in the data array (0 to length-1)
- * @param {number} totalLength - Total number of data points
+ * Calculate color based on price and volume movement direction and slope magnitude
+ * @param {number} priceChange - Change in price (current - previous)
+ * @param {number} volumeChange - Change in volume (current - previous)
+ * @param {number} maxMagnitude - Maximum magnitude for normalization
  * @returns {string} RGB color string
  */
-const getColorFromPosition = (position, totalLength) => {
-  // Normalize position to 0-1 range
-  const t = totalLength > 1 ? position / (totalLength - 1) : 0
+const getColorFromSlope = (priceChange, volumeChange, maxMagnitude) => {
+  // Determine base color based on direction
+  let baseColor
 
-  // Define color stops: light blue → deep blue → purple → red → orange → yellow
-  const colorStops = [
-    { pos: 0.0, rgb: [135, 206, 235] },  // Light blue
-    { pos: 0.2, rgb: [30, 58, 138] },    // Deep blue
-    { pos: 0.4, rgb: [147, 51, 234] },   // Purple
-    { pos: 0.6, rgb: [239, 68, 68] },    // Red
-    { pos: 0.8, rgb: [249, 115, 22] },   // Orange
-    { pos: 1.0, rgb: [252, 211, 77] }    // Yellow
-  ]
-
-  // Find the two color stops to interpolate between
-  let lowerStop = colorStops[0]
-  let upperStop = colorStops[colorStops.length - 1]
-
-  for (let i = 0; i < colorStops.length - 1; i++) {
-    if (t >= colorStops[i].pos && t <= colorStops[i + 1].pos) {
-      lowerStop = colorStops[i]
-      upperStop = colorStops[i + 1]
-      break
-    }
+  if (priceChange >= 0 && volumeChange >= 0) {
+    // Price up, Volume up → Green
+    baseColor = [0, 255, 0]
+  } else if (priceChange < 0 && volumeChange >= 0) {
+    // Price down, Volume up → Red
+    baseColor = [255, 0, 0]
+  } else if (priceChange >= 0 && volumeChange < 0) {
+    // Price up, Volume down → Blue
+    baseColor = [0, 0, 255]
+  } else {
+    // Price down, Volume down → Yellow
+    baseColor = [255, 255, 0]
   }
 
-  // Calculate interpolation factor between the two stops
-  const range = upperStop.pos - lowerStop.pos
-  const factor = range > 0 ? (t - lowerStop.pos) / range : 0
+  // Calculate magnitude (slope) for color intensity
+  const magnitude = Math.sqrt(priceChange * priceChange + volumeChange * volumeChange)
 
-  // Interpolate RGB values
-  const r = Math.round(lowerStop.rgb[0] + (upperStop.rgb[0] - lowerStop.rgb[0]) * factor)
-  const g = Math.round(lowerStop.rgb[1] + (upperStop.rgb[1] - lowerStop.rgb[1]) * factor)
-  const b = Math.round(lowerStop.rgb[2] + (upperStop.rgb[2] - lowerStop.rgb[2]) * factor)
+  // Normalize magnitude to 0-1 range, with minimum intensity of 0.3
+  const normalizedMagnitude = maxMagnitude > 0
+    ? Math.max(0.3, Math.min(1, magnitude / maxMagnitude))
+    : 0.5
+
+  // Apply intensity to base color
+  // Light background color when magnitude is low, full color when magnitude is high
+  const r = Math.round(255 - (255 - baseColor[0]) * normalizedMagnitude)
+  const g = Math.round(255 - (255 - baseColor[1]) * normalizedMagnitude)
+  const b = Math.round(255 - (255 - baseColor[2]) * normalizedMagnitude)
 
   return `rgb(${r}, ${g}, ${b})`
 }
@@ -281,33 +278,47 @@ const PriceVolumeChart = ({ prices, zoomRange }) => {
     // Calculate SMA3 for volume smoothing
     const volumeSMA3 = calculateVolumeSMA(zoomedPrices, 3)
 
-    // Calculate daily percentage change for each data point
-    const dataWithChange = zoomedPrices.map((price, index) => {
+    // Calculate price and volume changes for each data point
+    const dataWithChanges = zoomedPrices.map((price, index) => {
       let dailyChange = 0
+      let priceChange = 0
+      let volumeChange = 0
+
       if (index > 0) {
         const prevClose = zoomedPrices[index - 1].close
+        const prevVolume = volumeSMA3[index - 1]
+
         dailyChange = ((price.close - prevClose) / prevClose) * 100
+        priceChange = price.close - prevClose
+        volumeChange = volumeSMA3[index] - prevVolume
       }
 
       return {
         date: price.date,
         close: price.close,
-        volume: volumeSMA3[index], // Use SMA3 smoothed volume instead of raw volume
+        volume: volumeSMA3[index],
         dailyChange,
+        priceChange,
+        volumeChange,
       }
     })
 
+    // Calculate maximum magnitude for normalization
+    const magnitudes = dataWithChanges.map(d =>
+      Math.sqrt(d.priceChange * d.priceChange + d.volumeChange * d.volumeChange)
+    )
+    const maxMagnitude = Math.max(...magnitudes, 1) // Ensure non-zero
+
     // Calculate price range for X-axis domain
-    const closePrices = dataWithChange.map(d => d.close)
+    const closePrices = dataWithChanges.map(d => d.close)
     const minPrice = Math.min(...closePrices)
     const maxPrice = Math.max(...closePrices)
     const priceRange = [minPrice * 0.9, maxPrice * 1.1]
 
-    // Add color to each data point based on chronological position
-    const totalLength = dataWithChange.length
-    const finalData = dataWithChange.map((d, index) => ({
+    // Add color to each data point based on price/volume slope
+    const finalData = dataWithChanges.map(d => ({
       ...d,
-      color: getColorFromPosition(index, totalLength),
+      color: getColorFromSlope(d.priceChange, d.volumeChange, maxMagnitude),
     }))
 
     return { displayData: finalData, priceRange }
@@ -396,14 +407,40 @@ const PriceVolumeChart = ({ prices, zoomRange }) => {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-slate-400">Chronological Color:</span>
-          <div className="flex items-center gap-1">
-            <span className="font-semibold" style={{ color: 'rgb(135, 206, 235)' }}>Light Blue</span>
-            <div className="w-48 h-3 rounded" style={{
-              background: 'linear-gradient(to right, rgb(135,206,235), rgb(30,58,138), rgb(147,51,234), rgb(239,68,68), rgb(249,115,22), rgb(252,211,77))'
-            }}></div>
-            <span className="font-semibold" style={{ color: 'rgb(252, 211, 77)' }}>Yellow</span>
+        <div className="flex flex-col items-center gap-2 text-sm">
+          <span className="text-slate-400 font-semibold">Color Legend (based on Price & Volume movement):</span>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-700/50 rounded">
+              <div className="w-6 h-6 rounded" style={{ backgroundColor: 'rgb(0, 255, 0)' }}></div>
+              <div className="text-left">
+                <div className="text-slate-200 font-medium">Green</div>
+                <div className="text-xs text-slate-400">Price ↑ Volume ↑</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-700/50 rounded">
+              <div className="w-6 h-6 rounded" style={{ backgroundColor: 'rgb(255, 0, 0)' }}></div>
+              <div className="text-left">
+                <div className="text-slate-200 font-medium">Red</div>
+                <div className="text-xs text-slate-400">Price ↓ Volume ↑</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-700/50 rounded">
+              <div className="w-6 h-6 rounded" style={{ backgroundColor: 'rgb(0, 0, 255)' }}></div>
+              <div className="text-left">
+                <div className="text-slate-200 font-medium">Blue</div>
+                <div className="text-xs text-slate-400">Price ↑ Volume ↓</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2 bg-slate-700/50 rounded">
+              <div className="w-6 h-6 rounded" style={{ backgroundColor: 'rgb(255, 255, 0)' }}></div>
+              <div className="text-left">
+                <div className="text-slate-200 font-medium">Yellow</div>
+                <div className="text-xs text-slate-400">Price ↓ Volume ↓</div>
+              </div>
+            </div>
+          </div>
+          <div className="text-xs text-slate-400 text-center">
+            Color depth indicates slope magnitude (lighter = smaller change, darker = larger change)
           </div>
         </div>
         <div className="text-xs text-slate-400">
