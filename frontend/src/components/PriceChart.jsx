@@ -2370,10 +2370,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     if (visibleData.length === 0) return { windows: [], breaks: [] }
 
     const MIN_WINDOW_SIZE = 150
-    const NUM_PRICE_ZONES = 10
     const BREAK_VOLUME_THRESHOLD = 0.10 // 10%
-    const BREAK_DIFF_THRESHOLD = 0.08 // 8% difference from previous zone
+    const BREAK_DIFF_THRESHOLD = 0.08 // 8% difference from previous 5 zones
     const PRICE_SLOT_MIN_RATIO = 0.50 // Each zone must be at least 50% of previous window's zone
+    const ZONE_LOOKBACK = 5 // Check previous 5 zones for break detection
 
     const windows = []
     const breaks = []
@@ -2395,8 +2395,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       for (let i = 0; i < windowData.length; i++) {
         const dataPoint = windowData[i]
 
-        // Calculate volume distribution across all 10 price zones for current cumulative data
+        // Calculate volume distribution across price zones for current cumulative data
         const cumulativeData = windowData.slice(0, i + 1)
+
+        // Calculate dynamic number of zones: data points / 15, min 15, max 20
+        const numPriceZones = Math.max(15, Math.min(20, Math.floor(cumulativeData.length / 15)))
 
         // Calculate min/max from CUMULATIVE data (not entire window)
         const cumulativePrices = cumulativeData.map(p => p.close)
@@ -2421,11 +2424,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           continue
         }
 
-        const priceZoneHeight = priceRange / NUM_PRICE_ZONES
+        const priceZoneHeight = priceRange / numPriceZones
 
-        // Create 10 price zones based on cumulative range
+        // Create price zones based on cumulative range (dynamic number of zones)
         const priceZones = []
-        for (let j = 0; j < NUM_PRICE_ZONES; j++) {
+        for (let j = 0; j < numPriceZones; j++) {
           priceZones.push({
             minPrice: minPrice + (j * priceZoneHeight),
             maxPrice: minPrice + ((j + 1) * priceZoneHeight),
@@ -2442,7 +2445,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           totalVolume += volume
 
           let zoneIndex = Math.floor((priceValue - minPrice) / priceZoneHeight)
-          if (zoneIndex >= NUM_PRICE_ZONES) zoneIndex = NUM_PRICE_ZONES - 1
+          if (zoneIndex >= numPriceZones) zoneIndex = numPriceZones - 1
           if (zoneIndex < 0) zoneIndex = 0
 
           priceZones[zoneIndex].volume += volume
@@ -2456,14 +2459,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         // Find which zone the current price falls into
         const currentPrice = dataPoint.close
         let currentZoneIdx = Math.floor((currentPrice - minPrice) / priceZoneHeight)
-        if (currentZoneIdx >= NUM_PRICE_ZONES) currentZoneIdx = NUM_PRICE_ZONES - 1
+        if (currentZoneIdx >= numPriceZones) currentZoneIdx = numPriceZones - 1
         if (currentZoneIdx < 0) currentZoneIdx = 0
 
         const currentZone = priceZones[currentZoneIdx]
         const currentWeight = currentZone.volumeWeight
 
         // Check break condition (skip first few points to have meaningful data)
-        if (i >= 10 && currentZoneIdx > 0) {
+        if (i >= 10 && currentZoneIdx >= ZONE_LOOKBACK) {
           // Price slot constraint: Check if current zone height is at least 50% of previous window
           // If zones are too small compared to previous window, don't break - keep extending
           let priceSlotSizeOk = true
@@ -2475,17 +2478,36 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           // Only check volume break condition if price slot size is acceptable
           if (priceSlotSizeOk) {
-            // Find previous zone (the zone below current)
-            const prevZoneIdx = currentZoneIdx - 1
-            const prevZone = priceZones[prevZoneIdx]
-            const prevWeight = prevZone.volumeWeight
+            // Check any of the previous 5 zones for volume difference
+            let breakConditionMet = false
+            let maxWeightDiff = 0
+            let bestPrevZoneIdx = -1
 
-            // Break condition: current weight < 10% AND 8% less than previous zone
-            if (currentWeight < BREAK_VOLUME_THRESHOLD &&
-                prevWeight - currentWeight >= BREAK_DIFF_THRESHOLD) {
+            for (let lookback = 1; lookback <= ZONE_LOOKBACK; lookback++) {
+              const prevZoneIdx = currentZoneIdx - lookback
+              if (prevZoneIdx >= 0) {
+                const prevZone = priceZones[prevZoneIdx]
+                const prevWeight = prevZone.volumeWeight
+                const weightDiff = prevWeight - currentWeight
 
+                // Track the best weight difference
+                if (weightDiff > maxWeightDiff) {
+                  maxWeightDiff = weightDiff
+                  bestPrevZoneIdx = prevZoneIdx
+                }
+
+                // Break condition: current weight < 10% AND 8% less than any of previous 5 zones
+                if (currentWeight < BREAK_VOLUME_THRESHOLD &&
+                    weightDiff >= BREAK_DIFF_THRESHOLD) {
+                  breakConditionMet = true
+                  break
+                }
+              }
+            }
+
+            if (breakConditionMet) {
               // Determine if it's an up or down break based on price movement
-              const isUpBreak = currentZoneIdx > NUM_PRICE_ZONES / 2
+              const isUpBreak = currentZoneIdx > numPriceZones / 2
 
               // Find the zone with MAXIMUM volume weight (the volume-concentrated zone)
               // This is the strongest support/resistance level in the current window
@@ -2513,8 +2535,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 price: currentPrice,
                 isUpBreak: isUpBreak,
                 currentWeight: currentWeight,
-                prevWeight: prevWeight,
-                weightDiff: prevWeight - currentWeight,
+                prevWeight: bestPrevZoneIdx >= 0 ? priceZones[bestPrevZoneIdx].volumeWeight : 0,
+                weightDiff: maxWeightDiff,
                 windowIndex: windows.length,
                 supportLevel: supportLevel, // Price level to monitor for failed breakout
                 concentratedZoneIdx: maxWeightZoneIdx, // Index of the heaviest volume zone
