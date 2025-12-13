@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
-import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp, RefreshCw, Filter, Menu } from 'lucide-react'
+import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp, RefreshCw, Filter, Menu, ZoomIn } from 'lucide-react'
 import PriceChart from './PriceChart'
 import IndicatorsChart from './IndicatorsChart'
 import SignalsList from './SignalsList'
@@ -295,6 +295,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
             revAllChannelVolumeFilterEnabled: false,
             manualChannelEnabled: false,
             manualChannelDragMode: false,
+            zoomMode: false,
             bestChannelEnabled: false,
             bestChannelVolumeFilterEnabled: false,
             bestStdevEnabled: false,
@@ -1939,6 +1940,26 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                       )}
                       <button
                         type="button"
+                        onClick={() => {
+                          setCharts(prevCharts =>
+                            prevCharts.map(c =>
+                              c.id === chart.id
+                                ? { ...c, zoomMode: !c.zoomMode }
+                                : c
+                            )
+                          )
+                        }}
+                        className={`px-3 py-1 text-sm rounded font-medium transition-colors flex items-center gap-1 ${chart.zoomMode
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        title="Zoom Mode - Drag to select a range to zoom into"
+                      >
+                        <ZoomIn className="w-4 h-4" />
+                        Zoom
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => toggleBestChannel(chart.id)}
                         className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.bestChannelEnabled
                           ? 'bg-amber-600 text-white'
@@ -2142,6 +2163,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                     revAllChannelVolumeFilterEnabled={chart.revAllChannelVolumeFilterEnabled}
                     manualChannelEnabled={chart.manualChannelEnabled}
                     manualChannelDragMode={chart.manualChannelDragMode}
+                    zoomMode={chart.zoomMode}
                     bestChannelEnabled={chart.bestChannelEnabled}
                     bestChannelVolumeFilterEnabled={chart.bestChannelVolumeFilterEnabled}
                     bestStdevEnabled={chart.bestStdevEnabled}

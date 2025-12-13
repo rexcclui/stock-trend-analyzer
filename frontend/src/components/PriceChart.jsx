@@ -24,7 +24,7 @@ import {
 import VolumeLegendPills from './VolumeLegendPills'
 import { getVolumeColor } from './PriceChart/utils'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RefreshTrigger = 0, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RefreshTrigger = 0, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -77,6 +77,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const [isSelectingVolumeProfile, setIsSelectingVolumeProfile] = useState(false)
   const [volumeProfileSelectionStart, setVolumeProfileSelectionStart] = useState(null)
   const [volumeProfileSelectionEnd, setVolumeProfileSelectionEnd] = useState(null)
+
+  // Zoom selection state
+  const [isSelectingZoom, setIsSelectingZoom] = useState(false)
+  const [zoomSelectionStart, setZoomSelectionStart] = useState(null)
+  const [zoomSelectionEnd, setZoomSelectionEnd] = useState(null)
 
   // Chart panning state
   const [isPanning, setIsPanning] = useState(false)
@@ -3778,8 +3783,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       setSyncedMouseDate(e.activeLabel)
     }
 
-    // Handle chart panning - only when NOT in manual channel drag mode
-    if (isPanning && !manualChannelDragMode && e && e.chartX !== undefined && panStartX !== null && panStartZoom !== null) {
+    // Handle chart panning - only when NOT in manual channel drag mode or zoom mode
+    if (isPanning && !manualChannelDragMode && !zoomMode && e && e.chartX !== undefined && panStartX !== null && panStartZoom !== null) {
       const deltaX = e.chartX - panStartX
       const chartWidth = chartContainerRef.current?.offsetWidth || 800
       const totalDataLength = chartData.length
@@ -3853,6 +3858,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return
     }
 
+    // Handle zoom selection
+    if (zoomMode && isSelectingZoom && e && e.activeLabel) {
+      setZoomSelectionEnd(e.activeLabel)
+      return
+    }
+
     // Handle manual channel selection
     if (manualChannelEnabled && manualChannelDragMode && isSelecting && e && e.activeLabel) {
       setSelectionEnd(e.activeLabel)
@@ -3880,7 +3891,15 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return
     }
 
-    // Manual channel selection - second priority
+    // Zoom mode selection - second priority
+    if (zoomMode && e && e.activeLabel) {
+      setIsSelectingZoom(true)
+      setZoomSelectionStart(e.activeLabel)
+      setZoomSelectionEnd(e.activeLabel)
+      return
+    }
+
+    // Manual channel selection - third priority
     if (manualChannelEnabled && manualChannelDragMode && e && e.activeLabel) {
       setIsSelecting(true)
       setSelectionStart(e.activeLabel)
@@ -3888,7 +3907,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return
     }
 
-    // Panning - only when neither manual mode is active
+    // Panning - only when no other mode is active
     if (e && e.chartX !== undefined) {
       setIsPanning(true)
       setPanStartX(e.chartX)
@@ -3903,6 +3922,29 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       setIsPanning(false)
       setPanStartX(null)
       setPanStartZoom(null)
+      return
+    }
+
+    // Process zoom selection
+    if (zoomMode && isSelectingZoom && zoomSelectionStart && zoomSelectionEnd) {
+      // Find the indices in the reversed display prices (oldest first)
+      const reversedDisplayPrices = [...displayPrices].reverse()
+      const startIndex = reversedDisplayPrices.findIndex(p => p.date === zoomSelectionStart)
+      const endIndex = reversedDisplayPrices.findIndex(p => p.date === zoomSelectionEnd)
+
+      if (startIndex !== -1 && endIndex !== -1) {
+        // Ensure correct order (start should be earlier in time, which means lower index)
+        const minIndex = Math.min(startIndex, endIndex)
+        const maxIndex = Math.max(startIndex, endIndex)
+
+        // Apply zoom to the selected range
+        onZoomChange({ start: minIndex, end: maxIndex + 1 })
+      }
+
+      // Reset zoom selection state
+      setIsSelectingZoom(false)
+      setZoomSelectionStart(null)
+      setZoomSelectionEnd(null)
       return
     }
 
@@ -4736,6 +4778,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Determine cursor style based on state
   const getCursorStyle = () => {
+    if (zoomMode) return 'crosshair'
     if (manualChannelDragMode) return 'crosshair'
     if (isPanning) return 'grabbing'
     return 'grab'
@@ -5363,6 +5406,42 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                     height={height}
                     fill="rgba(147, 51, 234, 0.2)"
                     stroke="#9333ea"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                  />
+                )
+              }} />
+            )}
+
+            {/* Zoom Selection Rectangle */}
+            {zoomMode && isSelectingZoom && zoomSelectionStart && zoomSelectionEnd && (
+              <Customized component={(props) => {
+                const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
+                if (!xAxisMap || !yAxisMap) return null
+
+                const xAxis = xAxisMap[0]
+                const yAxis = yAxisMap[0]
+
+                if (!xAxis || !yAxis) return null
+
+                const startX = xAxis.scale(zoomSelectionStart)
+                const endX = xAxis.scale(zoomSelectionEnd)
+
+                if (startX === undefined || endX === undefined) return null
+
+                const x = Math.min(startX, endX)
+                const width = Math.abs(endX - startX)
+                const y = offset.top
+                const height = offset.height
+
+                return (
+                  <rect
+                    x={x}
+                    y={y}
+                    width={width}
+                    height={height}
+                    fill="rgba(59, 130, 246, 0.2)"
+                    stroke="#3b82f6"
                     strokeWidth={2}
                     strokeDasharray="5 5"
                   />
