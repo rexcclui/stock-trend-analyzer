@@ -2496,11 +2496,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 }
               })
 
-              // Support level is the top of the heaviest volume zone (for upbreak)
-              // This represents where the most volume concentration occurred before the breakout
+              // Support level is the BOTTOM of the heaviest volume zone (for upbreak)
+              // Price must break through the entire support zone to trigger a sell
+              // Example: If support zone is $16.2-$16.4, price must drop below $16.2
               const supportLevel = isUpBreak ?
-                (maxWeightZone ? maxWeightZone.maxPrice : currentZone.minPrice) :
-                (maxWeightZone ? maxWeightZone.minPrice : currentZone.maxPrice)
+                (maxWeightZone ? maxWeightZone.minPrice : currentZone.minPrice) :
+                (maxWeightZone ? maxWeightZone.maxPrice : currentZone.maxPrice)
 
               breaks.push({
                 date: dataPoint.date,
@@ -2797,9 +2798,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             }
           })
 
-          // Update support level to the top of the heaviest volume zone
+          // Update support level to the BOTTOM of the heaviest volume zone
+          // Price must break through the entire zone to trigger sell
           if (maxWeightZone) {
-            supportLevel = maxWeightZone.maxPrice
+            supportLevel = maxWeightZone.minPrice
             currentWindowIndex = windowData.windowIndex
           }
         }
