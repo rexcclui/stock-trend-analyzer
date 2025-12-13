@@ -116,8 +116,12 @@ const GradientLineWithArrows = ({ xScale, yScale, data, xKey, yKey }) => {
       </g>
     )
 
-    // Add arrow every 5 segments or at the last segment
-    if (i % 5 === 0 || i === data.length - 2) {
+    // Add arrow every 3 segments, and always add to first and last segments
+    const isFirst = i === 0
+    const isLast = i === data.length - 2
+    const isRegularInterval = i % 3 === 0
+
+    if (isFirst || isLast || isRegularInterval) {
       const dx = x2 - x1
       const dy = y2 - y1
       const angle = Math.atan2(dy, dx)
@@ -126,10 +130,10 @@ const GradientLineWithArrows = ({ xScale, yScale, data, xKey, yKey }) => {
       const midX = (x1 + x2) / 2
       const midY = (y1 + y2) / 2
 
-      // Arrow size
-      const arrowSize = 8
+      // Arrow size - larger for first and last
+      const arrowSize = (isFirst || isLast) ? 14 : 10
 
-      // Calculate arrow points
+      // Calculate arrow points forming a triangle
       const arrowPoints = [
         [midX, midY],
         [
@@ -150,17 +154,44 @@ const GradientLineWithArrows = ({ xScale, yScale, data, xKey, yKey }) => {
           points={arrowPoints.map(p => p.join(',')).join(' ')}
           fill={midColor}
           stroke="#1e293b"
-          strokeWidth={0.5}
-          opacity={0.9}
+          strokeWidth={1}
+          opacity={1}
         />
       )
     }
   }
 
+  // Add start and end markers for clarity
+  const startPoint = data[0]
+  const endPoint = data[data.length - 1]
+
+  const startX = xScale(startPoint[xKey])
+  const startY = yScale(startPoint[yKey])
+  const endX = xScale(endPoint[xKey])
+  const endY = yScale(endPoint[yKey])
+
   return (
     <g>
       {segments}
       {arrows}
+      {/* Start marker - circle with "S" */}
+      {!isNaN(startX) && !isNaN(startY) && (
+        <g>
+          <circle cx={startX} cy={startY} r={12} fill="#3b82f6" stroke="#1e293b" strokeWidth={2} opacity={0.9} />
+          <text x={startX} y={startY} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="10" fontWeight="bold">
+            S
+          </text>
+        </g>
+      )}
+      {/* End marker - circle with "E" */}
+      {!isNaN(endX) && !isNaN(endY) && (
+        <g>
+          <circle cx={endX} cy={endY} r={12} fill="#ef4444" stroke="#1e293b" strokeWidth={2} opacity={0.9} />
+          <text x={endX} y={endY} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="10" fontWeight="bold">
+            E
+          </text>
+        </g>
+      )}
     </g>
   )
 }
@@ -316,22 +347,30 @@ const PriceVolumeChart = ({ prices, zoomRange }) => {
 
       {/* Direction indicator and color legend */}
       <div className="mt-4 flex flex-col items-center gap-3">
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-sm flex-wrap justify-center">
           <span className="text-slate-400">Direction:</span>
-          <div className="flex items-center gap-1 px-3 py-1 bg-slate-700 rounded">
-            <span className="text-slate-300">Old Date</span>
-            <span className="text-slate-400 mx-2">→</span>
-            <span className="text-slate-300">Latest Date</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 px-2 py-1 bg-blue-600/20 border border-blue-500 rounded">
+              <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-bold">S</div>
+              <span className="text-slate-300 text-xs">Start</span>
+            </div>
+            <span className="text-slate-400">→</span>
+            <span className="text-slate-400">Arrows</span>
+            <span className="text-slate-400">→</span>
+            <div className="flex items-center gap-1 px-2 py-1 bg-red-600/20 border border-red-500 rounded">
+              <span className="text-slate-300 text-xs">End</span>
+              <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-bold">E</div>
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-2 text-sm">
-          <span className="text-slate-400">Daily Change:</span>
+          <span className="text-slate-400">Point Color (Daily % Change):</span>
           <div className="flex items-center gap-1">
-            <span className="text-red-500 font-semibold">Very Red</span>
+            <span className="text-red-500 font-semibold">Negative</span>
             <div className="w-32 h-3 rounded" style={{
               background: 'linear-gradient(to right, rgb(255,0,0), rgb(255,255,0), rgb(0,255,0))'
             }}></div>
-            <span className="text-green-500 font-semibold">Very Green</span>
+            <span className="text-green-500 font-semibold">Positive</span>
           </div>
         </div>
       </div>
