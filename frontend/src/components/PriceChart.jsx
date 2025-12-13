@@ -2686,6 +2686,108 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return { trades, totalPL, winRate, closedTradeCount: closedTrades.length, sellSignals, smaUsed: smaKey, marketChange }
   }
 
+  // Calculate P&L for Vol Prf V3 based on breakup/breakdown signals
+  const calculateV3PL = () => {
+    if (volumeProfileV3Breaks.length === 0) {
+      return { trades: [], totalPL: 0, winRate: 0, tradingSignals: 0, buySignals: [], sellSignals: [], marketChange: 0 }
+    }
+
+    // Separate breakup and breakdown signals
+    const breakupSignals = volumeProfileV3Breaks.filter(b => b.isUpBreak)
+    const breakdownSignals = volumeProfileV3Breaks.filter(b => !b.isUpBreak)
+
+    const trades = []
+    const buySignals = []
+    const sellSignals = []
+    let isHolding = false
+    let buyPrice = null
+    let buyDate = null
+    let lastBreakupDate = null
+
+    // Get all prices in forward chronological order
+    const reversedPrices = [...prices].reverse()
+
+    // Iterate through breaks in chronological order
+    const allBreaks = [...volumeProfileV3Breaks].sort((a, b) => {
+      const aIdx = reversedPrices.findIndex(p => p.date === a.date)
+      const bIdx = reversedPrices.findIndex(p => p.date === b.date)
+      return aIdx - bIdx
+    })
+
+    for (const breakSignal of allBreaks) {
+      if (breakSignal.isUpBreak) {
+        // Breakup signal - BUY only if not already holding
+        if (!isHolding) {
+          isHolding = true
+          buyPrice = breakSignal.price
+          buyDate = breakSignal.date
+          lastBreakupDate = breakSignal.date
+          buySignals.push({
+            date: breakSignal.date,
+            price: breakSignal.price
+          })
+        }
+        // If consecutive breakup (already holding), ignore it
+      } else {
+        // Breakdown signal - SELL only if holding
+        if (isHolding) {
+          const sellPrice = breakSignal.price
+          const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
+
+          trades.push({
+            buyPrice,
+            buyDate,
+            sellPrice,
+            sellDate: breakSignal.date,
+            plPercent
+          })
+
+          sellSignals.push({
+            date: breakSignal.date,
+            price: sellPrice
+          })
+
+          // Reset state
+          isHolding = false
+          buyPrice = null
+          buyDate = null
+        }
+        // If breakdown without holding, ignore it
+      }
+    }
+
+    // Calculate statistics
+    const closedTrades = trades.filter(t => t.sellPrice !== undefined)
+    const totalPL = closedTrades.reduce((sum, t) => sum + t.plPercent, 0)
+    const winningTrades = closedTrades.filter(t => t.plPercent > 0).length
+    const winRate = closedTrades.length > 0 ? (winningTrades / closedTrades.length) * 100 : 0
+
+    // Calculate trading signals: 1 complete trade = 1 signal, open position = 0.5 signal
+    const tradingSignals = closedTrades.length + (isHolding ? 0.5 : 0)
+
+    // Calculate market change (first buy to last sell)
+    let marketChange = 0
+    if (closedTrades.length > 0) {
+      const firstTrade = closedTrades[0]
+      const lastTrade = closedTrades[closedTrades.length - 1]
+      const startPrice = firstTrade.buyPrice
+      const endPrice = lastTrade.sellPrice
+      marketChange = ((endPrice - startPrice) / startPrice) * 100
+    }
+
+    return {
+      trades,
+      totalPL,
+      winRate,
+      tradingSignals,
+      closedTradeCount: closedTrades.length,
+      buySignals,
+      sellSignals,
+      marketChange,
+      isHolding
+    }
+  }
+
   // Reset Vol Prf v2 dates if they're not found in current visible data
   useEffect(() => {
     if (!volumeProfileV2Enabled || displayPrices.length === 0) return
@@ -3166,6 +3268,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Calculate P&L after chartData is created (needs SMA values from chartData)
   const breakoutPL = calculateBreakoutPL()
+  const v3PL = calculateV3PL()
 
   // Apply zoom range to chart data FIRST
   const endIndex = zoomRange.end === null ? chartData.length : zoomRange.end
@@ -5059,7 +5162,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             <Customized component={(props) => <ImportedCustomVolumeProfileV2 {...props} volumeProfileV2Enabled={volumeProfileV2Enabled} volumeProfileV2Data={volumeProfileV2Data} displayPrices={displayPrices} zoomRange={zoomRange} volV2HoveredBar={volV2HoveredBar} setVolV2HoveredBar={setVolV2HoveredBar} volumeProfileV2Breakouts={volumeProfileV2Breakouts} breakoutPL={breakoutPL} />} />
 
             {/* Volume Profile V3 - Windowed Analysis with Break Detection */}
-            <Customized component={(props) => <ImportedCustomVolumeProfileV3 {...props} volumeProfileV3Enabled={volumeProfileV3Enabled} volumeProfileV3Data={volumeProfileV3Data} displayPrices={displayPrices} zoomRange={zoomRange} volV3HoveredBar={volV3HoveredBar} setVolV3HoveredBar={setVolV3HoveredBar} volumeProfileV3Breaks={volumeProfileV3Breaks} />} />
+            <Customized component={(props) => <ImportedCustomVolumeProfileV3 {...props} volumeProfileV3Enabled={volumeProfileV3Enabled} volumeProfileV3Data={volumeProfileV3Data} displayPrices={displayPrices} zoomRange={zoomRange} volV3HoveredBar={volV3HoveredBar} setVolV3HoveredBar={setVolV3HoveredBar} volumeProfileV3Breaks={volumeProfileV3Breaks} v3PL={v3PL} />} />
 
             {/* Last Channel Zones as Parallel Lines */}
             <Customized component={CustomZoneLines} />

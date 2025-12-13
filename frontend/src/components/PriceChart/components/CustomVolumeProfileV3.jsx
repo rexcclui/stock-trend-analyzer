@@ -14,6 +14,7 @@ import React from 'react'
  * @param {Object} props.volV3HoveredBar - Currently hovered bar state
  * @param {Function} props.setVolV3HoveredBar - Setter for hovered bar state
  * @param {Array} props.volumeProfileV3Breaks - Break signals array
+ * @param {Object} props.v3PL - P&L statistics for V3 trading strategy
  * @param {Object} props.xAxisMap - X-axis mapping from recharts
  * @param {Object} props.yAxisMap - Y-axis mapping from recharts
  * @param {Object} props.offset - Chart offset dimensions from recharts
@@ -26,6 +27,7 @@ export const CustomVolumeProfileV3 = ({
   volV3HoveredBar,
   setVolV3HoveredBar,
   volumeProfileV3Breaks,
+  v3PL,
   xAxisMap,
   yAxisMap,
   offset
@@ -199,20 +201,18 @@ export const CustomVolumeProfileV3 = ({
         </g>
       )}
 
-      {/* Break signals - arrows */}
-      {volumeProfileV3Breaks.map((breakSignal, idx) => {
-        const x = xAxis.scale(breakSignal.date)
-        const y = yAxis.scale(breakSignal.price)
+      {/* Buy signals - green up arrows */}
+      {v3PL?.buySignals?.map((signal, idx) => {
+        const x = xAxis.scale(signal.date)
+        const y = yAxis.scale(signal.price)
 
         if (x === undefined || y === undefined) return null
 
-        const isUpBreak = breakSignal.isUpBreak
-
         return (
-          <g key={`break-arrow-${idx}`} transform={`translate(${x}, ${y})`}>
+          <g key={`buy-arrow-${idx}`} transform={`translate(${x}, ${y})`}>
             <path
-              d={isUpBreak ? "M 0,-8 L 6,0 L -6,0 Z" : "M 0,8 L 6,0 L -6,0 Z"}
-              fill={isUpBreak ? "#10b981" : "#ef4444"}
+              d="M 0,-8 L 6,0 L -6,0 Z"
+              fill="#10b981"
               stroke="white"
               strokeWidth={1}
               opacity={0.9}
@@ -222,19 +222,60 @@ export const CustomVolumeProfileV3 = ({
         )
       })}
 
-      {/* Display break count */}
-      {volumeProfileV3Enabled && volumeProfileV3Breaks.length > 0 && (
+      {/* Sell signals - red down arrows */}
+      {v3PL?.sellSignals?.map((signal, idx) => {
+        const x = xAxis.scale(signal.date)
+        const y = yAxis.scale(signal.price)
+
+        if (x === undefined || y === undefined) return null
+
+        return (
+          <g key={`sell-arrow-${idx}`} transform={`translate(${x}, ${y})`}>
+            <path
+              d="M 0,8 L 6,0 L -6,0 Z"
+              fill="#ef4444"
+              stroke="white"
+              strokeWidth={1}
+              opacity={0.9}
+              style={{ pointerEvents: 'none' }}
+            />
+          </g>
+        )
+      })}
+
+      {/* P&L Stats Display */}
+      {volumeProfileV3Enabled && v3PL && v3PL.tradingSignals > 0 && (
         <g>
           <text
             x={offset.left + 10}
-            y={offset.top + 80}
-            fill="#10b981"
-            fontSize="12"
+            y={offset.top + 20}
+            fill={v3PL.totalPL >= 0 ? '#10b981' : '#ef4444'}
+            fontSize="14"
             fontWeight="700"
             textAnchor="start"
             style={{ pointerEvents: 'none' }}
           >
-            V3 Breaks: {volumeProfileV3Breaks.length}
+            V3 P&L: {v3PL.totalPL >= 0 ? '+' : ''}{v3PL.totalPL.toFixed(2)}%
+          </text>
+          <text
+            x={offset.left + 10}
+            y={offset.top + 38}
+            fill="#6ee7b7"
+            fontSize="11"
+            textAnchor="start"
+            style={{ pointerEvents: 'none' }}
+          >
+            Signals: {v3PL.tradingSignals.toFixed(1)} | Win: {v3PL.winRate.toFixed(1)}%
+          </text>
+          <text
+            x={offset.left + 10}
+            y={offset.top + 54}
+            fill="#6ee7b7"
+            fontSize="10"
+            textAnchor="start"
+            style={{ pointerEvents: 'none' }}
+          >
+            Market: {v3PL.marketChange >= 0 ? '+' : ''}{v3PL.marketChange.toFixed(2)}% | α: {((v3PL.totalPL - v3PL.marketChange) >= 0 ? '+' : '')}{(v3PL.totalPL - v3PL.marketChange).toFixed(2)}%
           </text>
         </g>
       )}
