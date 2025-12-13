@@ -3,6 +3,7 @@ import axios from 'axios'
 import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp, RefreshCw, Filter, Menu } from 'lucide-react'
 import PriceChart from './PriceChart'
 import IndicatorsChart from './IndicatorsChart'
+import PriceVolumeChart from './PriceVolumeChart'
 import SignalsList from './SignalsList'
 import { apiCache } from '../utils/apiCache'
 import { joinUrl } from '../utils/urlHelper'
@@ -304,6 +305,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
             resLnEnabled: false,
             resLnRange: 100,
             resLnRefreshTrigger: 0,
+            priceVolumeChartEnabled: false,
             collapsed: false
           }
           newCharts.push(newChart)
@@ -2029,6 +2031,17 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                       >
                         MACD
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => updateChartIndicator(chart.id, 'priceVolumeChartEnabled', !chart.priceVolumeChartEnabled)}
+                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.priceVolumeChartEnabled
+                          ? 'bg-teal-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        title="Show Price-Volume scatter chart"
+                      >
+                        P-V Chart
+                      </button>
                     </div>
                   </div>}
                 </div>
@@ -2266,6 +2279,16 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                     zoomRange={globalZoomRange}
                     onZoomChange={updateGlobalZoom}
                     onExtendPeriod={extendTimePeriod}
+                  />
+                </div>
+              )}
+
+              {/* Price-Volume Chart */}
+              {!chart.collapsed && chart.priceVolumeChartEnabled && (
+                <div className="bg-slate-800 p-2 md:p-6 rounded-lg border-0 md:border md:border-slate-700">
+                  <PriceVolumeChart
+                    prices={chart.data.prices}
+                    zoomRange={globalZoomRange}
                   />
                 </div>
               )}
