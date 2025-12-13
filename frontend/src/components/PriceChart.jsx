@@ -2706,7 +2706,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     let isHolding = false
     let buyPrice = null
     let buyDate = null
-    let supportLevel = null // Track the support level from the breakup
+    let supportLevel = null // Track the support level (trailing stop)
+    let currentWindowIndex = null // Track which window we're in while holding
 
     // Get all prices in forward chronological order
     const reversedPrices = [...prices].reverse()
@@ -2715,6 +2716,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const breakSignalMap = new Map()
     volumeProfileV3Breaks.forEach(breakSignal => {
       breakSignalMap.set(breakSignal.date, breakSignal)
+    })
+
+    // Create a map of date -> window data for tracking window changes
+    const dateToWindowMap = new Map()
+    volumeProfileV3Data.forEach(window => {
+      window.dataPoints.forEach(point => {
+        dateToWindowMap.set(point.date, {
+          windowIndex: window.windowIndex,
+          priceZones: point.priceZones
+        })
+      })
     })
 
     // Iterate through all price points in chronological order
@@ -2749,6 +2761,32 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         buyPrice = null
         buyDate = null
         supportLevel = null
+        currentWindowIndex = null
+      }
+
+      // If holding, check if we've moved to a new window and update support level
+      if (isHolding && currentWindowIndex !== null) {
+        const windowData = dateToWindowMap.get(currentDate)
+        if (windowData && windowData.windowIndex !== currentWindowIndex) {
+          // We've entered a new window - update support level to heaviest volume zone
+          const priceZones = windowData.priceZones
+
+          // Find the zone with maximum volume weight
+          let maxWeight = 0
+          let maxWeightZone = null
+          priceZones.forEach(zone => {
+            if (zone.volumeWeight > maxWeight) {
+              maxWeight = zone.volumeWeight
+              maxWeightZone = zone
+            }
+          })
+
+          // Update support level to the top of the heaviest volume zone
+          if (maxWeightZone) {
+            supportLevel = maxWeightZone.maxPrice
+            currentWindowIndex = windowData.windowIndex
+          }
+        }
       }
 
       // Check for break signals at this point
@@ -2760,7 +2798,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             isHolding = true
             buyPrice = breakSignal.price
             buyDate = breakSignal.date
-            supportLevel = breakSignal.supportLevel // Store the support level to monitor
+            supportLevel = breakSignal.supportLevel // Store the initial support level
+            currentWindowIndex = breakSignal.windowIndex // Track starting window
             buySignals.push({
               date: breakSignal.date,
               price: breakSignal.price,
@@ -2794,6 +2833,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             buyPrice = null
             buyDate = null
             supportLevel = null
+            currentWindowIndex = null
           }
           // If breakdown without holding, ignore it
         }
