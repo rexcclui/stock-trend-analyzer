@@ -66,13 +66,13 @@ function VolumeLegendPills({ legend, keyPrefix = 'legend', titleFormatter = defa
         <span
           key={`${keyPrefix}-${slot?.legendIndex ?? index}`}
           title={titleFormatter(slot)}
-          className={`w-10 min-w-[2.5rem] max-w-[2.5rem] h-4 px-1 py-0 text-[6px] leading-[0.85] font-semibold rounded-sm shadow-sm border text-center shrink-0 flex flex-col items-center justify-center gap-0 overflow-hidden text-ellipsis ${slot?.isCurrent ? currentClasses : 'border-slate-800/60'} ${slot?.isPlaceholder ? 'border-dashed opacity-70' : ''}`}
+          className={`w-14 min-w-[3.5rem] max-w-[3.5rem] h-8 px-2 py-0.5 text-xs leading-tight font-semibold rounded-sm shadow-sm border text-center shrink-0 flex flex-col items-center justify-center gap-0 overflow-hidden text-ellipsis ${slot?.isCurrent ? currentClasses : 'border-slate-800/60'} ${slot?.isPlaceholder ? 'border-dashed opacity-70' : ''}`}
           style={{
             backgroundColor: slot?.color || '#1f2937',
             color: slot?.textColor || (slot?.isPlaceholder ? '#cbd5e1' : '#0f172a')
           }}
         >
-          <span className={slot?.isCurrent ? 'text-[7px]' : ''}>{slot?.label}</span>
+          <span className={slot?.isCurrent ? 'text-sm' : ''}>{slot?.label}</span>
         </span>
       ))}
     </div>
