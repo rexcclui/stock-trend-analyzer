@@ -2799,9 +2799,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           })
 
           // Update support level to the BOTTOM of the heaviest volume zone
-          // Price must break through the entire zone to trigger sell
+          // IMPORTANT: Support can only move UP (for long positions), never down
+          // This ensures it's a true trailing stop
           if (maxWeightZone) {
-            supportLevel = maxWeightZone.minPrice
+            const newSupportLevel = maxWeightZone.minPrice
+            // Only update if new support is HIGHER than current support
+            if (newSupportLevel > supportLevel) {
+              supportLevel = newSupportLevel
+            }
             currentWindowIndex = windowData.windowIndex
           }
         }
