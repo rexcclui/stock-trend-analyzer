@@ -2368,10 +2368,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const NUM_PRICE_ZONES = 10
     const BREAK_VOLUME_THRESHOLD = 0.10 // 10%
     const BREAK_DIFF_THRESHOLD = 0.08 // 8% difference from previous zone
+    const PRICE_SLOT_MIN_RATIO = 0.50 // Each zone must be at least 50% of previous window's zone
 
     const windows = []
     const breaks = []
     let currentWindowStart = 0
+    let previousWindowZoneHeight = null // Track previous window's zone height
 
     while (currentWindowStart < visibleData.length) {
       // Determine window end (at least MIN_WINDOW_SIZE points or until end of data)
@@ -2457,31 +2459,43 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
         // Check break condition (skip first few points to have meaningful data)
         if (i >= 10 && currentZoneIdx > 0) {
-          // Find previous zone (the zone below current)
-          const prevZoneIdx = currentZoneIdx - 1
-          const prevZone = priceZones[prevZoneIdx]
-          const prevWeight = prevZone.volumeWeight
+          // Price slot constraint: Check if current zone height is at least 50% of previous window
+          // If zones are too small compared to previous window, don't break - keep extending
+          let priceSlotSizeOk = true
+          if (previousWindowZoneHeight !== null) {
+            if (priceZoneHeight < previousWindowZoneHeight * PRICE_SLOT_MIN_RATIO) {
+              priceSlotSizeOk = false
+            }
+          }
 
-          // Break condition: current weight < 10% AND 8% less than previous zone
-          if (currentWeight < BREAK_VOLUME_THRESHOLD &&
-              prevWeight - currentWeight >= BREAK_DIFF_THRESHOLD) {
+          // Only check volume break condition if price slot size is acceptable
+          if (priceSlotSizeOk) {
+            // Find previous zone (the zone below current)
+            const prevZoneIdx = currentZoneIdx - 1
+            const prevZone = priceZones[prevZoneIdx]
+            const prevWeight = prevZone.volumeWeight
 
-            // Determine if it's an up or down break based on price movement
-            const isUpBreak = currentZoneIdx > NUM_PRICE_ZONES / 2
+            // Break condition: current weight < 10% AND 8% less than previous zone
+            if (currentWeight < BREAK_VOLUME_THRESHOLD &&
+                prevWeight - currentWeight >= BREAK_DIFF_THRESHOLD) {
 
-            breaks.push({
-              date: dataPoint.date,
-              price: currentPrice,
-              isUpBreak: isUpBreak,
-              currentWeight: currentWeight,
-              prevWeight: prevWeight,
-              weightDiff: prevWeight - currentWeight,
-              windowIndex: windows.length
-            })
+              // Determine if it's an up or down break based on price movement
+              const isUpBreak = currentZoneIdx > NUM_PRICE_ZONES / 2
 
-            breakDetected = true
-            breakIndex = i
-            break // Exit the loop to start a new window
+              breaks.push({
+                date: dataPoint.date,
+                price: currentPrice,
+                isUpBreak: isUpBreak,
+                currentWeight: currentWeight,
+                prevWeight: prevWeight,
+                weightDiff: prevWeight - currentWeight,
+                windowIndex: windows.length
+              })
+
+              breakDetected = true
+              breakIndex = i
+              break // Exit the loop to start a new window
+            }
           }
         }
 
@@ -2503,6 +2517,15 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         dataPoints: windowPoints,
         breakDetected: breakDetected
       })
+
+      // Store the zone height from the last data point for next window comparison
+      if (windowPoints.length > 0) {
+        const lastPoint = windowPoints[windowPoints.length - 1]
+        if (lastPoint.priceZones && lastPoint.priceZones.length > 0) {
+          const lastZone = lastPoint.priceZones[0]
+          previousWindowZoneHeight = lastZone.maxPrice - lastZone.minPrice
+        }
+      }
 
       // Move to next window
       if (breakDetected && breakIndex > 0) {
@@ -2713,9 +2736,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     }
 
     // Recalculate when refresh trigger changes or feature is enabled
+    // Note: Does NOT recalculate on zoom change - only on refresh or period change
     const result = calculateVolumeProfileV3()
     setVolumeProfileV3Result(result)
-  }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, displayPrices, zoomRange])
+  }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, displayPrices])
 
   // SMA Simulation Logic - find optimal SMA value based on P&L
   useEffect(() => {
