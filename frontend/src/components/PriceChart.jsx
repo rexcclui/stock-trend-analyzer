@@ -2686,15 +2686,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return { trades, totalPL, winRate, closedTradeCount: closedTrades.length, sellSignals, smaUsed: smaKey, marketChange }
   }
 
-  // Calculate P&L for Vol Prf V3 based on breakup/breakdown signals
+  // Calculate P&L for Vol Prf V3 based on breakup/breakdown signals and stop-loss
   const calculateV3PL = () => {
     if (volumeProfileV3Breaks.length === 0) {
       return { trades: [], totalPL: 0, winRate: 0, tradingSignals: 0, buySignals: [], sellSignals: [], marketChange: 0 }
     }
-
-    // Separate breakup and breakdown signals
-    const breakupSignals = volumeProfileV3Breaks.filter(b => b.isUpBreak)
-    const breakdownSignals = volumeProfileV3Breaks.filter(b => !b.isUpBreak)
 
     const trades = []
     const buySignals = []
@@ -2702,57 +2698,91 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     let isHolding = false
     let buyPrice = null
     let buyDate = null
-    let lastBreakupDate = null
 
     // Get all prices in forward chronological order
     const reversedPrices = [...prices].reverse()
 
-    // Iterate through breaks in chronological order
-    const allBreaks = [...volumeProfileV3Breaks].sort((a, b) => {
-      const aIdx = reversedPrices.findIndex(p => p.date === a.date)
-      const bIdx = reversedPrices.findIndex(p => p.date === b.date)
-      return aIdx - bIdx
+    // Create a map of break signals by date for quick lookup
+    const breakSignalMap = new Map()
+    volumeProfileV3Breaks.forEach(breakSignal => {
+      breakSignalMap.set(breakSignal.date, breakSignal)
     })
 
-    for (const breakSignal of allBreaks) {
-      if (breakSignal.isUpBreak) {
-        // Breakup signal - BUY only if not already holding
-        if (!isHolding) {
-          isHolding = true
-          buyPrice = breakSignal.price
-          buyDate = breakSignal.date
-          lastBreakupDate = breakSignal.date
-          buySignals.push({
-            date: breakSignal.date,
-            price: breakSignal.price
-          })
+    // Iterate through all price points in chronological order
+    for (let i = 0; i < reversedPrices.length; i++) {
+      const currentPoint = reversedPrices[i]
+      const currentPrice = currentPoint.close
+      const currentDate = currentPoint.date
+
+      // Check for stop-loss: if holding and price dropped below buy price, sell
+      if (isHolding && currentPrice < buyPrice) {
+        const sellPrice = currentPrice
+        const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
+
+        trades.push({
+          buyPrice,
+          buyDate,
+          sellPrice,
+          sellDate: currentDate,
+          plPercent,
+          isStopLoss: true
+        })
+
+        sellSignals.push({
+          date: currentDate,
+          price: sellPrice,
+          isStopLoss: true
+        })
+
+        // Reset state
+        isHolding = false
+        buyPrice = null
+        buyDate = null
+      }
+
+      // Check for break signals at this point
+      const breakSignal = breakSignalMap.get(currentDate)
+      if (breakSignal) {
+        if (breakSignal.isUpBreak) {
+          // Breakup signal - BUY only if not already holding
+          if (!isHolding) {
+            isHolding = true
+            buyPrice = breakSignal.price
+            buyDate = breakSignal.date
+            buySignals.push({
+              date: breakSignal.date,
+              price: breakSignal.price
+            })
+          }
+          // If consecutive breakup (already holding), ignore it
+        } else {
+          // Breakdown signal - SELL only if holding
+          if (isHolding) {
+            const sellPrice = breakSignal.price
+            const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
+
+            trades.push({
+              buyPrice,
+              buyDate,
+              sellPrice,
+              sellDate: breakSignal.date,
+              plPercent,
+              isStopLoss: false
+            })
+
+            sellSignals.push({
+              date: breakSignal.date,
+              price: sellPrice,
+              isStopLoss: false
+            })
+
+            // Reset state
+            isHolding = false
+            buyPrice = null
+            buyDate = null
+          }
+          // If breakdown without holding, ignore it
         }
-        // If consecutive breakup (already holding), ignore it
-      } else {
-        // Breakdown signal - SELL only if holding
-        if (isHolding) {
-          const sellPrice = breakSignal.price
-          const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
-
-          trades.push({
-            buyPrice,
-            buyDate,
-            sellPrice,
-            sellDate: breakSignal.date,
-            plPercent
-          })
-
-          sellSignals.push({
-            date: breakSignal.date,
-            price: sellPrice
-          })
-
-          // Reset state
-          isHolding = false
-          buyPrice = null
-          buyDate = null
-        }
-        // If breakdown without holding, ignore it
       }
     }
 

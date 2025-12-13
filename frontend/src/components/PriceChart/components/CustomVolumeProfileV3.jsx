@@ -222,18 +222,21 @@ export const CustomVolumeProfileV3 = ({
         )
       })}
 
-      {/* Sell signals - red down arrows */}
+      {/* Sell signals - red down arrows (breakdown) and orange (stop-loss) */}
       {v3PL?.sellSignals?.map((signal, idx) => {
         const x = xAxis.scale(signal.date)
         const y = yAxis.scale(signal.price)
 
         if (x === undefined || y === undefined) return null
 
+        // Stop-loss sells are orange, breakdown sells are red
+        const fillColor = signal.isStopLoss ? "#f59e0b" : "#ef4444"
+
         return (
           <g key={`sell-arrow-${idx}`} transform={`translate(${x}, ${y})`}>
             <path
               d="M 0,8 L 6,0 L -6,0 Z"
-              fill="#ef4444"
+              fill={fillColor}
               stroke="white"
               strokeWidth={1}
               opacity={0.9}
