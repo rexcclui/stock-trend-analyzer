@@ -276,6 +276,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
             volumeProfileV2EndDate: null,
             volumeProfileV2RefreshTrigger: 0,
             volumeProfileV2Params: hasOptimalParams || forceVolumeProfileV2 ? params : null,
+            volumeProfileV3Enabled: false,
+            volumeProfileV3RefreshTrigger: 0,
             spyData: null,
             performanceComparisonEnabled: false,
             performanceComparisonBenchmark: 'SPY',
@@ -922,6 +924,34 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
           return {
             ...chart,
             volumeProfileV2RefreshTrigger: (chart.volumeProfileV2RefreshTrigger || 0) + 1
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const toggleVolumeProfileV3 = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            volumeProfileV3Enabled: !chart.volumeProfileV3Enabled
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const refreshVolumeProfileV3 = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            volumeProfileV3RefreshTrigger: (chart.volumeProfileV3RefreshTrigger || 0) + 1
           }
         }
         return chart
@@ -1604,6 +1634,29 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                       <div className="flex gap-1 items-center">
                         <button
                           type="button"
+                          onClick={() => toggleVolumeProfileV3(chart.id)}
+                          className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.volumeProfileV3Enabled
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            }`}
+                          title="Show volume profile v3 - windowed analysis with break detection"
+                        >
+                          Vol Prf V3
+                        </button>
+                        {chart.volumeProfileV3Enabled && (
+                          <button
+                            type="button"
+                            onClick={() => refreshVolumeProfileV3(chart.id)}
+                            className="px-2 py-1 text-sm rounded font-medium transition-colors bg-slate-600 text-slate-200 hover:bg-slate-500"
+                            title="Refresh Vol Prf V3"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex gap-1 items-center">
+                        <button
+                          type="button"
                           onClick={() => {
                             setCharts(prevCharts =>
                               prevCharts.map(c =>
@@ -2068,6 +2121,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                     volumeProfileV2Params={chart.volumeProfileV2Params}
                     onVolumeProfileV2StartChange={(value) => updateVolumeProfileV2Start(chart.id, value)}
                     onVolumeProfileV2EndChange={(value) => updateVolumeProfileV2End(chart.id, value)}
+                    volumeProfileV3Enabled={chart.volumeProfileV3Enabled}
+                    volumeProfileV3RefreshTrigger={chart.volumeProfileV3RefreshTrigger}
                     spyData={chart.spyData}
                     performanceComparisonEnabled={chart.performanceComparisonEnabled}
                     performanceComparisonBenchmark={chart.performanceComparisonBenchmark}

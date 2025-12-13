@@ -9,6 +9,7 @@ import {
   CustomSlopeChannelLabel as ImportedCustomSlopeChannelLabel,
   CustomVolumeProfile as ImportedCustomVolumeProfile,
   CustomVolumeProfileV2 as ImportedCustomVolumeProfileV2,
+  CustomVolumeProfileV3 as ImportedCustomVolumeProfileV3,
   CustomLegend as ImportedCustomLegend,
   CustomResistanceLine as ImportedCustomResistanceLine,
   CustomSecondVolZoneLine as ImportedCustomSecondVolZoneLine,
@@ -23,7 +24,7 @@ import {
 import VolumeLegendPills from './VolumeLegendPills'
 import { getVolumeColor } from './PriceChart/utils'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RefreshTrigger = 0, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -86,11 +87,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const [volV2HoveredBar, setVolV2HoveredBar] = useState(null)
   const [volV2SliderDragging, setVolV2SliderDragging] = useState(false)
 
+  // Volume Profile V3 hover state
+  const [volV3HoveredBar, setVolV3HoveredBar] = useState(null)
+
   // Hovered volume zone pill
   const [hoveredVolumeLegend, setHoveredVolumeLegend] = useState(null)
 
   // Volume Profile V2 calculated data (only recalculates on manual refresh)
   const [volumeProfileV2Result, setVolumeProfileV2Result] = useState({ slots: [], breakouts: [] })
+
+  // Volume Profile V3 calculated data (only recalculates on manual refresh)
+  const [volumeProfileV3Result, setVolumeProfileV3Result] = useState({ windows: [], breaks: [] })
 
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
   // No need to reset here to avoid infinite loop
@@ -2348,9 +2355,164 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return { slots, breakouts }
   }
 
+  // Calculate Volume Profile V3 - Windowed analysis with break detection
+  const calculateVolumeProfileV3 = () => {
+    if (!volumeProfileV3Enabled || displayPrices.length === 0) return { windows: [], breaks: [] }
+
+    const reversedDisplayPrices = [...displayPrices].reverse()
+    const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
+
+    if (visibleData.length === 0) return { windows: [], breaks: [] }
+
+    const MIN_WINDOW_SIZE = 150
+    const NUM_PRICE_ZONES = 10
+    const BREAK_VOLUME_THRESHOLD = 0.10 // 10%
+    const BREAK_DIFF_THRESHOLD = 0.08 // 8% difference from previous zone
+
+    const windows = []
+    const breaks = []
+    let currentWindowStart = 0
+
+    while (currentWindowStart < visibleData.length) {
+      // Determine window end (at least MIN_WINDOW_SIZE points or until end of data)
+      let currentWindowEnd = Math.min(currentWindowStart + MIN_WINDOW_SIZE, visibleData.length)
+      let windowData = visibleData.slice(currentWindowStart, currentWindowEnd)
+
+      if (windowData.length === 0) break
+
+      // Find price range for this window
+      const windowPrices = windowData.map(p => p.close)
+      const minPrice = Math.min(...windowPrices)
+      const maxPrice = Math.max(...windowPrices)
+      const priceRange = maxPrice - minPrice
+
+      if (priceRange === 0) {
+        currentWindowStart = currentWindowEnd
+        continue
+      }
+
+      const priceZoneHeight = priceRange / NUM_PRICE_ZONES
+
+      // Process each data point in the window to detect breaks
+      const windowPoints = []
+      let breakDetected = false
+      let breakIndex = -1
+
+      for (let i = 0; i < windowData.length; i++) {
+        const dataPoint = windowData[i]
+
+        // Calculate volume distribution across all 10 price zones for current cumulative data
+        const cumulativeData = windowData.slice(0, i + 1)
+        const priceZones = []
+
+        for (let j = 0; j < NUM_PRICE_ZONES; j++) {
+          priceZones.push({
+            minPrice: minPrice + (j * priceZoneHeight),
+            maxPrice: minPrice + ((j + 1) * priceZoneHeight),
+            volume: 0,
+            volumeWeight: 0
+          })
+        }
+
+        // Accumulate volume in each price zone
+        let totalVolume = 0
+        cumulativeData.forEach(price => {
+          const priceValue = price.close
+          const volume = price.volume || 0
+          totalVolume += volume
+
+          let zoneIndex = Math.floor((priceValue - minPrice) / priceZoneHeight)
+          if (zoneIndex >= NUM_PRICE_ZONES) zoneIndex = NUM_PRICE_ZONES - 1
+          if (zoneIndex < 0) zoneIndex = 0
+
+          priceZones[zoneIndex].volume += volume
+        })
+
+        // Calculate volume weights
+        priceZones.forEach(zone => {
+          zone.volumeWeight = totalVolume > 0 ? zone.volume / totalVolume : 0
+        })
+
+        // Find which zone the current price falls into
+        const currentPrice = dataPoint.close
+        let currentZoneIdx = Math.floor((currentPrice - minPrice) / priceZoneHeight)
+        if (currentZoneIdx >= NUM_PRICE_ZONES) currentZoneIdx = NUM_PRICE_ZONES - 1
+        if (currentZoneIdx < 0) currentZoneIdx = 0
+
+        const currentZone = priceZones[currentZoneIdx]
+        const currentWeight = currentZone.volumeWeight
+
+        // Check break condition (skip first few points to have meaningful data)
+        if (i >= 10 && currentZoneIdx > 0) {
+          // Find previous zone (the zone below current)
+          const prevZoneIdx = currentZoneIdx - 1
+          const prevZone = priceZones[prevZoneIdx]
+          const prevWeight = prevZone.volumeWeight
+
+          // Break condition: current weight < 10% AND 8% less than previous zone
+          if (currentWeight < BREAK_VOLUME_THRESHOLD &&
+              prevWeight - currentWeight >= BREAK_DIFF_THRESHOLD) {
+
+            // Determine if it's an up or down break based on price movement
+            const isUpBreak = currentZoneIdx > NUM_PRICE_ZONES / 2
+
+            breaks.push({
+              date: dataPoint.date,
+              price: currentPrice,
+              isUpBreak: isUpBreak,
+              currentWeight: currentWeight,
+              prevWeight: prevWeight,
+              weightDiff: prevWeight - currentWeight,
+              windowIndex: windows.length
+            })
+
+            breakDetected = true
+            breakIndex = i
+            break // Exit the loop to start a new window
+          }
+        }
+
+        // Store this data point with its volume profile
+        windowPoints.push({
+          date: dataPoint.date,
+          price: dataPoint.close,
+          volume: dataPoint.volume || 0,
+          priceZones: priceZones,
+          currentZoneIdx: currentZoneIdx
+        })
+      }
+
+      // Add the window to our results
+      windows.push({
+        windowIndex: windows.length,
+        startDate: windowData[0].date,
+        endDate: windowData[windowData.length - 1].date,
+        dataPoints: windowPoints,
+        minPrice: minPrice,
+        maxPrice: maxPrice,
+        breakDetected: breakDetected
+      })
+
+      // Move to next window
+      if (breakDetected && breakIndex > 0) {
+        // Start new window after the break point
+        currentWindowStart += breakIndex + 1
+      } else {
+        // No break detected, move to next window
+        currentWindowStart = currentWindowEnd
+      }
+    }
+
+    return { windows, breaks }
+  }
+
   // Use the cached Volume Profile V2 data (only recalculates on manual refresh)
   const volumeProfileV2Data = volumeProfileV2Result.slots || []
   const volumeProfileV2Breakouts = volumeProfileV2Result.breakouts || []
+
+  // Use the cached Volume Profile V3 data (only recalculates on manual refresh)
+  const volumeProfileV3Data = volumeProfileV3Result.windows || []
+  const volumeProfileV3Breaks = volumeProfileV3Result.breaks || []
 
   // Calculate P&L based on breakout trading signals with SMA slope for sell
   const calculateBreakoutPL = () => {
@@ -2531,6 +2693,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     const result = calculateVolumeProfileV2()
     setVolumeProfileV2Result(result)
   }, [volumeProfileV2Enabled, volumeProfileV2RefreshTrigger, volumeProfileV2StartDate, volumeProfileV2EndDate])
+
+  // Calculate Volume Profile V3 - only when manually refreshed or feature toggled
+  useEffect(() => {
+    if (!volumeProfileV3Enabled) {
+      setVolumeProfileV3Result({ windows: [], breaks: [] })
+      return
+    }
+
+    // Recalculate when refresh trigger changes or feature is enabled
+    const result = calculateVolumeProfileV3()
+    setVolumeProfileV3Result(result)
+  }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, displayPrices, zoomRange])
 
   // SMA Simulation Logic - find optimal SMA value based on P&L
   useEffect(() => {
@@ -4826,6 +5000,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
             {/* Volume Profile V2 - Progressive Horizontal Bars (RENDER FIRST - UNDER EVERYTHING) */}
             <Customized component={(props) => <ImportedCustomVolumeProfileV2 {...props} volumeProfileV2Enabled={volumeProfileV2Enabled} volumeProfileV2Data={volumeProfileV2Data} displayPrices={displayPrices} zoomRange={zoomRange} volV2HoveredBar={volV2HoveredBar} setVolV2HoveredBar={setVolV2HoveredBar} volumeProfileV2Breakouts={volumeProfileV2Breakouts} breakoutPL={breakoutPL} />} />
+
+            {/* Volume Profile V3 - Windowed Analysis with Break Detection */}
+            <Customized component={(props) => <ImportedCustomVolumeProfileV3 {...props} volumeProfileV3Enabled={volumeProfileV3Enabled} volumeProfileV3Data={volumeProfileV3Data} displayPrices={displayPrices} zoomRange={zoomRange} volV3HoveredBar={volV3HoveredBar} setVolV3HoveredBar={setVolV3HoveredBar} volumeProfileV3Breaks={volumeProfileV3Breaks} />} />
 
             {/* Last Channel Zones as Parallel Lines */}
             <Customized component={CustomZoneLines} />
