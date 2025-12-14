@@ -2417,10 +2417,10 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                           key={index}
                           data-entry-key={getEntryKey(result.symbol, result.days)}
                           onClick={() => {
-                            if (!hasData || !hasParams || !onStockSelect) return
+                            if (!hasData || !hasOptimalSMAs || !onStockSelect) return
 
                             onStockSelect(result.symbol, {
-                              ...result.optimalParams,
+                              ...(result.optimalParams || {}),
                               smaPeriods: [result.optimalSMAs?.period],
                               days: result.days,
                               volumeProfileV3Enabled: true
@@ -2546,7 +2546,7 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                                   e.stopPropagation()
                                   if (onStockSelect) {
                                     onStockSelect(result.symbol, {
-                                      ...result.optimalParams,
+                                      ...(result.optimalParams || {}),
                                       smaPeriods: [result.optimalSMAs?.period],
                                       days: result.days,
                                       volumeProfileV3Enabled: true
