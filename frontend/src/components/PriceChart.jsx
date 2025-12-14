@@ -2793,6 +2793,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     let buyDate = null
     let supportLevel = null // Track the support level (trailing stop)
     let currentWindowIndex = null // Track which window we're in while holding
+    let lastSupportBreachBuyPrice = null // Track original buy price from last support breach
+    let lastSupportBreachSupportLevel = null // Track support level from last support breach
+    let lastSupportBreachWindowIndex = null // Track window index from last support breach
 
     // Get all prices in forward chronological order
     const reversedPrices = [...prices].reverse()
@@ -2840,6 +2843,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           price: sellPrice,
           isSupportBreach: true
         })
+
+        // Save the original buy price and support level for potential re-entry
+        lastSupportBreachBuyPrice = buyPrice
+        lastSupportBreachSupportLevel = supportLevel
+        lastSupportBreachWindowIndex = currentWindowIndex
 
         // Reset state
         isHolding = false
@@ -2896,6 +2904,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               price: breakSignal.price,
               supportLevel: breakSignal.supportLevel
             })
+
+            // Clear support breach tracking on new upbreak
+            lastSupportBreachBuyPrice = null
+            lastSupportBreachSupportLevel = null
+            lastSupportBreachWindowIndex = null
           }
           // If consecutive breakup (already holding), ignore it
         } else {
@@ -2926,8 +2939,35 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             supportLevel = null
             currentWindowIndex = null
           }
-          // If breakdown without holding, ignore it
+
+          // Clear support breach tracking on any breakdown (new window started)
+          lastSupportBreachBuyPrice = null
+          lastSupportBreachSupportLevel = null
+          lastSupportBreachWindowIndex = null
         }
+      }
+
+      // Re-entry logic: If not holding and price recovered above original buy price after support breach
+      // This indicates the support breach was a false signal
+      if (!isHolding && lastSupportBreachBuyPrice !== null && currentPrice > lastSupportBreachBuyPrice) {
+        // Re-enter the position
+        isHolding = true
+        buyPrice = currentPrice
+        buyDate = currentDate
+        supportLevel = lastSupportBreachSupportLevel // Use the same support level
+        currentWindowIndex = lastSupportBreachWindowIndex // Use the same window index
+
+        buySignals.push({
+          date: currentDate,
+          price: currentPrice,
+          supportLevel: lastSupportBreachSupportLevel,
+          isReEntry: true // Mark this as a re-entry signal
+        })
+
+        // Clear the support breach tracking
+        lastSupportBreachBuyPrice = null
+        lastSupportBreachSupportLevel = null
+        lastSupportBreachWindowIndex = null
       }
     }
 
