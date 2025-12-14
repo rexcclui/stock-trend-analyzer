@@ -501,6 +501,7 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
   const [hideLowSignalTrades, setHideLowSignalTrades] = useState(false)
   const [hideHighVolumeWeight, setHideHighVolumeWeight] = useState(false)
   const [hideWeakBreakouts, setHideWeakBreakouts] = useState(false)
+  const [disablePerformanceRemoval, setDisablePerformanceRemoval] = useState(false)
   const [selectedMarkets, setSelectedMarkets] = useState([])
   const [selectedPeriods, setSelectedPeriods] = useState([])
   const [searchFilter, setSearchFilter] = useState('')
@@ -1009,7 +1010,7 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
         }
       }
 
-      if (!passesSelectionFilters(candidateResult)) {
+      if (!disablePerformanceRemoval && !passesSelectionFilters(candidateResult)) {
         const periodLabel = formatPeriod(targetDays)
         showToast(`${symbol}${periodLabel ? ` (${periodLabel})` : ''} removed: V3 simulation did not meet performance filters.`)
         setResults(prev => prev.filter(entry => !(entry.symbol === symbol && entry.days === targetDays)))
@@ -1508,9 +1509,11 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
 
   const nonErrorResults = normalizedResults.filter(result => {
     if (result.error) return false
-    const winRate = result.optimalSMAs?.winRate
-    if (typeof winRate === 'number' && winRate < 60) return false
-    if (!meetsPerformanceThresholds(result)) return false
+    if (!disablePerformanceRemoval) {
+      const winRate = result.optimalSMAs?.winRate
+      if (typeof winRate === 'number' && winRate < 60) return false
+      if (!meetsPerformanceThresholds(result)) return false
+    }
     return true
   })
 
@@ -1868,11 +1871,11 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
       {/* Header */}
       <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <h2 className="text-2xl font-bold text-white">Vol Prf V2 + SMA Backtest Scanner</h2>
+          <h2 className="text-2xl font-bold text-white">Vol Prf V3 Backtest Scanner</h2>
           <button
             type="button"
             className="text-slate-400 hover:text-slate-200 transition-colors"
-            title="Scan multiple stocks for recent Volume Profile V2 breakouts (last 10 days). Backtest results and bookmarks are cached locally, so your queued or completed scans reload automatically after refresh."
+            title="Scan multiple stocks for recent Volume Profile V3 breakouts (last 10 days). Backtest results and bookmarks are cached locally, so your queued or completed scans reload automatically after refresh."
           >
             <Info className="w-5 h-5" />
             <span className="sr-only">Scanner details</span>
@@ -2240,6 +2243,14 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                 >
                   <AlertCircle className="w-4 h-4" />
                   {hideWeakBreakouts ? 'Diff ≥6%' : 'Diff <6%'}
+                </button>
+                <button
+                  onClick={() => setDisablePerformanceRemoval(prev => !prev)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${disablePerformanceRemoval ? 'border-orange-500 text-orange-200 bg-orange-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
+                  title="When enabled, stocks that don't meet performance criteria (Win Rate < 60% or performance thresholds) will NOT be automatically removed during scan"
+                >
+                  <Filter className="w-4 h-4" />
+                  {disablePerformanceRemoval ? 'Keep All' : 'Auto-Remove'}
                 </button>
                 {availableMarkets.length > 0 && (
                   <div className="flex items-center gap-2 border border-slate-600 rounded-lg px-3 py-2">
