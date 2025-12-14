@@ -252,41 +252,54 @@ export const CustomVolumeProfileV3 = ({
       })}
 
       {/* P&L Stats Display */}
-      {volumeProfileV3Enabled && v3PL && v3PL.tradingSignals > 0 && (
-        <g>
-          <text
-            x={offset.left + 10}
-            y={offset.top + 20}
-            fill={v3PL.totalPL >= 0 ? '#10b981' : '#ef4444'}
-            fontSize="14"
-            fontWeight="700"
-            textAnchor="start"
-            style={{ pointerEvents: 'none' }}
-          >
-            V3 P&L: {v3PL.totalPL >= 0 ? '+' : ''}{v3PL.totalPL.toFixed(2)}%
-          </text>
-          <text
-            x={offset.left + 10}
-            y={offset.top + 38}
-            fill="#6ee7b7"
-            fontSize="11"
-            textAnchor="start"
-            style={{ pointerEvents: 'none' }}
-          >
-            Signals: {v3PL.tradingSignals.toFixed(1)} | Win: {v3PL.winRate.toFixed(1)}%
-          </text>
-          <text
-            x={offset.left + 10}
-            y={offset.top + 54}
-            fill="#6ee7b7"
-            fontSize="10"
-            textAnchor="start"
-            style={{ pointerEvents: 'none' }}
-          >
-            Market: {v3PL.marketChange >= 0 ? '+' : ''}{v3PL.marketChange.toFixed(2)}% | α: {((v3PL.totalPL - v3PL.marketChange) >= 0 ? '+' : '')}{(v3PL.totalPL - v3PL.marketChange).toFixed(2)}%
-          </text>
-        </g>
-      )}
+      {volumeProfileV3Enabled && v3PL && v3PL.tradingSignals > 0 && (() => {
+        // Determine trend direction from visible prices
+        const reversedDisplayPrices = [...displayPrices].reverse()
+        const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
+
+        const isDowntrend = visibleData.length > 0 &&
+          visibleData[0].close > visibleData[visibleData.length - 1].close
+
+        // Position at top right if downtrend, top left if uptrend
+        const xPos = isDowntrend ? offset.left + offset.width - 10 : offset.left + 10
+        const textAnchor = isDowntrend ? 'end' : 'start'
+
+        return (
+          <g>
+            <text
+              x={xPos}
+              y={offset.top + 20}
+              fill={v3PL.totalPL >= 0 ? '#10b981' : '#ef4444'}
+              fontSize="14"
+              fontWeight="700"
+              textAnchor={textAnchor}
+              style={{ pointerEvents: 'none' }}
+            >
+              V3 P&L: {v3PL.totalPL >= 0 ? '+' : ''}{v3PL.totalPL.toFixed(2)}%
+            </text>
+            <text
+              x={xPos}
+              y={offset.top + 38}
+              fill="#6ee7b7"
+              fontSize="11"
+              textAnchor={textAnchor}
+              style={{ pointerEvents: 'none' }}
+            >
+              Signals: {v3PL.tradingSignals.toFixed(1)} | Win: {v3PL.winRate.toFixed(1)}%
+            </text>
+            <text
+              x={xPos}
+              y={offset.top + 54}
+              fill="#6ee7b7"
+              fontSize="10"
+              textAnchor={textAnchor}
+              style={{ pointerEvents: 'none' }}
+            >
+              Market: {v3PL.marketChange >= 0 ? '+' : ''}{v3PL.marketChange.toFixed(2)}% | α: {((v3PL.totalPL - v3PL.marketChange) >= 0 ? '+' : '')}{(v3PL.totalPL - v3PL.marketChange).toFixed(2)}%
+            </text>
+          </g>
+        )
+      })()}
     </g>
   )
 }
