@@ -2786,7 +2786,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     }
 
     const TRANSACTION_FEE = 0.003 // 0.3% broker fee per transaction
-    const CUTOFF_PERCENT = 0.08 // 8% cutoff from buy price
+    const CUTOFF_PERCENT = 0.08 // 8% cutoff from buy price (initial)
 
     const trades = []
     const buySignals = []
@@ -2794,6 +2794,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     let isHolding = false
     let buyPrice = null
     let buyDate = null
+    let cutoffPrice = null // Track the current cutoff price (trailing stop)
     let currentWindowIndex = null // Track which window we're in while holding
     let lastCutoffBuyPrice = null // Track original buy price from last cutoff sell
 
@@ -2823,39 +2824,68 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const currentPrice = currentPoint.close
       const currentDate = currentPoint.date
 
-      // Check for -8% cutoff: if holding and price dropped 8% below buy price, sell
-      if (isHolding && buyPrice !== null) {
-        const cutoffPrice = buyPrice * (1 - CUTOFF_PERCENT)
-        if (currentPrice < cutoffPrice) {
-          const sellPrice = currentPrice
-          // Apply transaction fees: buy fee increases cost, sell fee decreases proceeds
-          const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
-          const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
-          const plPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100
+      // Check for cutoff: if holding and price dropped below cutoff price, sell
+      if (isHolding && cutoffPrice !== null && currentPrice < cutoffPrice) {
+        const sellPrice = currentPrice
+        // Apply transaction fees: buy fee increases cost, sell fee decreases proceeds
+        const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
+        const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
+        const plPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100
 
-          trades.push({
-            buyPrice,
-            buyDate,
-            sellPrice,
-            sellDate: currentDate,
-            plPercent,
-            isCutoff: true
+        trades.push({
+          buyPrice,
+          buyDate,
+          sellPrice,
+          sellDate: currentDate,
+          plPercent,
+          isCutoff: true
+        })
+
+        sellSignals.push({
+          date: currentDate,
+          price: sellPrice,
+          isCutoff: true
+        })
+
+        // Save the original buy price for potential re-entry
+        lastCutoffBuyPrice = buyPrice
+
+        // Reset state
+        isHolding = false
+        buyPrice = null
+        buyDate = null
+        cutoffPrice = null
+        currentWindowIndex = null
+      }
+
+      // If holding, check if we've moved to a new window and update cutoff price
+      if (isHolding && currentWindowIndex !== null) {
+        const windowData = dateToWindowMap.get(currentDate)
+        if (windowData && windowData.windowIndex !== currentWindowIndex) {
+          // We've entered a new window - update cutoff to heaviest volume zone
+          const priceZones = windowData.priceZones
+
+          // Find the zone with maximum volume weight
+          let maxWeight = 0
+          let maxWeightZone = null
+          priceZones.forEach(zone => {
+            if (zone.volumeWeight > maxWeight) {
+              maxWeight = zone.volumeWeight
+              maxWeightZone = zone
+            }
           })
 
-          sellSignals.push({
-            date: currentDate,
-            price: sellPrice,
-            isCutoff: true
-          })
-
-          // Save the original buy price for potential re-entry
-          lastCutoffBuyPrice = buyPrice
-
-          // Reset state
-          isHolding = false
-          buyPrice = null
-          buyDate = null
-          currentWindowIndex = null
+          // Update cutoff to the BOTTOM of the heaviest volume zone
+          // IMPORTANT: Cutoff can only move UP (for long positions), never down
+          // This ensures it's a true trailing stop
+          if (maxWeightZone) {
+            const newCutoffPrice = maxWeightZone.minPrice
+            // Only update if new cutoff is HIGHER than current cutoff
+            if (newCutoffPrice > cutoffPrice) {
+              cutoffPrice = newCutoffPrice
+            }
+            currentWindowIndex = windowData.windowIndex
+          }
         }
       }
 
@@ -2868,6 +2898,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             isHolding = true
             buyPrice = breakSignal.price
             buyDate = breakSignal.date
+            cutoffPrice = breakSignal.price * (1 - CUTOFF_PERCENT) // Initial -8% cutoff
             currentWindowIndex = breakSignal.windowIndex // Track starting window
             buySignals.push({
               date: breakSignal.date,
@@ -2906,6 +2937,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             isHolding = false
             buyPrice = null
             buyDate = null
+            cutoffPrice = null
             currentWindowIndex = null
           }
 
@@ -2921,6 +2953,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         isHolding = true
         buyPrice = currentPrice
         buyDate = currentDate
+        cutoffPrice = currentPrice * (1 - CUTOFF_PERCENT) // Set -8% cutoff from re-entry price
         currentWindowIndex = null // Will be set if we enter a new window
 
         buySignals.push({
