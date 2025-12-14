@@ -2785,6 +2785,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return { trades: [], totalPL: 0, winRate: 0, tradingSignals: 0, buySignals: [], sellSignals: [], marketChange: 0 }
     }
 
+    const TRANSACTION_FEE = 0.003 // 0.3% broker fee per transaction
+
     const trades = []
     const buySignals = []
     const sellSignals = []
@@ -2827,7 +2829,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       // The support level is the top of the volume-concentrated range before the breakup
       if (isHolding && supportLevel !== null && currentPrice < supportLevel) {
         const sellPrice = currentPrice
-        const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
+        // Apply transaction fees: buy fee increases cost, sell fee decreases proceeds
+        const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
+        const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
+        const plPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100
 
         trades.push({
           buyPrice,
@@ -2915,7 +2920,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           // Breakdown signal - SELL only if holding
           if (isHolding) {
             const sellPrice = breakSignal.price
-            const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
+            // Apply transaction fees: buy fee increases cost, sell fee decreases proceeds
+            const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
+            const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
+            const plPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100
 
             trades.push({
               buyPrice,
@@ -2980,14 +2988,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // Calculate trading signals: 1 complete trade = 1 signal, open position = 0.5 signal
     const tradingSignals = closedTrades.length + (isHolding ? 0.5 : 0)
 
-    // Calculate market change (first buy to last sell)
+    // Calculate market change (first buy to last sell) with transaction fees
     let marketChange = 0
     if (closedTrades.length > 0) {
       const firstTrade = closedTrades[0]
       const lastTrade = closedTrades[closedTrades.length - 1]
       const startPrice = firstTrade.buyPrice
       const endPrice = lastTrade.sellPrice
-      marketChange = ((endPrice - startPrice) / startPrice) * 100
+      // Apply transaction fees for buy-and-hold comparison
+      const effectiveStartPrice = startPrice * (1 + TRANSACTION_FEE)
+      const effectiveEndPrice = endPrice * (1 - TRANSACTION_FEE)
+      marketChange = ((effectiveEndPrice - effectiveStartPrice) / effectiveStartPrice) * 100
     }
 
     return {
