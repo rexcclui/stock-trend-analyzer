@@ -733,8 +733,6 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
   }, [lastAddedKey])
 
   const ensureEntries = (symbolList, targetDays = days) => {
-    console.log('[ensureEntries] Called with symbols:', symbolList, 'targetDays:', targetDays, 'current days state:', days)
-
     const resolvedDays = normalizeDays(targetDays) ?? DEFAULT_DAYS
 
     if (!Array.isArray(symbolList) || symbolList.length === 0) {
@@ -792,7 +790,6 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
             bookmarked: false,
             marketChange: null
           }
-          console.log('[ensureEntries] Creating new entry:', { symbol, days: newEntry.days, period: newEntry.period, key })
           return newEntry
         })
 
@@ -1186,8 +1183,6 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
         params: { limit: 500, exchange: 'HKG' }
       })
 
-      console.log('[HK500] API Response:', response.data)
-
       const payload = response.data
       const symbols = Array.isArray(payload)
         ? payload
@@ -1195,18 +1190,12 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
           ? payload.symbols
           : []
 
-      console.log('[HK500] Raw symbols count:', symbols.length)
-      console.log('[HK500] First 10 symbols:', symbols.slice(0, 10))
-
       const normalized = symbols
         .map(item => (typeof item === 'string' ? item : item?.symbol))
         .filter(Boolean)
         .map(symbol => symbol.toUpperCase())
         .filter(symbol => !/^4\d{3}\.HK$/.test(symbol))
         .filter(symbol => !isDisallowedSymbol(symbol))
-
-      console.log('[HK500] Normalized symbols count:', normalized.length)
-      console.log('[HK500] First 10 normalized:', normalized.slice(0, 10))
 
       if (normalized.length === 0) {
         setError('No HK stocks returned from API. The exchange parameter might be incorrect.')
@@ -1229,8 +1218,6 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
         params: { limit: 400, exchange: 'CN' }
       })
 
-      console.log('[CN500] API Response:', response.data)
-
       const payload = response.data
       const symbols = Array.isArray(payload)
         ? payload
@@ -1238,18 +1225,12 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
           ? payload.symbols
           : []
 
-      console.log('[CN500] Raw symbols count:', symbols.length)
-      console.log('[CN500] First 10 symbols:', symbols.slice(0, 10))
-
       const normalized = symbols
         .map(item => (typeof item === 'string' ? item : item?.symbol))
         .filter(Boolean)
         .map(symbol => symbol.toUpperCase())
         .filter(symbol => !/^3\d{5}\.(SZ|SS)$/.test(symbol))
         .filter(symbol => !isDisallowedSymbol(symbol))
-
-      console.log('[CN500] Normalized symbols count:', normalized.length)
-      console.log('[CN500] First 10 normalized:', normalized.slice(0, 10))
 
       if (normalized.length === 0) {
         setError('No Chinese stocks returned from API. The exchange parameter might be incorrect.')
