@@ -2422,11 +2422,12 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                             onStockSelect(result.symbol, {
                               ...result.optimalParams,
                               smaPeriods: [result.optimalSMAs?.period],
-                              days: result.days
+                              days: result.days,
+                              volumeProfileV3Enabled: true
                             })
                           }}
                           className={`transition-colors ${hasData ? 'hover:bg-slate-700 cursor-pointer' : 'opacity-75'} ${isWithinLast10Days ? 'bg-blue-900/20 hover:bg-blue-800/30' : ''}`}
-                          title={hasData ? (result.breakoutClosed ? 'Click to view (breakout closed by sell signal)' : 'Click to view in Technical Analysis with optimized parameters') : 'Pending scan'}
+                          title={hasData ? (result.breakoutClosed ? 'Click to view with Vol Prf V3 (breakout closed by sell signal)' : 'Click to view in Technical Analysis with Vol Prf V3 and optimized parameters') : 'Pending scan'}
                         >
                           <td className="px-4 py-3 text-sm">
                             <button
