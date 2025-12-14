@@ -2967,20 +2967,39 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       }
     }
 
+    // If still holding at the end, add an open trade with current price
+    if (isHolding && buyPrice !== null && reversedPrices.length > 0) {
+      const lastPrice = reversedPrices[reversedPrices.length - 1]
+      const currentPrice = lastPrice.close
+      // Apply transaction fees: buy fee increases cost, sell would decrease proceeds
+      const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
+      const effectiveSellPrice = currentPrice * (1 - TRANSACTION_FEE)
+      const plPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100
+
+      trades.push({
+        buyPrice,
+        buyDate,
+        sellPrice: currentPrice,
+        sellDate: lastPrice.date,
+        plPercent,
+        isOpen: true // Mark as open position
+      })
+    }
+
     // Calculate statistics
-    const closedTrades = trades.filter(t => t.sellPrice !== undefined)
-    const totalPL = closedTrades.reduce((sum, t) => sum + t.plPercent, 0)
+    const closedTrades = trades.filter(t => !t.isOpen)
+    const totalPL = trades.reduce((sum, t) => sum + t.plPercent, 0) // Include open position
     const winningTrades = closedTrades.filter(t => t.plPercent > 0).length
     const winRate = closedTrades.length > 0 ? (winningTrades / closedTrades.length) * 100 : 0
 
     // Calculate trading signals: 1 complete trade = 1 signal, open position = 0.5 signal
     const tradingSignals = closedTrades.length + (isHolding ? 0.5 : 0)
 
-    // Calculate market change (first buy to last sell) with transaction fees
+    // Calculate market change (first buy to last sell/current) with transaction fees
     let marketChange = 0
-    if (closedTrades.length > 0) {
-      const firstTrade = closedTrades[0]
-      const lastTrade = closedTrades[closedTrades.length - 1]
+    if (trades.length > 0) {
+      const firstTrade = trades[0]
+      const lastTrade = trades[trades.length - 1]
       const startPrice = firstTrade.buyPrice
       const endPrice = lastTrade.sellPrice
       // Apply transaction fees for buy-and-hold comparison
