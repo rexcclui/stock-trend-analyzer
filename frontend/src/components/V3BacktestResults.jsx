@@ -7,8 +7,8 @@ import { apiCache } from '../utils/apiCache'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
-const BACKTEST_RESULTS_KEY = 'backtestResults'
-const SCAN_QUEUE_KEY = 'backtestScanQueue'
+const BACKTEST_RESULTS_KEY = 'v3BacktestResults'
+const SCAN_QUEUE_KEY = 'v3BacktestScanQueue'
 const INVALID_FIVE_CHAR_LENGTH = 5
 const BLOCKED_SUFFIX = '.TO'
 const HYPHEN = '-'
