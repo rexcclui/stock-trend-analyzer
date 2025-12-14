@@ -1936,6 +1936,19 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
               <option value="1825">5 Years</option>
             </select>
           </div>
+          <div className="flex items-end">
+            <label className="flex items-center gap-2 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg cursor-pointer hover:bg-slate-600 transition-colors">
+              <input
+                type="checkbox"
+                checked={disablePerformanceRemoval}
+                onChange={(e) => setDisablePerformanceRemoval(e.target.checked)}
+                className="w-4 h-4 text-purple-600 bg-slate-600 border-slate-500 rounded focus:ring-purple-500 focus:ring-2"
+              />
+              <span className="text-sm font-medium text-slate-200" title="When checked, stocks that don't meet performance criteria (Win Rate < 60% or performance thresholds) will NOT be automatically removed during scan">
+                Keep all results
+              </span>
+            </label>
+          </div>
           <div className="flex items-end gap-2 flex-wrap">
             <button
               onClick={() => runBacktest()}
@@ -2243,14 +2256,6 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                 >
                   <AlertCircle className="w-4 h-4" />
                   {hideWeakBreakouts ? 'Diff ≥6%' : 'Diff <6%'}
-                </button>
-                <button
-                  onClick={() => setDisablePerformanceRemoval(prev => !prev)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${disablePerformanceRemoval ? 'border-orange-500 text-orange-200 bg-orange-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
-                  title="When enabled, stocks that don't meet performance criteria (Win Rate < 60% or performance thresholds) will NOT be automatically removed during scan"
-                >
-                  <Filter className="w-4 h-4" />
-                  {disablePerformanceRemoval ? 'Keep All' : 'Auto-Remove'}
                 </button>
                 {availableMarkets.length > 0 && (
                   <div className="flex items-center gap-2 border border-slate-600 rounded-lg px-3 py-2">
