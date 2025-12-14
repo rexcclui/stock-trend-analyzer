@@ -739,6 +739,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
   const [hideLowSignalTrades, setHideLowSignalTrades] = useState(false)
   const [hideHighVolumeWeight, setHideHighVolumeWeight] = useState(false)
   const [hideWeakBreakouts, setHideWeakBreakouts] = useState(false)
+  const [disablePerformanceFilter, setDisablePerformanceFilter] = useState(false)
   const [selectedMarkets, setSelectedMarkets] = useState([])
   const [selectedPeriods, setSelectedPeriods] = useState([])
   const [searchFilter, setSearchFilter] = useState('')
@@ -1752,6 +1753,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
 
   const nonErrorResults = normalizedResults.filter(result => {
     if (result.error) return false
+    if (disablePerformanceFilter) return true
     const winRate = result.optimalSMAs?.winRate
     if (typeof winRate === 'number' && winRate < 60) return false
     if (!meetsPerformanceThresholds(result)) return false
@@ -2484,6 +2486,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
                 >
                   <AlertCircle className="w-4 h-4" />
                   {hideWeakBreakouts ? 'Diff ≥6%' : 'Diff <6%'}
+                </button>
+                <button
+                  onClick={() => setDisablePerformanceFilter(prev => !prev)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${disablePerformanceFilter ? 'border-orange-500 text-orange-200 bg-orange-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
+                  title={disablePerformanceFilter ? 'Performance filter disabled - showing all records including those with win rate < 60% or not meeting performance thresholds' : 'Enable to show all records regardless of performance criteria (win rate, P/L, signals)'}
+                >
+                  <Target className="w-4 h-4" />
+                  {disablePerformanceFilter ? 'Show All' : 'Perf Filter'}
                 </button>
                 {availableMarkets.length > 0 && (
                   <div className="flex items-center gap-2 border border-slate-600 rounded-lg px-3 py-2">
