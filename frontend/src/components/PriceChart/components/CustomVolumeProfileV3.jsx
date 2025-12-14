@@ -227,15 +227,15 @@ export const CustomVolumeProfileV3 = ({
         )
       })}
 
-      {/* Sell signals - red down arrows (breakdown) and orange (support breach) */}
+      {/* Sell signals - red down arrows (breakdown) and orange (-8% cutoff) */}
       {v3PL?.sellSignals?.map((signal, idx) => {
         const x = xAxis.scale(signal.date)
         const y = yAxis.scale(signal.price)
 
         if (x === undefined || y === undefined) return null
 
-        // Support breach sells are orange, breakdown sells are red
-        const fillColor = signal.isSupportBreach ? "#f59e0b" : "#ef4444"
+        // Cutoff sells are orange, breakdown sells are red
+        const fillColor = signal.isCutoff ? "#f59e0b" : "#ef4444"
 
         return (
           <g key={`sell-arrow-${idx}`} transform={`translate(${x}, ${y})`}>

@@ -2786,6 +2786,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     }
 
     const TRANSACTION_FEE = 0.003 // 0.3% broker fee per transaction
+    const CUTOFF_PERCENT = 0.08 // 8% cutoff from buy price
 
     const trades = []
     const buySignals = []
@@ -2793,11 +2794,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     let isHolding = false
     let buyPrice = null
     let buyDate = null
-    let supportLevel = null // Track the support level (trailing stop)
     let currentWindowIndex = null // Track which window we're in while holding
-    let lastSupportBreachBuyPrice = null // Track original buy price from last support breach
-    let lastSupportBreachSupportLevel = null // Track support level from last support breach
-    let lastSupportBreachWindowIndex = null // Track window index from last support breach
+    let lastCutoffBuyPrice = null // Track original buy price from last cutoff sell
 
     // Get all prices in forward chronological order
     const reversedPrices = [...prices].reverse()
@@ -2825,71 +2823,39 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const currentPrice = currentPoint.close
       const currentDate = currentPoint.date
 
-      // Check for support level breach: if holding and price dropped below support level, sell
-      // The support level is the top of the volume-concentrated range before the breakup
-      if (isHolding && supportLevel !== null && currentPrice < supportLevel) {
-        const sellPrice = currentPrice
-        // Apply transaction fees: buy fee increases cost, sell fee decreases proceeds
-        const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
-        const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
-        const plPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100
+      // Check for -8% cutoff: if holding and price dropped 8% below buy price, sell
+      if (isHolding && buyPrice !== null) {
+        const cutoffPrice = buyPrice * (1 - CUTOFF_PERCENT)
+        if (currentPrice < cutoffPrice) {
+          const sellPrice = currentPrice
+          // Apply transaction fees: buy fee increases cost, sell fee decreases proceeds
+          const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
+          const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
+          const plPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100
 
-        trades.push({
-          buyPrice,
-          buyDate,
-          sellPrice,
-          sellDate: currentDate,
-          plPercent,
-          isSupportBreach: true
-        })
-
-        sellSignals.push({
-          date: currentDate,
-          price: sellPrice,
-          isSupportBreach: true
-        })
-
-        // Save the original buy price and support level for potential re-entry
-        lastSupportBreachBuyPrice = buyPrice
-        lastSupportBreachSupportLevel = supportLevel
-        lastSupportBreachWindowIndex = currentWindowIndex
-
-        // Reset state
-        isHolding = false
-        buyPrice = null
-        buyDate = null
-        supportLevel = null
-        currentWindowIndex = null
-      }
-
-      // If holding, check if we've moved to a new window and update support level
-      if (isHolding && currentWindowIndex !== null) {
-        const windowData = dateToWindowMap.get(currentDate)
-        if (windowData && windowData.windowIndex !== currentWindowIndex) {
-          // We've entered a new window - update support level to heaviest volume zone
-          const priceZones = windowData.priceZones
-
-          // Find the zone with maximum volume weight
-          let maxWeight = 0
-          let maxWeightZone = null
-          priceZones.forEach(zone => {
-            if (zone.volumeWeight > maxWeight) {
-              maxWeight = zone.volumeWeight
-              maxWeightZone = zone
-            }
+          trades.push({
+            buyPrice,
+            buyDate,
+            sellPrice,
+            sellDate: currentDate,
+            plPercent,
+            isCutoff: true
           })
 
-          // Update support level to the BOTTOM of the heaviest volume zone
-          // IMPORTANT: Support can only move UP (for long positions), never down
-          // This ensures it's a true trailing stop
-          if (maxWeightZone) {
-            const newSupportLevel = maxWeightZone.minPrice
-            // Only update if new support is HIGHER than current support
-            if (newSupportLevel > supportLevel) {
-              supportLevel = newSupportLevel
-            }
-            currentWindowIndex = windowData.windowIndex
-          }
+          sellSignals.push({
+            date: currentDate,
+            price: sellPrice,
+            isCutoff: true
+          })
+
+          // Save the original buy price for potential re-entry
+          lastCutoffBuyPrice = buyPrice
+
+          // Reset state
+          isHolding = false
+          buyPrice = null
+          buyDate = null
+          currentWindowIndex = null
         }
       }
 
@@ -2902,18 +2868,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             isHolding = true
             buyPrice = breakSignal.price
             buyDate = breakSignal.date
-            supportLevel = breakSignal.supportLevel // Store the initial support level
             currentWindowIndex = breakSignal.windowIndex // Track starting window
             buySignals.push({
               date: breakSignal.date,
-              price: breakSignal.price,
-              supportLevel: breakSignal.supportLevel
+              price: breakSignal.price
             })
 
-            // Clear support breach tracking on new upbreak
-            lastSupportBreachBuyPrice = null
-            lastSupportBreachSupportLevel = null
-            lastSupportBreachWindowIndex = null
+            // Clear cutoff tracking on new upbreak
+            lastCutoffBuyPrice = null
           }
           // If consecutive breakup (already holding), ignore it
         } else {
@@ -2931,51 +2893,44 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               sellPrice,
               sellDate: breakSignal.date,
               plPercent,
-              isSupportBreach: false
+              isCutoff: false
             })
 
             sellSignals.push({
               date: breakSignal.date,
               price: sellPrice,
-              isSupportBreach: false
+              isCutoff: false
             })
 
             // Reset state
             isHolding = false
             buyPrice = null
             buyDate = null
-            supportLevel = null
             currentWindowIndex = null
           }
 
-          // Clear support breach tracking on any breakdown (new window started)
-          lastSupportBreachBuyPrice = null
-          lastSupportBreachSupportLevel = null
-          lastSupportBreachWindowIndex = null
+          // Clear cutoff tracking on any breakdown (new window started)
+          lastCutoffBuyPrice = null
         }
       }
 
-      // Re-entry logic: If not holding and price recovered above original buy price after support breach
-      // This indicates the support breach was a false signal
-      if (!isHolding && lastSupportBreachBuyPrice !== null && currentPrice > lastSupportBreachBuyPrice) {
+      // Re-entry logic: If not holding and price recovered above original buy price after cutoff sell
+      // This indicates the cutoff was a temporary dip and trend continues
+      if (!isHolding && lastCutoffBuyPrice !== null && currentPrice > lastCutoffBuyPrice) {
         // Re-enter the position
         isHolding = true
         buyPrice = currentPrice
         buyDate = currentDate
-        supportLevel = lastSupportBreachSupportLevel // Use the same support level
-        currentWindowIndex = lastSupportBreachWindowIndex // Use the same window index
+        currentWindowIndex = null // Will be set if we enter a new window
 
         buySignals.push({
           date: currentDate,
           price: currentPrice,
-          supportLevel: lastSupportBreachSupportLevel,
           isReEntry: true // Mark this as a re-entry signal
         })
 
-        // Clear the support breach tracking
-        lastSupportBreachBuyPrice = null
-        lastSupportBreachSupportLevel = null
-        lastSupportBreachWindowIndex = null
+        // Clear the cutoff tracking
+        lastCutoffBuyPrice = null
       }
     }
 
