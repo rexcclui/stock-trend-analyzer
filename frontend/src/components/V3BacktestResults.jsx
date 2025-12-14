@@ -502,6 +502,7 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
   const [hideHighVolumeWeight, setHideHighVolumeWeight] = useState(false)
   const [hideWeakBreakouts, setHideWeakBreakouts] = useState(false)
   const [disablePerformanceRemoval, setDisablePerformanceRemoval] = useState(false)
+  const [showPerfYOnly, setShowPerfYOnly] = useState(false)
   const [selectedMarkets, setSelectedMarkets] = useState([])
   const [selectedPeriods, setSelectedPeriods] = useState([])
   const [searchFilter, setSearchFilter] = useState('')
@@ -1538,6 +1539,7 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
         const weightDiff = result.originalBreakout?.weightDiff
         if (typeof weightDiff !== 'number' || weightDiff * 100 < 6) return false
       }
+      if (showPerfYOnly && !meetsAllPerformanceCriteria(result)) return false
       if (selectedMarkets.length > 0 && !selectedMarkets.includes(result.market)) return false
       if (selectedPeriods.length > 0 && !selectedPeriods.includes(result.period)) return false
 
@@ -1566,6 +1568,7 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
     hideLowSignalTrades,
     hideHighVolumeWeight,
     hideWeakBreakouts,
+    showPerfYOnly,
     selectedMarkets,
     selectedPeriods,
     searchFilter
@@ -1696,8 +1699,12 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
         return entry.optimalSMAs?.pl ?? -Infinity
       case 'marketChange':
         return typeof entry.marketChange === 'number' ? entry.marketChange : -Infinity
+      case 'perf':
+        return meetsAllPerformanceCriteria(entry) ? 1 : 0
       case 'bookmark':
         return entry.bookmarked ? 1 : 0
+      case 'period':
+        return entry.days ?? -Infinity
       default:
         return 0
     }
@@ -2247,6 +2254,14 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                   <AlertCircle className="w-4 h-4" />
                   {hideWeakBreakouts ? 'Diff ≥6%' : 'Diff <6%'}
                 </button>
+                <button
+                  onClick={() => setShowPerfYOnly(prev => !prev)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors text-sm ${showPerfYOnly ? 'border-green-500 text-green-200 bg-green-900/30' : 'border-slate-600 text-slate-200 hover:bg-slate-700/50'}`}
+                  title="Show only stocks that meet all performance criteria (Win Rate ≥ 60%, P/L and signals thresholds)"
+                >
+                  <Target className="w-4 h-4" />
+                  {showPerfYOnly ? 'Perf: Y' : 'Perf: All'}
+                </button>
                 {availableMarkets.length > 0 && (
                   <div className="flex items-center gap-2 border border-slate-600 rounded-lg px-3 py-2">
                     {availableMarkets.map(market => (
@@ -2346,7 +2361,7 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                       </th>
                       <th onClick={() => handleSort('pl')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Profit/Loss % from the Vol Prf V3 + SMA trading strategy">P/L {renderSortIndicator('pl')}</th>
                       <th onClick={() => handleSort('marketChange')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Buy-and-hold % change over the entire backtest period (oldest to newest price)">Mkt% {renderSortIndicator('marketChange')}</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase" title="Does this stock meet performance criteria? Win Rate ≥ 60%, P/L and signals thresholds. Click to view chart with Vol Prf V3">Perf</th>
+                      <th onClick={() => handleSort('perf')} className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Does this stock meet performance criteria? Win Rate ≥ 60%, P/L and signals thresholds. Click to sort by performance">Perf {renderSortIndicator('perf')}</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase" title="Optimized parameters: Th=Breakout Threshold %, LB=Lookback Zones, SMA=SMA Period">Optimal Params</th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase" title="Timestamp of when this backtest was last run (red if >7 days old)">Last Scan</th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase" title="Actions: Load in Volume tab, Rescan, Erase results, Remove from table">Action</th>
