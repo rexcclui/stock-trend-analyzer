@@ -290,7 +290,7 @@ export const CustomVolumeProfileV3 = ({
             <text
               x={xPos}
               y={offset.top + 54}
-              fill="#6ee7b7"
+              fill={v3PL.marketChange >= 0 ? '#6ee7b7' : '#ef4444'}
               fontSize="10"
               textAnchor={textAnchor}
               style={{ pointerEvents: 'none' }}
