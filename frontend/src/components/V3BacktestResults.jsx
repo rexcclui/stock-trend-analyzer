@@ -1456,6 +1456,15 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
     return true
   }
 
+  const meetsAllPerformanceCriteria = (result) => {
+    if (result.status !== 'completed') return false
+
+    const winRate = result.optimalSMAs?.winRate
+    if (typeof winRate !== 'number' || winRate < 60) return false
+
+    return meetsPerformanceThresholds(result)
+  }
+
   const formatLastScanTime = (isoString) => {
     if (!isoString) return '—'
     const date = new Date(isoString)
@@ -2354,8 +2363,9 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                           {renderSortIndicator('winRate')}
                         </span>
                       </th>
-                      <th onClick={() => handleSort('pl')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Profit/Loss % from the Vol Prf V2 + SMA trading strategy">P/L {renderSortIndicator('pl')}</th>
+                      <th onClick={() => handleSort('pl')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Profit/Loss % from the Vol Prf V3 + SMA trading strategy">P/L {renderSortIndicator('pl')}</th>
                       <th onClick={() => handleSort('marketChange')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Buy-and-hold % change over the entire backtest period (oldest to newest price)">Mkt% {renderSortIndicator('marketChange')}</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase" title="Does this stock meet performance criteria? Win Rate ≥ 60%, P/L and signals thresholds. Click to view chart with Vol Prf V3">Perf</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase" title="Optimized parameters: Th=Breakout Threshold %, LB=Lookback Zones, SMA=SMA Period">Optimal Params</th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase" title="Timestamp of when this backtest was last run (red if >7 days old)">Last Scan</th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase" title="Actions: Load in Volume tab, Rescan, Erase results, Remove from table">Action</th>
@@ -2527,6 +2537,33 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                                 {formatPercent(result.marketChange)}
                               </span>
                             ) : '—'}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            {result.status === 'completed' ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (onStockSelect) {
+                                    onStockSelect(result.symbol, {
+                                      ...result.optimalParams,
+                                      smaPeriods: [result.optimalSMAs?.period],
+                                      days: result.days,
+                                      volumeProfileV3Enabled: true
+                                    })
+                                  }
+                                }}
+                                className={`px-2 py-1 rounded text-xs font-bold transition-colors cursor-pointer ${
+                                  meetsAllPerformanceCriteria(result)
+                                    ? 'bg-green-900/50 text-green-300 hover:bg-green-800/60'
+                                    : 'bg-red-900/50 text-red-300 hover:bg-red-800/60'
+                                }`}
+                                title="Click to view chart with Vol Prf V3 indicator"
+                              >
+                                {meetsAllPerformanceCriteria(result) ? 'Y' : 'N'}
+                              </button>
+                            ) : (
+                              <span className="text-slate-500 text-xs">—</span>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-400 text-left">
                             {hasData && hasParams && hasOptimalSMAs ? (
