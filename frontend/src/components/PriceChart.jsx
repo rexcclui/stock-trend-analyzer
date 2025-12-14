@@ -2516,44 +2516,78 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               // Determine if it's an up or down break based on price movement from previous zone
               const isUpBreak = bestPrevZoneIdx < currentZoneIdx
 
-              // Find the zone with MAXIMUM volume weight (the volume-concentrated zone)
-              // This is the strongest support/resistance level in the current window
-              let maxWeight = 0
-              let maxWeightZone = null
-              let maxWeightZoneIdx = -1
+              // Additional check: Ensure no higher volume resistance/support in break direction
+              // For break up: check 5 zones above for higher volume (resistance)
+              // For break down: check 5 zones below for higher volume (support)
+              let hasResistanceInDirection = false
 
-              priceZones.forEach((zone, idx) => {
-                if (zone.volumeWeight > maxWeight) {
-                  maxWeight = zone.volumeWeight
-                  maxWeightZone = zone
-                  maxWeightZoneIdx = idx
+              if (isUpBreak) {
+                // Check 5 zones ABOVE current zone
+                for (let lookAhead = 1; lookAhead <= ZONE_LOOKBACK; lookAhead++) {
+                  const futureZoneIdx = currentZoneIdx + lookAhead
+                  if (futureZoneIdx < numPriceZones) {
+                    const futureZone = priceZones[futureZoneIdx]
+                    if (futureZone.volumeWeight > currentWeight) {
+                      hasResistanceInDirection = true
+                      break
+                    }
+                  }
                 }
-              })
+              } else {
+                // Check 5 zones BELOW current zone
+                for (let lookAhead = 1; lookAhead <= ZONE_LOOKBACK; lookAhead++) {
+                  const futureZoneIdx = currentZoneIdx - lookAhead
+                  if (futureZoneIdx >= 0) {
+                    const futureZone = priceZones[futureZoneIdx]
+                    if (futureZone.volumeWeight > currentWeight) {
+                      hasResistanceInDirection = true
+                      break
+                    }
+                  }
+                }
+              }
 
-              // Support level is the BOTTOM of the heaviest volume zone (for upbreak)
-              // Price must break through the entire support zone to trigger a sell
-              // Example: If support zone is $16.2-$16.4, price must drop below $16.2
-              const supportLevel = isUpBreak ?
-                (maxWeightZone ? maxWeightZone.minPrice : currentZone.minPrice) :
-                (maxWeightZone ? maxWeightZone.maxPrice : currentZone.maxPrice)
+              // Only proceed if there's no resistance/support in the break direction
+              if (!hasResistanceInDirection) {
+                // Find the zone with MAXIMUM volume weight (the volume-concentrated zone)
+                // This is the strongest support/resistance level in the current window
+                let maxWeight = 0
+                let maxWeightZone = null
+                let maxWeightZoneIdx = -1
 
-              breaks.push({
-                date: dataPoint.date,
-                price: currentPrice,
-                isUpBreak: isUpBreak,
-                currentWeight: currentWeight,
-                prevWeight: bestPrevZoneIdx >= 0 ? priceZones[bestPrevZoneIdx].volumeWeight : 0,
-                weightDiff: maxWeightDiff,
-                windowIndex: windows.length,
-                supportLevel: supportLevel, // Price level to monitor for failed breakout
-                concentratedZoneIdx: maxWeightZoneIdx, // Index of the heaviest volume zone
-                breakoutZoneIdx: currentZoneIdx, // Index of the low-volume breakout zone
-                maxVolumeWeight: maxWeight // Track the max volume weight
-              })
+                priceZones.forEach((zone, idx) => {
+                  if (zone.volumeWeight > maxWeight) {
+                    maxWeight = zone.volumeWeight
+                    maxWeightZone = zone
+                    maxWeightZoneIdx = idx
+                  }
+                })
 
-              breakDetected = true
-              breakIndex = i
-              break // Exit the loop to start a new window
+                // Support level is the BOTTOM of the heaviest volume zone (for upbreak)
+                // Price must break through the entire support zone to trigger a sell
+                // Example: If support zone is $16.2-$16.4, price must drop below $16.2
+                const supportLevel = isUpBreak ?
+                  (maxWeightZone ? maxWeightZone.minPrice : currentZone.minPrice) :
+                  (maxWeightZone ? maxWeightZone.maxPrice : currentZone.maxPrice)
+
+                breaks.push({
+                  date: dataPoint.date,
+                  price: currentPrice,
+                  isUpBreak: isUpBreak,
+                  currentWeight: currentWeight,
+                  prevWeight: bestPrevZoneIdx >= 0 ? priceZones[bestPrevZoneIdx].volumeWeight : 0,
+                  weightDiff: maxWeightDiff,
+                  windowIndex: windows.length,
+                  supportLevel: supportLevel, // Price level to monitor for failed breakout
+                  concentratedZoneIdx: maxWeightZoneIdx, // Index of the heaviest volume zone
+                  breakoutZoneIdx: currentZoneIdx, // Index of the low-volume breakout zone
+                  maxVolumeWeight: maxWeight // Track the max volume weight
+                })
+
+                breakDetected = true
+                breakIndex = i
+                break // Exit the loop to start a new window
+              }
             }
           }
         }
