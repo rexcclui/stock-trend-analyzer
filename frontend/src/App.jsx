@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { TrendingUp, BarChart3, Activity, Waves, Bug } from 'lucide-react'
+import { TrendingUp, BarChart3, Activity, Waves, Bug, BarChart2 } from 'lucide-react'
 import StockAnalyzer from './components/StockAnalyzer'
 import BacktestResults from './components/BacktestResults'
+import V3BacktestResults from './components/V3BacktestResults'
 import VolumeScreening from './components/VolumeScreening'
 import './App.css'
 
@@ -11,6 +12,7 @@ function App() {
   const [selectedParams, setSelectedParams] = useState(null)
   const [volumeSymbol, setVolumeSymbol] = useState(null)
   const [backtestSymbol, setBacktestSymbol] = useState(null)
+  const [v3BacktestSymbol, setV3BacktestSymbol] = useState(null)
   const [volumeImport, setVolumeImport] = useState(null)
   const [storageUsage, setStorageUsage] = useState(null)
   const [storageQuota, setStorageQuota] = useState(null)
@@ -151,6 +153,11 @@ function App() {
     setActiveTab('backtest')
   }
 
+  const handleV3BacktestSelect = (symbol, days) => {
+    setV3BacktestSymbol({ symbol, days })
+    setActiveTab('v3backtest')
+  }
+
   const handleVolumeImportProcessed = () => {
     setVolumeImport(null)
   }
@@ -210,6 +217,17 @@ function App() {
               Backtesting
             </button>
             <button
+              onClick={() => setActiveTab('v3backtest')}
+              className={`flex-1 px-6 py-4 font-semibold transition-colors flex items-center justify-center gap-2 ${
+                activeTab === 'v3backtest'
+                  ? 'text-purple-400 border-b-2 border-purple-400 bg-slate-900'
+                  : 'text-slate-300 hover:text-purple-400 hover:bg-slate-700'
+              }`}
+            >
+              <BarChart2 className="w-5 h-5" />
+              V3 Backtest
+            </button>
+            <button
               onClick={() => setActiveTab('volume')}
               className={`flex-1 px-6 py-4 font-semibold transition-colors flex items-center justify-center gap-2 ${
                 activeTab === 'volume'
@@ -235,6 +253,15 @@ function App() {
                 onVolumeBulkAdd={handleVolumeBulkAdd}
                 triggerBacktest={backtestSymbol}
                 onBacktestProcessed={() => setBacktestSymbol(null)}
+              />
+            </div>
+            <div style={{ display: activeTab === 'v3backtest' ? 'block' : 'none' }}>
+              <V3BacktestResults
+                onStockSelect={handleStockSelect}
+                onVolumeSelect={handleVolumeSelect}
+                onVolumeBulkAdd={handleVolumeBulkAdd}
+                triggerBacktest={v3BacktestSymbol}
+                onBacktestProcessed={() => setV3BacktestSymbol(null)}
               />
             </div>
             <div style={{ display: activeTab === 'volume' ? 'block' : 'none' }}>

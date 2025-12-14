@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import axios from 'axios'
 import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2, RotateCw, Upload, Download, Filter, Waves, Hash, Clock3, ChevronUp, ChevronDown, Info } from 'lucide-react'
-import { apiCache } from '../utils/apiCache'
 import { joinUrl } from '../utils/urlHelper'
-import { calculateVolPrfV2Breakouts, getRecentBreakouts, getLatestBreakout, findResistanceZones } from './PriceChart/utils/volumeProfileV2Utils'
+import { calculateVolumeProfileV3, calculateVolumeProfileV3PL } from './PriceChart/utils/volumeProfileV3Utils'
+import { apiCache } from '../utils/apiCache'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
@@ -184,6 +184,7 @@ function extractMarket(symbol) {
   const market = symbol.substring(dotIndex + 1).toUpperCase()
   return market || 'US'
 }
+
 
 // Check if a breakout has been closed (sell signal occurred after breakout date)
 function isBreakoutClosed(breakoutDate, prices, smaPeriod) {
@@ -428,7 +429,7 @@ function optimizeSMAParams(prices, slots, breakouts) {
   return { period: bestSMA, pl: bestPL, totalSignals, winRate }
 }
 
-function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, triggerBacktest, onBacktestProcessed }) {
+function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, triggerBacktest, onBacktestProcessed }) {
   const [symbols, setSymbols] = useState('')
   const [days, setDays] = useState(DEFAULT_DAYS) // Default to 5Y
   const [loading, setLoading] = useState(false)
@@ -969,16 +970,25 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
         throw new Error(`Insufficient data: only ${priceData.length} days (need 250+)`)
       }
 
-      // Test all parameter combinations to find one with >= 4 signals
-      const paramCombinations = [
-        { breakoutThreshold: 0.05, lookbackZones: 3, resetThreshold: 0.025, timeoutSlots: 5 },
-        { breakoutThreshold: 0.05, lookbackZones: 5, resetThreshold: 0.025, timeoutSlots: 5 },
-        { breakoutThreshold: 0.06, lookbackZones: 4, resetThreshold: 0.03, timeoutSlots: 5 },
-        { breakoutThreshold: 0.06, lookbackZones: 5, resetThreshold: 0.03, timeoutSlots: 5 },
-        { breakoutThreshold: 0.06, lookbackZones: 6, resetThreshold: 0.03, timeoutSlots: 5 },
-        { breakoutThreshold: 0.07, lookbackZones: 5, resetThreshold: 0.035, timeoutSlots: 5 },
-        { breakoutThreshold: 0.08, lookbackZones: 5, resetThreshold: 0.04, timeoutSlots: 7 },
-      ]
+      // Calculate V3 windows and breaks (no parameter optimization needed)
+      const { windows, breaks } = calculateVolumeProfileV3(priceData, { start: 0, end: null })
+
+      if (breaks.length === 0) {
+        const periodLabel = formatPeriod(targetDays)
+        showToast(`${symbol}${periodLabel ? ` (${periodLabel})` : ''} removed: no V3 breakouts detected.`)
+        setResults(prev => prev.filter(entry => !(entry.symbol === symbol && entry.days === targetDays)))
+        setScanQueue(prev => prev.filter(queuedSymbol => queuedSymbol !== symbol))
+        return
+      }
+
+      // Calculate V3 P&L
+      const v3PLResult = calculateVolumeProfileV3PL({
+        volumeProfileV3Breaks: breaks,
+        volumeProfileV3Data: windows,
+        prices: priceData,
+        transactionFee: 0.003,
+        cutoffPercent: 0.08
+      })
 
       const passesSelectionFilters = (candidate) => {
         const winRate = candidate.optimalSMAs?.winRate
@@ -986,61 +996,37 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
         return meetsPerformanceThresholds(candidate)
       }
 
-      let bestResult = null
-      let bestPL = -Infinity
-
-      for (const params of paramCombinations) {
-        const { slots, breakouts } = calculateVolPrfV2Breakouts(priceData, params)
-
-        if (breakouts.length === 0) {
-          continue
-        }
-
-        const smaResult = optimizeSMAParams(priceData, slots, breakouts)
-
-        // Only consider combinations with >= 4 signals
-        const candidateLatestBreakout = getLatestBreakout(breakouts)
-        const candidateResult = {
-          symbol,
-          status: 'completed',
-          days: targetDays,
-          totalSignals: smaResult.totalSignals,
-          optimalSMAs: smaResult,
-          latestBreakout: candidateLatestBreakout,
-          originalBreakout: candidateLatestBreakout
-        }
-
-        if (!passesSelectionFilters(candidateResult)) {
-          continue
-        }
-
-        if (smaResult.totalSignals >= 4) {
-          if (smaResult.pl > bestPL) {
-            bestPL = smaResult.pl
-            bestResult = {
-              params,
-              slots,
-              breakouts,
-              smaResult
-            }
-          }
+      // Check if meets minimum thresholds
+      const candidateResult = {
+        symbol,
+        status: 'completed',
+        days: targetDays,
+        totalSignals: v3PLResult.tradingSignals,
+        optimalSMAs: {
+          pl: v3PLResult.totalPL,
+          winRate: v3PLResult.winRate,
+          totalSignals: v3PLResult.tradingSignals
         }
       }
 
-      // If no combination passed selection filters, remove the entry entirely
-      if (!bestResult) {
+      if (!passesSelectionFilters(candidateResult)) {
         const periodLabel = formatPeriod(targetDays)
-        showToast(`${symbol}${periodLabel ? ` (${periodLabel})` : ''} removed: no simulation met performance filters.`)
+        showToast(`${symbol}${periodLabel ? ` (${periodLabel})` : ''} removed: V3 simulation did not meet performance filters.`)
         setResults(prev => prev.filter(entry => !(entry.symbol === symbol && entry.days === targetDays)))
         setScanQueue(prev => prev.filter(queuedSymbol => queuedSymbol !== symbol))
         return
       }
 
-      const { params: optimalParams, breakouts, slots, smaResult: optimalSMAs } = bestResult
+      const breakouts = breaks  // Rename for consistency with existing code
+      const recentBreakouts = breaks.filter(b => {
+        const now = new Date()
+        const cutoffDate = new Date(now)
+        cutoffDate.setDate(cutoffDate.getDate() - 10)
+        return new Date(b.date) >= cutoffDate
+      })
 
-      const recentBreakouts = getRecentBreakouts(breakouts, 10)
-      let latestBreakout = getLatestBreakout(breakouts)
-      const latestRecentBreakout = getLatestBreakout(recentBreakouts)
+      let latestBreakout = breakouts.length > 0 ? breakouts[breakouts.length - 1] : null
+      const latestRecentBreakout = recentBreakouts.length > 0 ? recentBreakouts[recentBreakouts.length - 1] : null
 
       if (!latestBreakout) {
         throw new Error('No breakout detected')
@@ -1059,13 +1045,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
         latestPrice = priceData[0].close
       }
 
-      // Find resistance zones before potentially nullifying latestBreakout
-      const { upResist, downResist } = findResistanceZones(latestBreakout, slots, latestPrice)
+      // V3 doesn't use resistance zones
+      const upResist = null
+      const downResist = null
 
       // Check if the latest breakout has been closed by a sell signal
       // Store original breakout for reference, but hide break price if closed
       const originalBreakout = latestBreakout
-      const breakoutClosed = isBreakoutClosed(latestBreakout.date, priceData, optimalSMAs.period)
+      const breakoutClosed = false  // V3 doesn't track breakout closure
       if (breakoutClosed) {
         latestBreakout = null  // This hides the break price column only
       }
@@ -1073,16 +1060,24 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
       const marketChange = computeMarketChange(priceData)
       const durationMs = Date.now() - startTime
 
+      const optimalSMAs = {
+        pl: v3PLResult.totalPL,
+        winRate: v3PLResult.winRate,
+        totalSignals: v3PLResult.tradingSignals,
+        marketChange: v3PLResult.marketChange,
+        alpha: v3PLResult.totalPL - v3PLResult.marketChange
+      }
+
       const completedEntry = {
         symbol,
         status: 'completed',
-        totalSignals: optimalSMAs.totalSignals,
+        totalSignals: v3PLResult.tradingSignals,
         latestBreakout,
         originalBreakout,  // Always has the breakout data, even if closed
         breakoutClosed,
         latestPrice,
         priceData,
-        optimalParams,
+        optimalParams: null,  // V3 doesn't use parameter optimization
         optimalSMAs,
         marketChange,
         durationMs,
@@ -2612,4 +2607,4 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
   )
 }
 
-export default BacktestResults
+export default V3BacktestResults
