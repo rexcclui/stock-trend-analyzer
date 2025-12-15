@@ -1,6 +1,13 @@
 /**
  * Calculate Volume Profile V3 windows and break signals
  *
+ * New logic:
+ * - Start with 150 data points, extend until breakthrough detected
+ * - Divide price range evenly into zones
+ * - Check if LAST point's zone is a breakthrough
+ * - Breakup = buy, Breakdown = sell
+ * - Continue creating windows while holding to update support
+ *
  * @param {Array} displayPrices - Array of price data {date, close, volume}
  * @param {Object} zoomRange - {start, end} - Range of visible data
  * @returns {Object} {windows, breaks} - Windows with volume profile data and break signals
@@ -14,82 +21,60 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
   if (visibleData.length === 0) return { windows: [], breaks: [] }
 
   const MIN_WINDOW_SIZE = 150
-  const BREAK_VOLUME_THRESHOLD = 0.10 // 10%
-  const BREAK_DIFF_THRESHOLD = 0.08 // 8% difference from previous 5 zones
-  const PRICE_SLOT_MIN_RATIO = 0.50 // Each zone must be at least 50% of previous window's zone
-  const ZONE_LOOKBACK = 5 // Check previous 5 zones for break detection
+  const NUM_PRICE_ZONES = 20 // Fixed number of zones
+  const BREAK_DIFF_THRESHOLD = 0.08 // 8% difference
+  const ZONE_LOOKBACK = 5 // Check previous 5 zones
 
   const windows = []
   const breaks = []
   let currentWindowStart = 0
-  let previousWindowZoneHeight = null // Track previous window's zone height
 
   while (currentWindowStart < visibleData.length) {
-    // Determine window end (at least MIN_WINDOW_SIZE points or until end of data)
-    let currentWindowEnd = Math.min(currentWindowStart + MIN_WINDOW_SIZE, visibleData.length)
-    let windowData = visibleData.slice(currentWindowStart, currentWindowEnd)
-
-    if (windowData.length === 0) break
-
-    // Process each data point in the window to detect breaks
-    const windowPoints = []
+    let windowEnd = Math.min(currentWindowStart + MIN_WINDOW_SIZE, visibleData.length)
     let breakDetected = false
     let breakIndex = -1
+    let isUpBreak = false
+    let breakPrice = 0
 
-    for (let i = 0; i < windowData.length; i++) {
-      const dataPoint = windowData[i]
+    // Keep extending window until breakthrough detected or end of data
+    while (windowEnd <= visibleData.length && !breakDetected) {
+      const windowData = visibleData.slice(currentWindowStart, windowEnd)
 
-      // Calculate volume distribution across price zones for current cumulative data
-      const cumulativeData = windowData.slice(0, i + 1)
+      if (windowData.length < MIN_WINDOW_SIZE) break
 
-      // Calculate dynamic number of zones: data points / 15, min 15, max 20
-      const numPriceZones = Math.max(15, Math.min(20, Math.floor(cumulativeData.length / 15)))
-
-      // Calculate min/max from CUMULATIVE data (not entire window)
-      const cumulativePrices = cumulativeData.map(p => p.close)
-      const minPrice = Math.min(...cumulativePrices)
-      const maxPrice = Math.max(...cumulativePrices)
+      // Calculate price range for THIS window
+      const windowPrices = windowData.map(p => p.close)
+      const minPrice = Math.min(...windowPrices)
+      const maxPrice = Math.max(...windowPrices)
       const priceRange = maxPrice - minPrice
 
-      // Skip if no price movement yet
       if (priceRange === 0) {
-        windowPoints.push({
-          date: dataPoint.date,
-          price: dataPoint.close,
-          volume: dataPoint.volume || 0,
-          priceZones: [{
-            minPrice: minPrice,
-            maxPrice: minPrice,
-            volume: dataPoint.volume || 0,
-            volumeWeight: 1.0
-          }],
-          currentZoneIdx: 0
-        })
+        windowEnd++
         continue
       }
 
-      const priceZoneHeight = priceRange / numPriceZones
+      const zoneHeight = priceRange / NUM_PRICE_ZONES
 
-      // Create price zones based on cumulative range (dynamic number of zones)
+      // Create evenly divided price zones
       const priceZones = []
-      for (let j = 0; j < numPriceZones; j++) {
+      for (let i = 0; i < NUM_PRICE_ZONES; i++) {
         priceZones.push({
-          minPrice: minPrice + (j * priceZoneHeight),
-          maxPrice: minPrice + ((j + 1) * priceZoneHeight),
+          minPrice: minPrice + (i * zoneHeight),
+          maxPrice: minPrice + ((i + 1) * zoneHeight),
           volume: 0,
           volumeWeight: 0
         })
       }
 
-      // Accumulate volume in each price zone
+      // Accumulate volume in each zone
       let totalVolume = 0
-      cumulativeData.forEach(price => {
+      windowData.forEach(price => {
         const priceValue = price.close
         const volume = price.volume || 0
         totalVolume += volume
 
-        let zoneIndex = Math.floor((priceValue - minPrice) / priceZoneHeight)
-        if (zoneIndex >= numPriceZones) zoneIndex = numPriceZones - 1
+        let zoneIndex = Math.floor((priceValue - minPrice) / zoneHeight)
+        if (zoneIndex >= NUM_PRICE_ZONES) zoneIndex = NUM_PRICE_ZONES - 1
         if (zoneIndex < 0) zoneIndex = 0
 
         priceZones[zoneIndex].volume += volume
@@ -100,177 +85,139 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
         zone.volumeWeight = totalVolume > 0 ? zone.volume / totalVolume : 0
       })
 
-      // Find which zone the current price falls into
-      const currentPrice = dataPoint.close
-      let currentZoneIdx = Math.floor((currentPrice - minPrice) / priceZoneHeight)
-      if (currentZoneIdx >= numPriceZones) currentZoneIdx = numPriceZones - 1
-      if (currentZoneIdx < 0) currentZoneIdx = 0
+      // Check if LAST data point's zone is a breakthrough
+      const lastPoint = windowData[windowData.length - 1]
+      const lastPrice = lastPoint.close
+      let lastZoneIdx = Math.floor((lastPrice - minPrice) / zoneHeight)
+      if (lastZoneIdx >= NUM_PRICE_ZONES) lastZoneIdx = NUM_PRICE_ZONES - 1
+      if (lastZoneIdx < 0) lastZoneIdx = 0
 
-      const currentZone = priceZones[currentZoneIdx]
-      const currentWeight = currentZone.volumeWeight
+      const lastZone = priceZones[lastZoneIdx]
+      const lastWeight = lastZone.volumeWeight
 
-      // Check break condition (skip first few points to have meaningful data)
-      if (i >= 10 && currentZoneIdx >= ZONE_LOOKBACK) {
-        // Price slot constraint: Check if current zone height is at least 50% of previous window
-        // If zones are too small compared to previous window, don't break - keep extending
-        let priceSlotSizeOk = true
-        if (previousWindowZoneHeight !== null) {
-          if (priceZoneHeight < previousWindowZoneHeight * PRICE_SLOT_MIN_RATIO) {
-            priceSlotSizeOk = false
-          }
-        }
+      // Only check for breakthrough if we have enough zones below/above
+      if (lastZoneIdx >= ZONE_LOOKBACK || lastZoneIdx < NUM_PRICE_ZONES - ZONE_LOOKBACK) {
+        // Determine trend direction: compare last zone to previous zone
+        const prevZoneIdx = lastZoneIdx > 0 ? lastZoneIdx - 1 : 0
+        const isTrendUp = lastZoneIdx > prevZoneIdx && lastPrice > windowData[windowData.length - 2]?.close
 
-        // Only check volume break condition if price slot size is acceptable
-        if (priceSlotSizeOk) {
-          // Check any of the previous 5 zones for volume difference
-          let breakConditionMet = false
-          let maxWeightDiff = 0
-          let bestPrevZoneIdx = -1
+        // Check breakthrough condition
+        let breakConditionMet = false
 
+        if (isTrendUp && lastZoneIdx >= ZONE_LOOKBACK) {
+          // Trend up: check 5 zones below
           for (let lookback = 1; lookback <= ZONE_LOOKBACK; lookback++) {
-            const prevZoneIdx = currentZoneIdx - lookback
-            if (prevZoneIdx >= 0) {
-              const prevZone = priceZones[prevZoneIdx]
-              const prevWeight = prevZone.volumeWeight
-              const weightDiff = prevWeight - currentWeight
-
-              // Track the best weight difference
-              if (weightDiff > maxWeightDiff) {
-                maxWeightDiff = weightDiff
-                bestPrevZoneIdx = prevZoneIdx
-              }
-
-              // Break condition: current weight < 10% AND 8% less than any of previous 5 zones
-              // Price direction check:
-              // - For break up: previous zone must be lower (prevZoneIdx < currentZoneIdx)
-              // - For break down: previous zone must be higher (prevZoneIdx > currentZoneIdx)
-              const isPriceMovingUp = prevZoneIdx < currentZoneIdx
-              const isPriceMovingDown = prevZoneIdx > currentZoneIdx
-
-              if (currentWeight < BREAK_VOLUME_THRESHOLD &&
-                  weightDiff >= BREAK_DIFF_THRESHOLD &&
-                  (isPriceMovingUp || isPriceMovingDown)) {
+            const belowZoneIdx = lastZoneIdx - lookback
+            if (belowZoneIdx >= 0) {
+              const belowWeight = priceZones[belowZoneIdx].volumeWeight
+              if (belowWeight - lastWeight >= BREAK_DIFF_THRESHOLD) {
                 breakConditionMet = true
+                isUpBreak = true
                 break
               }
             }
           }
-
-          if (breakConditionMet) {
-            // Determine if it's an up or down break based on price movement from previous zone
-            const isUpBreak = bestPrevZoneIdx < currentZoneIdx
-
-            // Additional check: Ensure no higher volume resistance/support in break direction
-            // For break up: check 5 zones above for higher volume (resistance)
-            // For break down: check 5 zones below for higher volume (support)
-            let hasResistanceInDirection = false
-
-            if (isUpBreak) {
-              // Check 5 zones ABOVE current zone
-              for (let lookAhead = 1; lookAhead <= ZONE_LOOKBACK; lookAhead++) {
-                const futureZoneIdx = currentZoneIdx + lookAhead
-                if (futureZoneIdx < numPriceZones) {
-                  const futureZone = priceZones[futureZoneIdx]
-                  if (futureZone.volumeWeight > currentWeight) {
-                    hasResistanceInDirection = true
-                    break
-                  }
-                }
+        } else if (!isTrendUp && lastZoneIdx < NUM_PRICE_ZONES - ZONE_LOOKBACK) {
+          // Trend down: check 5 zones above
+          for (let lookback = 1; lookback <= ZONE_LOOKBACK; lookback++) {
+            const aboveZoneIdx = lastZoneIdx + lookback
+            if (aboveZoneIdx < NUM_PRICE_ZONES) {
+              const aboveWeight = priceZones[aboveZoneIdx].volumeWeight
+              if (aboveWeight - lastWeight >= BREAK_DIFF_THRESHOLD) {
+                breakConditionMet = true
+                isUpBreak = false
+                break
               }
-            } else {
-              // Check 5 zones BELOW current zone
-              for (let lookAhead = 1; lookAhead <= ZONE_LOOKBACK; lookAhead++) {
-                const futureZoneIdx = currentZoneIdx - lookAhead
-                if (futureZoneIdx >= 0) {
-                  const futureZone = priceZones[futureZoneIdx]
-                  if (futureZone.volumeWeight > currentWeight) {
-                    hasResistanceInDirection = true
-                    break
-                  }
-                }
-              }
-            }
-
-            // Only proceed if there's no resistance/support in the break direction
-            if (!hasResistanceInDirection) {
-              // Find the zone with MAXIMUM volume weight (the volume-concentrated zone)
-              // This is the strongest support/resistance level in the current window
-              let maxWeight = 0
-              let maxWeightZone = null
-              let maxWeightZoneIdx = -1
-
-              priceZones.forEach((zone, idx) => {
-                if (zone.volumeWeight > maxWeight) {
-                  maxWeight = zone.volumeWeight
-                  maxWeightZone = zone
-                  maxWeightZoneIdx = idx
-                }
-              })
-
-              // Support level is the BOTTOM of the heaviest volume zone (for upbreak)
-              // Price must break through the entire support zone to trigger a sell
-              // Example: If support zone is $16.2-$16.4, price must drop below $16.2
-              const supportLevel = isUpBreak ?
-                (maxWeightZone ? maxWeightZone.minPrice : currentZone.minPrice) :
-                (maxWeightZone ? maxWeightZone.maxPrice : currentZone.maxPrice)
-
-              breaks.push({
-                date: dataPoint.date,
-                price: currentPrice,
-                isUpBreak: isUpBreak,
-                currentWeight: currentWeight,
-                prevWeight: bestPrevZoneIdx >= 0 ? priceZones[bestPrevZoneIdx].volumeWeight : 0,
-                weightDiff: maxWeightDiff,
-                windowIndex: windows.length,
-                supportLevel: supportLevel, // Price level to monitor for failed breakout
-                concentratedZoneIdx: maxWeightZoneIdx, // Index of the heaviest volume zone
-                breakoutZoneIdx: currentZoneIdx, // Index of the low-volume breakout zone
-                maxVolumeWeight: maxWeight // Track the max volume weight
-              })
-
-              breakDetected = true
-              breakIndex = i
-              break // Exit the loop to start a new window
             }
           }
         }
+
+        if (breakConditionMet) {
+          breakDetected = true
+          breakIndex = windowEnd - 1
+          breakPrice = lastPrice
+
+          // Find heaviest volume zone for support level
+          let maxWeight = 0
+          let maxWeightZone = null
+          priceZones.forEach(zone => {
+            if (zone.volumeWeight > maxWeight) {
+              maxWeight = zone.volumeWeight
+              maxWeightZone = zone
+            }
+          })
+
+          breaks.push({
+            date: lastPoint.date,
+            price: breakPrice,
+            isUpBreak: isUpBreak,
+            currentWeight: lastWeight,
+            windowIndex: windows.length,
+            supportLevel: maxWeightZone ? maxWeightZone.minPrice : minPrice,
+            maxVolumeWeight: maxWeight
+          })
+        }
       }
 
-      // Store this data point with its volume profile
-      windowPoints.push({
-        date: dataPoint.date,
-        price: dataPoint.close,
-        volume: dataPoint.volume || 0,
-        priceZones: priceZones,
-        currentZoneIdx: currentZoneIdx
+      // If no break detected, extend window by 1
+      if (!breakDetected) {
+        windowEnd++
+      }
+    }
+
+    // Store window data
+    const finalWindowData = visibleData.slice(currentWindowStart, windowEnd)
+    if (finalWindowData.length > 0) {
+      // Recalculate zones for final window
+      const windowPrices = finalWindowData.map(p => p.close)
+      const minPrice = Math.min(...windowPrices)
+      const maxPrice = Math.max(...windowPrices)
+      const priceRange = maxPrice - minPrice
+      const zoneHeight = priceRange > 0 ? priceRange / NUM_PRICE_ZONES : 1
+
+      const priceZones = []
+      for (let i = 0; i < NUM_PRICE_ZONES; i++) {
+        priceZones.push({
+          minPrice: minPrice + (i * zoneHeight),
+          maxPrice: minPrice + ((i + 1) * zoneHeight),
+          volume: 0,
+          volumeWeight: 0
+        })
+      }
+
+      let totalVolume = 0
+      finalWindowData.forEach(price => {
+        const volume = price.volume || 0
+        totalVolume += volume
+        let zoneIndex = Math.floor((price.close - minPrice) / zoneHeight)
+        if (zoneIndex >= NUM_PRICE_ZONES) zoneIndex = NUM_PRICE_ZONES - 1
+        if (zoneIndex < 0) zoneIndex = 0
+        priceZones[zoneIndex].volume += volume
+      })
+
+      priceZones.forEach(zone => {
+        zone.volumeWeight = totalVolume > 0 ? zone.volume / totalVolume : 0
+      })
+
+      windows.push({
+        windowIndex: windows.length,
+        startDate: finalWindowData[0].date,
+        endDate: finalWindowData[finalWindowData.length - 1].date,
+        dataPoints: finalWindowData.map(point => ({
+          date: point.date,
+          price: point.close,
+          volume: point.volume || 0,
+          priceZones: priceZones
+        })),
+        breakDetected: breakDetected
       })
     }
 
-    // Add the window to our results
-    windows.push({
-      windowIndex: windows.length,
-      startDate: windowData[0].date,
-      endDate: windowData[windowData.length - 1].date,
-      dataPoints: windowPoints,
-      breakDetected: breakDetected
-    })
-
-    // Store the zone height from the last data point for next window comparison
-    if (windowPoints.length > 0) {
-      const lastPoint = windowPoints[windowPoints.length - 1]
-      if (lastPoint.priceZones && lastPoint.priceZones.length > 0) {
-        const lastZone = lastPoint.priceZones[0]
-        previousWindowZoneHeight = lastZone.maxPrice - lastZone.minPrice
-      }
-    }
-
     // Move to next window
-    if (breakDetected && breakIndex > 0) {
-      // Start new window after the break point
-      currentWindowStart += breakIndex + 1
+    if (breakDetected && breakIndex >= currentWindowStart) {
+      currentWindowStart = breakIndex + 1
     } else {
-      // No break detected, move to next window
-      currentWindowStart = currentWindowEnd
+      break // End of data
     }
   }
 
@@ -321,7 +268,6 @@ export const calculateVolumeProfileV3PL = ({
   let buyDate = null
   let cutoffPrice = null // Track the current cutoff price (trailing stop)
   let currentWindowIndex = null // Track which window we're in while holding
-  let lastCutoffBuyPrice = null // Track original buy price from last cutoff sell
 
   // Get all prices in forward chronological order
   const reversedPrices = [...prices].reverse()
@@ -372,9 +318,6 @@ export const calculateVolumeProfileV3PL = ({
         isCutoff: true
       })
 
-      // Save the original buy price for potential re-entry
-      lastCutoffBuyPrice = buyPrice
-
       // Reset state
       isHolding = false
       buyPrice = null
@@ -383,16 +326,12 @@ export const calculateVolumeProfileV3PL = ({
       currentWindowIndex = null
     }
 
-    // If holding, check current window's volume distribution for support updates
+    // If holding, check if we entered a new window and update cutoff
     if (isHolding && currentWindowIndex !== null) {
       const windowData = dateToWindowMap.get(currentDate)
 
-      // Check if we entered a new window
-      const enteredNewWindow = windowData && windowData.windowIndex !== currentWindowIndex
-
-      // Update cutoff based on current window's volume distribution
-      // This happens BOTH when entering new window AND while staying in same window
-      if (windowData) {
+      if (windowData && windowData.windowIndex !== currentWindowIndex) {
+        // Entered a new window - update cutoff to heaviest zone's minPrice if higher
         const priceZones = windowData.priceZones
 
         // Find the zone with maximum volume weight
@@ -405,20 +344,7 @@ export const calculateVolumeProfileV3PL = ({
           }
         })
 
-        if (enteredNewWindow) {
-          console.log('[New Window]', {
-            date: currentDate,
-            oldWindow: currentWindowIndex,
-            newWindow: windowData.windowIndex,
-            maxWeight: (maxWeight * 100).toFixed(1) + '%',
-            meets15Threshold: maxWeight >= 0.15,
-            zoneMinPrice: maxWeightZone?.minPrice,
-            currentCutoff: cutoffPrice
-          })
-        }
-
-        // Update cutoff if max volume weight >= 15% and support is higher
-        if (maxWeightZone && maxWeight >= 0.15) {
+        if (maxWeightZone) {
           const newWindowSupport = maxWeightZone.minPrice
           const newCutoffPrice = Math.max(cutoffPrice, newWindowSupport)
 
@@ -429,15 +355,12 @@ export const calculateVolumeProfileV3PL = ({
               price: newCutoffPrice,
               volumeWeight: maxWeight
             })
-            console.log('[Cutoff Updated]', cutoffPrice, '→', newCutoffPrice, enteredNewWindow ? '(new window)' : '(same window)')
             cutoffPrice = newCutoffPrice
           }
         }
 
-        // Update window index if changed
-        if (enteredNewWindow) {
-          currentWindowIndex = windowData.windowIndex
-        }
+        // Update window index
+        currentWindowIndex = windowData.windowIndex
       }
     }
 
@@ -450,15 +373,17 @@ export const calculateVolumeProfileV3PL = ({
           isHolding = true
           buyPrice = breakSignal.price
           buyDate = breakSignal.date
-          cutoffPrice = breakSignal.price * (1 - CUTOFF_PERCENT) // Initial -8% cutoff
+
+          // Initial cutoff = MAX(buyPrice * 0.92, heaviest zone minPrice)
+          const priceBasedCutoff = breakSignal.price * (1 - CUTOFF_PERCENT)
+          const supportBasedCutoff = breakSignal.supportLevel || 0
+          cutoffPrice = Math.max(priceBasedCutoff, supportBasedCutoff)
+
           currentWindowIndex = breakSignal.windowIndex // Track starting window
           buySignals.push({
             date: breakSignal.date,
             price: breakSignal.price
           })
-
-          // Clear cutoff tracking on new upbreak
-          lastCutoffBuyPrice = null
         }
         // If consecutive breakup (already holding), ignore it
       } else {
@@ -492,30 +417,7 @@ export const calculateVolumeProfileV3PL = ({
           cutoffPrice = null
           currentWindowIndex = null
         }
-
-        // Clear cutoff tracking on any breakdown (new window started)
-        lastCutoffBuyPrice = null
       }
-    }
-
-    // Re-entry logic: If not holding and price recovered above original buy price after cutoff sell
-    // This indicates the cutoff was a temporary dip and trend continues
-    if (!isHolding && lastCutoffBuyPrice !== null && currentPrice > lastCutoffBuyPrice) {
-      // Re-enter the position
-      isHolding = true
-      buyPrice = currentPrice
-      buyDate = currentDate
-      cutoffPrice = currentPrice * (1 - CUTOFF_PERCENT) // Set -8% cutoff from re-entry price
-      currentWindowIndex = null // Will be set if we enter a new window
-
-      buySignals.push({
-        date: currentDate,
-        price: currentPrice,
-        isReEntry: true // Mark this as a re-entry signal
-      })
-
-      // Clear the cutoff tracking
-      lastCutoffBuyPrice = null
     }
   }
 
