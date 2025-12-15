@@ -383,63 +383,28 @@ export const calculateVolumeProfileV3PL = ({
       currentWindowIndex = null
     }
 
-    // If holding, check if we've moved to a new window and update cutoff price
-    if (isHolding && currentWindowIndex !== null) {
-      const windowData = dateToWindowMap.get(currentDate)
+    // If holding, update trailing stop based on current price
+    if (isHolding) {
+      // Calculate price-based trailing stop (current price - 8%)
+      const currentPriceBasedStop = currentPrice * (1 - CUTOFF_PERCENT)
 
-      // Debug: log every check
-      if (windowData) {
-        console.log('[Window Check]', {
+      // Only move stop up if price-based stop is higher than current cutoff
+      if (currentPriceBasedStop > cutoffPrice) {
+        const previousCutoff = cutoffPrice
+        cutoffPrice = currentPriceBasedStop
+
+        // Track this support level update
+        supportUpdates.push({
           date: currentDate,
-          currentWindow: currentWindowIndex,
-          dataWindow: windowData.windowIndex,
-          changed: windowData.windowIndex !== currentWindowIndex
+          price: cutoffPrice,
+          volumeWeight: 0 // Not from volume zone, just price-based
         })
       }
 
-      if (windowData && windowData.windowIndex !== currentWindowIndex) {
-        // We've entered a new window - update cutoff to heaviest volume zone
-        const priceZones = windowData.priceZones
-
-        // Find the zone with maximum volume weight
-        let maxWeight = 0
-        let maxWeightZone = null
-        priceZones.forEach(zone => {
-          if (zone.volumeWeight > maxWeight) {
-            maxWeight = zone.volumeWeight
-            maxWeightZone = zone
-          }
-        })
-
-        // Update cutoff based on current price and max volume zone
-        // In uptrend, we want the trailing stop to follow the price up
-        // Use the HIGHER of: current trailing stop OR current price - 8%
-        if (maxWeightZone) {
-          const currentPriceBasedStop = currentPrice * (1 - CUTOFF_PERCENT)
-          const newWindowSupport = maxWeightZone.minPrice
-
-          console.log('[Support Update]', {
-            date: currentDate,
-            currentPrice,
-            oldCutoff: cutoffPrice,
-            priceBasedStop: currentPriceBasedStop,
-            windowSupport: newWindowSupport,
-            willBe: Math.max(cutoffPrice, newWindowSupport, currentPriceBasedStop)
-          })
-
-          // Use the highest of: existing cutoff, new window support, or price-based trailing stop
-          const newCutoffPrice = Math.max(cutoffPrice, newWindowSupport, currentPriceBasedStop)
-
-          // ALWAYS track that we entered a new window with new support structure
-          supportUpdates.push({
-            date: currentDate,
-            price: newCutoffPrice,
-            volumeWeight: maxWeight
-          })
-
-          cutoffPrice = newCutoffPrice
-          currentWindowIndex = windowData.windowIndex
-        }
+      // Also check if we've moved to a new window and update window index
+      const windowData = dateToWindowMap.get(currentDate)
+      if (windowData && currentWindowIndex !== null && windowData.windowIndex !== currentWindowIndex) {
+        currentWindowIndex = windowData.windowIndex
       }
     }
 
