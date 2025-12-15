@@ -1958,8 +1958,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Calculate last channel ONLY on the data that will be displayed
   // This prevents mismatch when period changes and indicators haven't updated yet
-  const displayPrices = prices.slice(0, dataLength)
-  const displayIndicators = indicators.slice(0, dataLength)
+  const displayPrices = useMemo(() => prices.slice(0, dataLength), [prices, dataLength])
+  const displayIndicators = useMemo(() => indicators.slice(0, dataLength), [indicators, dataLength])
 
   // Build a map of SPY volumes by date for quick lookup
   const spyVolumeByDate = (() => {
