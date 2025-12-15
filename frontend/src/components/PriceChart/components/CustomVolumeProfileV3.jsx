@@ -252,40 +252,58 @@ export const CustomVolumeProfileV3 = ({
       })}
 
       {/* Support level updates - green arrows pointing at new support */}
-      {v3PL?.supportUpdates?.map((update, idx) => {
-        const x = xAxis.scale(update.date)
-        const y = yAxis.scale(update.price)
+      {(() => {
+        if (!v3PL?.supportUpdates) {
+          console.log('[V3 Chart] No support updates in v3PL')
+          return null
+        }
 
-        if (x === undefined || y === undefined) return null
+        console.log('[V3 Chart] Rendering support updates:', v3PL.supportUpdates.length)
 
-        return (
-          <g key={`support-update-${idx}`}>
-            {/* Green arrow pointing right at the support level */}
-            <g transform={`translate(${x - 15}, ${y})`}>
-              <path
-                d="M 0,0 L 8,-4 L 8,4 Z"
+        return v3PL.supportUpdates.map((update, idx) => {
+          const x = xAxis.scale(update.date)
+          const y = yAxis.scale(update.price)
+
+          console.log('[V3 Chart] Support update:', {
+            idx,
+            date: update.date,
+            price: update.price,
+            x,
+            y,
+            valid: x !== undefined && y !== undefined
+          })
+
+          if (x === undefined || y === undefined) return null
+
+          return (
+            <g key={`support-update-${idx}`}>
+              {/* Green arrow pointing right at the support level */}
+              <g transform={`translate(${x - 15}, ${y})`}>
+                <path
+                  d="M 0,0 L 8,-4 L 8,4 Z"
+                  fill="#10b981"
+                  stroke="white"
+                  strokeWidth={1}
+                  opacity={0.9}
+                  style={{ pointerEvents: 'none' }}
+                />
+              </g>
+              {/* Small label showing volume weight */}
+              <text
+                x={x - 18}
+                y={y - 6}
                 fill="#10b981"
-                stroke="white"
-                strokeWidth={1}
-                opacity={0.9}
+                fontSize="9"
+                fontWeight="600"
+                textAnchor="end"
                 style={{ pointerEvents: 'none' }}
-              />
+              >
+                {(update.volumeWeight * 100).toFixed(1)}%
+              </text>
             </g>
-            {/* Small label showing volume weight */}
-            <text
-              x={x - 18}
-              y={y - 6}
-              fill="#10b981"
-              fontSize="9"
-              fontWeight="600"
-              textAnchor="end"
-              style={{ pointerEvents: 'none' }}
-            >
-              {(update.volumeWeight * 100).toFixed(1)}%
-            </text>
-          </g>
-        )
-      })}
+          )
+        })
+      })()}
 
       {/* P&L Stats Display */}
       {volumeProfileV3Enabled && v3PL && v3PL.tradingSignals > 0 && (() => {
