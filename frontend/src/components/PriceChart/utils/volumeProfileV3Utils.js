@@ -401,6 +401,17 @@ export const calculateVolumeProfileV3PL = ({
           }
         })
 
+        console.log('[New Window]', {
+          date: currentDate,
+          oldWindow: currentWindowIndex,
+          newWindow: windowData.windowIndex,
+          maxWeight: (maxWeight * 100).toFixed(1) + '%',
+          meets15Threshold: maxWeight >= 0.15,
+          zoneMinPrice: maxWeightZone?.minPrice,
+          currentCutoff: cutoffPrice,
+          wouldUpdate: maxWeightZone && maxWeight >= 0.15 && Math.max(cutoffPrice, maxWeightZone.minPrice) > cutoffPrice
+        })
+
         // Only update cutoff if max volume weight >= 15%
         if (maxWeightZone && maxWeight >= 0.15) {
           const newWindowSupport = maxWeightZone.minPrice
@@ -413,8 +424,13 @@ export const calculateVolumeProfileV3PL = ({
               price: newCutoffPrice,
               volumeWeight: maxWeight
             })
+            console.log('[Cutoff Updated]', cutoffPrice, '→', newCutoffPrice)
             cutoffPrice = newCutoffPrice
+          } else {
+            console.log('[Cutoff Unchanged] New support not higher:', newWindowSupport, '≤', cutoffPrice)
           }
+        } else {
+          console.log('[15% Check Failed] Max weight too low:', (maxWeight * 100).toFixed(1) + '%')
         }
 
         // Update window index regardless
