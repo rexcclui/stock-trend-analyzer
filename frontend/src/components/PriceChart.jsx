@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, ReferenceDot, Customized } from 'recharts'
 import { X, ArrowLeftRight, Hand } from 'lucide-react'
 import { findBestChannels, filterOverlappingChannels } from './PriceChart/utils/bestChannelFinder'
@@ -3261,13 +3261,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Calculate P&L after chartData is created (needs SMA values from chartData)
   const breakoutPL = calculateBreakoutPL()
-  const v3PL = calculateVolumeProfileV3PL({
+  const v3PL = useMemo(() => calculateVolumeProfileV3PL({
     volumeProfileV3Breaks,
     volumeProfileV3Data,
     prices,
     transactionFee: 0.003, // 0.3% broker fee
     cutoffPercent: 0.08 // 8% cutoff
-  })
+  }), [volumeProfileV3Breaks, volumeProfileV3Data, prices])
 
   // Apply zoom range to chart data FIRST
   const endIndex = zoomRange.end === null ? chartData.length : zoomRange.end
