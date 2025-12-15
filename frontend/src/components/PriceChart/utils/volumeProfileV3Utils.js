@@ -147,6 +147,18 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
             }
           })
 
+          console.log('[Breakthrough]', {
+            date: lastPoint.date,
+            type: isUpBreak ? 'BREAKUP' : 'BREAKDOWN',
+            windowSize: windowData.length,
+            priceRange: `${minPrice.toFixed(2)}-${maxPrice.toFixed(2)}`,
+            heaviestZoneWeight: (maxWeight * 100).toFixed(1) + '%',
+            zoneDistribution: priceZones.map((z, i) => ({
+              zone: i,
+              weight: (z.volumeWeight * 100).toFixed(1) + '%'
+            })).filter(z => parseFloat(z.weight) > 0)
+          })
+
           breaks.push({
             date: lastPoint.date,
             price: breakPrice,
@@ -344,12 +356,32 @@ export const calculateVolumeProfileV3PL = ({
           }
         })
 
+        console.log('[Support Check]', {
+          date: currentDate,
+          windowIdx: windowData.windowIndex,
+          zonesWithVolume: priceZones.filter(z => z.volumeWeight > 0).length,
+          maxWeight: (maxWeight * 100).toFixed(1) + '%',
+          distribution: priceZones.map((z, i) => ({
+            zone: i,
+            weight: (z.volumeWeight * 100).toFixed(1) + '%',
+            priceRange: `${z.minPrice.toFixed(2)}-${z.maxPrice.toFixed(2)}`
+          })).filter(z => parseFloat(z.weight) > 0)
+        })
+
         if (maxWeightZone) {
           const newWindowSupport = maxWeightZone.minPrice
           const newCutoffPrice = Math.max(cutoffPrice, newWindowSupport)
 
           // Track support update if it moved up
           if (newCutoffPrice > cutoffPrice) {
+            console.log('[Support UPDATE]', {
+              date: currentDate,
+              oldCutoff: cutoffPrice.toFixed(2),
+              newCutoff: newCutoffPrice.toFixed(2),
+              supportLevel: newWindowSupport.toFixed(2),
+              volumeWeight: (maxWeight * 100).toFixed(1) + '%'
+            })
+
             supportUpdates.push({
               date: currentDate,
               price: newCutoffPrice,
