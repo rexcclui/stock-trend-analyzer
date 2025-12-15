@@ -252,9 +252,20 @@ export const CustomVolumeProfileV3 = ({
       })}
 
       {/* Support level updates - cyan up arrows below the support level */}
+      {v3PL?.supportUpdates && v3PL.supportUpdates.length > 0 && console.log('[V3 Render] Rendering', v3PL.supportUpdates.length, 'support arrows')}
       {v3PL?.supportUpdates?.map((update, idx) => {
         const x = xAxis.scale(update.date)
         const y = yAxis.scale(update.price)
+
+        console.log('[V3 Render] Arrow', idx, ':', {
+          date: update.date,
+          price: update.price,
+          x,
+          y,
+          yPlusOffset: y + 12,
+          valid: x !== undefined && y !== undefined,
+          inBounds: x >= offset.left && x <= offset.left + offset.width && y >= offset.top && y <= offset.top + offset.height
+        })
 
         if (x === undefined || y === undefined) return null
 
