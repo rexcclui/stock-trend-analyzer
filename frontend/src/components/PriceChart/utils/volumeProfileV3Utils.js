@@ -303,6 +303,7 @@ export const calculateVolumeProfileV3PL = ({
       tradingSignals: 0,
       buySignals: [],
       sellSignals: [],
+      supportUpdates: [],
       marketChange: 0,
       isHolding: false
     }
@@ -314,6 +315,7 @@ export const calculateVolumeProfileV3PL = ({
   const trades = []
   const buySignals = []
   const sellSignals = []
+  const supportUpdates = [] // Track support level updates
   let isHolding = false
   let buyPrice = null
   let buyDate = null
@@ -405,6 +407,12 @@ export const calculateVolumeProfileV3PL = ({
           const newCutoffPrice = maxWeightZone.minPrice
           // Only update if new cutoff is HIGHER than current cutoff
           if (newCutoffPrice > cutoffPrice) {
+            // Track this support level update
+            supportUpdates.push({
+              date: currentDate,
+              price: newCutoffPrice,
+              volumeWeight: maxWeight
+            })
             cutoffPrice = newCutoffPrice
           }
           currentWindowIndex = windowData.windowIndex
@@ -539,6 +547,7 @@ export const calculateVolumeProfileV3PL = ({
     closedTradeCount: closedTrades.length,
     buySignals,
     sellSignals,
+    supportUpdates,
     marketChange,
     isHolding
   }
