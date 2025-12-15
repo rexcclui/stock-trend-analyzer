@@ -407,6 +407,15 @@ export const calculateVolumeProfileV3PL = ({
           const currentPriceBasedStop = currentPrice * (1 - CUTOFF_PERCENT)
           const newWindowSupport = maxWeightZone.minPrice
 
+          console.log('[Support Update]', {
+            date: currentDate,
+            currentPrice,
+            oldCutoff: cutoffPrice,
+            priceBasedStop: currentPriceBasedStop,
+            windowSupport: newWindowSupport,
+            willBe: Math.max(cutoffPrice, newWindowSupport, currentPriceBasedStop)
+          })
+
           // Use the highest of: existing cutoff, new window support, or price-based trailing stop
           const newCutoffPrice = Math.max(cutoffPrice, newWindowSupport, currentPriceBasedStop)
 
