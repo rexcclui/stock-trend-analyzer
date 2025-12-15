@@ -401,29 +401,20 @@ export const calculateVolumeProfileV3PL = ({
         })
 
         // Update cutoff to the BOTTOM of the heaviest volume zone
-        // When entering a new window, ALWAYS update to reflect the new volume structure
-        // Use the higher of: current cutoff OR new window's max volume zone bottom
-        // This ensures true trailing stop (never goes down) while adapting to new windows
+        // When entering a new window, update to the new window's max volume zone
+        // BUT maintain trailing stop behavior (never go down)
         if (maxWeightZone) {
-          const newCutoffPrice = Math.max(cutoffPrice, maxWeightZone.minPrice)
+          const newWindowSupport = maxWeightZone.minPrice
+          const newCutoffPrice = Math.max(cutoffPrice, newWindowSupport)
 
-          // Track this support level update if it changed
-          if (newCutoffPrice > cutoffPrice) {
-            supportUpdates.push({
-              date: currentDate,
-              price: newCutoffPrice,
-              volumeWeight: maxWeight
-            })
-            cutoffPrice = newCutoffPrice
-          } else {
-            // Even if cutoff didn't move up, still track that we entered new window
-            // This shows the support level holding steady through the new window
-            supportUpdates.push({
-              date: currentDate,
-              price: cutoffPrice,
-              volumeWeight: maxWeight
-            })
-          }
+          // ALWAYS track that we entered a new window with new support structure
+          supportUpdates.push({
+            date: currentDate,
+            price: newCutoffPrice,
+            volumeWeight: maxWeight
+          })
+
+          cutoffPrice = newCutoffPrice
           currentWindowIndex = windowData.windowIndex
         }
       }
