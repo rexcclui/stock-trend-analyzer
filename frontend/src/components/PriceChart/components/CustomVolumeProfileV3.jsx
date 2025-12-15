@@ -251,7 +251,7 @@ export const CustomVolumeProfileV3 = ({
         )
       })}
 
-      {/* Support level updates - cyan arrows pointing down at new support */}
+      {/* Support level updates - bright yellow circles marking new support */}
       {v3PL?.supportUpdates?.map((update, idx) => {
         const x = xAxis.scale(update.date)
         const y = yAxis.scale(update.price)
@@ -260,28 +260,40 @@ export const CustomVolumeProfileV3 = ({
 
         return (
           <g key={`support-update-${idx}`}>
-            {/* Cyan arrow pointing down at the support level from above */}
-            <g transform={`translate(${x}, ${y - 12})`}>
-              <path
-                d="M 0,8 L 6,0 L -6,0 Z"
-                fill="#06b6d4"
-                stroke="white"
-                strokeWidth={1.5}
-                opacity={0.95}
-                style={{ pointerEvents: 'none' }}
-              />
-            </g>
-            {/* Label showing volume weight above the arrow */}
+            {/* Large bright yellow circle with white border */}
+            <circle
+              cx={x}
+              cy={y}
+              r={8}
+              fill="#FFD700"
+              stroke="white"
+              strokeWidth={3}
+              opacity={1}
+              style={{ pointerEvents: 'none' }}
+            />
+            {/* Inner circle for contrast */}
+            <circle
+              cx={x}
+              cy={y}
+              r={5}
+              fill="#FF6B00"
+              opacity={1}
+              style={{ pointerEvents: 'none' }}
+            />
+            {/* Large label showing volume weight */}
             <text
-              x={x}
-              y={y - 16}
-              fill="#06b6d4"
-              fontSize="10"
-              fontWeight="700"
-              textAnchor="middle"
+              x={x + 15}
+              y={y + 5}
+              fill="#FFD700"
+              fontSize="14"
+              fontWeight="900"
+              textAnchor="start"
+              stroke="black"
+              strokeWidth={3}
+              paintOrder="stroke"
               style={{ pointerEvents: 'none' }}
             >
-              {(update.volumeWeight * 100).toFixed(0)}%
+              ↑{(update.volumeWeight * 100).toFixed(0)}%
             </text>
           </g>
         )
