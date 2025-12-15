@@ -3261,13 +3261,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Calculate P&L after chartData is created (needs SMA values from chartData)
   const breakoutPL = calculateBreakoutPL()
-  const v3PL = useMemo(() => calculateVolumeProfileV3PL({
-    volumeProfileV3Breaks,
-    volumeProfileV3Data,
-    prices,
-    transactionFee: 0.003, // 0.3% broker fee
-    cutoffPercent: 0.08 // 8% cutoff
-  }), [volumeProfileV3Breaks, volumeProfileV3Data, prices])
+  const v3PL = useMemo(() => {
+    const breaks = volumeProfileV3Result.breaks || []
+    const windows = volumeProfileV3Result.windows || []
+
+    return calculateVolumeProfileV3PL({
+      volumeProfileV3Breaks: breaks,
+      volumeProfileV3Data: windows,
+      prices,
+      transactionFee: 0.003, // 0.3% broker fee
+      cutoffPercent: 0.08 // 8% cutoff
+    })
+  }, [volumeProfileV3Result, prices])
 
   // Apply zoom range to chart data FIRST
   const endIndex = zoomRange.end === null ? chartData.length : zoomRange.end
