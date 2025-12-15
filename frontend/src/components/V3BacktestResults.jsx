@@ -501,7 +501,7 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
   const [hideLowSignalTrades, setHideLowSignalTrades] = useState(false)
   const [hideHighVolumeWeight, setHideHighVolumeWeight] = useState(false)
   const [hideWeakBreakouts, setHideWeakBreakouts] = useState(false)
-  const [disablePerformanceRemoval, setDisablePerformanceRemoval] = useState(false)
+  const [disablePerformanceRemoval, setDisablePerformanceRemoval] = useState(true)
   const [showPerfYOnly, setShowPerfYOnly] = useState(false)
   const [selectedMarkets, setSelectedMarkets] = useState([])
   const [selectedPeriods, setSelectedPeriods] = useState([])
@@ -1972,7 +1972,7 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                 className="w-4 h-4 text-purple-600 bg-slate-600 border-slate-500 rounded focus:ring-purple-500 focus:ring-2"
               />
               <span className="text-sm font-medium text-slate-200" title="When checked, stocks that don't meet performance criteria (Win Rate < 60% or performance thresholds) will NOT be automatically removed during scan">
-                Keep all results
+                No Perf Chk
               </span>
             </label>
           </div>
