@@ -251,7 +251,7 @@ export const CustomVolumeProfileV3 = ({
         )
       })}
 
-      {/* Support level updates - green arrows pointing at new support */}
+      {/* Support level updates - cyan up arrows below the support level */}
       {v3PL?.supportUpdates?.map((update, idx) => {
         const x = xAxis.scale(update.date)
         const y = yAxis.scale(update.price)
@@ -260,28 +260,28 @@ export const CustomVolumeProfileV3 = ({
 
         return (
           <g key={`support-update-${idx}`}>
-            {/* Green arrow pointing right at the support level */}
-            <g transform={`translate(${x - 15}, ${y})`}>
+            {/* Cyan arrow pointing up from below the support level */}
+            <g transform={`translate(${x}, ${y + 12})`}>
               <path
-                d="M 0,0 L 8,-4 L 8,4 Z"
-                fill="#10b981"
+                d="M 0,-8 L 6,0 L -6,0 Z"
+                fill="#06b6d4"
                 stroke="white"
-                strokeWidth={1}
-                opacity={0.9}
+                strokeWidth={1.5}
+                opacity={0.95}
                 style={{ pointerEvents: 'none' }}
               />
             </g>
-            {/* Small label showing volume weight */}
+            {/* Label showing volume weight above the arrow */}
             <text
-              x={x - 18}
-              y={y - 6}
-              fill="#10b981"
-              fontSize="9"
-              fontWeight="600"
-              textAnchor="end"
+              x={x}
+              y={y + 20}
+              fill="#06b6d4"
+              fontSize="10"
+              fontWeight="700"
+              textAnchor="middle"
               style={{ pointerEvents: 'none' }}
             >
-              {(update.volumeWeight * 100).toFixed(1)}%
+              {(update.volumeWeight * 100).toFixed(0)}%
             </text>
           </g>
         )
