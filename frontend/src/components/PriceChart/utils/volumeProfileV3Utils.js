@@ -386,6 +386,17 @@ export const calculateVolumeProfileV3PL = ({
     // If holding, check if we've moved to a new window and update cutoff price
     if (isHolding && currentWindowIndex !== null) {
       const windowData = dateToWindowMap.get(currentDate)
+
+      // Debug: log every check
+      if (windowData) {
+        console.log('[Window Check]', {
+          date: currentDate,
+          currentWindow: currentWindowIndex,
+          dataWindow: windowData.windowIndex,
+          changed: windowData.windowIndex !== currentWindowIndex
+        })
+      }
+
       if (windowData && windowData.windowIndex !== currentWindowIndex) {
         // We've entered a new window - update cutoff to heaviest volume zone
         const priceZones = windowData.priceZones
