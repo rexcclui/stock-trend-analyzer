@@ -251,7 +251,7 @@ export const CustomVolumeProfileV3 = ({
         )
       })}
 
-      {/* Support level updates - cyan up arrows below the support level */}
+      {/* Support level updates - cyan arrows pointing down at new support */}
       {v3PL?.supportUpdates?.map((update, idx) => {
         const x = xAxis.scale(update.date)
         const y = yAxis.scale(update.price)
@@ -260,10 +260,10 @@ export const CustomVolumeProfileV3 = ({
 
         return (
           <g key={`support-update-${idx}`}>
-            {/* Cyan arrow pointing up from below the support level */}
-            <g transform={`translate(${x}, ${y + 12})`}>
+            {/* Cyan arrow pointing down at the support level from above */}
+            <g transform={`translate(${x}, ${y - 12})`}>
               <path
-                d="M 0,-8 L 6,0 L -6,0 Z"
+                d="M 0,8 L 6,0 L -6,0 Z"
                 fill="#06b6d4"
                 stroke="white"
                 strokeWidth={1.5}
@@ -274,7 +274,7 @@ export const CustomVolumeProfileV3 = ({
             {/* Label showing volume weight above the arrow */}
             <text
               x={x}
-              y={y + 20}
+              y={y - 16}
               fill="#06b6d4"
               fontSize="10"
               fontWeight="700"
