@@ -388,13 +388,6 @@ export const calculateVolumeProfileV3PL = ({
       const windowData = dateToWindowMap.get(currentDate)
       if (windowData && windowData.windowIndex !== currentWindowIndex) {
         // We've entered a new window - update cutoff to heaviest volume zone
-        console.log('[V3 PL] Entered new window:', {
-          date: currentDate,
-          oldWindow: currentWindowIndex,
-          newWindow: windowData.windowIndex,
-          currentCutoff: cutoffPrice
-        })
-
         const priceZones = windowData.priceZones
 
         // Find the zone with maximum volume weight
@@ -412,12 +405,6 @@ export const calculateVolumeProfileV3PL = ({
         // This ensures it's a true trailing stop
         if (maxWeightZone) {
           const newCutoffPrice = maxWeightZone.minPrice
-          console.log('[V3 PL] Checking support update:', {
-            newCutoffPrice,
-            currentCutoffPrice: cutoffPrice,
-            willUpdate: newCutoffPrice > cutoffPrice,
-            maxWeight
-          })
 
           // Only update if new cutoff is HIGHER than current cutoff
           if (newCutoffPrice > cutoffPrice) {
@@ -427,7 +414,6 @@ export const calculateVolumeProfileV3PL = ({
               price: newCutoffPrice,
               volumeWeight: maxWeight
             })
-            console.log('[V3 PL] Added support update!', supportUpdates[supportUpdates.length - 1])
             cutoffPrice = newCutoffPrice
           }
           currentWindowIndex = windowData.windowIndex
@@ -553,14 +539,6 @@ export const calculateVolumeProfileV3PL = ({
     const effectiveEndPrice = endPrice * (1 - TRANSACTION_FEE)
     marketChange = ((effectiveEndPrice - effectiveStartPrice) / effectiveStartPrice) * 100
   }
-
-  console.log('[V3 PL] Final results:', {
-    totalTrades: trades.length,
-    buySignals: buySignals.length,
-    sellSignals: sellSignals.length,
-    supportUpdates: supportUpdates.length,
-    isHolding
-  })
 
   return {
     trades,
