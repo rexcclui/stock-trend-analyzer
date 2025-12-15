@@ -400,12 +400,15 @@ export const calculateVolumeProfileV3PL = ({
           }
         })
 
-        // Update cutoff to the BOTTOM of the heaviest volume zone
-        // When entering a new window, update to the new window's max volume zone
-        // BUT maintain trailing stop behavior (never go down)
+        // Update cutoff based on current price and max volume zone
+        // In uptrend, we want the trailing stop to follow the price up
+        // Use the HIGHER of: current trailing stop OR current price - 8%
         if (maxWeightZone) {
+          const currentPriceBasedStop = currentPrice * (1 - CUTOFF_PERCENT)
           const newWindowSupport = maxWeightZone.minPrice
-          const newCutoffPrice = Math.max(cutoffPrice, newWindowSupport)
+
+          // Use the highest of: existing cutoff, new window support, or price-based trailing stop
+          const newCutoffPrice = Math.max(cutoffPrice, newWindowSupport, currentPriceBasedStop)
 
           // ALWAYS track that we entered a new window with new support structure
           supportUpdates.push({
