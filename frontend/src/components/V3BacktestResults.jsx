@@ -513,6 +513,8 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
   const importInputRef = useRef(null)
   const tableScrollRef = useRef(null)
   const previousSortRef = useRef(sortConfig)
+  const saveResultsTimeoutRef = useRef(null)
+  const saveScanQueueTimeoutRef = useRef(null)
 
   // Hydrate cached backtest results after mount before enabling persistence
   useEffect(() => {
@@ -628,73 +630,105 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
   }
 
   // Persist backtest results to localStorage (selective caching to save space)
+  // Debounced to prevent excessive CPU usage when many results are loaded
   useEffect(() => {
     if (!hasHydratedCache) return
 
-    try {
-      // Only cache full details for bookmarked, recent breakout, or
-      // top-performing rows (high winrate/pl/signals or strong Diff).
-      // A "recent breakout" is any completed entry whose latest breakout
-      // happened in the last 10 days (see getRecentBreakouts below).
-      // Others get minimal cache (symbol, status, lastScanAt, bookmarked)
-      const selectiveResults = results.map(result => {
-        const { priceData, ...rest } = result
+    // Clear existing timeout
+    if (saveResultsTimeoutRef.current) {
+      clearTimeout(saveResultsTimeoutRef.current)
+    }
 
-        // Full cache for: any completed entry, bookmarked, recent breakout,
-        // or high-performing rows so table data survives reloads without
-        // rerunning scans. Price data is still omitted to save space.
-        const shouldCacheFull =
-          result.status === 'completed' ||
-          result.bookmarked ||
-          result.isRecentBreakout ||
-          hasHighConvictionPerformance(result) ||
-          hasStrongBreakoutDiff(result)
+    // Debounce: wait 500ms after last change before saving
+    saveResultsTimeoutRef.current = setTimeout(() => {
+      try {
+        // Only cache full details for bookmarked, recent breakout, or
+        // top-performing rows (high winrate/pl/signals or strong Diff).
+        // A "recent breakout" is any completed entry whose latest breakout
+        // happened in the last 10 days (see getRecentBreakouts below).
+        // Others get minimal cache (symbol, status, lastScanAt, bookmarked)
+        const selectiveResults = results.map(result => {
+          const { priceData, ...rest } = result
 
-        if (shouldCacheFull) {
-          return rest
+          // Full cache for: any completed entry, bookmarked, recent breakout,
+          // or high-performing rows so table data survives reloads without
+          // rerunning scans. Price data is still omitted to save space.
+          const shouldCacheFull =
+            result.status === 'completed' ||
+            result.bookmarked ||
+            result.isRecentBreakout ||
+            hasHighConvictionPerformance(result) ||
+            hasStrongBreakoutDiff(result)
+
+          if (shouldCacheFull) {
+            return rest
+          }
+
+          // Slim cache: only essential fields for pending/error results
+          return {
+            symbol: result.symbol,
+            days: result.days,
+            period: result.period,
+            status: result.status || 'pending',
+            lastScanAt: result.lastScanAt || null,
+            bookmarked: result.bookmarked || false,
+            error: result.error || null,
+            marketChange: typeof result.marketChange === 'number' ? result.marketChange : null,
+            durationMs: typeof result.durationMs === 'number' ? result.durationMs : null,
+            latestPrice: typeof result.latestPrice === 'number' ? result.latestPrice : null
+          }
+        })
+
+        localStorage.setItem(BACKTEST_RESULTS_KEY, JSON.stringify(selectiveResults))
+      } catch (e) {
+        if (e.name === 'QuotaExceededError') {
+          console.error('localStorage quota exceeded. Consider clearing old results.')
+          // Optionally clear old data automatically
+          // localStorage.clear()
+        } else {
+          console.error('Failed to cache backtest results:', e)
         }
+      }
+    }, 500)
 
-        // Slim cache: only essential fields for pending/error results
-        return {
-          symbol: result.symbol,
-          days: result.days,
-          period: result.period,
-          status: result.status || 'pending',
-          lastScanAt: result.lastScanAt || null,
-          bookmarked: result.bookmarked || false,
-          error: result.error || null,
-          marketChange: typeof result.marketChange === 'number' ? result.marketChange : null,
-          durationMs: typeof result.durationMs === 'number' ? result.durationMs : null,
-          latestPrice: typeof result.latestPrice === 'number' ? result.latestPrice : null
-        }
-      })
-
-      localStorage.setItem(BACKTEST_RESULTS_KEY, JSON.stringify(selectiveResults))
-    } catch (e) {
-      if (e.name === 'QuotaExceededError') {
-        console.error('localStorage quota exceeded. Consider clearing old results.')
-        // Optionally clear old data automatically
-        // localStorage.clear()
-      } else {
-        console.error('Failed to cache backtest results:', e)
+    // Cleanup on unmount
+    return () => {
+      if (saveResultsTimeoutRef.current) {
+        clearTimeout(saveResultsTimeoutRef.current)
       }
     }
   }, [results, hasHydratedCache])
 
   // Persist scan queue and progress to localStorage
+  // Debounced to prevent excessive CPU usage
   useEffect(() => {
     if (!hasHydratedCache) return
 
-    try {
-      const queueData = {
-        queue: scanQueue,
-        isScanning,
-        completed: scanCompleted,
-        total: scanTotal
+    // Clear existing timeout
+    if (saveScanQueueTimeoutRef.current) {
+      clearTimeout(saveScanQueueTimeoutRef.current)
+    }
+
+    // Debounce: wait 300ms after last change before saving
+    saveScanQueueTimeoutRef.current = setTimeout(() => {
+      try {
+        const queueData = {
+          queue: scanQueue,
+          isScanning,
+          completed: scanCompleted,
+          total: scanTotal
+        }
+        localStorage.setItem(SCAN_QUEUE_KEY, JSON.stringify(queueData))
+      } catch (e) {
+        console.error('Failed to cache scan queue:', e)
       }
-      localStorage.setItem(SCAN_QUEUE_KEY, JSON.stringify(queueData))
-    } catch (e) {
-      console.error('Failed to cache scan queue:', e)
+    }, 300)
+
+    // Cleanup on unmount
+    return () => {
+      if (saveScanQueueTimeoutRef.current) {
+        clearTimeout(saveScanQueueTimeoutRef.current)
+      }
     }
   }, [scanQueue, isScanning, scanCompleted, scanTotal, hasHydratedCache])
 
