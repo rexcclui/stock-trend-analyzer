@@ -258,8 +258,29 @@ export const CustomVolumeProfileV3 = ({
 
         if (x === undefined || y === undefined) return null
 
+        // Draw horizontal line from this support update to the next one (or to the end)
+        const nextUpdate = v3PL.supportUpdates[idx + 1]
+        const lineEndX = nextUpdate
+          ? xAxis.scale(nextUpdate.date)
+          : offset.left + offset.width
+
         return (
           <g key={`support-update-${idx}`}>
+            {/* Horizontal line showing support level */}
+            {lineEndX && (
+              <line
+                x1={x}
+                y1={y}
+                x2={lineEndX}
+                y2={y}
+                stroke="#FFD700"
+                strokeWidth={3}
+                strokeDasharray="5,5"
+                opacity={0.9}
+                style={{ pointerEvents: 'none' }}
+              />
+            )}
+
             {/* Large bright yellow circle with white border */}
             <circle
               cx={x}
