@@ -406,15 +406,6 @@ export const calculateVolumeProfileV3PL = ({
         if (maxWeightZone) {
           const newCutoffPrice = maxWeightZone.minPrice
 
-          console.log('[V3] Window change:', {
-            date: currentDate,
-            oldWindow: currentWindowIndex,
-            newWindow: windowData.windowIndex,
-            currentCutoff: cutoffPrice,
-            newCutoff: newCutoffPrice,
-            willUpdate: newCutoffPrice > cutoffPrice
-          })
-
           // Only update if new cutoff is HIGHER than current cutoff
           if (newCutoffPrice > cutoffPrice) {
             // Track this support level update
@@ -423,7 +414,6 @@ export const calculateVolumeProfileV3PL = ({
               price: newCutoffPrice,
               volumeWeight: maxWeight
             })
-            console.log('[V3] ✓ Support update added!')
             cutoffPrice = newCutoffPrice
           }
           currentWindowIndex = windowData.windowIndex
@@ -549,8 +539,6 @@ export const calculateVolumeProfileV3PL = ({
     const effectiveEndPrice = endPrice * (1 - TRANSACTION_FEE)
     marketChange = ((effectiveEndPrice - effectiveStartPrice) / effectiveStartPrice) * 100
   }
-
-  console.log('[V3] Final support updates:', supportUpdates.length)
 
   return {
     trades,
