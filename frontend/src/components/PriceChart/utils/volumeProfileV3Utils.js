@@ -95,14 +95,11 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       const lastZone = priceZones[lastZoneIdx]
       const lastWeight = lastZone.volumeWeight
 
-      // Determine trend direction: compare last zone to previous zone
-      const prevZoneIdx = lastZoneIdx > 0 ? lastZoneIdx - 1 : 0
-      const isTrendUp = lastZoneIdx > prevZoneIdx && lastPrice > windowData[windowData.length - 2]?.close
-
       // Check breakthrough condition
       let breakConditionMet = false
 
-      if (isTrendUp) {
+      // Check for breakup: last zone in upper part of range, check zones below
+      if (lastZoneIdx >= ZONE_LOOKBACK) {
           // Trend up: check 5 zones below (skip zones with 0% volume)
           let zonesChecked = 0
           for (let offset = 1; offset <= NUM_PRICE_ZONES && zonesChecked < ZONE_LOOKBACK; offset++) {
@@ -120,7 +117,10 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
               break
             }
           }
-        } else if (!isTrendUp) {
+        }
+
+      // Check for breakdown: last zone in lower part of range, check zones above
+      if (!breakConditionMet && lastZoneIdx < NUM_PRICE_ZONES - ZONE_LOOKBACK) {
           // Trend down: check 5 zones above (skip zones with 0% volume)
           let zonesChecked = 0
           for (let offset = 1; offset <= NUM_PRICE_ZONES && zonesChecked < ZONE_LOOKBACK; offset++) {
