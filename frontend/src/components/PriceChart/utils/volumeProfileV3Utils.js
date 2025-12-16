@@ -379,7 +379,7 @@ export const calculateVolumeProfileV3PL = ({
     }
 
     // If holding, check for enhanced breakdown detection
-    if (isHolding && supportZoneVolume > 0) {
+    if (isHolding) {
       const windowData = dateToWindowMap.get(currentDate)
 
       if (windowData && windowData.priceZones) {
@@ -405,7 +405,7 @@ export const calculateVolumeProfileV3PL = ({
           if (currentZone) {
             const currentWeight = currentZone.volumeWeight
 
-            // Check for breakdown: compare with 5 zones above that have sufficient volume
+            // Check for breakdown: compare with 5 zones above that have non-zero volume
             let zonesChecked = 0
             let breakdownDetected = false
             let breakdownReason = ''
@@ -417,11 +417,23 @@ export const calculateVolumeProfileV3PL = ({
               const aboveZone = priceZones[aboveZoneIdx]
               // Skip zones with 0% volume
               if (aboveZone.volumeWeight === 0) continue
-              // Skip zones with volume < 50% of original support zone volume
-              if (aboveZone.volume < supportZoneVolume * 0.5) continue
+
+              // Only check volume threshold if we have supportZoneVolume
+              if (supportZoneVolume > 0 && aboveZone.volume < supportZoneVolume * 0.5) continue
 
               zonesChecked++
               const aboveWeight = aboveZone.volumeWeight
+
+              console.log('[Breakdown Check]', {
+                date: currentDate,
+                currentPrice: currentPrice.toFixed(2),
+                currentZone: currentZoneIdx,
+                currentWeight: (currentWeight * 100).toFixed(1) + '%',
+                checkingZone: aboveZoneIdx,
+                aboveWeight: (aboveWeight * 100).toFixed(1) + '%',
+                diff: ((aboveWeight - currentWeight) * 100).toFixed(1) + '%',
+                threshold: '8.0%'
+              })
 
               if (aboveWeight - currentWeight >= 0.08) {
                 breakdownDetected = true
@@ -435,6 +447,12 @@ export const calculateVolumeProfileV3PL = ({
               const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
               const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
               const plPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100
+
+              console.log('[BREAKDOWN SELL]', {
+                date: currentDate,
+                sellPrice: sellPrice.toFixed(2),
+                reason: breakdownReason
+              })
 
               trades.push({
                 buyPrice,
