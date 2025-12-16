@@ -157,18 +157,6 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
             }
           })
 
-          console.log('[Breakthrough]', {
-            date: lastPoint.date,
-            type: isUpBreak ? 'BREAKUP' : 'BREAKDOWN',
-            windowSize: windowData.length,
-            priceRange: `${minPrice.toFixed(2)}-${maxPrice.toFixed(2)}`,
-            heaviestZoneWeight: (maxWeight * 100).toFixed(1) + '%',
-            zoneDistribution: priceZones.map((z, i) => ({
-              zone: i,
-              weight: (z.volumeWeight * 100).toFixed(1) + '%'
-            })).filter(z => parseFloat(z.weight) > 0)
-          })
-
           breaks.push({
             date: lastPoint.date,
             price: breakPrice,
@@ -219,30 +207,6 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
 
       priceZones.forEach(zone => {
         zone.volumeWeight = totalVolume > 0 ? zone.volume / totalVolume : 0
-      })
-
-      console.log('[Window Created]', {
-        windowIdx: windows.length,
-        startDate: finalWindowData[0].date,
-        endDate: finalWindowData[finalWindowData.length - 1].date,
-        dataPoints: finalWindowData.length,
-        priceRange: `${minPrice.toFixed(2)}-${maxPrice.toFixed(2)}`,
-        range: (maxPrice - minPrice).toFixed(2),
-        zoneHeight: zoneHeight.toFixed(2),
-        zonesWithVolume: priceZones.filter(z => z.volume > 0).length,
-        totalVolume,
-        distribution: priceZones
-          .map((z, i) => ({
-            zone: i,
-            count: finalWindowData.filter(p => {
-              const zi = Math.floor((p.close - minPrice) / zoneHeight)
-              return (zi >= NUM_PRICE_ZONES ? NUM_PRICE_ZONES - 1 : zi < 0 ? 0 : zi) === i
-            }).length,
-            volume: z.volume.toFixed(0),
-            weight: (z.volumeWeight * 100).toFixed(1) + '%',
-            priceRange: `${z.minPrice.toFixed(2)}-${z.maxPrice.toFixed(2)}`
-          }))
-          .filter(z => z.volume > 0)
       })
 
       windows.push({
@@ -424,17 +388,6 @@ export const calculateVolumeProfileV3PL = ({
               zonesChecked++
               const aboveWeight = aboveZone.volumeWeight
 
-              console.log('[Breakdown Check]', {
-                date: currentDate,
-                currentPrice: currentPrice.toFixed(2),
-                currentZone: currentZoneIdx,
-                currentWeight: (currentWeight * 100).toFixed(1) + '%',
-                checkingZone: aboveZoneIdx,
-                aboveWeight: (aboveWeight * 100).toFixed(1) + '%',
-                diff: ((aboveWeight - currentWeight) * 100).toFixed(1) + '%',
-                threshold: '8.0%'
-              })
-
               if (aboveWeight - currentWeight >= 0.08) {
                 breakdownDetected = true
                 breakdownReason = `Breakdown: Zone ${currentZoneIdx} (${(currentWeight * 100).toFixed(1)}%) vs Zone ${aboveZoneIdx} (${(aboveWeight * 100).toFixed(1)}%)`
@@ -447,12 +400,6 @@ export const calculateVolumeProfileV3PL = ({
               const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
               const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
               const plPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100
-
-              console.log('[BREAKDOWN SELL]', {
-                date: currentDate,
-                sellPrice: sellPrice.toFixed(2),
-                reason: breakdownReason
-              })
 
               trades.push({
                 buyPrice,
@@ -504,18 +451,6 @@ export const calculateVolumeProfileV3PL = ({
           }
         })
 
-        console.log('[Support Check]', {
-          date: currentDate,
-          windowIdx: windowData.windowIndex,
-          zonesWithVolume: priceZones.filter(z => z.volumeWeight > 0).length,
-          maxWeight: (maxWeight * 100).toFixed(1) + '%',
-          distribution: priceZones.map((z, i) => ({
-            zone: i,
-            weight: (z.volumeWeight * 100).toFixed(1) + '%',
-            priceRange: `${z.minPrice.toFixed(2)}-${z.maxPrice.toFixed(2)}`
-          })).filter(z => parseFloat(z.weight) > 0)
-        })
-
         if (maxWeightZone) {
           // Use support as 5% below the heaviest zone's bottom
           const newWindowSupport = maxWeightZone.minPrice * 0.95
@@ -525,15 +460,6 @@ export const calculateVolumeProfileV3PL = ({
 
           if (newWindowSupport >= minIncrease) {
             const newCutoffPrice = newWindowSupport
-
-            console.log('[Support UPDATE]', {
-              date: currentDate,
-              oldCutoff: cutoffPrice.toFixed(2),
-              newCutoff: newCutoffPrice.toFixed(2),
-              supportLevel: newWindowSupport.toFixed(2),
-              volumeWeight: (maxWeight * 100).toFixed(1) + '%',
-              increase: (((newCutoffPrice - cutoffPrice) / cutoffPrice) * 100).toFixed(1) + '%'
-            })
 
             supportUpdates.push({
               date: currentDate,
@@ -569,13 +495,6 @@ export const calculateVolumeProfileV3PL = ({
 
           // Initial cutoff = buyPrice * 0.92 (8% below buy price) - NEVER use zone support
           cutoffPrice = breakSignal.price * 0.92
-
-          console.log('[Initial Cutoff]', {
-            date: breakSignal.date,
-            buyPrice: breakSignal.price.toFixed(2),
-            cutoffPrice: cutoffPrice.toFixed(2),
-            cutoffPercent: '8%'
-          })
 
           currentWindowIndex = breakSignal.windowIndex // Track starting window
           supportZoneVolume = breakSignal.supportZoneVolume || 0 // Track support zone volume for breakdown detection
