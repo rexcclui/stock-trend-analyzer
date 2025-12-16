@@ -415,8 +415,8 @@ export const calculateVolumeProfileV3PL = ({
               if (aboveZoneIdx >= 20) break
 
               const aboveZone = priceZones[aboveZoneIdx]
-              // Skip zones with 0% volume
-              if (aboveZone.volumeWeight === 0) continue
+              // Skip if zone doesn't exist or has 0% volume
+              if (!aboveZone || aboveZone.volumeWeight === 0) continue
 
               // Only check volume threshold if we have supportZoneVolume
               if (supportZoneVolume > 0 && aboveZone.volume < supportZoneVolume * 0.5) continue
