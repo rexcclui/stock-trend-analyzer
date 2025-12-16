@@ -37,6 +37,8 @@ export const CustomVolumeProfileV3 = ({
   yAxisMap,
   offset
 }) => {
+  const [hoveredSell, setHoveredSell] = React.useState(null)
+
   if (!volumeProfileV3Enabled || volumeProfileV3Data.length === 0) return null
 
   const xAxis = xAxisMap?.[0]
@@ -263,6 +265,7 @@ export const CustomVolumeProfileV3 = ({
 
         // Cutoff sells are orange, breakdown sells are red
         const fillColor = signal.isCutoff ? "#f59e0b" : "#ef4444"
+        const isHovered = hoveredSell === idx
 
         return (
           <g key={`sell-arrow-${idx}`}>
@@ -286,6 +289,17 @@ export const CustomVolumeProfileV3 = ({
               opacity={0.9}
               style={{ pointerEvents: 'none' }}
             />
+            {/* Invisible hover area around S label */}
+            <rect
+              x={x - 20}
+              y={y + 40}
+              width={40}
+              height={25}
+              fill="transparent"
+              style={{ pointerEvents: 'all', cursor: 'pointer' }}
+              onMouseEnter={() => setHoveredSell(idx)}
+              onMouseLeave={() => setHoveredSell(null)}
+            />
             {/* S label at end */}
             <text
               x={x}
@@ -301,6 +315,33 @@ export const CustomVolumeProfileV3 = ({
             >
               S
             </text>
+            {/* Tooltip on hover */}
+            {isHovered && signal.reason && (
+              <g>
+                <rect
+                  x={x + 25}
+                  y={y + 35}
+                  width={Math.max(150, signal.reason.length * 5.5)}
+                  height={30}
+                  fill="rgba(0, 0, 0, 0.9)"
+                  stroke={fillColor}
+                  strokeWidth={2}
+                  rx={4}
+                  style={{ pointerEvents: 'none' }}
+                />
+                <text
+                  x={x + 30}
+                  y={y + 55}
+                  fill="white"
+                  fontSize="12"
+                  fontWeight="600"
+                  textAnchor="start"
+                  style={{ pointerEvents: 'none' }}
+                >
+                  {signal.reason}
+                </text>
+              </g>
+            )}
           </g>
         )
       })}

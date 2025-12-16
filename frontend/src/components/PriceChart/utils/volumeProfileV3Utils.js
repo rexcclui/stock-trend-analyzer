@@ -174,7 +174,8 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
             currentWeight: lastWeight,
             windowIndex: windows.length,
             supportLevel: maxWeightZone ? maxWeightZone.minPrice : minPrice,
-            maxVolumeWeight: maxWeight
+            maxVolumeWeight: maxWeight,
+            supportZoneVolume: maxWeightZone ? maxWeightZone.volume : 0 // Store absolute volume of support zone
           })
         }
 
@@ -289,6 +290,7 @@ export const calculateVolumeProfileV3PL = ({
   let cutoffPrice = null // Track the current cutoff price (trailing stop)
   let currentWindowIndex = null // Track which window we're in while holding
   let currentTradeId = 0 // Track which trade we're in for support line segmentation
+  let supportZoneVolume = 0 // Track the absolute volume of the original support zone
 
   // Get all prices in forward chronological order
   const reversedPrices = [...prices].reverse()
@@ -336,7 +338,8 @@ export const calculateVolumeProfileV3PL = ({
       sellSignals.push({
         date: currentDate,
         price: sellPrice,
-        isCutoff: true
+        isCutoff: true,
+        reason: `Price $${currentPrice.toFixed(2)} < Cutoff $${cutoffPrice.toFixed(2)}`
       })
 
       // Reset state
@@ -345,7 +348,98 @@ export const calculateVolumeProfileV3PL = ({
       buyDate = null
       cutoffPrice = null
       currentWindowIndex = null
+      supportZoneVolume = 0
       currentTradeId++ // Increment for next trade
+    }
+
+    // If holding, check for enhanced breakdown detection
+    if (isHolding && supportZoneVolume > 0) {
+      const windowData = dateToWindowMap.get(currentDate)
+
+      if (windowData && windowData.priceZones) {
+        const priceZones = windowData.priceZones
+        const currentPrice = currentPoint.close
+
+        // Find which zone the current price is in
+        const windowPrices = reversedPrices.slice(
+          Math.max(0, i - 200),
+          Math.min(reversedPrices.length, i + 50)
+        ).map(p => p.close)
+        const minPrice = Math.min(...windowPrices)
+        const maxPrice = Math.max(...windowPrices)
+        const priceRange = maxPrice - minPrice
+
+        if (priceRange > 0) {
+          const zoneHeight = priceRange / 20
+          let currentZoneIdx = Math.floor((currentPrice - minPrice) / zoneHeight)
+          if (currentZoneIdx >= 20) currentZoneIdx = 19
+          if (currentZoneIdx < 0) currentZoneIdx = 0
+
+          const currentZone = priceZones[currentZoneIdx]
+          if (currentZone) {
+            const currentWeight = currentZone.volumeWeight
+
+            // Check for breakdown: compare with 5 zones above that have sufficient volume
+            let zonesChecked = 0
+            let breakdownDetected = false
+            let breakdownReason = ''
+
+            for (let offset = 1; offset <= 20 && zonesChecked < 5; offset++) {
+              const aboveZoneIdx = currentZoneIdx + offset
+              if (aboveZoneIdx >= 20) break
+
+              const aboveZone = priceZones[aboveZoneIdx]
+              // Skip zones with 0% volume
+              if (aboveZone.volumeWeight === 0) continue
+              // Skip zones with volume < 50% of original support zone volume
+              if (aboveZone.volume < supportZoneVolume * 0.5) continue
+
+              zonesChecked++
+              const aboveWeight = aboveZone.volumeWeight
+
+              if (aboveWeight - currentWeight >= 0.08) {
+                breakdownDetected = true
+                breakdownReason = `Breakdown: Zone ${currentZoneIdx} (${(currentWeight * 100).toFixed(1)}%) vs Zone ${aboveZoneIdx} (${(aboveWeight * 100).toFixed(1)}%)`
+                break
+              }
+            }
+
+            if (breakdownDetected) {
+              const sellPrice = currentPrice
+              const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
+              const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
+              const plPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100
+
+              trades.push({
+                buyPrice,
+                buyDate,
+                sellPrice,
+                sellDate: currentDate,
+                plPercent,
+                isCutoff: false
+              })
+
+              sellSignals.push({
+                date: currentDate,
+                price: sellPrice,
+                isCutoff: false,
+                reason: breakdownReason
+              })
+
+              // Reset state
+              isHolding = false
+              buyPrice = null
+              buyDate = null
+              cutoffPrice = null
+              currentWindowIndex = null
+              supportZoneVolume = 0
+              currentTradeId++
+
+              continue // Skip other checks for this point
+            }
+          }
+        }
+      }
     }
 
     // If holding, check if we entered a new window and update cutoff
@@ -430,6 +524,8 @@ export const calculateVolumeProfileV3PL = ({
           cutoffPrice = Math.max(priceBasedCutoff, supportBasedCutoff)
 
           currentWindowIndex = breakSignal.windowIndex // Track starting window
+          supportZoneVolume = breakSignal.supportZoneVolume || 0 // Track support zone volume for breakdown detection
+
           buySignals.push({
             date: breakSignal.date,
             price: breakSignal.price
@@ -464,7 +560,8 @@ export const calculateVolumeProfileV3PL = ({
           sellSignals.push({
             date: breakSignal.date,
             price: sellPrice,
-            isCutoff: false
+            isCutoff: false,
+            reason: 'Breakdown: Volume pattern deterioration'
           })
 
           // Reset state
@@ -473,6 +570,7 @@ export const calculateVolumeProfileV3PL = ({
           buyDate = null
           cutoffPrice = null
           currentWindowIndex = null
+          supportZoneVolume = 0
           currentTradeId++ // Increment for next trade
         }
       }
