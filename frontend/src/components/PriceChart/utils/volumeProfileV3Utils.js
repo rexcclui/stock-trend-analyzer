@@ -281,6 +281,7 @@ export const calculateVolumeProfileV3PL = ({
   let currentWindowIndex = null // Track which window we're in while holding
   let currentTradeId = 0 // Track which trade we're in for support line segmentation
   let supportZoneVolume = 0 // Track the absolute volume of the original support zone
+  let previousZoneIdx = null // Track last observed zone while holding
 
   // Get all prices in forward chronological order
   const reversedPrices = [...prices].reverse()
@@ -339,6 +340,7 @@ export const calculateVolumeProfileV3PL = ({
       cutoffPrice = null
       currentWindowIndex = null
       supportZoneVolume = 0
+      previousZoneIdx = null
       currentTradeId++ // Increment for next trade
     }
 
@@ -350,47 +352,31 @@ export const calculateVolumeProfileV3PL = ({
         const priceZones = windowData.priceZones
         const currentPrice = currentPoint.close
 
-        // Find which zone the current price is in
-        const windowPrices = reversedPrices.slice(
-          Math.max(0, i - 200),
-          Math.min(reversedPrices.length, i + 50)
-        ).map(p => p.close)
-        const minPrice = Math.min(...windowPrices)
-        const maxPrice = Math.max(...windowPrices)
-        const priceRange = maxPrice - minPrice
+        // Find which zone the current price is in using the current window's zones
+        let currentZoneIdx = priceZones.findIndex(zone => currentPrice >= zone.minPrice && currentPrice <= zone.maxPrice)
+        if (currentZoneIdx === -1) {
+          // Fallback to nearest boundary if price falls outside computed ranges
+          currentZoneIdx = currentPrice < priceZones[0].minPrice ? 0 : priceZones.length - 1
+        }
 
-        if (priceRange > 0) {
-          const zoneHeight = priceRange / 20
-          let currentZoneIdx = Math.floor((currentPrice - minPrice) / zoneHeight)
-          if (currentZoneIdx >= 20) currentZoneIdx = 19
-          if (currentZoneIdx < 0) currentZoneIdx = 0
+        const currentZone = priceZones[currentZoneIdx]
+        if (currentZone) {
+          const currentWeight = currentZone.volumeWeight
 
-          const currentZone = priceZones[currentZoneIdx]
-          if (currentZone) {
-            const currentWeight = currentZone.volumeWeight
-
-            // Check for breakdown: compare with 5 zones above that have non-zero volume
-            let zonesChecked = 0
+          // Breakdown rule: price moved to a lower-priced zone AND that zone's weight is 8%+ lower than any prior higher-priced zone
+          if (previousZoneIdx !== null && currentZoneIdx < previousZoneIdx) {
             let breakdownDetected = false
             let breakdownReason = ''
 
-            for (let offset = 1; offset <= 20 && zonesChecked < 5; offset++) {
-              const aboveZoneIdx = currentZoneIdx + offset
-              if (aboveZoneIdx >= 20) break
+            for (let idx = previousZoneIdx; idx >= 0; idx--) {
+              if (idx === currentZoneIdx) continue
+              const priorZone = priceZones[idx]
+              if (!priorZone || priorZone.volumeWeight === 0) continue
 
-              const aboveZone = priceZones[aboveZoneIdx]
-              // Skip if zone doesn't exist or has 0% volume
-              if (!aboveZone || aboveZone.volumeWeight === 0) continue
-
-              // Only check volume threshold if we have supportZoneVolume
-              if (supportZoneVolume > 0 && aboveZone.volume < supportZoneVolume * 0.5) continue
-
-              zonesChecked++
-              const aboveWeight = aboveZone.volumeWeight
-
-              if (aboveWeight - currentWeight >= 0.08) {
+              const weightDiff = priorZone.volumeWeight - currentWeight
+              if (weightDiff >= 0.08) {
                 breakdownDetected = true
-                breakdownReason = `Breakdown: Zone ${currentZoneIdx} (${(currentWeight * 100).toFixed(1)}%) vs Zone ${aboveZoneIdx} (${(aboveWeight * 100).toFixed(1)}%)`
+                breakdownReason = `Breakdown: Moved to zone ${currentZoneIdx} (${(currentWeight * 100).toFixed(1)}%), ${((weightDiff) * 100).toFixed(1)}% below zone ${idx} (${(priorZone.volumeWeight * 100).toFixed(1)}%)`
                 break
               }
             }
@@ -424,11 +410,15 @@ export const calculateVolumeProfileV3PL = ({
               cutoffPrice = null
               currentWindowIndex = null
               supportZoneVolume = 0
+              previousZoneIdx = null
               currentTradeId++
 
               continue // Skip other checks for this point
             }
           }
+
+          // Update last seen zone while holding
+          previousZoneIdx = currentZoneIdx
         }
       }
     }
