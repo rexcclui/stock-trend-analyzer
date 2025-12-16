@@ -3270,7 +3270,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       volumeProfileV3Data: windows,
       prices,
       transactionFee: 0.003, // 0.3% broker fee
-      cutoffPercent: 0.08 // 8% cutoff
+      cutoffPercent: 0.12 // 12% cutoff
     })
   }, [volumeProfileV3Result, prices])
 

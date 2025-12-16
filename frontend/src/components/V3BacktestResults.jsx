@@ -1020,7 +1020,7 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
         volumeProfileV3Data: windows,
         prices: priceData,
         transactionFee: 0.003,
-        cutoffPercent: 0.08
+        cutoffPercent: 0.12
       })
 
       const passesSelectionFilters = (candidate) => {

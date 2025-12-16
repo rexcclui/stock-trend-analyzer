@@ -242,7 +242,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
  * @param {Array} params.volumeProfileV3Data - Array of window data with price zones
  * @param {Array} params.prices - Array of price data {date, close, volume}
  * @param {number} params.transactionFee - Transaction fee as decimal (e.g., 0.003 for 0.3%)
- * @param {number} params.cutoffPercent - Initial cutoff percentage as decimal (e.g., 0.08 for 8%)
+ * @param {number} params.cutoffPercent - Initial cutoff percentage as decimal (e.g., 0.12 for 12%)
  * @returns {Object} P&L calculation results
  */
 export const calculateVolumeProfileV3PL = ({
@@ -250,7 +250,7 @@ export const calculateVolumeProfileV3PL = ({
   volumeProfileV3Data = [],
   prices = [],
   transactionFee = 0.003,
-  cutoffPercent = 0.08
+  cutoffPercent = 0.12
 }) => {
   if (volumeProfileV3Breaks.length === 0) {
     return {
@@ -493,8 +493,8 @@ export const calculateVolumeProfileV3PL = ({
           buyPrice = breakSignal.price
           buyDate = breakSignal.date
 
-          // Initial cutoff = buyPrice * 0.92 (8% below buy price) - NEVER use zone support
-          cutoffPrice = breakSignal.price * 0.92
+          // Initial cutoff = buyPrice * (1 - cutoffPercent) - NEVER use zone support
+          cutoffPrice = breakSignal.price * (1 - CUTOFF_PERCENT)
 
           currentWindowIndex = breakSignal.windowIndex // Track starting window
           supportZoneVolume = breakSignal.supportZoneVolume || 0 // Track support zone volume for breakdown detection
