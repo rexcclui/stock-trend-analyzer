@@ -331,14 +331,6 @@ export const calculateVolumeProfileV3PL = ({
         isCutoff: true
       })
 
-      // Add final cutoff point before reset
-      if (cutoffPrice !== null) {
-        cutoffPrices.push({
-          date: currentDate,
-          price: cutoffPrice
-        })
-      }
-
       // Reset state
       isHolding = false
       buyPrice = null
@@ -464,14 +456,6 @@ export const calculateVolumeProfileV3PL = ({
             isCutoff: false
           })
 
-          // Add final cutoff point before reset
-          if (cutoffPrice !== null) {
-            cutoffPrices.push({
-              date: breakSignal.date,
-              price: cutoffPrice
-            })
-          }
-
           // Reset state
           isHolding = false
           buyPrice = null
@@ -524,7 +508,7 @@ export const calculateVolumeProfileV3PL = ({
     marketChange = ((effectiveEndPrice - effectiveStartPrice) / effectiveStartPrice) * 100
   }
 
-  // If still holding at the end, add final cutoff point
+  // If still holding at the end, extend to current price
   if (isHolding && cutoffPrice !== null && reversedPrices.length > 0) {
     const lastPrice = reversedPrices[reversedPrices.length - 1]
     cutoffPrices.push({

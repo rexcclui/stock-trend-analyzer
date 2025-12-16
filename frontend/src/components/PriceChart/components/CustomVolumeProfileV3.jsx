@@ -280,17 +280,6 @@ export const CustomVolumeProfileV3 = ({
           }
         }
 
-        // Extend to the end of chart if still holding
-        if (v3PL.isHolding && v3PL.cutoffPrices.length > 0) {
-          const lastPoint = v3PL.cutoffPrices[v3PL.cutoffPrices.length - 1]
-          const lastY = yAxis.scale(lastPoint.price)
-          const chartEndX = offset.left + offset.width
-
-          if (lastY !== undefined) {
-            pathSegments.push(`L ${chartEndX},${lastY}`)
-          }
-        }
-
         const pathD = pathSegments.join(' ')
 
         return (
