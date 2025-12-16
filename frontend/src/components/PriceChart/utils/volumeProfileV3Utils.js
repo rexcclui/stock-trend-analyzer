@@ -525,9 +525,15 @@ export const calculateVolumeProfileV3PL = ({
           buyPrice = breakSignal.price
           buyDate = breakSignal.date
 
-          // Initial cutoff = buyPrice * 0.92 (8% below buy price)
-          // Don't use zone support - it's too close to buy price
-          cutoffPrice = breakSignal.price * (1 - CUTOFF_PERCENT)
+          // Initial cutoff = buyPrice * 0.92 (8% below buy price) - NEVER use zone support
+          cutoffPrice = breakSignal.price * 0.92
+
+          console.log('[Initial Cutoff]', {
+            date: breakSignal.date,
+            buyPrice: breakSignal.price.toFixed(2),
+            cutoffPrice: cutoffPrice.toFixed(2),
+            cutoffPercent: '8%'
+          })
 
           currentWindowIndex = breakSignal.windowIndex // Track starting window
           supportZoneVolume = breakSignal.supportZoneVolume || 0 // Track support zone volume for breakdown detection
