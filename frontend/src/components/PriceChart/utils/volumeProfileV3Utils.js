@@ -368,8 +368,8 @@ export const calculateVolumeProfileV3PL = ({
             let breakdownDetected = false
             let breakdownReason = ''
 
-            for (let idx = previousZoneIdx; idx >= 0; idx--) {
-              if (idx === currentZoneIdx) continue
+            // Only compare against zones strictly above the current lower-priced zone
+            for (let idx = previousZoneIdx; idx > currentZoneIdx; idx--) {
               const priorZone = priceZones[idx]
               if (!priorZone || priorZone.volumeWeight === 0) continue
 
