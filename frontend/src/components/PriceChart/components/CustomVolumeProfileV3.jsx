@@ -251,74 +251,84 @@ export const CustomVolumeProfileV3 = ({
         )
       })}
 
-      {/* Support level updates - bright yellow circles marking new support */}
-      {v3PL?.supportUpdates?.map((update, idx) => {
-        const x = xAxis.scale(update.date)
-        const y = yAxis.scale(update.price)
+      {/* Support line - continuous line showing trailing stop (cutoff price) */}
+      {v3PL?.cutoffPrices && v3PL.cutoffPrices.length > 0 && (() => {
+        // Build path for continuous support line
+        const pathSegments = []
 
-        if (x === undefined || y === undefined) return null
+        for (let i = 0; i < v3PL.cutoffPrices.length; i++) {
+          const point = v3PL.cutoffPrices[i]
+          const x = xAxis.scale(point.date)
+          const y = yAxis.scale(point.price)
 
-        // Draw horizontal line from this support update to the next one (or to the end)
-        const nextUpdate = v3PL.supportUpdates[idx + 1]
-        const lineEndX = nextUpdate
-          ? xAxis.scale(nextUpdate.date)
-          : offset.left + offset.width
+          if (x === undefined || y === undefined) continue
+
+          if (i === 0) {
+            pathSegments.push(`M ${x},${y}`)
+          } else {
+            // Draw horizontal line from previous point, then vertical to current point
+            const prevPoint = v3PL.cutoffPrices[i - 1]
+            const prevX = xAxis.scale(prevPoint.date)
+            const prevY = yAxis.scale(prevPoint.price)
+
+            if (prevX !== undefined && prevY !== undefined) {
+              // Horizontal line at previous price level until current date
+              pathSegments.push(`L ${x},${prevY}`)
+              // Vertical line to current price level (support update)
+              pathSegments.push(`L ${x},${y}`)
+            }
+          }
+        }
+
+        // Extend to the end of chart if still holding
+        if (v3PL.isHolding && v3PL.cutoffPrices.length > 0) {
+          const lastPoint = v3PL.cutoffPrices[v3PL.cutoffPrices.length - 1]
+          const lastY = yAxis.scale(lastPoint.price)
+          const chartEndX = offset.left + offset.width
+
+          if (lastY !== undefined) {
+            pathSegments.push(`L ${chartEndX},${lastY}`)
+          }
+        }
+
+        const pathD = pathSegments.join(' ')
 
         return (
-          <g key={`support-update-${idx}`}>
-            {/* Horizontal line showing support level */}
-            {lineEndX && (
-              <line
-                x1={x}
-                y1={y}
-                x2={lineEndX}
-                y2={y}
-                stroke="#FFD700"
-                strokeWidth={3}
-                strokeDasharray="5,5"
-                opacity={0.9}
-                style={{ pointerEvents: 'none' }}
-              />
-            )}
+          <g>
+            {/* Main support line */}
+            <path
+              d={pathD}
+              stroke="#FFD700"
+              strokeWidth={2}
+              fill="none"
+              opacity={0.8}
+              style={{ pointerEvents: 'none' }}
+            />
 
-            {/* Large bright yellow circle with white border */}
-            <circle
-              cx={x}
-              cy={y}
-              r={8}
-              fill="#FFD700"
-              stroke="white"
-              strokeWidth={3}
-              opacity={1}
-              style={{ pointerEvents: 'none' }}
-            />
-            {/* Inner circle for contrast */}
-            <circle
-              cx={x}
-              cy={y}
-              r={5}
-              fill="#FF6B00"
-              opacity={1}
-              style={{ pointerEvents: 'none' }}
-            />
-            {/* Large label showing volume weight */}
-            <text
-              x={x + 15}
-              y={y + 5}
-              fill="#FFD700"
-              fontSize="14"
-              fontWeight="900"
-              textAnchor="start"
-              stroke="black"
-              strokeWidth={3}
-              paintOrder="stroke"
-              style={{ pointerEvents: 'none' }}
-            >
-              ↑{(update.volumeWeight * 100).toFixed(0)}%
-            </text>
+            {/* Mark support update points with small circles */}
+            {v3PL.supportUpdates?.map((update, idx) => {
+              const x = xAxis.scale(update.date)
+              const y = yAxis.scale(update.price)
+
+              if (x === undefined || y === undefined) return null
+
+              return (
+                <circle
+                  key={`support-mark-${idx}`}
+                  cx={x}
+                  cy={y}
+                  r={4}
+                  fill="#FFD700"
+                  stroke="white"
+                  strokeWidth={2}
+                  opacity={1}
+                  style={{ pointerEvents: 'none' }}
+                />
+              )
+            })}
           </g>
         )
-      })}
+      })()}
 
       {/* P&L Stats Display */}
       {volumeProfileV3Enabled && v3PL && v3PL.tradingSignals > 0 && (() => {
