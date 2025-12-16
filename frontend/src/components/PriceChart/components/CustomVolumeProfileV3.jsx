@@ -289,12 +289,12 @@ export const CustomVolumeProfileV3 = ({
               opacity={0.9}
               style={{ pointerEvents: 'none' }}
             />
-            {/* Invisible hover area around S label */}
+            {/* Invisible hover area - large area covering entire arrow */}
             <rect
-              x={x - 20}
-              y={y + 40}
-              width={40}
-              height={25}
+              x={x - 30}
+              y={y}
+              width={60}
+              height={65}
               fill="transparent"
               style={{ pointerEvents: 'all', cursor: 'pointer' }}
               onMouseEnter={() => setHoveredSell(idx)}
