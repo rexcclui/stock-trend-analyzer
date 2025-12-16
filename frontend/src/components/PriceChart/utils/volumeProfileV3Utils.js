@@ -98,47 +98,45 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       // Check breakthrough condition
       let breakConditionMet = false
 
-      // Check for breakup: last zone in upper part of range, check zones below
-      if (lastZoneIdx >= ZONE_LOOKBACK) {
-          // Trend up: check 5 zones below (skip zones with 0% volume)
-          let zonesChecked = 0
-          for (let offset = 1; offset <= NUM_PRICE_ZONES && zonesChecked < ZONE_LOOKBACK; offset++) {
-            const belowZoneIdx = lastZoneIdx - offset
-            if (belowZoneIdx < 0) break
+      // Check for breakup: check zones below (anywhere in range)
+      // Trend up: check up to 5 zones below (skip zones with 0% volume)
+      let zonesChecked = 0
+      for (let offset = 1; offset <= NUM_PRICE_ZONES && zonesChecked < ZONE_LOOKBACK; offset++) {
+        const belowZoneIdx = lastZoneIdx - offset
+        if (belowZoneIdx < 0) break
 
-            const belowWeight = priceZones[belowZoneIdx].volumeWeight
-            // Skip zones with 0% volume
-            if (belowWeight === 0) continue
+        const belowWeight = priceZones[belowZoneIdx].volumeWeight
+        // Skip zones with 0% volume
+        if (belowWeight === 0) continue
 
-            zonesChecked++
-            if (belowWeight - lastWeight >= BREAK_DIFF_THRESHOLD) {
-              breakConditionMet = true
-              isUpBreak = true
-              break
-            }
+        zonesChecked++
+        if (belowWeight - lastWeight >= BREAK_DIFF_THRESHOLD) {
+          breakConditionMet = true
+          isUpBreak = true
+          break
+        }
+      }
+
+      // Check for breakdown: check zones above (if no breakup found)
+      if (!breakConditionMet) {
+        // Trend down: check up to 5 zones above (skip zones with 0% volume)
+        let zonesChecked = 0
+        for (let offset = 1; offset <= NUM_PRICE_ZONES && zonesChecked < ZONE_LOOKBACK; offset++) {
+          const aboveZoneIdx = lastZoneIdx + offset
+          if (aboveZoneIdx >= NUM_PRICE_ZONES) break
+
+          const aboveWeight = priceZones[aboveZoneIdx].volumeWeight
+          // Skip zones with 0% volume
+          if (aboveWeight === 0) continue
+
+          zonesChecked++
+          if (aboveWeight - lastWeight >= BREAK_DIFF_THRESHOLD) {
+            breakConditionMet = true
+            isUpBreak = false
+            break
           }
         }
-
-      // Check for breakdown: last zone in lower part of range, check zones above
-      if (!breakConditionMet && lastZoneIdx < NUM_PRICE_ZONES - ZONE_LOOKBACK) {
-          // Trend down: check 5 zones above (skip zones with 0% volume)
-          let zonesChecked = 0
-          for (let offset = 1; offset <= NUM_PRICE_ZONES && zonesChecked < ZONE_LOOKBACK; offset++) {
-            const aboveZoneIdx = lastZoneIdx + offset
-            if (aboveZoneIdx >= NUM_PRICE_ZONES) break
-
-            const aboveWeight = priceZones[aboveZoneIdx].volumeWeight
-            // Skip zones with 0% volume
-            if (aboveWeight === 0) continue
-
-            zonesChecked++
-            if (aboveWeight - lastWeight >= BREAK_DIFF_THRESHOLD) {
-              breakConditionMet = true
-              isUpBreak = false
-              break
-            }
-          }
-        }
+      }
 
         if (breakConditionMet) {
           breakDetected = true
