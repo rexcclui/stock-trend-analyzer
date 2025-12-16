@@ -288,6 +288,7 @@ export const calculateVolumeProfileV3PL = ({
   let buyDate = null
   let cutoffPrice = null // Track the current cutoff price (trailing stop)
   let currentWindowIndex = null // Track which window we're in while holding
+  let currentTradeId = 0 // Track which trade we're in for support line segmentation
 
   // Get all prices in forward chronological order
   const reversedPrices = [...prices].reverse()
@@ -344,6 +345,7 @@ export const calculateVolumeProfileV3PL = ({
       buyDate = null
       cutoffPrice = null
       currentWindowIndex = null
+      currentTradeId++ // Increment for next trade
     }
 
     // If holding, check if we entered a new window and update cutoff
@@ -399,7 +401,8 @@ export const calculateVolumeProfileV3PL = ({
             // Add cutoff price change point
             cutoffPrices.push({
               date: currentDate,
-              price: newCutoffPrice
+              price: newCutoffPrice,
+              tradeId: currentTradeId
             })
 
             cutoffPrice = newCutoffPrice
@@ -435,7 +438,8 @@ export const calculateVolumeProfileV3PL = ({
           // Add initial cutoff point
           cutoffPrices.push({
             date: breakSignal.date,
-            price: cutoffPrice
+            price: cutoffPrice,
+            tradeId: currentTradeId
           })
         }
         // If consecutive breakup (already holding), ignore it
@@ -469,6 +473,7 @@ export const calculateVolumeProfileV3PL = ({
           buyDate = null
           cutoffPrice = null
           currentWindowIndex = null
+          currentTradeId++ // Increment for next trade
         }
       }
     }
@@ -520,7 +525,8 @@ export const calculateVolumeProfileV3PL = ({
     const lastPrice = reversedPrices[reversedPrices.length - 1]
     cutoffPrices.push({
       date: lastPrice.date,
-      price: cutoffPrice
+      price: cutoffPrice,
+      tradeId: currentTradeId
     })
   }
 

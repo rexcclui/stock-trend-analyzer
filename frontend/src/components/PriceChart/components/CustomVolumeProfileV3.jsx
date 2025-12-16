@@ -206,7 +206,7 @@ export const CustomVolumeProfileV3 = ({
         </g>
       )}
 
-      {/* Buy signals - green up arrows */}
+      {/* Buy signals - long green up arrows with B */}
       {v3PL?.buySignals?.map((signal, idx) => {
         const x = xAxis.scale(signal.date)
         const y = yAxis.scale(signal.price)
@@ -214,20 +214,47 @@ export const CustomVolumeProfileV3 = ({
         if (x === undefined || y === undefined) return null
 
         return (
-          <g key={`buy-arrow-${idx}`} transform={`translate(${x}, ${y})`}>
+          <g key={`buy-arrow-${idx}`}>
+            {/* Long vertical arrow line */}
+            <line
+              x1={x}
+              y1={y}
+              x2={x}
+              y2={y - 40}
+              stroke="#10b981"
+              strokeWidth={2}
+              opacity={0.9}
+              style={{ pointerEvents: 'none' }}
+            />
+            {/* Arrow head */}
             <path
-              d="M 0,-8 L 6,0 L -6,0 Z"
+              d={`M ${x},${y} L ${x - 6},${y - 10} L ${x + 6},${y - 10} Z`}
               fill="#10b981"
               stroke="white"
               strokeWidth={1}
               opacity={0.9}
               style={{ pointerEvents: 'none' }}
             />
+            {/* B label at end */}
+            <text
+              x={x}
+              y={y - 45}
+              fill="#10b981"
+              fontSize="16"
+              fontWeight="bold"
+              textAnchor="middle"
+              stroke="white"
+              strokeWidth={3}
+              paintOrder="stroke"
+              style={{ pointerEvents: 'none' }}
+            >
+              B
+            </text>
           </g>
         )
       })}
 
-      {/* Sell signals - red down arrows (breakdown) and orange (-8% cutoff) */}
+      {/* Sell signals - long down arrows with S (orange for cutoff, red for breakdown) */}
       {v3PL?.sellSignals?.map((signal, idx) => {
         const x = xAxis.scale(signal.date)
         const y = yAxis.scale(signal.price)
@@ -238,61 +265,102 @@ export const CustomVolumeProfileV3 = ({
         const fillColor = signal.isCutoff ? "#f59e0b" : "#ef4444"
 
         return (
-          <g key={`sell-arrow-${idx}`} transform={`translate(${x}, ${y})`}>
+          <g key={`sell-arrow-${idx}`}>
+            {/* Long vertical arrow line */}
+            <line
+              x1={x}
+              y1={y}
+              x2={x}
+              y2={y + 40}
+              stroke={fillColor}
+              strokeWidth={2}
+              opacity={0.9}
+              style={{ pointerEvents: 'none' }}
+            />
+            {/* Arrow head */}
             <path
-              d="M 0,8 L 6,0 L -6,0 Z"
+              d={`M ${x},${y} L ${x - 6},${y + 10} L ${x + 6},${y + 10} Z`}
               fill={fillColor}
               stroke="white"
               strokeWidth={1}
               opacity={0.9}
               style={{ pointerEvents: 'none' }}
             />
+            {/* S label at end */}
+            <text
+              x={x}
+              y={y + 55}
+              fill={fillColor}
+              fontSize="16"
+              fontWeight="bold"
+              textAnchor="middle"
+              stroke="white"
+              strokeWidth={3}
+              paintOrder="stroke"
+              style={{ pointerEvents: 'none' }}
+            >
+              S
+            </text>
           </g>
         )
       })}
 
-      {/* Support line - continuous line showing trailing stop (cutoff price) */}
+      {/* Support line - separate segments per trade showing trailing stop (cutoff price) */}
       {v3PL?.cutoffPrices && v3PL.cutoffPrices.length > 0 && (() => {
-        // Build path for continuous support line
-        const pathSegments = []
-
-        for (let i = 0; i < v3PL.cutoffPrices.length; i++) {
-          const point = v3PL.cutoffPrices[i]
-          const x = xAxis.scale(point.date)
-          const y = yAxis.scale(point.price)
-
-          if (x === undefined || y === undefined) continue
-
-          if (i === 0) {
-            pathSegments.push(`M ${x},${y}`)
-          } else {
-            // Draw horizontal line from previous point, then vertical to current point
-            const prevPoint = v3PL.cutoffPrices[i - 1]
-            const prevX = xAxis.scale(prevPoint.date)
-            const prevY = yAxis.scale(prevPoint.price)
-
-            if (prevX !== undefined && prevY !== undefined) {
-              // Horizontal line at previous price level until current date
-              pathSegments.push(`L ${x},${prevY}`)
-              // Vertical line to current price level (support update)
-              pathSegments.push(`L ${x},${y}`)
-            }
+        // Group cutoff points by tradeId
+        const tradeSegments = {}
+        v3PL.cutoffPrices.forEach(point => {
+          const tradeId = point.tradeId || 0
+          if (!tradeSegments[tradeId]) {
+            tradeSegments[tradeId] = []
           }
-        }
-
-        const pathD = pathSegments.join(' ')
+          tradeSegments[tradeId].push(point)
+        })
 
         return (
           <g>
-            {/* Main support line */}
-            <path
-              d={pathD}
-              stroke="#FFD700"
-              strokeWidth={2}
-              fill="none"
-              opacity={0.8}
-              style={{ pointerEvents: 'none' }}
-            />
+            {/* Render each trade's support line separately */}
+            {Object.entries(tradeSegments).map(([tradeId, points]) => {
+              const pathSegments = []
+
+              for (let i = 0; i < points.length; i++) {
+                const point = points[i]
+                const x = xAxis.scale(point.date)
+                const y = yAxis.scale(point.price)
+
+                if (x === undefined || y === undefined) continue
+
+                if (i === 0) {
+                  pathSegments.push(`M ${x},${y}`)
+                } else {
+                  // Draw horizontal line from previous point, then vertical to current point
+                  const prevPoint = points[i - 1]
+                  const prevX = xAxis.scale(prevPoint.date)
+                  const prevY = yAxis.scale(prevPoint.price)
+
+                  if (prevX !== undefined && prevY !== undefined) {
+                    // Horizontal line at previous price level until current date
+                    pathSegments.push(`L ${x},${prevY}`)
+                    // Vertical line to current price level (support update)
+                    pathSegments.push(`L ${x},${y}`)
+                  }
+                }
+              }
+
+              const pathD = pathSegments.join(' ')
+
+              return (
+                <path
+                  key={`support-line-${tradeId}`}
+                  d={pathD}
+                  stroke="#FFD700"
+                  strokeWidth={2}
+                  fill="none"
+                  opacity={0.8}
+                  style={{ pointerEvents: 'none' }}
+                />
+              )
+            })}
 
             {/* Mark support update points with small circles */}
             {v3PL.supportUpdates?.map((update, idx) => {
