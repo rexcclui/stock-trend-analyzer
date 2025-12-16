@@ -289,17 +289,6 @@ export const CustomVolumeProfileV3 = ({
               opacity={0.9}
               style={{ pointerEvents: 'none' }}
             />
-            {/* Invisible hover area - large area covering entire arrow */}
-            <rect
-              x={x - 30}
-              y={y}
-              width={60}
-              height={65}
-              fill="transparent"
-              style={{ pointerEvents: 'all', cursor: 'pointer' }}
-              onMouseEnter={() => setHoveredSell(idx)}
-              onMouseLeave={() => setHoveredSell(null)}
-            />
             {/* S label at end */}
             <text
               x={x}
@@ -315,33 +304,54 @@ export const CustomVolumeProfileV3 = ({
             >
               S
             </text>
+            {/* Large invisible hover area covering entire arrow and label */}
+            <rect
+              x={x - 50}
+              y={y - 10}
+              width={100}
+              height={80}
+              fill="transparent"
+              style={{ pointerEvents: 'all', cursor: 'help' }}
+              onMouseEnter={() => setHoveredSell(idx)}
+              onMouseLeave={() => setHoveredSell(null)}
+            />
             {/* Tooltip on hover */}
-            {isHovered && signal.reason && (
-              <g>
-                <rect
-                  x={x + 25}
-                  y={y + 35}
-                  width={Math.max(150, signal.reason.length * 5.5)}
-                  height={30}
-                  fill="rgba(0, 0, 0, 0.9)"
-                  stroke={fillColor}
-                  strokeWidth={2}
-                  rx={4}
-                  style={{ pointerEvents: 'none' }}
-                />
-                <text
-                  x={x + 30}
-                  y={y + 55}
-                  fill="white"
-                  fontSize="12"
-                  fontWeight="600"
-                  textAnchor="start"
-                  style={{ pointerEvents: 'none' }}
-                >
-                  {signal.reason}
-                </text>
-              </g>
-            )}
+            {isHovered && signal.reason && (() => {
+              // Position tooltip to the left if near right edge
+              const chartRightEdge = offset.left + offset.width
+              const tooltipWidth = Math.max(200, signal.reason.length * 6)
+              const showLeft = x + tooltipWidth + 30 > chartRightEdge
+
+              const tooltipX = showLeft ? x - tooltipWidth - 10 : x + 25
+              const tooltipTextX = showLeft ? tooltipX + 5 : x + 30
+
+              return (
+                <g>
+                  <rect
+                    x={tooltipX}
+                    y={y + 25}
+                    width={tooltipWidth}
+                    height={40}
+                    fill="rgba(0, 0, 0, 0.95)"
+                    stroke={fillColor}
+                    strokeWidth={2}
+                    rx={5}
+                    style={{ pointerEvents: 'none' }}
+                  />
+                  <text
+                    x={tooltipTextX}
+                    y={y + 45}
+                    fill="white"
+                    fontSize="13"
+                    fontWeight="600"
+                    textAnchor="start"
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    {signal.reason}
+                  </text>
+                </g>
+              )
+            })()}
           </g>
         )
       })}
