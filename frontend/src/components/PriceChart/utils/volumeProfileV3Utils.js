@@ -95,31 +95,34 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       const lastZone = priceZones[lastZoneIdx]
       const lastWeight = lastZone.volumeWeight
 
-      // Check breakthrough condition
+      // Check breakthrough condition based on position in range
       let breakConditionMet = false
+      const midPoint = NUM_PRICE_ZONES / 2
 
-      // Check for breakup: check zones below (anywhere in range)
-      // Trend up: check up to 5 zones below (skip zones with 0% volume)
-      let zonesChecked = 0
-      for (let offset = 1; offset <= NUM_PRICE_ZONES && zonesChecked < ZONE_LOOKBACK; offset++) {
-        const belowZoneIdx = lastZoneIdx - offset
-        if (belowZoneIdx < 0) break
+      // If in upper half or middle, check for breakup (zones below with more volume)
+      if (lastZoneIdx >= midPoint) {
+        // Breakup: check up to 5 zones below
+        let zonesChecked = 0
+        for (let offset = 1; offset <= NUM_PRICE_ZONES && zonesChecked < ZONE_LOOKBACK; offset++) {
+          const belowZoneIdx = lastZoneIdx - offset
+          if (belowZoneIdx < 0) break
 
-        const belowWeight = priceZones[belowZoneIdx].volumeWeight
-        // Skip zones with 0% volume
-        if (belowWeight === 0) continue
+          const belowWeight = priceZones[belowZoneIdx].volumeWeight
+          // Skip zones with 0% volume
+          if (belowWeight === 0) continue
 
-        zonesChecked++
-        if (belowWeight - lastWeight >= BREAK_DIFF_THRESHOLD) {
-          breakConditionMet = true
-          isUpBreak = true
-          break
+          zonesChecked++
+          // If zone below has 8%+ more volume, it's a breakup
+          if (belowWeight - lastWeight >= BREAK_DIFF_THRESHOLD) {
+            breakConditionMet = true
+            isUpBreak = true
+            break
+          }
         }
       }
-
-      // Check for breakdown: check zones above (if no breakup found)
-      if (!breakConditionMet) {
-        // Trend down: check up to 5 zones above (skip zones with 0% volume)
+      // If in lower half, check for breakdown (zones above with more volume)
+      else {
+        // Breakdown: check up to 5 zones above
         let zonesChecked = 0
         for (let offset = 1; offset <= NUM_PRICE_ZONES && zonesChecked < ZONE_LOOKBACK; offset++) {
           const aboveZoneIdx = lastZoneIdx + offset
@@ -130,6 +133,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           if (aboveWeight === 0) continue
 
           zonesChecked++
+          // If zone above has 8%+ more volume, it's a breakdown
           if (aboveWeight - lastWeight >= BREAK_DIFF_THRESHOLD) {
             breakConditionMet = true
             isUpBreak = false
