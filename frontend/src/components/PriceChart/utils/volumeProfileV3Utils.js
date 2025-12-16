@@ -473,17 +473,22 @@ export const calculateVolumeProfileV3PL = ({
         })
 
         if (maxWeightZone) {
-          const newWindowSupport = maxWeightZone.minPrice
-          const newCutoffPrice = Math.max(cutoffPrice, newWindowSupport)
+          // Use support as 5% below the heaviest zone's bottom
+          const newWindowSupport = maxWeightZone.minPrice * 0.95
 
-          // Track support update if it moved up
-          if (newCutoffPrice > cutoffPrice) {
+          // Only update if new support is at least 3% higher than current cutoff
+          const minIncrease = cutoffPrice * 1.03
+
+          if (newWindowSupport >= minIncrease) {
+            const newCutoffPrice = newWindowSupport
+
             console.log('[Support UPDATE]', {
               date: currentDate,
               oldCutoff: cutoffPrice.toFixed(2),
               newCutoff: newCutoffPrice.toFixed(2),
               supportLevel: newWindowSupport.toFixed(2),
-              volumeWeight: (maxWeight * 100).toFixed(1) + '%'
+              volumeWeight: (maxWeight * 100).toFixed(1) + '%',
+              increase: (((newCutoffPrice - cutoffPrice) / cutoffPrice) * 100).toFixed(1) + '%'
             })
 
             supportUpdates.push({
@@ -518,10 +523,9 @@ export const calculateVolumeProfileV3PL = ({
           buyPrice = breakSignal.price
           buyDate = breakSignal.date
 
-          // Initial cutoff = MAX(buyPrice * 0.92, heaviest zone minPrice)
-          const priceBasedCutoff = breakSignal.price * (1 - CUTOFF_PERCENT)
-          const supportBasedCutoff = breakSignal.supportLevel || 0
-          cutoffPrice = Math.max(priceBasedCutoff, supportBasedCutoff)
+          // Initial cutoff = buyPrice * 0.92 (8% below buy price)
+          // Don't use zone support - it's too close to buy price
+          cutoffPrice = breakSignal.price * (1 - CUTOFF_PERCENT)
 
           currentWindowIndex = breakSignal.windowIndex // Track starting window
           supportZoneVolume = breakSignal.supportZoneVolume || 0 // Track support zone volume for breakdown detection
