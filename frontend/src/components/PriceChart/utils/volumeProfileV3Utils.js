@@ -221,6 +221,30 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
         zone.volumeWeight = totalVolume > 0 ? zone.volume / totalVolume : 0
       })
 
+      console.log('[Window Created]', {
+        windowIdx: windows.length,
+        startDate: finalWindowData[0].date,
+        endDate: finalWindowData[finalWindowData.length - 1].date,
+        dataPoints: finalWindowData.length,
+        priceRange: `${minPrice.toFixed(2)}-${maxPrice.toFixed(2)}`,
+        range: (maxPrice - minPrice).toFixed(2),
+        zoneHeight: zoneHeight.toFixed(2),
+        zonesWithVolume: priceZones.filter(z => z.volume > 0).length,
+        totalVolume,
+        distribution: priceZones
+          .map((z, i) => ({
+            zone: i,
+            count: finalWindowData.filter(p => {
+              const zi = Math.floor((p.close - minPrice) / zoneHeight)
+              return (zi >= NUM_PRICE_ZONES ? NUM_PRICE_ZONES - 1 : zi < 0 ? 0 : zi) === i
+            }).length,
+            volume: z.volume.toFixed(0),
+            weight: (z.volumeWeight * 100).toFixed(1) + '%',
+            priceRange: `${z.minPrice.toFixed(2)}-${z.maxPrice.toFixed(2)}`
+          }))
+          .filter(z => z.volume > 0)
+      })
+
       windows.push({
         windowIndex: windows.length,
         startDate: finalWindowData[0].date,
