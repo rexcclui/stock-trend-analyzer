@@ -369,12 +369,14 @@ export const calculateVolumeProfileV3PL = ({
             let breakdownReason = ''
 
             // Only compare against zones strictly above the current lower-priced zone
+            const minSupportVolume = supportZoneVolume > 0 ? supportZoneVolume * 0.4 : 0
             for (let idx = previousZoneIdx; idx > currentZoneIdx; idx--) {
               const priorZone = priceZones[idx]
               if (!priorZone || priorZone.volumeWeight === 0) continue
 
               const weightDiff = priorZone.volumeWeight - currentWeight
-              if (weightDiff >= 0.08) {
+              const hasRequiredVolume = minSupportVolume === 0 || priorZone.volume >= minSupportVolume
+              if (hasRequiredVolume && weightDiff >= 0.08) {
                 breakdownDetected = true
                 breakdownReason = `Breakdown: Moved to zone ${currentZoneIdx} (${(currentWeight * 100).toFixed(1)}%), ${((weightDiff) * 100).toFixed(1)}% below zone ${idx} (${(priorZone.volumeWeight * 100).toFixed(1)}%)`
                 break
