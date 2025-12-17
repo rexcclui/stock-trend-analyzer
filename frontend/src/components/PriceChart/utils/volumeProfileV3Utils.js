@@ -102,22 +102,23 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       if (lastWeight > 0) {
         const findHeavierZone = step => {
           let zonesChecked = 0
-          let offset = 1
+          let zoneIdx = lastZoneIdx + step
 
-          while (zonesChecked < ZONE_LOOKBACK) {
-            const zoneIdx = lastZoneIdx + (offset * step)
-            if (zoneIdx < 0 || zoneIdx >= NUM_PRICE_ZONES) break
-
+          while (zoneIdx >= 0 && zoneIdx < NUM_PRICE_ZONES && zonesChecked < ZONE_LOOKBACK) {
             const zoneWeight = priceZones[zoneIdx].volumeWeight
-            // Skip zones with 0% volume without counting toward the five-zone lookback
-            if (zoneWeight !== 0) {
-              zonesChecked++
-              if (zoneWeight - lastWeight >= BREAK_DIFF_THRESHOLD) {
-                return true
-              }
+
+            // Skip zones with 0% volume entirely (do not consume the lookback budget)
+            if (zoneWeight === 0) {
+              zoneIdx += step
+              continue
             }
 
-            offset++
+            zonesChecked++
+            if (zoneWeight - lastWeight >= BREAK_DIFF_THRESHOLD) {
+              return true
+            }
+
+            zoneIdx += step
           }
 
           return false
