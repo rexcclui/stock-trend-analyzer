@@ -255,13 +255,12 @@ function App() {
               />
             )}
             {activeTab === 'v3backtest' && (
-              <V3BacktestResults
-                onStockSelect={handleStockSelect}
-                onVolumeSelect={handleVolumeSelect}
-                onVolumeBulkAdd={handleVolumeBulkAdd}
-                triggerBacktest={v3BacktestSymbol}
-                onBacktestProcessed={() => setV3BacktestSymbol(null)}
-              />
+              <div className="p-6 bg-slate-800 rounded-lg border border-slate-700">
+                <div className="text-center text-slate-300">
+                  <h3 className="text-xl font-semibold mb-4">V3 Backtest (Under Maintenance)</h3>
+                  <p>This feature is currently being fixed. Please use the Technical Analysis tab with Vol Prf V3 enabled instead.</p>
+                </div>
+              </div>
             )}
             {activeTab === 'volume' && (
               <VolumeScreening
