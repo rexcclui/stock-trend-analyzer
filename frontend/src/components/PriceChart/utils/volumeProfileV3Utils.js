@@ -203,8 +203,9 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       })
     }
 
-    // Store window data (up to breakIndex if detected)
-    const finalWindowData = visibleData.slice(currentWindowStart, breakDetected ? breakIndex + 1 : currentWindowEnd)
+    // Store window data (up to breakIndex if detected, otherwise all processed data)
+    const windowEnd = breakDetected ? breakIndex + 1 : currentWindowStart + windowData.length
+    const finalWindowData = visibleData.slice(currentWindowStart, windowEnd)
     if (finalWindowData.length > 0) {
       // Recalculate zones for final window
       const windowPrices = finalWindowData.map(p => p.close)
