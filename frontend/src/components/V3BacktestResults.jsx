@@ -70,6 +70,19 @@ function computeMarketChange(priceData) {
   return ((newestPrice - oldestPrice) / oldestPrice) * 100
 }
 
+function getPriceDateRange(priceData = []) {
+  if (!Array.isArray(priceData) || priceData.length === 0) return null
+
+  const firstDate = new Date(priceData[0].date)
+  const lastDate = new Date(priceData[priceData.length - 1].date)
+
+  if (Number.isNaN(firstDate.getTime()) || Number.isNaN(lastDate.getTime())) return null
+
+  return firstDate < lastDate
+    ? { start: firstDate, end: lastDate }
+    : { start: lastDate, end: firstDate }
+}
+
 function normalizeCachedResults(entries = []) {
   if (!Array.isArray(entries)) return []
 
@@ -2412,8 +2425,11 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                       const plValue = result.optimalSMAs?.pl
                       const winRate = result.optimalSMAs?.winRate
                       const periodLabel = result.period || formatPeriod(result.days)
+                      const dateRange = getPriceDateRange(result.priceData)
                       const periodTooltip = result.priceData?.length > 0
-                        ? `${result.days} days (${result.priceData.length} trading days)`
+                        ? `${result.days} days (${result.priceData.length} trading days)` + (dateRange
+                          ? `\nRange: ${formatDate(dateRange.start)} → ${formatDate(dateRange.end)}`
+                          : '')
                         : `${result.days} days (no price data yet)`
                       const plClassName =
                         typeof plValue === 'number'
