@@ -242,10 +242,11 @@ function App() {
 
           {/* Tab Content */}
           <div className="p-0 md:p-6">
-            {activeTab === 'analyze' && (
+            {/* Keep all components mounted so cached volume data hydrates even before the tab is visible */}
+            <div style={{ display: activeTab === 'analyze' ? 'block' : 'none' }}>
               <StockAnalyzer selectedSymbol={selectedSymbol} selectedParams={selectedParams} />
-            )}
-            {activeTab === 'backtest' && (
+            </div>
+            <div style={{ display: activeTab === 'backtest' ? 'block' : 'none' }}>
               <BacktestResults
                 onStockSelect={handleStockSelect}
                 onVolumeSelect={handleVolumeSelect}
@@ -253,8 +254,8 @@ function App() {
                 triggerBacktest={backtestSymbol}
                 onBacktestProcessed={() => setBacktestSymbol(null)}
               />
-            )}
-            {activeTab === 'v3backtest' && (
+            </div>
+            <div style={{ display: activeTab === 'v3backtest' ? 'block' : 'none' }}>
               <V3BacktestResults
                 onStockSelect={handleStockSelect}
                 onVolumeSelect={handleVolumeSelect}
@@ -262,8 +263,8 @@ function App() {
                 triggerBacktest={v3BacktestSymbol}
                 onBacktestProcessed={() => setV3BacktestSymbol(null)}
               />
-            )}
-            {activeTab === 'volume' && (
+            </div>
+            <div style={{ display: activeTab === 'volume' ? 'block' : 'none' }}>
               <VolumeScreening
                 onStockSelect={handleStockSelect}
                 triggerSymbol={volumeSymbol}
@@ -272,7 +273,7 @@ function App() {
                 bulkImport={volumeImport}
                 onImportProcessed={handleVolumeImportProcessed}
               />
-            )}
+            </div>
           </div>
         </div>
 
