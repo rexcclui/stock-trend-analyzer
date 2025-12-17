@@ -16,6 +16,7 @@ function App() {
   const [volumeImport, setVolumeImport] = useState(null)
   const [storageUsage, setStorageUsage] = useState(null)
   const [storageQuota, setStorageQuota] = useState(null)
+  const [mountedTabs, setMountedTabs] = useState({ analyze: true }) // Track which tabs have been mounted
 
   const measureLocalStorageUsage = () => {
     if (typeof window === 'undefined' || !window.localStorage) return null
@@ -73,6 +74,13 @@ function App() {
       isMounted = false
     }
   }, [])
+
+  // Mount tabs lazily when they become active
+  useEffect(() => {
+    if (!mountedTabs[activeTab]) {
+      setMountedTabs(prev => ({ ...prev, [activeTab]: true }))
+    }
+  }, [activeTab, mountedTabs])
 
   const exportLocalStorage = () => {
     if (typeof window === 'undefined') return
@@ -242,38 +250,46 @@ function App() {
 
           {/* Tab Content */}
           <div className="p-0 md:p-6">
-            {/* Keep all components mounted so cached volume data hydrates even before the tab is visible */}
-            <div style={{ display: activeTab === 'analyze' ? 'block' : 'none' }}>
-              <StockAnalyzer selectedSymbol={selectedSymbol} selectedParams={selectedParams} />
-            </div>
-            <div style={{ display: activeTab === 'backtest' ? 'block' : 'none' }}>
-              <BacktestResults
-                onStockSelect={handleStockSelect}
-                onVolumeSelect={handleVolumeSelect}
-                onVolumeBulkAdd={handleVolumeBulkAdd}
-                triggerBacktest={backtestSymbol}
-                onBacktestProcessed={() => setBacktestSymbol(null)}
-              />
-            </div>
-            <div style={{ display: activeTab === 'v3backtest' ? 'block' : 'none' }}>
-              <V3BacktestResults
-                onStockSelect={handleStockSelect}
-                onVolumeSelect={handleVolumeSelect}
-                onVolumeBulkAdd={handleVolumeBulkAdd}
-                triggerBacktest={v3BacktestSymbol}
-                onBacktestProcessed={() => setV3BacktestSymbol(null)}
-              />
-            </div>
-            <div style={{ display: activeTab === 'volume' ? 'block' : 'none' }}>
-              <VolumeScreening
-                onStockSelect={handleStockSelect}
-                triggerSymbol={volumeSymbol}
-                onSymbolProcessed={() => setVolumeSymbol(null)}
-                onBacktestSelect={handleBacktestSelect}
-                bulkImport={volumeImport}
-                onImportProcessed={handleVolumeImportProcessed}
-              />
-            </div>
+            {/* Lazy mount tabs - only render once activated, then keep mounted but hidden */}
+            {mountedTabs.analyze && (
+              <div style={{ display: activeTab === 'analyze' ? 'block' : 'none' }}>
+                <StockAnalyzer selectedSymbol={selectedSymbol} selectedParams={selectedParams} />
+              </div>
+            )}
+            {mountedTabs.backtest && (
+              <div style={{ display: activeTab === 'backtest' ? 'block' : 'none' }}>
+                <BacktestResults
+                  onStockSelect={handleStockSelect}
+                  onVolumeSelect={handleVolumeSelect}
+                  onVolumeBulkAdd={handleVolumeBulkAdd}
+                  triggerBacktest={backtestSymbol}
+                  onBacktestProcessed={() => setBacktestSymbol(null)}
+                />
+              </div>
+            )}
+            {mountedTabs.v3backtest && (
+              <div style={{ display: activeTab === 'v3backtest' ? 'block' : 'none' }}>
+                <V3BacktestResults
+                  onStockSelect={handleStockSelect}
+                  onVolumeSelect={handleVolumeSelect}
+                  onVolumeBulkAdd={handleVolumeBulkAdd}
+                  triggerBacktest={v3BacktestSymbol}
+                  onBacktestProcessed={() => setV3BacktestSymbol(null)}
+                />
+              </div>
+            )}
+            {mountedTabs.volume && (
+              <div style={{ display: activeTab === 'volume' ? 'block' : 'none' }}>
+                <VolumeScreening
+                  onStockSelect={handleStockSelect}
+                  triggerSymbol={volumeSymbol}
+                  onSymbolProcessed={() => setVolumeSymbol(null)}
+                  onBacktestSelect={handleBacktestSelect}
+                  bulkImport={volumeImport}
+                  onImportProcessed={handleVolumeImportProcessed}
+                />
+              </div>
+            )}
           </div>
         </div>
 
