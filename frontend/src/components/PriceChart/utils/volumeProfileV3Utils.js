@@ -36,15 +36,13 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
   let previousWindowZoneHeight = null // Track previous window's zone height
 
   while (currentWindowStart < visibleData.length) {
-    // Process all remaining data, extending window until break detected
+    // Process all remaining data in one continuous window
     let windowData = visibleData.slice(currentWindowStart)
 
     if (windowData.length === 0) break
 
     // Process each data point in the window to detect breaks
     const windowPoints = []
-    let breakDetected = false
-    let breakIndex = -1
 
     for (let i = 0; i < windowData.length; i++) {
       const dataPoint = windowData[i]
@@ -176,9 +174,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           }
 
           if (breakConditionMet) {
-            breakDetected = true
-            breakIndex = currentWindowStart + i
-
+            // Record break but DON'T end the window - continue extending
             breaks.push({
               date: dataPoint.date,
               price: currentPrice,
@@ -188,7 +184,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
               supportLevel: priceZones[bestPrevZoneIdx]?.minPrice || minPrice,  // High-volume support zone below
               maxVolumeWeight: bestPrevZoneWeight  // Volume weight of support zone
             })
-            break
+            // Don't break - keep extending window to find more breaks
           }
         }
       }
@@ -203,9 +199,8 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       })
     }
 
-    // Store window data (up to breakIndex if detected, otherwise all processed data)
-    const windowEnd = breakDetected ? breakIndex + 1 : currentWindowStart + windowData.length
-    const finalWindowData = visibleData.slice(currentWindowStart, windowEnd)
+    // Store all window data (continuous window with all breaks)
+    const finalWindowData = visibleData.slice(currentWindowStart, currentWindowStart + windowData.length)
     if (finalWindowData.length > 0) {
       // Recalculate zones for final window
       const windowPrices = finalWindowData.map(p => p.close)
@@ -251,17 +246,12 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           volume: point.volume || 0,
           priceZones: priceZones
         })),
-        breakDetected: breakDetected
+        breakDetected: breaks.length > 0  // Mark if any breaks found in this window
       })
     }
 
-    // Move to next window only if break was detected
-    if (breakDetected && breakIndex >= currentWindowStart) {
-      currentWindowStart = breakIndex + 1
-    } else {
-      // No break detected - window extended to end of data, so we're done
-      break
-    }
+    // Window processes all remaining data, so we're done after one iteration
+    break
   }
 
   return { windows, breaks }
@@ -374,53 +364,78 @@ export const calculateVolumeProfileV3PL = ({
       continue // Move to next point
     }
 
-    // If holding, check if we entered a new window and update cutoff
+    // If holding, update trailing stop dynamically
+    if (isHolding && cutoffPrice !== null) {
+      // Update trailing stop: if currentPrice * 0.92 > current cutoff, raise it
+      const potentialNewCutoff = currentPrice * 0.92
+      if (potentialNewCutoff > cutoffPrice) {
+        cutoffPrice = potentialNewCutoff
+
+        supportUpdates.push({
+          date: currentDate,
+          price: cutoffPrice,
+          reason: 'Trailing stop update (92% of current price)'
+        })
+
+        cutoffPrices.push({
+          date: currentDate,
+          price: cutoffPrice,
+          tradeId: currentTradeId
+        })
+      }
+    }
+
+    // Check for sell condition: price below heaviest zone
     if (isHolding && currentWindowIndex !== null) {
       const windowData = dateToWindowMap.get(currentDate)
 
-      if (windowData && windowData.windowIndex !== currentWindowIndex) {
-        // Entered a new window - update cutoff to heaviest zone's minPrice if higher
+      if (windowData) {
         const priceZones = windowData.priceZones
 
-        // Find the zone with maximum volume weight
+        // Find the heaviest zone in the current window
         let maxWeight = 0
-        let maxWeightZone = null
+        let heaviestZone = null
         priceZones.forEach(zone => {
           if (zone.volumeWeight > maxWeight) {
             maxWeight = zone.volumeWeight
-            maxWeightZone = zone
+            heaviestZone = zone
           }
         })
 
-        if (maxWeightZone) {
-          // Use support as 5% below the heaviest zone's bottom
-          const newWindowSupport = maxWeightZone.minPrice * 0.95
+        // Sell if price drops below the heaviest zone's minimum price
+        if (heaviestZone && currentPrice < heaviestZone.minPrice) {
+          const sellPrice = currentPrice
+          const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
+          const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
+          const plPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100
 
-          // Only update if new support is at least 3% higher than current cutoff
-          const minIncrease = cutoffPrice * 1.03
+          trades.push({
+            buyPrice,
+            buyDate,
+            sellPrice,
+            sellDate: currentDate,
+            plPercent,
+            isCutoff: false,
+            reason: `Price below heaviest zone (${maxWeight.toFixed(2)} weight)`
+          })
 
-          if (newWindowSupport >= minIncrease) {
-            const newCutoffPrice = newWindowSupport
+          sellSignals.push({
+            date: currentDate,
+            price: sellPrice,
+            isCutoff: false,
+            reason: `Price $${currentPrice.toFixed(2)} < Heaviest zone $${heaviestZone.minPrice.toFixed(2)}`
+          })
 
-            supportUpdates.push({
-              date: currentDate,
-              price: newCutoffPrice,
-              volumeWeight: maxWeight
-            })
+          // Reset state
+          isHolding = false
+          buyPrice = null
+          buyDate = null
+          cutoffPrice = null
+          currentWindowIndex = null
+          currentTradeId++
 
-            // Add cutoff price change point
-            cutoffPrices.push({
-              date: currentDate,
-              price: newCutoffPrice,
-              tradeId: currentTradeId
-            })
-
-            cutoffPrice = newCutoffPrice
-          }
+          continue // Move to next point
         }
-
-        // Update window index
-        currentWindowIndex = windowData.windowIndex
       }
     }
 
