@@ -242,10 +242,11 @@ function App() {
 
           {/* Tab Content */}
           <div className="p-0 md:p-6">
-            {activeTab === 'analyze' && (
+            {/* Keep all components mounted so cached volume data hydrates even before the tab is visible */}
+            <div style={{ display: activeTab === 'analyze' ? 'block' : 'none' }}>
               <StockAnalyzer selectedSymbol={selectedSymbol} selectedParams={selectedParams} />
-            )}
-            {activeTab === 'backtest' && (
+            </div>
+            <div style={{ display: activeTab === 'backtest' ? 'block' : 'none' }}>
               <BacktestResults
                 onStockSelect={handleStockSelect}
                 onVolumeSelect={handleVolumeSelect}
@@ -253,16 +254,17 @@ function App() {
                 triggerBacktest={backtestSymbol}
                 onBacktestProcessed={() => setBacktestSymbol(null)}
               />
-            )}
-            {activeTab === 'v3backtest' && (
-              <div className="p-6 bg-slate-800 rounded-lg border border-slate-700">
-                <div className="text-center text-slate-300">
-                  <h3 className="text-xl font-semibold mb-4">V3 Backtest (Under Maintenance)</h3>
-                  <p>This feature is currently being fixed. Please use the Technical Analysis tab with Vol Prf V3 enabled instead.</p>
-                </div>
-              </div>
-            )}
-            {activeTab === 'volume' && (
+            </div>
+            <div style={{ display: activeTab === 'v3backtest' ? 'block' : 'none' }}>
+              <V3BacktestResults
+                onStockSelect={handleStockSelect}
+                onVolumeSelect={handleVolumeSelect}
+                onVolumeBulkAdd={handleVolumeBulkAdd}
+                triggerBacktest={v3BacktestSymbol}
+                onBacktestProcessed={() => setV3BacktestSymbol(null)}
+              />
+            </div>
+            <div style={{ display: activeTab === 'volume' ? 'block' : 'none' }}>
               <VolumeScreening
                 onStockSelect={handleStockSelect}
                 triggerSymbol={volumeSymbol}
@@ -271,7 +273,7 @@ function App() {
                 bulkImport={volumeImport}
                 onImportProcessed={handleVolumeImportProcessed}
               />
-            )}
+            </div>
           </div>
         </div>
 
