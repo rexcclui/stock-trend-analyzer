@@ -1823,25 +1823,26 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     }
   }, [])
 
-  useEffect(() => {
-    const removalSources = [
-      { entries: lowWinRateRemoved, reason: 'win rate below 60%.' },
-      { entries: performanceRemoved, reason: 'P/L or signal thresholds.' }
-    ]
-
-    const firstRemoval = removalSources.find(source => source.entries.length > 0)
-    if (!firstRemoval) return
-
-    const removedNames = firstRemoval.entries
-      .map(entry => {
-        const periodLabel = entry.period || formatPeriod(entry.days)
-        return periodLabel ? `${entry.symbol} (${periodLabel})` : entry.symbol
-      })
-    const preview = removedNames.slice(0, 3).join(', ')
-    const suffix = removedNames.length > 3 ? ` +${removedNames.length - 3} more` : ''
-    const message = `${preview}${suffix} removed for ${firstRemoval.reason}`
-    showToast(message)
-  }, [lowWinRateRemoved.length, performanceRemoved.length])
+  // TEMPORARILY DISABLED - causes hooks error
+  // useEffect(() => {
+  //   const removalSources = [
+  //     { entries: lowWinRateRemoved, reason: 'win rate below 60%.' },
+  //     { entries: performanceRemoved, reason: 'P/L or signal thresholds.' }
+  //   ]
+  //
+  //   const firstRemoval = removalSources.find(source => source.entries.length > 0)
+  //   if (!firstRemoval) return
+  //
+  //   const removedNames = firstRemoval.entries
+  //     .map(entry => {
+  //       const periodLabel = entry.period || formatPeriod(entry.days)
+  //       return periodLabel ? `${entry.symbol} (${periodLabel})` : entry.symbol
+  //     })
+  //   const preview = removedNames.slice(0, 3).join(', ')
+  //   const suffix = removedNames.length > 3 ? ` +${removedNames.length - 3} more` : ''
+  //   const message = `${preview}${suffix} removed for ${firstRemoval.reason}`
+  //   showToast(message)
+  // }, [lowWinRateRemoved.length, performanceRemoved.length])
 
   return (
     <div className="space-y-6">
