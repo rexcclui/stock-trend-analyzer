@@ -104,8 +104,8 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           let nonZeroChecked = 0
           let zoneIdx = lastZoneIdx + step
 
-          // Walk sequentially until we evaluate five non-zero zones, ignoring zero-weight gaps entirely
-          while (zoneIdx >= 0 && zoneIdx < NUM_PRICE_ZONES && nonZeroChecked < ZONE_LOOKBACK) {
+          // Walk sequentially, skipping zero-weight gaps without consuming the five-zone budget
+          while (zoneIdx >= 0 && zoneIdx < NUM_PRICE_ZONES) {
             const zoneWeight = priceZones[zoneIdx].volumeWeight
 
             if (zoneWeight === 0) {
@@ -113,11 +113,17 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
               continue
             }
 
-            if (zoneWeight - lastWeight >= BREAK_DIFF_THRESHOLD) {
+            const weightDiff = zoneWeight - lastWeight
+            nonZeroChecked++
+
+            if (weightDiff >= BREAK_DIFF_THRESHOLD) {
               return true
             }
 
-            nonZeroChecked++
+            if (nonZeroChecked >= ZONE_LOOKBACK) {
+              break
+            }
+
             zoneIdx += step
           }
 
