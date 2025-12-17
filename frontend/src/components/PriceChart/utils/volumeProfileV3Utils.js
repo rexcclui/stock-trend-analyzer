@@ -120,9 +120,9 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       const currentZone = priceZones[currentZoneIdx]
       const currentWeight = currentZone.volumeWeight
 
-      // Check break condition (skip first few points to have meaningful data)
-      // Require at least 5 zones below (actual non-zero count verified in lookback loop)
-      if (i >= 10 && currentZoneIdx >= ZONE_LOOKBACK) {
+      // Check break condition - require at least 150 data points before buy signal
+      // This ensures sufficient volume profile history for meaningful detection
+      if (i >= MIN_WINDOW_SIZE && currentZoneIdx >= ZONE_LOOKBACK) {
         // Price slot constraint: Check if current zone height is at least 50% of previous window
         // If zones are too small compared to previous window, don't break - keep extending
         let priceSlotSizeOk = true
