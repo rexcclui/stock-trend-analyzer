@@ -1,6 +1,6 @@
 import PropTypes from 'prop-types'
 
-const LEGEND_WINDOW = 11
+const LEGEND_WINDOW = 17
 const LEGEND_SIDE = Math.floor(LEGEND_WINDOW / 2)
 
 function defaultTitleFormatter(slot) {
@@ -66,7 +66,7 @@ function VolumeLegendPills({ legend, keyPrefix = 'legend', titleFormatter = defa
         <span
           key={`${keyPrefix}-${slot?.legendIndex ?? index}`}
           title={titleFormatter(slot)}
-          className={`w-14 min-w-[3.5rem] max-w-[3.5rem] h-8 px-2 py-0.5 text-xs leading-tight font-semibold rounded-sm shadow-sm border text-center shrink-0 flex flex-col items-center justify-center gap-0 overflow-hidden text-ellipsis ${slot?.isCurrent ? currentClasses : 'border-slate-800/60'} ${slot?.isPlaceholder ? 'border-dashed opacity-70' : ''}`}
+          className={`w-11 min-w-[2.75rem] max-w-[2.75rem] h-7 px-1.5 py-0.5 text-[11px] leading-tight font-semibold rounded-sm shadow-sm border text-center shrink-0 flex flex-col items-center justify-center gap-0 overflow-hidden text-ellipsis ${slot?.isCurrent ? currentClasses : 'border-slate-800/60'} ${slot?.isPlaceholder ? 'border-dashed opacity-70' : ''}`}
           style={{
             backgroundColor: slot?.color || '#1f2937',
             color: slot?.textColor || (slot?.isPlaceholder ? '#cbd5e1' : '#0f172a')
