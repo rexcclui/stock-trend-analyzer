@@ -13,17 +13,10 @@
  * @returns {Object} {windows, breaks} - Windows with volume profile data and break signals
  */
 export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, end: null }) => {
-  console.log('🔍 calculateVolumeProfileV3 CALLED', {
-    pricesLength: displayPrices?.length,
-    zoomRange
-  })
-
   if (!displayPrices || displayPrices.length === 0) return { windows: [], breaks: [] }
 
   const reversedDisplayPrices = [...displayPrices].reverse()
   const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
-
-  console.log('📊 Visible data points:', visibleData.length)
 
   if (visibleData.length === 0) return { windows: [], breaks: [] }
 
@@ -42,8 +35,6 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
     let breakIndex = -1
     let isUpBreak = false
     let breakPrice = 0
-
-    console.log(`🪟 Starting window ${windows.length} at position ${currentWindowStart}`)
 
     // Keep extending window until breakthrough detected or end of data
     while (windowEnd <= visibleData.length && !breakDetected) {
@@ -108,32 +99,16 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       let breakConditionMet = false
 
       // If there is no volume in the current zone, skip break checks entirely
-      if (lastWeight === 0) {
-        console.log('⊘ SKIPPED (zero-weight current zone):', {
-          date: lastPoint.date,
-          price: lastPrice.toFixed(2),
-          lastZoneIdx,
-          lastWeight: 0
-        })
-      }
-
       if (lastWeight > 0) {
         const findHeavierZone = step => {
           let nonZeroChecked = 0
           let zoneIdx = lastZoneIdx + step
-          const debugInfo = {
-            lastZoneIdx,
-            lastWeight,
-            step: step === -1 ? 'DOWN' : 'UP',
-            zonesChecked: []
-          }
 
           // Walk sequentially, skipping zero-weight gaps without consuming the five-zone budget
           while (zoneIdx >= 0 && zoneIdx < NUM_PRICE_ZONES) {
             const zoneWeight = priceZones[zoneIdx].volumeWeight
 
             if (zoneWeight === 0) {
-              debugInfo.zonesChecked.push({ zoneIdx, weight: 0, skipped: true })
               zoneIdx += step
               continue
             }
@@ -141,29 +116,11 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
             const weightDiff = zoneWeight - lastWeight
             nonZeroChecked++
 
-            debugInfo.zonesChecked.push({
-              zoneIdx,
-              weight: (zoneWeight * 100).toFixed(1) + '%',
-              weightDiff: (weightDiff * 100).toFixed(1) + '%',
-              nonZeroCount: nonZeroChecked,
-              meetsThreshold: weightDiff >= BREAK_DIFF_THRESHOLD
-            })
-
             if (weightDiff >= BREAK_DIFF_THRESHOLD) {
-              console.log('✓ BREAK DETECTED:', {
-                date: lastPoint.date,
-                price: lastPrice.toFixed(2),
-                ...debugInfo
-              })
               return true
             }
 
             if (nonZeroChecked >= ZONE_LOOKBACK) {
-              console.log('✗ LOOKBACK LIMIT REACHED:', {
-                date: lastPoint.date,
-                price: lastPrice.toFixed(2),
-                ...debugInfo
-              })
               break
             }
 
