@@ -17,40 +17,6 @@ function App() {
   const [storageUsage, setStorageUsage] = useState(null)
   const [storageQuota, setStorageQuota] = useState(null)
 
-  // Clear potentially corrupted backtest data on mount
-  useEffect(() => {
-    try {
-      const backtestKey = 'backtestResults'
-      const v3BacktestKey = 'v3BacktestResults'
-      const scanQueueKey = 'v3BacktestScanQueue'
-
-      // Only clear if data exists and might be corrupted
-      if (localStorage.getItem(backtestKey)) {
-        const data = JSON.parse(localStorage.getItem(backtestKey))
-        if (!Array.isArray(data)) {
-          console.warn('Clearing corrupted backtestResults')
-          localStorage.removeItem(backtestKey)
-        }
-      }
-      if (localStorage.getItem(v3BacktestKey)) {
-        const data = JSON.parse(localStorage.getItem(v3BacktestKey))
-        if (!Array.isArray(data)) {
-          console.warn('Clearing corrupted v3BacktestResults')
-          localStorage.removeItem(v3BacktestKey)
-        }
-      }
-      if (localStorage.getItem(scanQueueKey)) {
-        const data = JSON.parse(localStorage.getItem(scanQueueKey))
-        if (!data || typeof data !== 'object') {
-          console.warn('Clearing corrupted scan queue')
-          localStorage.removeItem(scanQueueKey)
-        }
-      }
-    } catch (e) {
-      console.error('Error checking localStorage:', e)
-    }
-  }, [])
-
   const measureLocalStorageUsage = () => {
     if (typeof window === 'undefined' || !window.localStorage) return null
 
