@@ -36,9 +36,8 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
   let previousWindowZoneHeight = null // Track previous window's zone height
 
   while (currentWindowStart < visibleData.length) {
-    // Determine window end (at least MIN_WINDOW_SIZE points or until end of data)
-    let currentWindowEnd = Math.min(currentWindowStart + MIN_WINDOW_SIZE, visibleData.length)
-    let windowData = visibleData.slice(currentWindowStart, currentWindowEnd)
+    // Process all remaining data, extending window until break detected
+    let windowData = visibleData.slice(currentWindowStart)
 
     if (windowData.length === 0) break
 
@@ -255,14 +254,12 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       })
     }
 
-    // Move to next window
+    // Move to next window only if break was detected
     if (breakDetected && breakIndex >= currentWindowStart) {
       currentWindowStart = breakIndex + 1
-    } else if (!breakDetected && currentWindowEnd < visibleData.length) {
-      // If no break detected but window ended before data end, move to next window
-      currentWindowStart = currentWindowEnd
     } else {
-      break // End of data
+      // No break detected - window extended to end of data, so we're done
+      break
     }
   }
 
