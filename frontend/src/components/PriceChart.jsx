@@ -2468,6 +2468,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
         // Check break condition (skip first few points to have meaningful data)
         if (i >= 10 && currentZoneIdx >= ZONE_LOOKBACK) {
+          console.log(`📍 Checking break at ${dataPoint.date}:`, {
+            price: currentPrice.toFixed(2),
+            currentZoneIdx,
+            currentWeight: (currentWeight * 100).toFixed(1) + '%'
+          })
           // Price slot constraint: Check if current zone height is at least 50% of previous window
           // If zones are too small compared to previous window, don't break - keep extending
           let priceSlotSizeOk = true
@@ -2484,12 +2489,22 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             let maxWeightDiff = 0
             let bestPrevZoneIdx = -1
 
+            const lookbackChecks = []
             for (let lookback = 1; lookback <= ZONE_LOOKBACK; lookback++) {
               const prevZoneIdx = currentZoneIdx - lookback
               if (prevZoneIdx >= 0) {
                 const prevZone = priceZones[prevZoneIdx]
                 const prevWeight = prevZone.volumeWeight
                 const weightDiff = prevWeight - currentWeight
+
+                lookbackChecks.push({
+                  lookback,
+                  prevZoneIdx,
+                  prevWeight: (prevWeight * 100).toFixed(1) + '%',
+                  weightDiff: (weightDiff * 100).toFixed(1) + '%',
+                  meetsThreshold: weightDiff >= BREAK_DIFF_THRESHOLD,
+                  currentBelowThreshold: currentWeight < BREAK_VOLUME_THRESHOLD
+                })
 
                 // Track the best weight difference
                 if (weightDiff > maxWeightDiff) {
@@ -2512,6 +2527,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 }
               }
             }
+
+            console.log(`  Lookback results:`, lookbackChecks)
 
             if (breakConditionMet) {
               // Determine if it's an up or down break based on price movement from previous zone
@@ -2549,7 +2566,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               }
 
               // Only proceed if there's no resistance/support in the break direction
+              if (hasResistanceInDirection) {
+                console.log(`❌ BREAK REJECTED at ${dataPoint.date} - resistance in ${isUpBreak ? 'up' : 'down'} direction`)
+              }
+
               if (!hasResistanceInDirection) {
+                console.log(`✅ BREAK CONFIRMED at ${dataPoint.date} - isUpBreak: ${isUpBreak}`)
                 // Find the zone with MAXIMUM volume weight (the volume-concentrated zone)
                 // This is the strongest support/resistance level in the current window
                 let maxWeight = 0
