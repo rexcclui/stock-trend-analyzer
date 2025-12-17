@@ -105,6 +105,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // Volume Profile V3 calculated data (only recalculates on manual refresh)
   const [volumeProfileV3Result, setVolumeProfileV3Result] = useState({ windows: [], breaks: [] })
 
+  const volumeProfileV2Data = useMemo(() => volumeProfileV2Result.slots || [], [volumeProfileV2Result])
+  const volumeProfileV2Breakouts = useMemo(() => volumeProfileV2Result.breakouts || [], [volumeProfileV2Result])
+  const volumeProfileV3Data = useMemo(() => volumeProfileV3Result.windows || [], [volumeProfileV3Result])
+  const volumeProfileV3Breaks = useMemo(() => volumeProfileV3Result.breaks || [], [volumeProfileV3Result])
+
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
   // No need to reset here to avoid infinite loop
 
