@@ -2582,11 +2582,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return
     }
 
-      // Recalculate when refresh trigger changes or feature is enabled
-      // Note: Does NOT recalculate on zoom change - only on refresh or period change
-      const result = calculateVolumeProfileV3(displayPrices, zoomRange)
-      setVolumeProfileV3Result(result)
-    }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, displayPrices, zoomRange])
+    // Recalculate against the full visible dataset (matching backtest behavior)
+    // Note: Does NOT recalculate on zoom change - only on refresh or period change
+    const fullRange = { start: 0, end: null }
+    const result = calculateVolumeProfileV3(displayPrices, fullRange)
+    setVolumeProfileV3Result(result)
+  }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, displayPrices])
 
   // SMA Simulation Logic - find optimal SMA value based on P&L
   useEffect(() => {
