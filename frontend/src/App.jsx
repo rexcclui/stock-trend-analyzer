@@ -1,41 +1,10 @@
-import { useEffect, useState, Component } from 'react'
+import { useEffect, useState } from 'react'
 import { TrendingUp, BarChart3, Activity, Waves, Bug, BarChart2 } from 'lucide-react'
 import StockAnalyzer from './components/StockAnalyzer'
 import BacktestResults from './components/BacktestResults'
 import V3BacktestResults from './components/V3BacktestResults'
 import VolumeScreening from './components/VolumeScreening'
 import './App.css'
-
-class ErrorBoundary extends Component {
-  constructor(props) {
-    super(props)
-    this.state = { hasError: false, error: null }
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error }
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error('ErrorBoundary caught:', error, errorInfo)
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="p-6 bg-slate-800 rounded-lg border border-red-500">
-          <div className="text-center text-red-300">
-            <h3 className="text-xl font-semibold mb-4">Component Error</h3>
-            <p className="mb-4">This tab encountered an error. Please refresh the page or try another tab.</p>
-            <p className="text-sm text-slate-400">{this.state.error?.message}</p>
-          </div>
-        </div>
-      )
-    }
-
-    return this.props.children
-  }
-}
 
 function App() {
   const [activeTab, setActiveTab] = useState('analyze')
@@ -47,7 +16,6 @@ function App() {
   const [volumeImport, setVolumeImport] = useState(null)
   const [storageUsage, setStorageUsage] = useState(null)
   const [storageQuota, setStorageQuota] = useState(null)
-  const [mountedTabs, setMountedTabs] = useState({ analyze: true }) // Track which tabs have been mounted
 
   const measureLocalStorageUsage = () => {
     if (typeof window === 'undefined' || !window.localStorage) return null
@@ -105,13 +73,6 @@ function App() {
       isMounted = false
     }
   }, [])
-
-  // Mount tabs lazily when they become active
-  useEffect(() => {
-    if (!mountedTabs[activeTab]) {
-      setMountedTabs(prev => ({ ...prev, [activeTab]: true }))
-    }
-  }, [activeTab, mountedTabs])
 
   const exportLocalStorage = () => {
     if (typeof window === 'undefined') return
@@ -281,50 +242,38 @@ function App() {
 
           {/* Tab Content */}
           <div className="p-0 md:p-6">
-            {/* Lazy mount tabs - only render once activated, then keep mounted but hidden */}
-            {mountedTabs.analyze && (
-              <div style={{ display: activeTab === 'analyze' ? 'block' : 'none' }}>
-                <StockAnalyzer selectedSymbol={selectedSymbol} selectedParams={selectedParams} />
-              </div>
-            )}
-            {mountedTabs.backtest && (
-              <div style={{ display: activeTab === 'backtest' ? 'block' : 'none' }}>
-                <ErrorBoundary>
-                  <BacktestResults
-                    onStockSelect={handleStockSelect}
-                    onVolumeSelect={handleVolumeSelect}
-                    onVolumeBulkAdd={handleVolumeBulkAdd}
-                    triggerBacktest={backtestSymbol}
-                    onBacktestProcessed={() => setBacktestSymbol(null)}
-                  />
-                </ErrorBoundary>
-              </div>
-            )}
-            {mountedTabs.v3backtest && (
-              <div style={{ display: activeTab === 'v3backtest' ? 'block' : 'none' }}>
-                <ErrorBoundary>
-                  <V3BacktestResults
-                    onStockSelect={handleStockSelect}
-                    onVolumeSelect={handleVolumeSelect}
-                    onVolumeBulkAdd={handleVolumeBulkAdd}
-                    triggerBacktest={v3BacktestSymbol}
-                    onBacktestProcessed={() => setV3BacktestSymbol(null)}
-                  />
-                </ErrorBoundary>
-              </div>
-            )}
-            {mountedTabs.volume && (
-              <div style={{ display: activeTab === 'volume' ? 'block' : 'none' }}>
-                <VolumeScreening
-                  onStockSelect={handleStockSelect}
-                  triggerSymbol={volumeSymbol}
-                  onSymbolProcessed={() => setVolumeSymbol(null)}
-                  onBacktestSelect={handleBacktestSelect}
-                  bulkImport={volumeImport}
-                  onImportProcessed={handleVolumeImportProcessed}
-                />
-              </div>
-            )}
+            {/* Keep all components mounted so cached volume data hydrates even before the tab is visible */}
+            <div style={{ display: activeTab === 'analyze' ? 'block' : 'none' }}>
+              <StockAnalyzer selectedSymbol={selectedSymbol} selectedParams={selectedParams} />
+            </div>
+            <div style={{ display: activeTab === 'backtest' ? 'block' : 'none' }}>
+              <BacktestResults
+                onStockSelect={handleStockSelect}
+                onVolumeSelect={handleVolumeSelect}
+                onVolumeBulkAdd={handleVolumeBulkAdd}
+                triggerBacktest={backtestSymbol}
+                onBacktestProcessed={() => setBacktestSymbol(null)}
+              />
+            </div>
+            <div style={{ display: activeTab === 'v3backtest' ? 'block' : 'none' }}>
+              <V3BacktestResults
+                onStockSelect={handleStockSelect}
+                onVolumeSelect={handleVolumeSelect}
+                onVolumeBulkAdd={handleVolumeBulkAdd}
+                triggerBacktest={v3BacktestSymbol}
+                onBacktestProcessed={() => setV3BacktestSymbol(null)}
+              />
+            </div>
+            <div style={{ display: activeTab === 'volume' ? 'block' : 'none' }}>
+              <VolumeScreening
+                onStockSelect={handleStockSelect}
+                triggerSymbol={volumeSymbol}
+                onSymbolProcessed={() => setVolumeSymbol(null)}
+                onBacktestSelect={handleBacktestSelect}
+                bulkImport={volumeImport}
+                onImportProcessed={handleVolumeImportProcessed}
+              />
+            </div>
           </div>
         </div>
 
