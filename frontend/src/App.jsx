@@ -1,10 +1,41 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Component } from 'react'
 import { TrendingUp, BarChart3, Activity, Waves, Bug, BarChart2 } from 'lucide-react'
 import StockAnalyzer from './components/StockAnalyzer'
 import BacktestResults from './components/BacktestResults'
 import V3BacktestResults from './components/V3BacktestResults'
 import VolumeScreening from './components/VolumeScreening'
 import './App.css'
+
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('ErrorBoundary caught:', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6 bg-slate-800 rounded-lg border border-red-500">
+          <div className="text-center text-red-300">
+            <h3 className="text-xl font-semibold mb-4">Component Error</h3>
+            <p className="mb-4">This tab encountered an error. Please refresh the page or try another tab.</p>
+            <p className="text-sm text-slate-400">{this.state.error?.message}</p>
+          </div>
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
 
 function App() {
   const [activeTab, setActiveTab] = useState('analyze')
@@ -258,24 +289,28 @@ function App() {
             )}
             {mountedTabs.backtest && (
               <div style={{ display: activeTab === 'backtest' ? 'block' : 'none' }}>
-                <BacktestResults
-                  onStockSelect={handleStockSelect}
-                  onVolumeSelect={handleVolumeSelect}
-                  onVolumeBulkAdd={handleVolumeBulkAdd}
-                  triggerBacktest={backtestSymbol}
-                  onBacktestProcessed={() => setBacktestSymbol(null)}
-                />
+                <ErrorBoundary>
+                  <BacktestResults
+                    onStockSelect={handleStockSelect}
+                    onVolumeSelect={handleVolumeSelect}
+                    onVolumeBulkAdd={handleVolumeBulkAdd}
+                    triggerBacktest={backtestSymbol}
+                    onBacktestProcessed={() => setBacktestSymbol(null)}
+                  />
+                </ErrorBoundary>
               </div>
             )}
             {mountedTabs.v3backtest && (
               <div style={{ display: activeTab === 'v3backtest' ? 'block' : 'none' }}>
-                <V3BacktestResults
-                  onStockSelect={handleStockSelect}
-                  onVolumeSelect={handleVolumeSelect}
-                  onVolumeBulkAdd={handleVolumeBulkAdd}
-                  triggerBacktest={v3BacktestSymbol}
-                  onBacktestProcessed={() => setV3BacktestSymbol(null)}
-                />
+                <ErrorBoundary>
+                  <V3BacktestResults
+                    onStockSelect={handleStockSelect}
+                    onVolumeSelect={handleVolumeSelect}
+                    onVolumeBulkAdd={handleVolumeBulkAdd}
+                    triggerBacktest={v3BacktestSymbol}
+                    onBacktestProcessed={() => setV3BacktestSymbol(null)}
+                  />
+                </ErrorBoundary>
               </div>
             )}
             {mountedTabs.volume && (
