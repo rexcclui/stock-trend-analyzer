@@ -121,6 +121,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       const currentWeight = currentZone.volumeWeight
 
       // Check break condition (skip first few points to have meaningful data)
+      // Require at least 5 zones below (actual non-zero count verified in lookback loop)
       if (i >= 10 && currentZoneIdx >= ZONE_LOOKBACK) {
         // Price slot constraint: Check if current zone height is at least 50% of previous window
         // If zones are too small compared to previous window, don't break - keep extending
@@ -133,28 +134,37 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
 
         // Only check volume break condition if price slot size is acceptable
         if (priceSlotSizeOk) {
-          // Check any of the previous 5 zones below - current zone must have LESS volume (low-volume breakout)
+          // Check the next 5 NON-ZERO volume zones below - current zone must have LESS volume (low-volume breakout)
           let breakConditionMet = false
           let minWeightDiff = 0  // Track most negative difference (strongest support zone)
           let bestPrevZoneIdx = -1
           let bestPrevZoneWeight = 0
 
-          for (let k = 1; k <= ZONE_LOOKBACK; k++) {
+          // Look back through zones, counting only non-zero zones
+          let nonZeroZonesFound = 0
+          let k = 1
+          while (nonZeroZonesFound < ZONE_LOOKBACK && (currentZoneIdx - k) >= 0) {
             const prevZoneIdx = currentZoneIdx - k
             const prevZoneWeight = priceZones[prevZoneIdx].volumeWeight
 
-            const weightDiff = currentWeight - prevZoneWeight
-            // Break if current zone has at least 8% LESS volume than any zone below
-            if (weightDiff <= -BREAK_DIFF_THRESHOLD) {
-              breakConditionMet = true
-            }
+            // Skip zones with zero volume weight
+            if (prevZoneWeight > 0) {
+              nonZeroZonesFound++
 
-            // Track the zone with most negative difference (highest volume support zone)
-            if (weightDiff < minWeightDiff) {
-              minWeightDiff = weightDiff
-              bestPrevZoneIdx = prevZoneIdx
-              bestPrevZoneWeight = prevZoneWeight
+              const weightDiff = currentWeight - prevZoneWeight
+              // Break if current zone has at least 8% LESS volume than any non-zero zone below
+              if (weightDiff <= -BREAK_DIFF_THRESHOLD) {
+                breakConditionMet = true
+              }
+
+              // Track the zone with most negative difference (highest volume support zone)
+              if (weightDiff < minWeightDiff) {
+                minWeightDiff = weightDiff
+                bestPrevZoneIdx = prevZoneIdx
+                bestPrevZoneWeight = prevZoneWeight
+              }
             }
+            k++
           }
 
           // Additional threshold: require support zone (below) to have at least 10% of total window volume
