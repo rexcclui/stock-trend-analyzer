@@ -2484,51 +2484,67 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           // Only check volume break condition if price slot size is acceptable
           if (priceSlotSizeOk) {
-            // Check any of the previous 5 zones for volume difference
+            // Check any of the previous 5 NON-ZERO zones for volume difference
             let breakConditionMet = false
             let maxWeightDiff = 0
             let bestPrevZoneIdx = -1
 
             const lookbackChecks = []
-            for (let lookback = 1; lookback <= ZONE_LOOKBACK; lookback++) {
-              const prevZoneIdx = currentZoneIdx - lookback
-              if (prevZoneIdx >= 0) {
-                const prevZone = priceZones[prevZoneIdx]
-                const prevWeight = prevZone.volumeWeight
-                const weightDiff = prevWeight - currentWeight
+            let nonZeroChecked = 0
+            let prevZoneIdx = currentZoneIdx - 1
 
+            // Walk backward, skipping zero-weight zones without counting them
+            while (prevZoneIdx >= 0 && nonZeroChecked < ZONE_LOOKBACK) {
+              const prevZone = priceZones[prevZoneIdx]
+              const prevWeight = prevZone.volumeWeight
+
+              // Skip zero-weight zones
+              if (prevWeight === 0) {
                 lookbackChecks.push({
-                  lookback,
                   prevZoneIdx,
-                  prevWeight: (prevWeight * 100).toFixed(1) + '%',
-                  weightDiff: (weightDiff * 100).toFixed(1) + '%',
-                  meetsThreshold: weightDiff >= BREAK_DIFF_THRESHOLD,
-                  currentBelowThreshold: currentWeight < BREAK_VOLUME_THRESHOLD
+                  prevWeight: '0.0%',
+                  skipped: true
                 })
-
-                // Track the best weight difference
-                if (weightDiff > maxWeightDiff) {
-                  maxWeightDiff = weightDiff
-                  bestPrevZoneIdx = prevZoneIdx
-                }
-
-                // Break condition: current weight < 10% AND 8% less than any of previous 5 zones
-                // Price direction check:
-                // - For break up: previous zone must be lower (prevZoneIdx < currentZoneIdx)
-                // - For break down: previous zone must be higher (prevZoneIdx > currentZoneIdx)
-                const isPriceMovingUp = prevZoneIdx < currentZoneIdx
-                const isPriceMovingDown = prevZoneIdx > currentZoneIdx
-
-                if (currentWeight < BREAK_VOLUME_THRESHOLD &&
-                    weightDiff >= BREAK_DIFF_THRESHOLD &&
-                    (isPriceMovingUp || isPriceMovingDown)) {
-                  breakConditionMet = true
-                  break
-                }
+                prevZoneIdx--
+                continue
               }
+
+              nonZeroChecked++
+              const weightDiff = prevWeight - currentWeight
+
+              lookbackChecks.push({
+                nonZeroCount: nonZeroChecked,
+                prevZoneIdx,
+                prevWeight: (prevWeight * 100).toFixed(1) + '%',
+                weightDiff: (weightDiff * 100).toFixed(1) + '%',
+                meetsThreshold: weightDiff >= BREAK_DIFF_THRESHOLD,
+                currentBelowThreshold: currentWeight < BREAK_VOLUME_THRESHOLD
+              })
+
+              // Track the best weight difference
+              if (weightDiff > maxWeightDiff) {
+                maxWeightDiff = weightDiff
+                bestPrevZoneIdx = prevZoneIdx
+              }
+
+              // Break condition: current weight < 10% AND 8% less than any of previous 5 non-zero zones
+              // Price direction check:
+              // - For break up: previous zone must be lower (prevZoneIdx < currentZoneIdx)
+              // - For break down: previous zone must be higher (prevZoneIdx > currentZoneIdx)
+              const isPriceMovingUp = prevZoneIdx < currentZoneIdx
+              const isPriceMovingDown = prevZoneIdx > currentZoneIdx
+
+              if (currentWeight < BREAK_VOLUME_THRESHOLD &&
+                  weightDiff >= BREAK_DIFF_THRESHOLD &&
+                  (isPriceMovingUp || isPriceMovingDown)) {
+                breakConditionMet = true
+                break
+              }
+
+              prevZoneIdx--
             }
 
-            console.log(`  Lookback results:`, lookbackChecks)
+            console.log(`  Lookback results (${nonZeroChecked} non-zero checked):`, lookbackChecks)
 
             if (breakConditionMet) {
               // Determine if it's an up or down break based on price movement from previous zone
