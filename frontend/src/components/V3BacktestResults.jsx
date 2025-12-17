@@ -1811,18 +1811,6 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
   const totalDurationDisplay = totalScanDurationMs > 0 ? formatDuration(totalScanDurationMs) : '—'
   const isScanActive = isScanning && scanQueue.length > 0
 
-  // Show loading message while hydrating cache
-  if (!hasHydratedCache) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
-          <p className="text-slate-300">Loading cached results...</p>
-        </div>
-      </div>
-    )
-  }
-
   const showToast = (message) => {
     setToastMessage(message)
     if (toastTimeoutRef.current) {
@@ -1847,6 +1835,19 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
       clearTimeout(toastTimeoutRef.current)
     }
   }, [])
+
+  const loadingContent = (
+    <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex flex-col items-center gap-3">
+        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+        <p className="text-slate-300">Loading cached results...</p>
+      </div>
+    </div>
+  )
+
+  if (!hasHydratedCache) {
+    return loadingContent
+  }
 
   // TEMPORARILY DISABLED - causes hooks error
   // useEffect(() => {
