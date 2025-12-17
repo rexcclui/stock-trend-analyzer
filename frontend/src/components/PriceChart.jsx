@@ -110,6 +110,173 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const volumeProfileV3Data = useMemo(() => volumeProfileV3Result.windows || [], [volumeProfileV3Result])
   const volumeProfileV3Breaks = useMemo(() => volumeProfileV3Result.breaks || [], [volumeProfileV3Result])
 
+  // Calculate P&L based on breakout trading signals with SMA slope for sell
+  const calculateBreakoutPL = () => {
+    if (volumeProfileV2Data.length === 0) return { trades: [], totalPL: 0, winRate: 0, sellSignals: [], smaUsed: null }
+
+    // Check which SMA is enabled (use smallest period available)
+    if (smaPeriods.length === 0) {
+      console.warn('No SMA enabled - cannot generate sell signals. Please enable SMA5 or SMA10.')
+      return { trades: [], totalPL: 0, winRate: 0, sellSignals: [], smaUsed: null }
+    }
+
+    const smaPeriod = Math.min(...smaPeriods) // Use smallest SMA period
+    const smaKey = `sma${smaPeriod}`
+
+    const trades = []
+    const sellSignals = [] // Track sell signal points for visualization
+    let isHolding = false
+    let buyPrice = null
+    let buyDate = null
+    let buySlotIdx = null
+    let prevSlopeWhileHolding = null
+
+    // Create a map of breakout dates for quick lookup
+    const breakoutDates = new Set(volumeProfileV2Breakouts.map(b => b.date))
+
+    // Prices are in reverse chronological order (newest first), so reverse for forward-time processing
+    const reversedPrices = [...prices].reverse()
+
+    // Calculate SMA from daily prices in forward chronological order
+    const dateToSMA = new Map()
+    for (let i = 0; i < reversedPrices.length; i++) {
+      if (i < smaPeriod - 1) {
+        dateToSMA.set(reversedPrices[i].date, null)
+      } else {
+        const sum = reversedPrices.slice(i - smaPeriod + 1, i + 1).reduce((acc, p) => acc + p.close, 0)
+        dateToSMA.set(reversedPrices[i].date, sum / smaPeriod)
+      }
+    }
+
+    // Calculate SMA slope helper
+    const getSMASlope = (currentDate, prevDate) => {
+      const currentSMA = dateToSMA.get(currentDate)
+      const prevSMA = dateToSMA.get(prevDate)
+      if (currentSMA !== undefined && prevSMA !== undefined) {
+        return currentSMA - prevSMA // Positive = going up, Negative = going down
+      }
+      return null
+    }
+
+    // Iterate through daily prices in forward chronological order for simulation
+    for (let i = 0; i < reversedPrices.length; i++) {
+      const currentPrice = reversedPrices[i]
+      const currentDate = currentPrice.date
+      const currentClose = currentPrice.close
+      const currentSMA = dateToSMA.get(currentDate)
+
+      // Check for breakout buy signal (V2 breakout)
+      if (!isHolding && breakoutDates.has(currentDate)) {
+        isHolding = true
+        buyPrice = currentClose
+        buyDate = currentDate
+        buySlotIdx = volumeProfileV2Data.findIndex(slot => slot.date === currentDate)
+      }
+
+      // If holding, check for sell signal based on SMA slope
+      if (isHolding && currentSMA !== null && i > 0) {
+        const prevDate = reversedPrices[i - 1].date
+        const prevSMA = dateToSMA.get(prevDate)
+        const currentSlope = getSMASlope(currentDate, prevDate)
+
+        // Calculate slope sign changes while holding
+        if (prevSlopeWhileHolding === null) {
+          prevSlopeWhileHolding = currentSlope
+        }
+
+        // Sell when slope turns negative from non-negative, or becomes more negative
+        if (currentSlope !== null) {
+          const slopeSignChanged = prevSlopeWhileHolding >= 0 && currentSlope < 0
+          const slopeMoreNegative = prevSlopeWhileHolding < 0 && currentSlope < prevSlopeWhileHolding
+
+          if (slopeSignChanged || slopeMoreNegative) {
+            const sellPrice = currentClose
+            const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
+            const holdingDays = i - reversedPrices.findIndex(p => p.date === buyDate)
+
+            trades.push({
+              buyDate,
+              buyPrice,
+              sellDate: currentDate,
+              sellPrice,
+              plPercent,
+              holdingDays,
+              buySlotIdx
+            })
+
+            sellSignals.push({
+              date: currentDate,
+              price: sellPrice,
+              slope: currentSlope,
+              prevSlope: prevSlopeWhileHolding,
+              sma: currentSMA,
+              smaKey
+            })
+
+            isHolding = false
+            buyPrice = null
+            buyDate = null
+            buySlotIdx = null
+            prevSlopeWhileHolding = null
+          } else {
+            prevSlopeWhileHolding = currentSlope
+          }
+        }
+      }
+    }
+
+    // If still holding at end, close at last price
+    if (isHolding) {
+      const lastPrice = reversedPrices[reversedPrices.length - 1]
+      const lastClose = lastPrice.close
+      const plPercent = ((lastClose - buyPrice) / buyPrice) * 100
+      const holdingDays = reversedPrices.length - 1 - reversedPrices.findIndex(p => p.date === buyDate)
+
+      trades.push({
+        buyDate,
+        buyPrice,
+        sellDate: lastPrice.date,
+        sellPrice: lastClose,
+        plPercent,
+        holdingDays,
+        buySlotIdx
+      })
+    }
+
+    // Calculate statistics
+    const totalPL = trades.reduce((sum, t) => sum + t.plPercent, 0)
+    const winRate = trades.length > 0
+      ? (trades.filter(t => t.plPercent > 0).length / trades.length) * 100
+      : 0
+
+    // Calculate market performance over same period
+    const marketChange = prices.length > 1
+      ? ((prices[0].close - prices[prices.length - 1].close) / prices[prices.length - 1].close) * 100
+      : 0
+
+    const closedTradeCount = trades.length
+    const avgHoldingDays = trades.length > 0
+      ? trades.reduce((sum, t) => sum + t.holdingDays, 0) / trades.length
+      : 0
+
+    const maxDrawdown = trades.reduce((maxDD, t) => {
+      const drawdown = Math.min(0, (t.sellPrice - t.buyPrice) / t.buyPrice * 100)
+      return Math.min(maxDD, drawdown)
+    }, 0)
+
+    return {
+      trades,
+      sellSignals,
+      totalPL,
+      winRate,
+      smaUsed: smaKey,
+      marketChange,
+      closedTradeCount,
+      avgHoldingDays,
+      maxDrawdown
+    }
+  }
+
   // Note: Zoom reset is handled by parent (StockAnalyzer) when time period changes
   // No need to reset here to avoid infinite loop
 
