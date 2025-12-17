@@ -2582,12 +2582,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return
     }
 
-    // Recalculate against the full visible dataset (matching backtest behavior)
-    // Note: Does NOT recalculate on zoom change - only on refresh or period change
-    const fullRange = { start: 0, end: null }
-    const result = calculateVolumeProfileV3(displayPrices, fullRange)
+    // Recalculate using the current zoomed range so chart results reflect the visible data
+    const result = calculateVolumeProfileV3(displayPrices, zoomRange)
     setVolumeProfileV3Result(result)
-  }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, displayPrices])
+  }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, displayPrices, zoomRange])
 
   // SMA Simulation Logic - find optimal SMA value based on P&L
   useEffect(() => {
