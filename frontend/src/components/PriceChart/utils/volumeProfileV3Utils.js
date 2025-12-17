@@ -103,14 +103,14 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       if (lastWeight > 0) {
         // If in upper half or middle, check for breakup (zones below with more volume)
         if (lastZoneIdx >= midPoint) {
-          // Breakup: check up to 5 zones below
+          // Breakup: check up to 5 non-zero-volume zones below (skip zero-weight zones without consuming lookback)
           let zonesChecked = 0
           for (let offset = 1; offset <= NUM_PRICE_ZONES && zonesChecked < ZONE_LOOKBACK; offset++) {
             const belowZoneIdx = lastZoneIdx - offset
             if (belowZoneIdx < 0) break
 
             const belowWeight = priceZones[belowZoneIdx].volumeWeight
-            // Skip zones with 0% volume
+            // Skip zones with 0% volume without counting toward the five-zone lookback
             if (belowWeight === 0) continue
 
             zonesChecked++
@@ -124,14 +124,14 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
         }
         // If in lower half, check for breakdown (zones above with more volume)
         else {
-          // Breakdown: check up to 5 zones above
+          // Breakdown: check up to 5 non-zero-volume zones above (skip zero-weight zones without consuming lookback)
           let zonesChecked = 0
           for (let offset = 1; offset <= NUM_PRICE_ZONES && zonesChecked < ZONE_LOOKBACK; offset++) {
             const aboveZoneIdx = lastZoneIdx + offset
             if (aboveZoneIdx >= NUM_PRICE_ZONES) break
 
             const aboveWeight = priceZones[aboveZoneIdx].volumeWeight
-            // Skip zones with 0% volume
+            // Skip zones with 0% volume without counting toward the five-zone lookback
             if (aboveWeight === 0) continue
 
             zonesChecked++
