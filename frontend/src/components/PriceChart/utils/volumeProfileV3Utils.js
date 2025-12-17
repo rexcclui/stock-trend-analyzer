@@ -13,10 +13,17 @@
  * @returns {Object} {windows, breaks} - Windows with volume profile data and break signals
  */
 export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, end: null }) => {
+  console.log('🔍 calculateVolumeProfileV3 CALLED', {
+    pricesLength: displayPrices?.length,
+    zoomRange
+  })
+
   if (!displayPrices || displayPrices.length === 0) return { windows: [], breaks: [] }
 
   const reversedDisplayPrices = [...displayPrices].reverse()
   const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
+
+  console.log('📊 Visible data points:', visibleData.length)
 
   if (visibleData.length === 0) return { windows: [], breaks: [] }
 
@@ -35,6 +42,8 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
     let breakIndex = -1
     let isUpBreak = false
     let breakPrice = 0
+
+    console.log(`🪟 Starting window ${windows.length} at position ${currentWindowStart}`)
 
     // Keep extending window until breakthrough detected or end of data
     while (windowEnd <= visibleData.length && !breakDetected) {
