@@ -6,18 +6,6 @@ import V3BacktestResults from './components/V3BacktestResults'
 import VolumeScreening from './components/VolumeScreening'
 import './App.css'
 
-// Clear corrupted localStorage before React initializes
-try {
-  if (typeof window !== 'undefined' && window.localStorage) {
-    localStorage.removeItem('backtestResults')
-    localStorage.removeItem('v3BacktestResults')
-    localStorage.removeItem('v3BacktestScanQueue')
-    console.log('Cleared backtest localStorage data')
-  }
-} catch (e) {
-  console.error('Failed to clear localStorage:', e)
-}
-
 function App() {
   const [activeTab, setActiveTab] = useState('analyze')
   const [selectedSymbol, setSelectedSymbol] = useState('')
