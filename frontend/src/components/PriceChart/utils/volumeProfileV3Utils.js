@@ -588,62 +588,28 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
     }
   }
 
-  // Get the original window with cumulative volume profiles for each point
-  const originalWindow = result.windows[0]
-  if (!originalWindow || !originalWindow.dataPoints) {
-    return {
-      windows: result.windows,
-      breaks: result.breaks,
-      ...plResult
-    }
-  }
-
-  // Create a map from date to original dataPoint (with cumulative profile)
-  const dateToDataPoint = new Map()
-  originalWindow.dataPoints.forEach(dp => {
-    dateToDataPoint.set(dp.date, dp)
-  })
+  // Recalculate with windows split at sell dates to get separate windows with cumulative profiles
+  const sellDates = plResult.trades.map(t => t.sellDate)
+  const splitResult = calculateVolumeProfileV3(displayPrices, zoomRange, sellDates)
 
   const tradeWindows = []
   const tradeBreaks = []
 
+  // Map each trade to its corresponding split window
   plResult.trades.forEach((trade, tradeIdx) => {
-    // Find dataPoints for this trade window using cumulative profiles from original
-    const windowDataPoints = []
-    let foundStart = false
-    const startDate = tradeIdx === 0 ? originalWindow.startDate : plResult.trades[tradeIdx - 1].sellDate
-
-    for (const dp of originalWindow.dataPoints) {
-      // Skip until we reach window start
-      if (!foundStart) {
-        if (tradeIdx === 0 && dp.date === originalWindow.startDate) {
-          foundStart = true
-        } else if (tradeIdx > 0 && dp.date > startDate) {
-          foundStart = true
-        }
-      }
-
-      if (foundStart) {
-        windowDataPoints.push(dp)
-        // Include sell date, then stop
-        if (dp.date === trade.sellDate) {
-          break
-        }
-      }
-    }
-
-    if (windowDataPoints.length === 0) return
+    // Find the window that contains this trade's sell date
+    const window = splitResult.windows.find(w => w.endDate === trade.sellDate)
+    if (!window) return
 
     tradeWindows.push({
-      windowIndex: tradeIdx,
-      startDate: windowDataPoints[0].date,
-      endDate: windowDataPoints[windowDataPoints.length - 1].date,
-      dataPoints: windowDataPoints, // Use original dataPoints with cumulative profiles
-      breakDetected: true
+      ...window,
+      windowIndex: tradeIdx
     })
 
     // Find the ONE break that triggered this trade (matches buy date)
-    const tradeBuyBreak = result.breaks.find(brk => brk.date === trade.buyDate)
+    const tradeBuyBreak = splitResult.breaks.find(brk =>
+      brk.date === trade.buyDate && brk.windowIndex === splitResult.windows.indexOf(window)
+    )
     if (tradeBuyBreak) {
       tradeBreaks.push({
         ...tradeBuyBreak,
@@ -658,37 +624,24 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
     ? plResult.trades[plResult.trades.length - 1].sellDate
     : null
 
-  const finalWindowDataPoints = []
-  let collectingFinal = false
-
-  for (const dp of originalWindow.dataPoints) {
-    if (lastSellDate === null) {
-      // No trades yet, include all
-      finalWindowDataPoints.push(dp)
-    } else if (dp.date > lastSellDate) {
-      collectingFinal = true
-    }
-
-    if (collectingFinal) {
-      finalWindowDataPoints.push(dp)
-    }
-  }
-
-  if (finalWindowDataPoints.length > 0) {
+  // Find the last window from split result (if it exists beyond last sell)
+  const lastSplitWindow = splitResult.windows[splitResult.windows.length - 1]
+  if (lastSplitWindow && (!lastSellDate || lastSplitWindow.endDate > lastSellDate)) {
     const finalWindowIndex = tradeWindows.length
 
     tradeWindows.push({
+      ...lastSplitWindow,
       windowIndex: finalWindowIndex,
-      startDate: finalWindowDataPoints[0].date,
-      endDate: finalWindowDataPoints[finalWindowDataPoints.length - 1].date,
-      dataPoints: finalWindowDataPoints, // Use original dataPoints with cumulative profiles
       breakDetected: false  // May or may not have breaks
     })
 
     // Add any breaks in the final window (if currently holding, show the buy signal)
     if (plResult.isHolding && plResult.buySignals.length > 0) {
       const lastBuySignal = plResult.buySignals[plResult.buySignals.length - 1]
-      const matchingBreak = result.breaks.find(brk => brk.date === lastBuySignal.date)
+      const matchingBreak = splitResult.breaks.find(brk =>
+        brk.date === lastBuySignal.date &&
+        brk.windowIndex === splitResult.windows.indexOf(lastSplitWindow)
+      )
       if (matchingBreak) {
         tradeBreaks.push({
           ...matchingBreak,
