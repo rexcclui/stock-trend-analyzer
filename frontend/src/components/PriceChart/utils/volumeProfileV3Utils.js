@@ -560,63 +560,129 @@ export const calculateVolumeProfileV3PL = ({
 }
 
 /**
- * Two-pass calculation: First get sell dates, then recalculate windows split at those dates
- * This ensures windows reset after each sell, as required by the strategy
- * Only creates windows that have at least one buy signal (complete trading cycle)
+ * Single-pass calculation: Calculate once, then segment windows by actual trade boundaries
+ * Each window represents one complete trading cycle (buy to sell)
  */
 export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, transactionFee = 0.003, cutoffPercent = 0.12) => {
-  // First pass: Calculate with one continuous window to find all trades
-  const initialResult = calculateVolumeProfileV3(displayPrices, zoomRange, [])
-  const initialPL = calculateVolumeProfileV3PL({
-    volumeProfileV3Breaks: initialResult.breaks,
-    volumeProfileV3Data: initialResult.windows,
+  // Single pass: Calculate with one continuous window to find all breaks and trades
+  const result = calculateVolumeProfileV3(displayPrices, zoomRange, [])
+  const plResult = calculateVolumeProfileV3PL({
+    volumeProfileV3Breaks: result.breaks,
+    volumeProfileV3Data: result.windows,
     prices: displayPrices,
     transactionFee,
     cutoffPercent
   })
 
-  // Only split at sell dates that complete a trade (have a corresponding buy)
-  // This ensures every window has at least one buy signal
-  const completedTradeSellDates = initialPL.trades.map(trade => trade.sellDate)
+  if (plResult.trades.length === 0) {
+    // No trades - return the original window
+    return {
+      windows: result.windows,
+      breaks: result.breaks,
+      ...plResult
+    }
+  }
 
-  // Second pass: Recalculate windows split only at completed trade sell dates
-  const finalResult = calculateVolumeProfileV3(displayPrices, zoomRange, completedTradeSellDates)
+  // Create windows based on actual trade boundaries
+  // Each window goes from start (or previous sell) to current sell
+  const reversedDisplayPrices = [...displayPrices].reverse()
+  const visibleData = reversedDisplayPrices.slice(
+    zoomRange.start,
+    zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end
+  )
 
-  // Filter out windows that don't have any breaks in them
-  // This can happen when smaller split windows don't meet the break detection criteria
-  const windowsWithBreaks = new Set(finalResult.breaks.map(b => b.windowIndex))
-  const filteredWindows = finalResult.windows.filter(w => windowsWithBreaks.has(w.windowIndex))
-
-  // Reassign window indices after filtering
-  filteredWindows.forEach((window, idx) => {
-    window.windowIndex = idx
+  const dateToIndex = new Map()
+  visibleData.forEach((point, idx) => {
+    dateToIndex.set(point.date, idx)
   })
 
-  // Update break windowIndex to match new indices
-  const oldToNewWindowIndex = new Map()
-  filteredWindows.forEach((window, newIdx) => {
-    const oldIdx = finalResult.windows.findIndex(w => w.startDate === window.startDate && w.endDate === window.endDate)
-    oldToNewWindowIndex.set(oldIdx, newIdx)
+  const tradeWindows = []
+  const tradeBreaks = []
+
+  plResult.trades.forEach((trade, tradeIdx) => {
+    const buyIdx = dateToIndex.get(trade.buyDate)
+    const sellIdx = dateToIndex.get(trade.sellDate)
+
+    if (buyIdx === undefined || sellIdx === undefined) return
+
+    // Window starts from beginning (or after previous sell) to current sell
+    const windowStart = tradeIdx === 0 ? 0 : dateToIndex.get(plResult.trades[tradeIdx - 1].sellDate) + 1
+    const windowEnd = sellIdx + 1
+
+    const windowData = visibleData.slice(windowStart, windowEnd)
+    if (windowData.length === 0) return
+
+    // Calculate volume profile for this window
+    const minPrice = Math.min(...windowData.map(p => p.close))
+    const maxPrice = Math.max(...windowData.map(p => p.close))
+    const priceRange = maxPrice - minPrice
+
+    const numPriceZones = Math.max(15, Math.min(20, Math.floor(windowData.length / 15)))
+    const priceZoneHeight = priceRange > 0 ? priceRange / numPriceZones : 1
+
+    const priceZones = []
+    for (let j = 0; j < numPriceZones; j++) {
+      priceZones.push({
+        minPrice: minPrice + (j * priceZoneHeight),
+        maxPrice: minPrice + ((j + 1) * priceZoneHeight),
+        volume: 0,
+        volumeWeight: 0
+      })
+    }
+
+    let totalVolume = 0
+    windowData.forEach(price => {
+      const volume = price.volume || 0
+      totalVolume += volume
+      if (priceRange > 0) {
+        let zoneIndex = Math.floor((price.close - minPrice) / priceZoneHeight)
+        if (zoneIndex >= numPriceZones) zoneIndex = numPriceZones - 1
+        if (zoneIndex < 0) zoneIndex = 0
+        priceZones[zoneIndex].volume += volume
+      }
+    })
+
+    priceZones.forEach(zone => {
+      zone.volumeWeight = totalVolume > 0 ? zone.volume / totalVolume : 0
+    })
+
+    tradeWindows.push({
+      windowIndex: tradeIdx,
+      startDate: windowData[0].date,
+      endDate: windowData[windowData.length - 1].date,
+      dataPoints: windowData.map(point => ({
+        date: point.date,
+        price: point.close,
+        volume: point.volume || 0,
+        priceZones: priceZones
+      })),
+      breakDetected: true
+    })
+
+    // Find breaks that belong to this window
+    result.breaks.forEach(brk => {
+      const breakIdx = dateToIndex.get(brk.date)
+      if (breakIdx !== undefined && breakIdx >= windowStart && breakIdx <= sellIdx) {
+        tradeBreaks.push({
+          ...brk,
+          windowIndex: tradeIdx
+        })
+      }
+    })
   })
 
-  const updatedBreaks = finalResult.breaks
-    .filter(b => windowsWithBreaks.has(b.windowIndex))
-    .map(b => ({
-      ...b,
-      windowIndex: oldToNewWindowIndex.get(b.windowIndex)
-    }))
-
+  // Recalculate P&L with new windows to ensure consistency
   const finalPL = calculateVolumeProfileV3PL({
-    volumeProfileV3Breaks: updatedBreaks,
-    volumeProfileV3Data: filteredWindows,
+    volumeProfileV3Breaks: tradeBreaks,
+    volumeProfileV3Data: tradeWindows,
     prices: displayPrices,
     transactionFee,
     cutoffPercent
   })
 
   return {
-    windows: filteredWindows,
-    breaks: updatedBreaks,
+    windows: tradeWindows,
+    breaks: tradeBreaks,
     ...finalPL
   }
 }
