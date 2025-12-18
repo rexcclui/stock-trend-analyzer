@@ -44,7 +44,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
     let windowEnd = visibleData.length
     for (let i = currentWindowStart; i < visibleData.length; i++) {
       if (splitDateSet.has(visibleData[i].date)) {
-        windowEnd = i
+        windowEnd = i + 1  // INCLUDE the sell date in the current window
         break
       }
     }
@@ -263,9 +263,9 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       })
     }
 
-    // Move to next window (after the split point)
+    // Move to next window (starts right after the current window ends)
     if (windowEnd < visibleData.length) {
-      currentWindowStart = windowEnd + 1  // Start after the split date
+      currentWindowStart = windowEnd  // Start at next data point (window already includes sell date)
     } else {
       break  // Reached end of data
     }
