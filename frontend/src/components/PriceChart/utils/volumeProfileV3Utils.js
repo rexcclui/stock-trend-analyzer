@@ -606,13 +606,12 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
       windowIndex: tradeIdx
     })
 
-    // Find the ONE break that triggered this trade (matches buy date)
-    const tradeBuyBreak = splitResult.breaks.find(brk =>
-      brk.date === trade.buyDate && brk.windowIndex === splitResult.windows.indexOf(window)
-    )
-    if (tradeBuyBreak) {
+    // Use the break from FIRST pass (where detection worked correctly)
+    // Just map it to this window's index for visualization
+    const originalBreak = result.breaks.find(brk => brk.date === trade.buyDate)
+    if (originalBreak) {
       tradeBreaks.push({
-        ...tradeBuyBreak,
+        ...originalBreak,
         windowIndex: tradeIdx
       })
     }
@@ -638,10 +637,7 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
     // Add any breaks in the final window (if currently holding, show the buy signal)
     if (plResult.isHolding && plResult.buySignals.length > 0) {
       const lastBuySignal = plResult.buySignals[plResult.buySignals.length - 1]
-      const matchingBreak = splitResult.breaks.find(brk =>
-        brk.date === lastBuySignal.date &&
-        brk.windowIndex === splitResult.windows.indexOf(lastSplitWindow)
-      )
+      const matchingBreak = result.breaks.find(brk => brk.date === lastBuySignal.date)
       if (matchingBreak) {
         tradeBreaks.push({
           ...matchingBreak,
