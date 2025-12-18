@@ -28,14 +28,12 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
   const MIN_WINDOW_SIZE = 150
   const BREAK_VOLUME_THRESHOLD = 0.10 // 10%
   const BREAK_DIFF_THRESHOLD = 0.08 // 8% - current zone must have LESS volume than zones below
-  const PRICE_SLOT_MIN_RATIO = 0.50 // Each zone must be at least 50% of previous window's zone
   const ZONE_LOOKBACK = 10 // Check previous 10 zones for break detection
   const ZONE_LOOKABOVE = 3 // Check upper 3 zones - must have less volume than current
 
   const windows = []
   const breaks = []
   let currentWindowStart = 0
-  let previousWindowZoneHeight = null // Track previous window's zone height
 
   // Create a set of split dates for quick lookup
   const splitDateSet = new Set(windowSplitDates)
@@ -133,28 +131,17 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
 
       // Check break condition - require at least 150 data points before buy signal
       // This ensures sufficient volume profile history for meaningful detection
-      if (i >= MIN_WINDOW_SIZE && currentZoneIdx >= ZONE_LOOKBACK) {
-        // Price slot constraint: Check if current zone height is at least 50% of previous window
-        // If zones are too small compared to previous window, don't break - keep extending
-        let priceSlotSizeOk = true
-        if (previousWindowZoneHeight !== null) {
-          if (priceZoneHeight < previousWindowZoneHeight * PRICE_SLOT_MIN_RATIO) {
-            priceSlotSizeOk = false
-          }
-        }
+      if (i >= MIN_WINDOW_SIZE) {
+        // Check the next 10 NON-ZERO volume zones below - current zone must have LESS volume (low-volume breakout)
+        let breakConditionMet = false
+        let minWeightDiff = 0  // Track most negative difference (strongest support zone)
+        let bestPrevZoneIdx = -1
+        let bestPrevZoneWeight = 0
 
-        // Only check volume break condition if price slot size is acceptable
-        if (priceSlotSizeOk) {
-          // Check the next 10 NON-ZERO volume zones below - current zone must have LESS volume (low-volume breakout)
-          let breakConditionMet = false
-          let minWeightDiff = 0  // Track most negative difference (strongest support zone)
-          let bestPrevZoneIdx = -1
-          let bestPrevZoneWeight = 0
-
-          // Look back through zones, counting only non-zero zones
-          let nonZeroZonesFound = 0
-          let k = 1
-          while (nonZeroZonesFound < ZONE_LOOKBACK && (currentZoneIdx - k) >= 0) {
+        // Look back through zones, counting only non-zero zones
+        let nonZeroZonesFound = 0
+        let k = 1
+        while (nonZeroZonesFound < ZONE_LOOKBACK && (currentZoneIdx - k) >= 0) {
             const prevZoneIdx = currentZoneIdx - k
             const prevZoneWeight = priceZones[prevZoneIdx].volumeWeight
 
@@ -203,19 +190,18 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
             }
           }
 
-          if (breakConditionMet) {
-            // Record break but DON'T end the window - continue extending
-            breaks.push({
-              date: dataPoint.date,
-              price: currentPrice,
-              isUpBreak: true, // Low-volume breakout - price moving away from high-volume support
-              currentWeight: currentWeight,  // Low volume weight at break price
-              windowIndex: windows.length,
-              supportLevel: priceZones[bestPrevZoneIdx]?.minPrice || minPrice,  // High-volume support zone below
-              maxVolumeWeight: bestPrevZoneWeight  // Volume weight of support zone
-            })
-            // Don't break - keep extending window to find more breaks
-          }
+        if (breakConditionMet) {
+          // Record break but DON'T end the window - continue extending
+          breaks.push({
+            date: dataPoint.date,
+            price: currentPrice,
+            isUpBreak: true, // Low-volume breakout - price moving away from high-volume support
+            currentWeight: currentWeight,  // Low volume weight at break price
+            windowIndex: windows.length,
+            supportLevel: priceZones[bestPrevZoneIdx]?.minPrice || minPrice,  // High-volume support zone below
+            maxVolumeWeight: bestPrevZoneWeight  // Volume weight of support zone
+          })
+          // Don't break - keep extending window to find more breaks
         }
       }
 
@@ -239,7 +225,6 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       const priceRange = maxPrice - minPrice
 
       const priceZoneHeight = priceRange > 0 ? priceRange / Math.max(15, Math.min(20, Math.floor(finalWindowData.length / 15))) : 1
-      previousWindowZoneHeight = priceZoneHeight
 
       const priceZones = []
       const numPriceZones = Math.max(15, Math.min(20, Math.floor(finalWindowData.length / 15)))
