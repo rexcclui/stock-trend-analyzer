@@ -581,17 +581,42 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
 
   // Second pass: Recalculate windows split only at completed trade sell dates
   const finalResult = calculateVolumeProfileV3(displayPrices, zoomRange, completedTradeSellDates)
+
+  // Filter out windows that don't have any breaks in them
+  // This can happen when smaller split windows don't meet the break detection criteria
+  const windowsWithBreaks = new Set(finalResult.breaks.map(b => b.windowIndex))
+  const filteredWindows = finalResult.windows.filter(w => windowsWithBreaks.has(w.windowIndex))
+
+  // Reassign window indices after filtering
+  filteredWindows.forEach((window, idx) => {
+    window.windowIndex = idx
+  })
+
+  // Update break windowIndex to match new indices
+  const oldToNewWindowIndex = new Map()
+  filteredWindows.forEach((window, newIdx) => {
+    const oldIdx = finalResult.windows.findIndex(w => w.startDate === window.startDate && w.endDate === window.endDate)
+    oldToNewWindowIndex.set(oldIdx, newIdx)
+  })
+
+  const updatedBreaks = finalResult.breaks
+    .filter(b => windowsWithBreaks.has(b.windowIndex))
+    .map(b => ({
+      ...b,
+      windowIndex: oldToNewWindowIndex.get(b.windowIndex)
+    }))
+
   const finalPL = calculateVolumeProfileV3PL({
-    volumeProfileV3Breaks: finalResult.breaks,
-    volumeProfileV3Data: finalResult.windows,
+    volumeProfileV3Breaks: updatedBreaks,
+    volumeProfileV3Data: filteredWindows,
     prices: displayPrices,
     transactionFee,
     cutoffPercent
   })
 
   return {
-    windows: finalResult.windows,
-    breaks: finalResult.breaks,
+    windows: filteredWindows,
+    breaks: updatedBreaks,
     ...finalPL
   }
 }
