@@ -669,6 +669,79 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
     }
   })
 
+  // Add final window for remaining data (if any) after the last completed trade
+  // This shows current holding or waiting-for-signal state
+  const lastTradeEndIdx = plResult.trades.length > 0
+    ? dateToIndex.get(plResult.trades[plResult.trades.length - 1].sellDate) + 1
+    : 0
+
+  if (lastTradeEndIdx < visibleData.length) {
+    const finalWindowData = visibleData.slice(lastTradeEndIdx)
+
+    if (finalWindowData.length > 0) {
+      // Calculate volume profile for final window
+      const minPrice = Math.min(...finalWindowData.map(p => p.close))
+      const maxPrice = Math.max(...finalWindowData.map(p => p.close))
+      const priceRange = maxPrice - minPrice
+
+      const numPriceZones = Math.max(15, Math.min(20, Math.floor(finalWindowData.length / 15)))
+      const priceZoneHeight = priceRange > 0 ? priceRange / numPriceZones : 1
+
+      const priceZones = []
+      for (let j = 0; j < numPriceZones; j++) {
+        priceZones.push({
+          minPrice: minPrice + (j * priceZoneHeight),
+          maxPrice: minPrice + ((j + 1) * priceZoneHeight),
+          volume: 0,
+          volumeWeight: 0
+        })
+      }
+
+      let totalVolume = 0
+      finalWindowData.forEach(price => {
+        const volume = price.volume || 0
+        totalVolume += volume
+        if (priceRange > 0) {
+          let zoneIndex = Math.floor((price.close - minPrice) / priceZoneHeight)
+          if (zoneIndex >= numPriceZones) zoneIndex = numPriceZones - 1
+          if (zoneIndex < 0) zoneIndex = 0
+          priceZones[zoneIndex].volume += volume
+        }
+      })
+
+      priceZones.forEach(zone => {
+        zone.volumeWeight = totalVolume > 0 ? zone.volume / totalVolume : 0
+      })
+
+      const finalWindowIndex = tradeWindows.length
+
+      tradeWindows.push({
+        windowIndex: finalWindowIndex,
+        startDate: finalWindowData[0].date,
+        endDate: finalWindowData[finalWindowData.length - 1].date,
+        dataPoints: finalWindowData.map(point => ({
+          date: point.date,
+          price: point.close,
+          volume: point.volume || 0,
+          priceZones: priceZones
+        })),
+        breakDetected: false  // May or may not have breaks
+      })
+
+      // Add any breaks in the final window (if currently holding, show the buy signal)
+      if (plResult.isHolding && plResult.buySignals.length > 0) {
+        const lastBuySignal = plResult.buySignals[plResult.buySignals.length - 1]
+        const matchingBreak = result.breaks.find(brk => brk.date === lastBuySignal.date)
+        if (matchingBreak) {
+          tradeBreaks.push({
+            ...matchingBreak,
+            windowIndex: finalWindowIndex
+          })
+        }
+      }
+    }
+  }
+
   // Recalculate P&L with new windows to ensure consistency
   const finalPL = calculateVolumeProfileV3PL({
     volumeProfileV3Breaks: tradeBreaks,
