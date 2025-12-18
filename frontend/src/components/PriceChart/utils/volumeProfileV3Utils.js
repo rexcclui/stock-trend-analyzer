@@ -596,10 +596,14 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
   const tradeBreaks = []
 
   // Map each trade to its corresponding split window
+  // Only include windows with at least 150 data points (buy signal requirement)
   plResult.trades.forEach((trade, tradeIdx) => {
     // Find the window that contains this trade's sell date
     const window = splitResult.windows.find(w => w.endDate === trade.sellDate)
     if (!window) return
+
+    // Skip windows with less than 150 data points
+    if (window.dataPoints.length < 150) return
 
     tradeWindows.push({
       ...window,
@@ -625,7 +629,7 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
 
   // Find the last window from split result (if it exists beyond last sell)
   const lastSplitWindow = splitResult.windows[splitResult.windows.length - 1]
-  if (lastSplitWindow && (!lastSellDate || lastSplitWindow.endDate > lastSellDate)) {
+  if (lastSplitWindow && (!lastSellDate || lastSplitWindow.endDate > lastSellDate) && lastSplitWindow.dataPoints.length >= 150) {
     const finalWindowIndex = tradeWindows.length
 
     tradeWindows.push({
