@@ -181,10 +181,13 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
               const upperZoneIdx = currentZoneIdx + m
               if (upperZoneIdx < numPriceZones) {
                 const upperZoneWeight = priceZones[upperZoneIdx].volumeWeight
-                // Upper zone must have LESS volume than current zone
-                if (upperZoneWeight >= currentWeight) {
-                  breakConditionMet = false
-                  break
+                // Skip zones with zero volume (price hasn't reached there yet)
+                if (upperZoneWeight > 0) {
+                  // Upper zone must have LESS volume than current zone
+                  if (upperZoneWeight >= currentWeight) {
+                    breakConditionMet = false
+                    break
+                  }
                 }
               }
             }
