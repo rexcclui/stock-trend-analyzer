@@ -1881,7 +1881,11 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     const idSetChanged = visibleIds.length !== stableRowOrder.length || visibleIds.some(id => !stableRowOrder.includes(id))
 
     if (!sortConfig.field) {
-      if (idSetChanged || sortChanged || stableRowOrder.length === 0) {
+      if (visibleIds.length === 0) {
+        if (stableRowOrder.length !== 0) {
+          setStableRowOrder([])
+        }
+      } else if (idSetChanged || sortChanged || stableRowOrder.length === 0) {
         setStableRowOrder(visibleIds)
       }
     } else if (sortChanged || idSetChanged) {
