@@ -659,16 +659,14 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
       breakDetected: true
     })
 
-    // Find breaks that belong to this window
-    result.breaks.forEach(brk => {
-      const breakIdx = dateToIndex.get(brk.date)
-      if (breakIdx !== undefined && breakIdx >= windowStart && breakIdx <= sellIdx) {
-        tradeBreaks.push({
-          ...brk,
-          windowIndex: tradeIdx
-        })
-      }
-    })
+    // Find the ONE break that triggered this trade (matches buy date)
+    const tradeBuyBreak = result.breaks.find(brk => brk.date === trade.buyDate)
+    if (tradeBuyBreak) {
+      tradeBreaks.push({
+        ...tradeBuyBreak,
+        windowIndex: tradeIdx
+      })
+    }
   })
 
   // Recalculate P&L with new windows to ensure consistency
