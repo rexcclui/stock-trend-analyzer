@@ -594,31 +594,45 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
 
   const tradeWindows = []
   const tradeBreaks = []
+  const filteredTrades = []
+  const filteredBuySignals = []
+  const filteredSellSignals = []
 
   // Map each trade to its corresponding split window
-  // Only include windows with at least 150 data points (buy signal requirement)
-  plResult.trades.forEach((trade, tradeIdx) => {
+  // Only include trades where window has at least 150 data points
+  let newWindowIndex = 0
+  plResult.trades.forEach((trade) => {
     // Find the window that contains this trade's sell date
     const window = splitResult.windows.find(w => w.endDate === trade.sellDate)
     if (!window) return
 
-    // Skip windows with less than 150 data points
+    // Skip windows with less than 150 data points AND their corresponding trades
     if (window.dataPoints.length < 150) return
 
     tradeWindows.push({
       ...window,
-      windowIndex: tradeIdx
+      windowIndex: newWindowIndex
     })
 
+    // Keep this trade
+    filteredTrades.push(trade)
+
+    // Keep corresponding signals
+    const buySignal = plResult.buySignals.find(s => s.date === trade.buyDate)
+    const sellSignal = plResult.sellSignals.find(s => s.date === trade.sellDate)
+    if (buySignal) filteredBuySignals.push(buySignal)
+    if (sellSignal) filteredSellSignals.push(sellSignal)
+
     // Use the break from FIRST pass (where detection worked correctly)
-    // Just map it to this window's index for visualization
     const originalBreak = result.breaks.find(brk => brk.date === trade.buyDate)
     if (originalBreak) {
       tradeBreaks.push({
         ...originalBreak,
-        windowIndex: tradeIdx
+        windowIndex: newWindowIndex
       })
     }
+
+    newWindowIndex++
   })
 
   // Add final window for remaining data (if any) after the last completed trade
@@ -651,11 +665,23 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
     }
   }
 
-  // DON'T recalculate P&L - use the original from first pass
-  // Split windows are ONLY for visualization with cumulative profiles
+  // Use filtered trades and signals (only those with windows >= 150 points)
   return {
     windows: tradeWindows,
     breaks: tradeBreaks,
-    ...plResult  // Use P&L from first pass, not recalculated
+    trades: filteredTrades,
+    buySignals: filteredBuySignals,
+    sellSignals: filteredSellSignals,
+    // Recalculate stats based on filtered trades
+    totalPL: filteredTrades.reduce((sum, t) => sum + t.plPercent, 0),
+    winRate: filteredTrades.length > 0
+      ? (filteredTrades.filter(t => t.plPercent > 0).length / filteredTrades.length) * 100
+      : 0,
+    tradingSignals: filteredBuySignals.length,
+    supportUpdates: plResult.supportUpdates,
+    marketChange: plResult.marketChange,
+    cutoffPrices: plResult.cutoffPrices,
+    sellDates: filteredTrades.map(t => t.sellDate),
+    isHolding: plResult.isHolding
   }
 }
