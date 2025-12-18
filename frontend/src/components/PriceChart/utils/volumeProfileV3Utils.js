@@ -589,99 +589,36 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
   }
 
   // Recalculate with windows split at sell dates to get separate windows with cumulative profiles
+  // Windows MUST cover ENTIRE visible range with NO GAPS
   const sellDates = plResult.trades.map(t => t.sellDate)
   const splitResult = calculateVolumeProfileV3(displayPrices, zoomRange, sellDates)
 
   const tradeWindows = []
   const tradeBreaks = []
-  const filteredTrades = []
-  const filteredBuySignals = []
-  const filteredSellSignals = []
 
-  // Map each trade to its corresponding split window
-  // Only include trades where window has at least 150 data points
-  let newWindowIndex = 0
-  plResult.trades.forEach((trade) => {
-    // Find the window that contains this trade's sell date
-    const window = splitResult.windows.find(w => w.endDate === trade.sellDate)
-    if (!window) return
-
-    // Skip windows with less than 150 data points AND their corresponding trades
-    if (window.dataPoints.length < 150) return
-
+  // Include ALL windows from split result - covering entire visible range
+  splitResult.windows.forEach((window, idx) => {
     tradeWindows.push({
       ...window,
-      windowIndex: newWindowIndex
+      windowIndex: idx
     })
+  })
 
-    // Keep this trade
-    filteredTrades.push(trade)
-
-    // Keep corresponding signals
-    const buySignal = plResult.buySignals.find(s => s.date === trade.buyDate)
-    const sellSignal = plResult.sellSignals.find(s => s.date === trade.sellDate)
-    if (buySignal) filteredBuySignals.push(buySignal)
-    if (sellSignal) filteredSellSignals.push(sellSignal)
-
-    // Use the break from FIRST pass (where detection worked correctly)
-    const originalBreak = result.breaks.find(brk => brk.date === trade.buyDate)
+  // Map breaks from split result, using original break data for accuracy
+  splitResult.breaks.forEach((splitBreak) => {
+    const originalBreak = result.breaks.find(b => b.date === splitBreak.date)
     if (originalBreak) {
       tradeBreaks.push({
         ...originalBreak,
-        windowIndex: newWindowIndex
+        windowIndex: splitBreak.windowIndex
       })
     }
-
-    newWindowIndex++
   })
 
-  // Add final window for remaining data (if any) after the last completed trade
-  // This shows current holding or waiting-for-signal state
-  const lastSellDate = plResult.trades.length > 0
-    ? plResult.trades[plResult.trades.length - 1].sellDate
-    : null
-
-  // Find the last window from split result (if it exists beyond last sell)
-  const lastSplitWindow = splitResult.windows[splitResult.windows.length - 1]
-  if (lastSplitWindow && (!lastSellDate || lastSplitWindow.endDate > lastSellDate) && lastSplitWindow.dataPoints.length >= 150) {
-    const finalWindowIndex = tradeWindows.length
-
-    tradeWindows.push({
-      ...lastSplitWindow,
-      windowIndex: finalWindowIndex,
-      breakDetected: false  // May or may not have breaks
-    })
-
-    // Add any breaks in the final window (if currently holding, show the buy signal)
-    if (plResult.isHolding && plResult.buySignals.length > 0) {
-      const lastBuySignal = plResult.buySignals[plResult.buySignals.length - 1]
-      const matchingBreak = result.breaks.find(brk => brk.date === lastBuySignal.date)
-      if (matchingBreak) {
-        tradeBreaks.push({
-          ...matchingBreak,
-          windowIndex: finalWindowIndex
-        })
-      }
-    }
-  }
-
-  // Use filtered trades and signals (only those with windows >= 150 points)
+  // Use P&L from first pass (correct trade detection)
   return {
     windows: tradeWindows,
     breaks: tradeBreaks,
-    trades: filteredTrades,
-    buySignals: filteredBuySignals,
-    sellSignals: filteredSellSignals,
-    // Recalculate stats based on filtered trades
-    totalPL: filteredTrades.reduce((sum, t) => sum + t.plPercent, 0),
-    winRate: filteredTrades.length > 0
-      ? (filteredTrades.filter(t => t.plPercent > 0).length / filteredTrades.length) * 100
-      : 0,
-    tradingSignals: filteredBuySignals.length,
-    supportUpdates: plResult.supportUpdates,
-    marketChange: plResult.marketChange,
-    cutoffPrices: plResult.cutoffPrices,
-    sellDates: filteredTrades.map(t => t.sellDate),
-    isHolding: plResult.isHolding
+    ...plResult
   }
 }
