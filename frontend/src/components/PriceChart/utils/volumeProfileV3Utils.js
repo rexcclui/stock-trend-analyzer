@@ -647,18 +647,11 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
     }
   }
 
-  // Recalculate P&L with new windows to ensure consistency
-  const finalPL = calculateVolumeProfileV3PL({
-    volumeProfileV3Breaks: tradeBreaks,
-    volumeProfileV3Data: tradeWindows,
-    prices: displayPrices,
-    transactionFee,
-    cutoffPercent
-  })
-
+  // DON'T recalculate P&L - use the original from first pass
+  // Split windows are ONLY for visualization with cumulative profiles
   return {
     windows: tradeWindows,
     breaks: tradeBreaks,
-    ...finalPL
+    ...plResult  // Use P&L from first pass, not recalculated
   }
 }
