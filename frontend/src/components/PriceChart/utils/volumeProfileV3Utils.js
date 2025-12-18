@@ -25,7 +25,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
 
   if (visibleData.length === 0) return { windows: [], breaks: [] }
 
-  const MIN_WINDOW_SIZE = 150
+  const MIN_WINDOW_SIZE = 75  // Changed from 150 to 75
   const BREAK_VOLUME_THRESHOLD = 0.10 // 10%
   const BREAK_DIFF_THRESHOLD = 0.08 // 8% - current zone must have LESS volume than zones below
   const ZONE_LOOKBACK = 10 // Check previous 10 zones for break detection
@@ -218,53 +218,14 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       })
     }
 
-    // Store all window data (continuous window with all breaks)
-    const finalWindowData = visibleData.slice(currentWindowStart, currentWindowStart + windowData.length)
-    if (finalWindowData.length > 0) {
-      // Recalculate zones for final window
-      const windowPrices = finalWindowData.map(p => p.close)
-      const minPrice = Math.min(...windowPrices)
-      const maxPrice = Math.max(...windowPrices)
-      const priceRange = maxPrice - minPrice
-
-      const priceZoneHeight = priceRange > 0 ? priceRange / Math.max(15, Math.min(20, Math.floor(finalWindowData.length / 15))) : 1
-
-      const priceZones = []
-      const numPriceZones = Math.max(15, Math.min(20, Math.floor(finalWindowData.length / 15)))
-      for (let i = 0; i < numPriceZones; i++) {
-        priceZones.push({
-          minPrice: minPrice + (i * priceZoneHeight),
-          maxPrice: minPrice + ((i + 1) * priceZoneHeight),
-          volume: 0,
-          volumeWeight: 0
-        })
-      }
-
-      let totalVolume = 0
-      finalWindowData.forEach(price => {
-        const volume = price.volume || 0
-        totalVolume += volume
-        let zoneIndex = Math.floor((price.close - minPrice) / priceZoneHeight)
-        if (zoneIndex >= numPriceZones) zoneIndex = numPriceZones - 1
-        if (zoneIndex < 0) zoneIndex = 0
-        priceZones[zoneIndex].volume += volume
-      })
-
-      priceZones.forEach(zone => {
-        zone.volumeWeight = totalVolume > 0 ? zone.volume / totalVolume : 0
-      })
-
+    // Store all window data with cumulative profiles
+    if (windowPoints.length > 0) {
       windows.push({
         windowIndex: windows.length,
-        startDate: finalWindowData[0].date,
-        endDate: finalWindowData[finalWindowData.length - 1].date,
-        dataPoints: finalWindowData.map(point => ({
-          date: point.date,
-          price: point.close,
-          volume: point.volume || 0,
-          priceZones: priceZones
-        })),
-        breakDetected: breaks.length > 0  // Mark if any breaks found in this window
+        startDate: windowPoints[0].date,
+        endDate: windowPoints[windowPoints.length - 1].date,
+        dataPoints: windowPoints,  // Use cumulative profiles from windowPoints
+        breakDetected: breaks.length > 0
       })
     }
 
