@@ -1088,7 +1088,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     if (onSymbolProcessed) {
       onSymbolProcessed()
     }
-  }, [triggerSymbol, onSymbolProcessed])
+  }, [triggerSymbol])
 
   useEffect(() => {
     if (!bulkImport || !Array.isArray(bulkImport.entries)) return
@@ -1100,7 +1100,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     if (onImportProcessed) {
       onImportProcessed()
     }
-  }, [bulkImport, onImportProcessed])
+  }, [bulkImport])
 
   const saveToHistory = (symbols) => {
     if (!Array.isArray(symbols) || symbols.length === 0) return
