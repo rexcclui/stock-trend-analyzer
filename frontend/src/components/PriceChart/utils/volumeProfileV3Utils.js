@@ -588,79 +588,57 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
     }
   }
 
-  // Create windows based on actual trade boundaries
-  // Each window goes from start (or previous sell) to current sell
-  const reversedDisplayPrices = [...displayPrices].reverse()
-  const visibleData = reversedDisplayPrices.slice(
-    zoomRange.start,
-    zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end
-  )
+  // Get the original window with cumulative volume profiles for each point
+  const originalWindow = result.windows[0]
+  if (!originalWindow || !originalWindow.dataPoints) {
+    return {
+      windows: result.windows,
+      breaks: result.breaks,
+      ...plResult
+    }
+  }
 
-  const dateToIndex = new Map()
-  visibleData.forEach((point, idx) => {
-    dateToIndex.set(point.date, idx)
+  // Create a map from date to original dataPoint (with cumulative profile)
+  const dateToDataPoint = new Map()
+  originalWindow.dataPoints.forEach(dp => {
+    dateToDataPoint.set(dp.date, dp)
   })
 
   const tradeWindows = []
   const tradeBreaks = []
 
   plResult.trades.forEach((trade, tradeIdx) => {
-    const buyIdx = dateToIndex.get(trade.buyDate)
-    const sellIdx = dateToIndex.get(trade.sellDate)
+    // Find dataPoints for this trade window using cumulative profiles from original
+    const windowDataPoints = []
+    let foundStart = false
+    const startDate = tradeIdx === 0 ? originalWindow.startDate : plResult.trades[tradeIdx - 1].sellDate
 
-    if (buyIdx === undefined || sellIdx === undefined) return
+    for (const dp of originalWindow.dataPoints) {
+      // Skip until we reach window start
+      if (!foundStart) {
+        if (tradeIdx === 0 && dp.date === originalWindow.startDate) {
+          foundStart = true
+        } else if (tradeIdx > 0 && dp.date > startDate) {
+          foundStart = true
+        }
+      }
 
-    // Window starts from beginning (or after previous sell) to current sell
-    const windowStart = tradeIdx === 0 ? 0 : dateToIndex.get(plResult.trades[tradeIdx - 1].sellDate) + 1
-    const windowEnd = sellIdx + 1
-
-    const windowData = visibleData.slice(windowStart, windowEnd)
-    if (windowData.length === 0) return
-
-    // Calculate volume profile for this window
-    const minPrice = Math.min(...windowData.map(p => p.close))
-    const maxPrice = Math.max(...windowData.map(p => p.close))
-    const priceRange = maxPrice - minPrice
-
-    const numPriceZones = Math.max(15, Math.min(20, Math.floor(windowData.length / 15)))
-    const priceZoneHeight = priceRange > 0 ? priceRange / numPriceZones : 1
-
-    const priceZones = []
-    for (let j = 0; j < numPriceZones; j++) {
-      priceZones.push({
-        minPrice: minPrice + (j * priceZoneHeight),
-        maxPrice: minPrice + ((j + 1) * priceZoneHeight),
-        volume: 0,
-        volumeWeight: 0
-      })
+      if (foundStart) {
+        windowDataPoints.push(dp)
+        // Include sell date, then stop
+        if (dp.date === trade.sellDate) {
+          break
+        }
+      }
     }
 
-    let totalVolume = 0
-    windowData.forEach(price => {
-      const volume = price.volume || 0
-      totalVolume += volume
-      if (priceRange > 0) {
-        let zoneIndex = Math.floor((price.close - minPrice) / priceZoneHeight)
-        if (zoneIndex >= numPriceZones) zoneIndex = numPriceZones - 1
-        if (zoneIndex < 0) zoneIndex = 0
-        priceZones[zoneIndex].volume += volume
-      }
-    })
-
-    priceZones.forEach(zone => {
-      zone.volumeWeight = totalVolume > 0 ? zone.volume / totalVolume : 0
-    })
+    if (windowDataPoints.length === 0) return
 
     tradeWindows.push({
       windowIndex: tradeIdx,
-      startDate: windowData[0].date,
-      endDate: windowData[windowData.length - 1].date,
-      dataPoints: windowData.map(point => ({
-        date: point.date,
-        price: point.close,
-        volume: point.volume || 0,
-        priceZones: priceZones
-      })),
+      startDate: windowDataPoints[0].date,
+      endDate: windowDataPoints[windowDataPoints.length - 1].date,
+      dataPoints: windowDataPoints, // Use original dataPoints with cumulative profiles
       breakDetected: true
     })
 
@@ -676,73 +654,46 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
 
   // Add final window for remaining data (if any) after the last completed trade
   // This shows current holding or waiting-for-signal state
-  const lastTradeEndIdx = plResult.trades.length > 0
-    ? dateToIndex.get(plResult.trades[plResult.trades.length - 1].sellDate) + 1
-    : 0
+  const lastSellDate = plResult.trades.length > 0
+    ? plResult.trades[plResult.trades.length - 1].sellDate
+    : null
 
-  if (lastTradeEndIdx < visibleData.length) {
-    const finalWindowData = visibleData.slice(lastTradeEndIdx)
+  const finalWindowDataPoints = []
+  let collectingFinal = false
 
-    if (finalWindowData.length > 0) {
-      // Calculate volume profile for final window
-      const minPrice = Math.min(...finalWindowData.map(p => p.close))
-      const maxPrice = Math.max(...finalWindowData.map(p => p.close))
-      const priceRange = maxPrice - minPrice
+  for (const dp of originalWindow.dataPoints) {
+    if (lastSellDate === null) {
+      // No trades yet, include all
+      finalWindowDataPoints.push(dp)
+    } else if (dp.date > lastSellDate) {
+      collectingFinal = true
+    }
 
-      const numPriceZones = Math.max(15, Math.min(20, Math.floor(finalWindowData.length / 15)))
-      const priceZoneHeight = priceRange > 0 ? priceRange / numPriceZones : 1
+    if (collectingFinal) {
+      finalWindowDataPoints.push(dp)
+    }
+  }
 
-      const priceZones = []
-      for (let j = 0; j < numPriceZones; j++) {
-        priceZones.push({
-          minPrice: minPrice + (j * priceZoneHeight),
-          maxPrice: minPrice + ((j + 1) * priceZoneHeight),
-          volume: 0,
-          volumeWeight: 0
+  if (finalWindowDataPoints.length > 0) {
+    const finalWindowIndex = tradeWindows.length
+
+    tradeWindows.push({
+      windowIndex: finalWindowIndex,
+      startDate: finalWindowDataPoints[0].date,
+      endDate: finalWindowDataPoints[finalWindowDataPoints.length - 1].date,
+      dataPoints: finalWindowDataPoints, // Use original dataPoints with cumulative profiles
+      breakDetected: false  // May or may not have breaks
+    })
+
+    // Add any breaks in the final window (if currently holding, show the buy signal)
+    if (plResult.isHolding && plResult.buySignals.length > 0) {
+      const lastBuySignal = plResult.buySignals[plResult.buySignals.length - 1]
+      const matchingBreak = result.breaks.find(brk => brk.date === lastBuySignal.date)
+      if (matchingBreak) {
+        tradeBreaks.push({
+          ...matchingBreak,
+          windowIndex: finalWindowIndex
         })
-      }
-
-      let totalVolume = 0
-      finalWindowData.forEach(price => {
-        const volume = price.volume || 0
-        totalVolume += volume
-        if (priceRange > 0) {
-          let zoneIndex = Math.floor((price.close - minPrice) / priceZoneHeight)
-          if (zoneIndex >= numPriceZones) zoneIndex = numPriceZones - 1
-          if (zoneIndex < 0) zoneIndex = 0
-          priceZones[zoneIndex].volume += volume
-        }
-      })
-
-      priceZones.forEach(zone => {
-        zone.volumeWeight = totalVolume > 0 ? zone.volume / totalVolume : 0
-      })
-
-      const finalWindowIndex = tradeWindows.length
-
-      tradeWindows.push({
-        windowIndex: finalWindowIndex,
-        startDate: finalWindowData[0].date,
-        endDate: finalWindowData[finalWindowData.length - 1].date,
-        dataPoints: finalWindowData.map(point => ({
-          date: point.date,
-          price: point.close,
-          volume: point.volume || 0,
-          priceZones: priceZones
-        })),
-        breakDetected: false  // May or may not have breaks
-      })
-
-      // Add any breaks in the final window (if currently holding, show the buy signal)
-      if (plResult.isHolding && plResult.buySignals.length > 0) {
-        const lastBuySignal = plResult.buySignals[plResult.buySignals.length - 1]
-        const matchingBreak = result.breaks.find(brk => brk.date === lastBuySignal.date)
-        if (matchingBreak) {
-          tradeBreaks.push({
-            ...matchingBreak,
-            windowIndex: finalWindowIndex
-          })
-        }
       }
     }
   }
