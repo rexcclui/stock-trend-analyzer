@@ -29,7 +29,8 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
   const BREAK_VOLUME_THRESHOLD = 0.10 // 10%
   const BREAK_DIFF_THRESHOLD = 0.08 // 8% - current zone must have LESS volume than zones below
   const PRICE_SLOT_MIN_RATIO = 0.50 // Each zone must be at least 50% of previous window's zone
-  const ZONE_LOOKBACK = 5 // Check previous 5 zones for break detection
+  const ZONE_LOOKBACK = 10 // Check previous 10 zones for break detection
+  const ZONE_LOOKABOVE = 3 // Check upper 3 zones - must have less volume than current
 
   const windows = []
   const breaks = []
@@ -144,7 +145,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
 
         // Only check volume break condition if price slot size is acceptable
         if (priceSlotSizeOk) {
-          // Check the next 5 NON-ZERO volume zones below - current zone must have LESS volume (low-volume breakout)
+          // Check the next 10 NON-ZERO volume zones below - current zone must have LESS volume (low-volume breakout)
           let breakConditionMet = false
           let minWeightDiff = 0  // Track most negative difference (strongest support zone)
           let bestPrevZoneIdx = -1
@@ -183,6 +184,22 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
             const supportZoneVolume = priceZones[bestPrevZoneIdx]?.volume || 0
             if (supportZoneVolume / totalVolume < BREAK_VOLUME_THRESHOLD) {
               breakConditionMet = false
+            }
+          }
+
+          // Check upper zones: the 3 zones above (if exist) must have LESS volume than current zone
+          // This confirms we're moving into progressively thinner resistance
+          if (breakConditionMet) {
+            for (let m = 1; m <= ZONE_LOOKABOVE; m++) {
+              const upperZoneIdx = currentZoneIdx + m
+              if (upperZoneIdx < numPriceZones) {
+                const upperZoneWeight = priceZones[upperZoneIdx].volumeWeight
+                // Upper zone must have LESS volume than current zone
+                if (upperZoneWeight >= currentWeight) {
+                  breakConditionMet = false
+                  break
+                }
+              }
             }
           }
 
