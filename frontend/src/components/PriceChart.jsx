@@ -23,7 +23,7 @@ import {
 } from './PriceChart/components'
 import VolumeLegendPills from './VolumeLegendPills'
 import { getVolumeColor } from './PriceChart/utils'
-import { calculateVolumeProfileV3, calculateVolumeProfileV3PL } from './PriceChart/utils/volumeProfileV3Utils'
+import { calculateVolumeProfileV3WithSells } from './PriceChart/utils/volumeProfileV3Utils'
 
 function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RefreshTrigger = 0, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete }) {
   const chartContainerRef = useRef(null)
@@ -2576,6 +2576,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }, [volumeProfileV2Enabled, volumeProfileV2RefreshTrigger, volumeProfileV2StartDate, volumeProfileV2EndDate])
 
   // Calculate Volume Profile V3 - only when manually refreshed or feature toggled
+  // Uses two-pass calculation: first finds sell dates, then creates windows split at those dates
   useEffect(() => {
     if (!volumeProfileV3Enabled) {
       setVolumeProfileV3Result({ windows: [], breaks: [] })
@@ -2583,7 +2584,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     }
 
     // Recalculate using the current zoomed range so chart results reflect the visible data
-    const result = calculateVolumeProfileV3(displayPrices, zoomRange)
+    const result = calculateVolumeProfileV3WithSells(displayPrices, zoomRange, 0.003, 0.12)
     setVolumeProfileV3Result(result)
   }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, displayPrices, zoomRange])
 
@@ -3012,18 +3013,20 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Calculate P&L after chartData is created (needs SMA values from chartData)
   const breakoutPL = calculateBreakoutPL()
+  // V3 P&L is now included in volumeProfileV3Result from the wrapper function
   const v3PL = useMemo(() => {
-    const breaks = volumeProfileV3Result.breaks || []
-    const windows = volumeProfileV3Result.windows || []
-
-    return calculateVolumeProfileV3PL({
-      volumeProfileV3Breaks: breaks,
-      volumeProfileV3Data: windows,
-      prices,
-      transactionFee: 0.003, // 0.3% broker fee
-      cutoffPercent: 0.12 // 12% cutoff
-    })
-  }, [volumeProfileV3Result, prices])
+    return volumeProfileV3Result || {
+      trades: [],
+      totalPL: 0,
+      winRate: 0,
+      tradingSignals: 0,
+      buySignals: [],
+      sellSignals: [],
+      supportUpdates: [],
+      marketChange: 0,
+      cutoffPrices: []
+    }
+  }, [volumeProfileV3Result])
 
   // Apply zoom range to chart data FIRST
   const endIndex = zoomRange.end === null ? chartData.length : zoomRange.end

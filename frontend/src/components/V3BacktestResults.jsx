@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import axios from 'axios'
 import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2, RotateCw, Upload, Download, Filter, Waves, Hash, Clock3, ChevronUp, ChevronDown, Info } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
-import { calculateVolumeProfileV3, calculateVolumeProfileV3PL } from './PriceChart/utils/volumeProfileV3Utils'
+import { calculateVolumeProfileV3WithSells } from './PriceChart/utils/volumeProfileV3Utils'
 import { apiCache } from '../utils/apiCache'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
@@ -1003,8 +1003,9 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
         throw new Error(`Insufficient data: only ${priceData.length} days (need 250+)`)
       }
 
-      // Calculate V3 windows and breaks (no parameter optimization needed)
-      const { windows, breaks } = calculateVolumeProfileV3(priceData, { start: 0, end: null })
+      // Calculate V3 with window splitting at sell dates (two-pass calculation)
+      const v3Result = calculateVolumeProfileV3WithSells(priceData, { start: 0, end: null }, 0.003, 0.12)
+      const { windows, breaks } = v3Result
 
       if (breaks.length === 0) {
         const periodLabel = formatPeriod(targetDays)
@@ -1014,14 +1015,8 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
         return
       }
 
-      // Calculate V3 P&L
-      const v3PLResult = calculateVolumeProfileV3PL({
-        volumeProfileV3Breaks: breaks,
-        volumeProfileV3Data: windows,
-        prices: priceData,
-        transactionFee: 0.003,
-        cutoffPercent: 0.12
-      })
+      // P&L is already included in v3Result from the wrapper function
+      const v3PLResult = v3Result
 
       const passesSelectionFilters = (candidate) => {
         const winRate = candidate.optimalSMAs?.winRate
