@@ -2,18 +2,19 @@
  * Calculate Volume Profile V3 windows and break signals
  *
  * LOW-VOLUME BREAKOUT DETECTION:
- * - Start with 150 data points, extend until breakthrough detected
+ * - Windows extend continuously, detecting multiple breaks
+ * - When a sell happens (in P&L calculation), a new window starts
  * - Divide price range evenly into 15-20 zones
  * - Detect when price breaks into a zone with LOW volume (≤8% less than zones below)
  * - This identifies price moving away from high-volume support into resistance
  * - Breakup = buy signal (price escaping support with low volume = bullish)
- * - Continue creating windows while holding to update support
  *
  * @param {Array} displayPrices - Array of price data {date, close, volume}
  * @param {Object} zoomRange - {start, end} - Range of visible data
+ * @param {Array} windowSplitDates - Optional dates where windows should split (e.g., sell dates)
  * @returns {Object} {windows, breaks} - Windows with volume profile data and break signals
  */
-export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, end: null }) => {
+export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, end: null }, windowSplitDates = []) => {
   if (!displayPrices || displayPrices.length === 0) return { windows: [], breaks: [] }
 
   const reversedDisplayPrices = [...displayPrices].reverse()
@@ -35,9 +36,21 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
   let currentWindowStart = 0
   let previousWindowZoneHeight = null // Track previous window's zone height
 
+  // Create a set of split dates for quick lookup
+  const splitDateSet = new Set(windowSplitDates)
+
   while (currentWindowStart < visibleData.length) {
-    // Process all remaining data in one continuous window
-    let windowData = visibleData.slice(currentWindowStart)
+    // Find the next split point (sell date) or end of data
+    let windowEnd = visibleData.length
+    for (let i = currentWindowStart; i < visibleData.length; i++) {
+      if (splitDateSet.has(visibleData[i].date)) {
+        windowEnd = i
+        break
+      }
+    }
+
+    // Process data from currentWindowStart to windowEnd
+    let windowData = visibleData.slice(currentWindowStart, windowEnd)
 
     if (windowData.length === 0) break
 
@@ -250,8 +263,12 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       })
     }
 
-    // Window processes all remaining data, so we're done after one iteration
-    break
+    // Move to next window (after the split point)
+    if (windowEnd < visibleData.length) {
+      currentWindowStart = windowEnd + 1  // Start after the split date
+    } else {
+      break  // Reached end of data
+    }
   }
 
   return { windows, breaks }
@@ -536,5 +553,40 @@ export const calculateVolumeProfileV3PL = ({
     marketChange = ((endPrice - startPrice) / startPrice) * 100
   }
 
-  return { trades, totalPL, winRate, tradingSignals: buySignals.length, buySignals, sellSignals, supportUpdates, marketChange, cutoffPrices }
+  // Extract sell dates for window splitting
+  const sellDates = sellSignals.map(s => s.date)
+
+  return { trades, totalPL, winRate, tradingSignals: buySignals.length, buySignals, sellSignals, supportUpdates, marketChange, cutoffPrices, sellDates }
+}
+
+/**
+ * Two-pass calculation: First get sell dates, then recalculate windows split at those dates
+ * This ensures windows reset after each sell, as required by the strategy
+ */
+export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, transactionFee = 0.003, cutoffPercent = 0.12) => {
+  // First pass: Calculate with one continuous window to find sell dates
+  const initialResult = calculateVolumeProfileV3(displayPrices, zoomRange, [])
+  const initialPL = calculateVolumeProfileV3PL({
+    volumeProfileV3Breaks: initialResult.breaks,
+    volumeProfileV3Data: initialResult.windows,
+    prices: displayPrices,
+    transactionFee,
+    cutoffPercent
+  })
+
+  // Second pass: Recalculate windows split at sell dates
+  const finalResult = calculateVolumeProfileV3(displayPrices, zoomRange, initialPL.sellDates)
+  const finalPL = calculateVolumeProfileV3PL({
+    volumeProfileV3Breaks: finalResult.breaks,
+    volumeProfileV3Data: finalResult.windows,
+    prices: displayPrices,
+    transactionFee,
+    cutoffPercent
+  })
+
+  return {
+    windows: finalResult.windows,
+    breaks: finalResult.breaks,
+    ...finalPL
+  }
 }
