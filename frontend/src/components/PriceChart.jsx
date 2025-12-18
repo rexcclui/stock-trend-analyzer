@@ -96,6 +96,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // Volume Profile V3 hover state
   const [volV3HoveredBar, setVolV3HoveredBar] = useState(null)
 
+  // Store the zoomRange snapshot for V3 calculations (doesn't trigger recalc on zoom)
+  const v3ZoomRangeRef = useRef(zoomRange)
+
   // Hovered volume zone pill
   const [hoveredVolumeLegend, setHoveredVolumeLegend] = useState(null)
 
@@ -2584,10 +2587,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return
     }
 
-    // Calculate on ALL data (not just visible range) - zoom is visual only
-    const result = calculateVolumeProfileV3WithSells(displayPrices, { start: 0, end: null }, 0.003, 0.12)
+    // Capture current zoomRange snapshot (won't trigger recalc when zoom changes)
+    v3ZoomRangeRef.current = zoomRange
+
+    // Calculate on visible range only
+    const result = calculateVolumeProfileV3WithSells(displayPrices, v3ZoomRangeRef.current, 0.003, 0.12)
     setVolumeProfileV3Result(result)
-  }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, displayPrices])  // zoomRange removed!
+  }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, displayPrices])  // zoomRange NOT in dependencies!
 
   // SMA Simulation Logic - find optimal SMA value based on P&L
   useEffect(() => {
