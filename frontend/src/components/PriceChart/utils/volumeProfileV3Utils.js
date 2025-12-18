@@ -562,9 +562,10 @@ export const calculateVolumeProfileV3PL = ({
 /**
  * Two-pass calculation: First get sell dates, then recalculate windows split at those dates
  * This ensures windows reset after each sell, as required by the strategy
+ * Only creates windows that have at least one buy signal (complete trading cycle)
  */
 export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, transactionFee = 0.003, cutoffPercent = 0.12) => {
-  // First pass: Calculate with one continuous window to find sell dates
+  // First pass: Calculate with one continuous window to find all trades
   const initialResult = calculateVolumeProfileV3(displayPrices, zoomRange, [])
   const initialPL = calculateVolumeProfileV3PL({
     volumeProfileV3Breaks: initialResult.breaks,
@@ -574,8 +575,12 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
     cutoffPercent
   })
 
-  // Second pass: Recalculate windows split at sell dates
-  const finalResult = calculateVolumeProfileV3(displayPrices, zoomRange, initialPL.sellDates)
+  // Only split at sell dates that complete a trade (have a corresponding buy)
+  // This ensures every window has at least one buy signal
+  const completedTradeSellDates = initialPL.trades.map(trade => trade.sellDate)
+
+  // Second pass: Recalculate windows split only at completed trade sell dates
+  const finalResult = calculateVolumeProfileV3(displayPrices, zoomRange, completedTradeSellDates)
   const finalPL = calculateVolumeProfileV3PL({
     volumeProfileV3Breaks: finalResult.breaks,
     volumeProfileV3Data: finalResult.windows,
