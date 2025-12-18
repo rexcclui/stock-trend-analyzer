@@ -1892,7 +1892,8 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     }
 
     previousSortRef.current = sortConfig
-  }, [visibleEntries, sortConfig, stableRowOrder])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleEntries, sortConfig])
 
   const sortedEntries = (() => {
     if (!sortConfig.field && stableRowOrder.length === 0) return visibleEntries
