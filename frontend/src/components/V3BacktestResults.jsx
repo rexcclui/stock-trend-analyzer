@@ -1003,24 +1003,9 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
         throw new Error(`Insufficient data: only ${priceData.length} days (need 250+)`)
       }
 
-      console.log(`[V3 Backtest] ${symbol}: Calculating V3 signals for ${priceData.length} price points`)
-      console.log(`[V3 Backtest] ${symbol}: Latest price date: ${priceData[0]?.date}, Oldest: ${priceData[priceData.length - 1]?.date}`)
-
       // Calculate V3 with window splitting at sell dates (two-pass calculation)
       const v3Result = calculateVolumeProfileV3WithSells(priceData, { start: 0, end: null }, 0.003, 0.12)
       const { windows, breaks } = v3Result
-
-      console.log(`[V3 Backtest] ${symbol}: Found ${breaks.length} BREAKOUTS total`)
-      if (breaks.length > 0) {
-        const latestBreak = breaks[breaks.length - 1]
-        console.log(`[V3 Backtest] ${symbol}: Latest BREAKOUT: ${latestBreak.date} at $${latestBreak.price.toFixed(2)}`)
-      }
-
-      console.log(`[V3 Backtest] ${symbol}: Found ${v3Result.buySignals?.length || 0} BUY SIGNALS (actual trades)`)
-      if (v3Result.buySignals && v3Result.buySignals.length > 0) {
-        const latestBuy = v3Result.buySignals[v3Result.buySignals.length - 1]
-        console.log(`[V3 Backtest] ${symbol}: Latest BUY SIGNAL: ${latestBuy.date} at $${latestBuy.price.toFixed(2)}`)
-      }
 
       if (breaks.length === 0) {
         const periodLabel = formatPeriod(targetDays)

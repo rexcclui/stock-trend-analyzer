@@ -2591,23 +2591,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // (visible zoom can differ from the full dataset, which would otherwise shift breakout dates)
     v3ZoomRangeRef.current = { start: 0, end: null }
 
-    console.log(`[V3 Chart] Calculating V3 signals for ${prices.length} price points`)
-    console.log(`[V3 Chart] Latest price date: ${prices[0]?.date}, Oldest: ${prices[prices.length - 1]?.date}`)
-
     const result = calculateVolumeProfileV3WithSells(prices, v3ZoomRangeRef.current, 0.003, 0.12)
-
-    console.log(`[V3 Chart] Found ${result.breaks.length} BREAKOUTS total`)
-    if (result.breaks.length > 0) {
-      const latestBreak = result.breaks[result.breaks.length - 1]
-      console.log(`[V3 Chart] Latest BREAKOUT: ${latestBreak.date} at $${latestBreak.price.toFixed(2)}`)
-    }
-
-    console.log(`[V3 Chart] Found ${result.buySignals?.length || 0} BUY SIGNALS (actual trades)`)
-    if (result.buySignals && result.buySignals.length > 0) {
-      const latestBuy = result.buySignals[result.buySignals.length - 1]
-      console.log(`[V3 Chart] Latest BUY SIGNAL: ${latestBuy.date} at $${latestBuy.price.toFixed(2)}`)
-    }
-
     setVolumeProfileV3Result(result)
   }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, prices])  // zoomRange NOT in dependencies!
 
