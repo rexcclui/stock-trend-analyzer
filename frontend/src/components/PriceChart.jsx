@@ -2128,8 +2128,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return zoneColors
   }
 
-  // Combine data - ensure we use the minimum length to stay in sync with indicators
-  const dataLength = Math.min(prices?.length || 0, indicators?.length || 0)
+  // Combine data - default to full price series so the latest bars (and V3 signals) are always visible
+  const dataLength = prices?.length || 0
 
   // Calculate last channel ONLY on the data that will be displayed
   // This prevents mismatch when period changes and indicators haven't updated yet

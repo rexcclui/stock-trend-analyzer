@@ -236,10 +236,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
 
       for (const upperSymbol of symbols) {
         try {
-          const preferFreshFetch = params?.volumeProfileV3Enabled === true
-
           // Try to get from cache first (use fetch period for cache key)
-          let data = preferFreshFetch ? null : apiCache.get(upperSymbol, fetchDays)
+          let data = apiCache.get(upperSymbol, fetchDays)
 
           if (data) {
             console.log(`[Cache] ✅ Cache available for ${upperSymbol}:${fetchDays}`)
