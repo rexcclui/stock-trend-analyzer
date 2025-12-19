@@ -2128,13 +2128,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return zoneColors
   }
 
-  // Combine data - ensure we use the minimum length to stay in sync with indicators
-  const dataLength = Math.min(prices?.length || 0, indicators?.length || 0)
+  // Combine data - default to full price series so the latest bars (and V3 signals) are always visible
+  const dataLength = prices?.length || 0
 
   // Calculate last channel ONLY on the data that will be displayed
   // This prevents mismatch when period changes and indicators haven't updated yet
   const displayPrices = useMemo(() => prices.slice(0, dataLength), [prices, dataLength])
-  const displayIndicators = useMemo(() => indicators.slice(0, dataLength), [indicators, dataLength])
+  const displayIndicators = useMemo(() => (indicators || []).slice(0, dataLength), [indicators, dataLength])
 
   // Build a map of SPY volumes by date for quick lookup
   const spyVolumeByDate = (() => {
@@ -2587,13 +2587,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return
     }
 
-    // Capture current zoomRange snapshot (won't trigger recalc when zoom changes)
-    v3ZoomRangeRef.current = zoomRange
+    // Always calculate on the full price series to keep the chart in sync with V3 backtest results
+    // (visible zoom can differ from the full dataset, which would otherwise shift breakout dates)
+    v3ZoomRangeRef.current = { start: 0, end: null }
 
-    // Calculate on visible range only
-    const result = calculateVolumeProfileV3WithSells(displayPrices, v3ZoomRangeRef.current, 0.003, 0.12)
+    const result = calculateVolumeProfileV3WithSells(prices, v3ZoomRangeRef.current, 0.003, 0.12)
     setVolumeProfileV3Result(result)
-  }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, displayPrices])  // zoomRange NOT in dependencies!
+  }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, prices])  // zoomRange NOT in dependencies!
 
   // SMA Simulation Logic - find optimal SMA value based on P&L
   useEffect(() => {

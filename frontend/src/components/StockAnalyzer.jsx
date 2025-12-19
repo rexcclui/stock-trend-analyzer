@@ -239,6 +239,14 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
           // Try to get from cache first (use fetch period for cache key)
           let data = apiCache.get(upperSymbol, fetchDays)
 
+          // If V3 backtest provided the latest date and cached data is older, force refresh
+          const expectedLatestDate = params?.expectedLatestDate
+          const cachedLatestDate = data?.prices?.[0]?.date
+          if (data && expectedLatestDate && cachedLatestDate && cachedLatestDate !== expectedLatestDate) {
+            console.log(`[Cache] Stale for ${upperSymbol}:${fetchDays} (cached latest ${cachedLatestDate} vs expected ${expectedLatestDate}) - refetching`)
+            data = null
+          }
+
           if (data) {
             console.log(`[Cache] ✅ Cache available for ${upperSymbol}:${fetchDays}`)
           } else {

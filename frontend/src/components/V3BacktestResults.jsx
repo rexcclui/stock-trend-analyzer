@@ -2430,15 +2430,16 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                           key={index}
                           data-entry-key={getEntryKey(result.symbol, result.days)}
                           onClick={() => {
-                            if (!hasData || !hasOptimalSMAs || !onStockSelect) return
+                          if (!hasData || !hasOptimalSMAs || !onStockSelect) return
 
-                            onStockSelect(result.symbol, {
-                              ...(result.optimalParams || {}),
-                              smaPeriods: [result.optimalSMAs?.period],
-                              days: result.days,
-                              volumeProfileV3Enabled: true
-                            })
-                          }}
+                          onStockSelect(result.symbol, {
+                            ...(result.optimalParams || {}),
+                            smaPeriods: [result.optimalSMAs?.period],
+                            days: result.days,
+                            volumeProfileV3Enabled: true,
+                            expectedLatestDate: result.priceData?.[0]?.date || result.latestBreakout?.date || null
+                          })
+                        }}
                           className={`transition-colors ${hasData ? 'hover:bg-slate-700 cursor-pointer' : 'opacity-75'} ${isWithinLast10Days ? 'bg-blue-900/20 hover:bg-blue-800/30' : ''}`}
                           title={hasData ? (result.breakoutClosed ? 'Click to view with Vol Prf V3 (breakout closed by sell signal)' : 'Click to view in Technical Analysis with Vol Prf V3 and optimized parameters') : 'Pending scan'}
                         >
@@ -2529,17 +2530,18 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                           <td className="px-4 py-3 text-center">
                             {result.status === 'completed' ? (
                               <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  if (onStockSelect) {
-                                    onStockSelect(result.symbol, {
-                                      ...(result.optimalParams || {}),
-                                      smaPeriods: [result.optimalSMAs?.period],
-                                      days: result.days,
-                                      volumeProfileV3Enabled: true
-                                    })
-                                  }
-                                }}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (onStockSelect) {
+                                onStockSelect(result.symbol, {
+                                  ...(result.optimalParams || {}),
+                                  smaPeriods: [result.optimalSMAs?.period],
+                                  days: result.days,
+                                  volumeProfileV3Enabled: true,
+                                  expectedLatestDate: result.priceData?.[0]?.date || result.latestBreakout?.date || null
+                                })
+                              }
+                            }}
                                 className={`px-2 py-1 rounded text-xs font-bold transition-colors cursor-pointer ${
                                   meetsAllPerformanceCriteria(result)
                                     ? 'bg-green-900/50 text-green-300 hover:bg-green-800/60'
