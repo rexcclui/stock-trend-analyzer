@@ -1010,10 +1010,16 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
       const v3Result = calculateVolumeProfileV3WithSells(priceData, { start: 0, end: null }, 0.003, 0.12)
       const { windows, breaks } = v3Result
 
-      console.log(`[V3 Backtest] ${symbol}: Found ${breaks.length} breakouts`)
+      console.log(`[V3 Backtest] ${symbol}: Found ${breaks.length} BREAKOUTS total`)
       if (breaks.length > 0) {
         const latestBreak = breaks[breaks.length - 1]
-        console.log(`[V3 Backtest] ${symbol}: Latest breakout: ${latestBreak.date} at $${latestBreak.price.toFixed(2)}`)
+        console.log(`[V3 Backtest] ${symbol}: Latest BREAKOUT: ${latestBreak.date} at $${latestBreak.price.toFixed(2)}`)
+      }
+
+      console.log(`[V3 Backtest] ${symbol}: Found ${v3Result.buySignals?.length || 0} BUY SIGNALS (actual trades)`)
+      if (v3Result.buySignals && v3Result.buySignals.length > 0) {
+        const latestBuy = v3Result.buySignals[v3Result.buySignals.length - 1]
+        console.log(`[V3 Backtest] ${symbol}: Latest BUY SIGNAL: ${latestBuy.date} at $${latestBuy.price.toFixed(2)}`)
       }
 
       if (breaks.length === 0) {

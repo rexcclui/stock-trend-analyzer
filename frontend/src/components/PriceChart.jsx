@@ -2596,10 +2596,16 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     const result = calculateVolumeProfileV3WithSells(prices, v3ZoomRangeRef.current, 0.003, 0.12)
 
-    console.log(`[V3 Chart] Found ${result.breaks.length} breakouts`)
+    console.log(`[V3 Chart] Found ${result.breaks.length} BREAKOUTS total`)
     if (result.breaks.length > 0) {
       const latestBreak = result.breaks[result.breaks.length - 1]
-      console.log(`[V3 Chart] Latest breakout: ${latestBreak.date} at $${latestBreak.price.toFixed(2)}`)
+      console.log(`[V3 Chart] Latest BREAKOUT: ${latestBreak.date} at $${latestBreak.price.toFixed(2)}`)
+    }
+
+    console.log(`[V3 Chart] Found ${result.buySignals?.length || 0} BUY SIGNALS (actual trades)`)
+    if (result.buySignals && result.buySignals.length > 0) {
+      const latestBuy = result.buySignals[result.buySignals.length - 1]
+      console.log(`[V3 Chart] Latest BUY SIGNAL: ${latestBuy.date} at $${latestBuy.price.toFixed(2)}`)
     }
 
     setVolumeProfileV3Result(result)
