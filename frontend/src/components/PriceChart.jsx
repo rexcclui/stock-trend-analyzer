@@ -2587,13 +2587,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return
     }
 
-    // Capture current zoomRange snapshot (won't trigger recalc when zoom changes)
-    v3ZoomRangeRef.current = zoomRange
+    // Always calculate on the full price series to keep the chart in sync with V3 backtest results
+    // (visible zoom can differ from the full dataset, which would otherwise shift breakout dates)
+    v3ZoomRangeRef.current = { start: 0, end: null }
 
-    // Calculate on visible range only
-    const result = calculateVolumeProfileV3WithSells(displayPrices, v3ZoomRangeRef.current, 0.003, 0.12)
+    const result = calculateVolumeProfileV3WithSells(prices, v3ZoomRangeRef.current, 0.003, 0.12)
     setVolumeProfileV3Result(result)
-  }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, displayPrices])  // zoomRange NOT in dependencies!
+  }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, prices])  // zoomRange NOT in dependencies!
 
   // SMA Simulation Logic - find optimal SMA value based on P&L
   useEffect(() => {
