@@ -1060,19 +1060,23 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
         return
       }
 
-      const breakouts = breaks  // Rename for consistency with existing code
-      const recentBreakouts = breaks.filter(b => {
+      // Use BUY SIGNALS for table display (matches what chart shows with "B" markers)
+      // Breakouts are detected continuously, but buy signals are only created when opening positions
+      const buySignals = v3Result.buySignals || []
+      const recentBuySignals = buySignals.filter(b => {
         const now = new Date()
         const cutoffDate = new Date(now)
         cutoffDate.setDate(cutoffDate.getDate() - 10)
         return new Date(b.date) >= cutoffDate
       })
 
-      let latestBreakout = breakouts.length > 0 ? breakouts[breakouts.length - 1] : null
-      const latestRecentBreakout = recentBreakouts.length > 0 ? recentBreakouts[recentBreakouts.length - 1] : null
+      // Store both breakouts (for reference) and buy signals (for display)
+      const allBreakouts = breaks  // Keep original breakouts for debugging
+      let latestBreakout = buySignals.length > 0 ? buySignals[buySignals.length - 1] : null
+      const latestRecentBreakout = recentBuySignals.length > 0 ? recentBuySignals[recentBuySignals.length - 1] : null
 
       if (!latestBreakout) {
-        throw new Error('No breakout detected')
+        throw new Error('No buy signals detected (no actionable trades)')
       }
 
       // Determine if data is in chronological or reverse chronological order to get latest market price
