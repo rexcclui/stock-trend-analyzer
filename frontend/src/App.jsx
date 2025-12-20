@@ -270,6 +270,7 @@ function App() {
                 triggerSymbol={volumeSymbol}
                 onSymbolProcessed={() => setVolumeSymbol(null)}
                 onBacktestSelect={handleBacktestSelect}
+                onV3BacktestSelect={handleV3BacktestSelect}
                 bulkImport={volumeImport}
                 onImportProcessed={handleVolumeImportProcessed}
               />

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search, Clock3, BarChart3, ArrowUpToLine, ArrowDownToLine } from 'lucide-react'
+import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search, Clock3, BarChart2, BarChart3, ArrowUpToLine, ArrowDownToLine } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 import VolumeLegendPills from './VolumeLegendPills'
 
@@ -736,7 +736,7 @@ function formatResistance(currentRange, resistance) {
   return `${resistance.range} (${sign}${diff.toFixed(1)}%)`
 }
 
-function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBacktestSelect, bulkImport, onImportProcessed }) {
+function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBacktestSelect, onV3BacktestSelect, bulkImport, onImportProcessed }) {
   const [symbolInput, setSymbolInput] = useState('')
   const [period, setPeriod] = useState('1825')
   const [stockHistory, setStockHistory] = useState([])
@@ -2734,6 +2734,20 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                           title="Load in Backtest"
                         >
                           <BarChart3 className="w-5 h-5" />
+                        </button>
+                      )}
+                      {onV3BacktestSelect && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setLastAddedId(entry.id)
+                            onV3BacktestSelect(entry.symbol, entry.period)
+                          }}
+                          className="inline-flex items-center justify-center rounded-full p-2 text-slate-300 hover:text-purple-300 hover:bg-purple-900/40 transition-colors mr-2"
+                          aria-label={`Load ${entry.symbol} in V3 backtest`}
+                          title="Load in V3 Backtest"
+                        >
+                          <BarChart2 className="w-5 h-5" />
                         </button>
                       )}
                       <button
