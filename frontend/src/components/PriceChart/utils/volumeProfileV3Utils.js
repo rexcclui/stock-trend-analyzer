@@ -155,6 +155,12 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           k++
         }
 
+        // DEBUG: Log zone collection
+        if (nonZeroZonesBelow.length > 0) {
+          console.log(`[V3 Break Detection] Date: ${dataPoint.date}, Current Zone: ${currentZoneIdx}, Current Weight: ${(currentWeight * 100).toFixed(2)}%`)
+          console.log('  Zones below:', nonZeroZonesBelow.map((z, idx) => `[${idx}] Idx:${z.zoneIdx} = ${(z.weight * 100).toFixed(2)}%`).join(', '))
+        }
+
         // PART 1: Check individual zones for 8% difference
         for (let i = 0; i < nonZeroZonesBelow.length; i++) {
           const zone = nonZeroZonesBelow[i]
@@ -174,6 +180,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
         }
 
         // PART 2: Check merged consecutive zones (zone[i] + zone[i+1])
+        const mergedZones = []
         for (let i = 0; i < nonZeroZonesBelow.length - 1; i++) {
           const zone1 = nonZeroZonesBelow[i]
           const zone2 = nonZeroZonesBelow[i + 1]
@@ -181,6 +188,14 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           // Merge two consecutive zones
           const mergedWeight = zone1.weight + zone2.weight
           const weightDiff = currentWeight - mergedWeight
+
+          mergedZones.push({
+            pair: `[${i}+${i+1}]`,
+            weights: `${(zone1.weight * 100).toFixed(2)}% + ${(zone2.weight * 100).toFixed(2)}%`,
+            merged: `${(mergedWeight * 100).toFixed(2)}%`,
+            diff: `${(weightDiff * 100).toFixed(2)}%`,
+            triggers: weightDiff <= -BREAK_DIFF_THRESHOLD
+          })
 
           // Break if current zone has at least 8% LESS volume than merged zone
           if (weightDiff <= -BREAK_DIFF_THRESHOLD) {
@@ -196,11 +211,17 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           }
         }
 
+        // DEBUG: Log merged zones
+        if (mergedZones.length > 0) {
+          console.log('  Merged zones:', mergedZones)
+        }
+
           // Additional threshold: require support zone (below) to have at least 10% of total window volume
           // This ensures we're breaking away from a significant support, not just noise
           // Note: bestPrevZoneWeight is already the weight (proportion), works for both individual and merged zones
           if (breakConditionMet && bestPrevZoneWeight > 0) {
             if (bestPrevZoneWeight < BREAK_VOLUME_THRESHOLD) {
+              console.log(`  ❌ REJECTED: Support too weak (${(bestPrevZoneWeight * 100).toFixed(2)}% < 10%)`)
               breakConditionMet = false
             }
           }
@@ -208,23 +229,31 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           // Check upper zones: the 3 zones above (if exist) must have LESS volume than current zone
           // This confirms we're moving into progressively thinner resistance
           if (breakConditionMet) {
+            const upperZones = []
             for (let m = 1; m <= ZONE_LOOKABOVE; m++) {
               const upperZoneIdx = currentZoneIdx + m
               if (upperZoneIdx < numPriceZones) {
                 const upperZoneWeight = priceZones[upperZoneIdx].volumeWeight
+                upperZones.push({zone: upperZoneIdx, weight: `${(upperZoneWeight * 100).toFixed(2)}%`})
                 // Skip zones with zero volume (price hasn't reached there yet)
                 if (upperZoneWeight > 0) {
                   // Upper zone must have LESS volume than current zone
                   if (upperZoneWeight >= currentWeight) {
+                    console.log(`  ❌ REJECTED: Upper zone ${upperZoneIdx} has >= current (${(upperZoneWeight * 100).toFixed(2)}% >= ${(currentWeight * 100).toFixed(2)}%)`)
+                    console.log('  Upper zones:', upperZones)
                     breakConditionMet = false
                     break
                   }
                 }
               }
             }
+            if (breakConditionMet && upperZones.length > 0) {
+              console.log('  ✅ Upper zones clear:', upperZones)
+            }
           }
 
         if (breakConditionMet) {
+          console.log(`  ✅ BREAK DETECTED! Support: ${(bestPrevZoneWeight * 100).toFixed(2)}%, Diff: ${(minWeightDiff * 100).toFixed(2)}%`)
           // Record break but DON'T end the window - continue extending
           breaks.push({
             date: dataPoint.date,
