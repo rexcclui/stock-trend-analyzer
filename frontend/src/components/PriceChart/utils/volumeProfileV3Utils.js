@@ -575,44 +575,59 @@ export const calculateVolumeProfileV3PL = ({
  * Each window represents one complete trading cycle (buy to sell)
  */
 export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, transactionFee = 0.003, cutoffPercent = 0.12) => {
-  // Single pass: Calculate with one continuous window to find all breaks and trades
-  const result = calculateVolumeProfileV3(displayPrices, zoomRange, [])
-  const plResult = calculateVolumeProfileV3PL({
-    volumeProfileV3Breaks: result.breaks,
-    volumeProfileV3Data: result.windows,
-    prices: displayPrices,
-    transactionFee,
-    cutoffPercent
-  })
+  // Iterative approach: converge to correct sell dates
+  // Start with no window splits, then iterate until sell dates stabilize
+  let currentSellDates = []
+  let previousSellDates = null
+  let iterations = 0
+  const MAX_ITERATIONS = 10  // Prevent infinite loops
 
-  if (plResult.trades.length === 0) {
-    // No trades - return the original window
-    return {
-      windows: result.windows,
-      breaks: result.breaks,
-      ...plResult
+  let finalResult = null
+  let finalPlResult = null
+
+  while (iterations < MAX_ITERATIONS) {
+    // Calculate breaks with current window splits
+    const result = calculateVolumeProfileV3(displayPrices, zoomRange, currentSellDates)
+
+    // Calculate P&L based on these breaks
+    const plResult = calculateVolumeProfileV3PL({
+      volumeProfileV3Breaks: result.breaks,
+      volumeProfileV3Data: result.windows,
+      prices: displayPrices,
+      transactionFee,
+      cutoffPercent
+    })
+
+    // Extract sell dates from trades
+    const newSellDates = plResult.trades
+      .filter(t => !t.isOpen)  // Only closed trades
+      .map(t => t.sellDate)
+      .sort()
+
+    // Check if sell dates have converged
+    const converged = previousSellDates !== null &&
+      newSellDates.length === previousSellDates.length &&
+      newSellDates.every((date, idx) => date === previousSellDates[idx])
+
+    if (converged) {
+      // Converged! Use these results
+      finalResult = result
+      finalPlResult = plResult
+      break
     }
+
+    // Not converged yet, iterate with new sell dates
+    previousSellDates = newSellDates
+    currentSellDates = newSellDates
+    finalResult = result
+    finalPlResult = plResult
+    iterations++
   }
 
-  // Recalculate with windows split at sell dates to get separate windows with cumulative profiles
-  // Windows MUST cover ENTIRE visible range with NO GAPS
-  const sellDates = plResult.trades.map(t => t.sellDate)
-  const splitResult = calculateVolumeProfileV3(displayPrices, zoomRange, sellDates)
-
-  // IMPORTANT: Recalculate P&L using breaks from SECOND pass (windows that reset after each sell)
-  // This is the correct approach - breaks should be detected in fresh windows, not continuous ones
-  const finalPlResult = calculateVolumeProfileV3PL({
-    volumeProfileV3Breaks: splitResult.breaks,  // Use breaks from split windows!
-    volumeProfileV3Data: splitResult.windows,
-    prices: displayPrices,
-    transactionFee,
-    cutoffPercent
-  })
-
-  // Use windows and breaks from second pass
+  // Return final converged results
   return {
-    windows: splitResult.windows,
-    breaks: splitResult.breaks,
+    windows: finalResult.windows,
+    breaks: finalResult.breaks,
     ...finalPlResult
   }
 }
