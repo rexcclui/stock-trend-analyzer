@@ -53,6 +53,17 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
 
     if (windowData.length === 0) break
 
+    // Skip windows with less than MIN_WINDOW_SIZE points - they cannot generate valid buy signals
+    if (windowData.length < MIN_WINDOW_SIZE) {
+      // Move to next window
+      if (windowEnd < visibleData.length) {
+        currentWindowStart = windowEnd
+        continue
+      } else {
+        break
+      }
+    }
+
     // Process each data point in the window to detect breaks
     const windowPoints = []
 
