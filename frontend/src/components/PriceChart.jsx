@@ -2580,20 +2580,20 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Calculate Volume Profile V3 - only when manually refreshed or feature toggled
   // Uses two-pass calculation: first finds sell dates, then creates windows split at those dates
-  // NOTE: Does NOT recalculate on zoom - only on refresh or period change
+  // Recalculates based on visible zoom range so user can compare with backtest period
   useEffect(() => {
     if (!volumeProfileV3Enabled) {
       setVolumeProfileV3Result({ windows: [], breaks: [] })
       return
     }
 
-    // Always calculate on the full price series to keep the chart in sync with V3 backtest results
-    // (visible zoom can differ from the full dataset, which would otherwise shift breakout dates)
-    v3ZoomRangeRef.current = { start: 0, end: null }
+    // Use the visible zoom range for V3 calculations
+    // User will manually select same period in backtest dropdown to compare
+    v3ZoomRangeRef.current = zoomRange
 
     const result = calculateVolumeProfileV3WithSells(prices, v3ZoomRangeRef.current, 0.003, 0.12)
     setVolumeProfileV3Result(result)
-  }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, prices])  // zoomRange NOT in dependencies!
+  }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, prices, zoomRange])  // zoomRange IS in dependencies!
 
   // SMA Simulation Logic - find optimal SMA value based on P&L
   useEffect(() => {
