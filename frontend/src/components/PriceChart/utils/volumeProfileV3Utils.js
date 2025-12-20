@@ -158,8 +158,9 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           k++
         }
 
-        // DEBUG: Log zone collection
-        if (nonZeroZonesBelow.length > 0) {
+        // DEBUG: Log zone collection (only for June-July 2023)
+        const shouldLog = dataPoint.date >= '2023-06-01' && dataPoint.date <= '2023-07-31'
+        if (nonZeroZonesBelow.length > 0 && shouldLog) {
           console.log(`[V3 Break Detection] Date: ${dataPoint.date}, Current Zone: ${currentZoneIdx}, Current Weight: ${(currentWeight * 100).toFixed(2)}%`)
           console.log('  Zones below:', nonZeroZonesBelow.map((z, idx) => `[${idx}] Idx:${z.zoneIdx} = ${(z.weight * 100).toFixed(2)}%`).join(', '))
         }
@@ -215,19 +216,21 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
         }
 
         // DEBUG: Log merged zones
-        if (mergedZones.length > 0) {
+        if (mergedZones.length > 0 && shouldLog) {
           console.log('  Merged zones:', mergedZones)
         }
 
           // DEBUG: Log breakConditionMet status before support check
-          console.log(`  breakConditionMet after zone checks: ${breakConditionMet}, bestPrevZoneWeight: ${(bestPrevZoneWeight * 100).toFixed(2)}%`)
+          if (shouldLog) {
+            console.log(`  breakConditionMet after zone checks: ${breakConditionMet}, bestPrevZoneWeight: ${(bestPrevZoneWeight * 100).toFixed(2)}%`)
+          }
 
           // Additional threshold: require support zone (below) to have at least 10% of total window volume
           // This ensures we're breaking away from a significant support, not just noise
           // Note: bestPrevZoneWeight is already the weight (proportion), works for both individual and merged zones
           if (breakConditionMet && bestPrevZoneWeight > 0) {
             if (bestPrevZoneWeight < BREAK_VOLUME_THRESHOLD) {
-              console.log(`  ❌ REJECTED: Support too weak (${(bestPrevZoneWeight * 100).toFixed(2)}% < 10%)`)
+              if (shouldLog) console.log(`  ❌ REJECTED: Support too weak (${(bestPrevZoneWeight * 100).toFixed(2)}% < 10%)`)
               breakConditionMet = false
             }
           }
@@ -235,37 +238,41 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           // Check upper zones: the 3 zones above (if exist) must have LESS volume than current zone
           // This confirms we're moving into progressively thinner resistance
           if (breakConditionMet) {
-            console.log(`  Checking upper zones... numPriceZones: ${numPriceZones}, currentZoneIdx: ${currentZoneIdx}`)
+            if (shouldLog) console.log(`  Checking upper zones... numPriceZones: ${numPriceZones}, currentZoneIdx: ${currentZoneIdx}`)
             const upperZones = []
             for (let m = 1; m <= ZONE_LOOKABOVE; m++) {
               const upperZoneIdx = currentZoneIdx + m
               if (upperZoneIdx < numPriceZones) {
                 const upperZoneWeight = priceZones[upperZoneIdx].volumeWeight
-                upperZones.push({zone: upperZoneIdx, weight: `${(upperZoneWeight * 100).toFixed(2)}%`})
+                if (shouldLog) upperZones.push({zone: upperZoneIdx, weight: `${(upperZoneWeight * 100).toFixed(2)}%`})
                 // Skip zones with zero volume (price hasn't reached there yet)
                 if (upperZoneWeight > 0) {
                   // Upper zone must have LESS volume than current zone
                   if (upperZoneWeight >= currentWeight) {
-                    console.log(`  ❌ REJECTED: Upper zone ${upperZoneIdx} has >= current (${(upperZoneWeight * 100).toFixed(2)}% >= ${(currentWeight * 100).toFixed(2)}%)`)
-                    console.log('  Upper zones:', upperZones)
+                    if (shouldLog) {
+                      console.log(`  ❌ REJECTED: Upper zone ${upperZoneIdx} has >= current (${(upperZoneWeight * 100).toFixed(2)}% >= ${(currentWeight * 100).toFixed(2)}%)`)
+                      console.log('  Upper zones:', upperZones)
+                    }
                     breakConditionMet = false
                     break
                   }
                 }
               }
             }
-            if (breakConditionMet && upperZones.length > 0) {
-              console.log('  ✅ Upper zones clear:', upperZones)
-            }
-            if (upperZones.length === 0) {
-              console.log('  ℹ️ No upper zones exist (at top of range)')
+            if (shouldLog) {
+              if (breakConditionMet && upperZones.length > 0) {
+                console.log('  ✅ Upper zones clear:', upperZones)
+              }
+              if (upperZones.length === 0) {
+                console.log('  ℹ️ No upper zones exist (at top of range)')
+              }
             }
           } else {
-            console.log('  ⏭️ Skipping upper zone check (breakConditionMet already false)')
+            if (shouldLog) console.log('  ⏭️ Skipping upper zone check (breakConditionMet already false)')
           }
 
         if (breakConditionMet) {
-          console.log(`  ✅ BREAK DETECTED! Support: ${(bestPrevZoneWeight * 100).toFixed(2)}%, Diff: ${(minWeightDiff * 100).toFixed(2)}%`)
+          if (shouldLog) console.log(`  ✅ BREAK DETECTED! Support: ${(bestPrevZoneWeight * 100).toFixed(2)}%, Diff: ${(minWeightDiff * 100).toFixed(2)}%`)
           // Record break but DON'T end the window - continue extending
           breaks.push({
             date: dataPoint.date,
@@ -278,7 +285,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           })
           // Don't break - keep extending window to find more breaks
         } else {
-          console.log(`  ❌ No break detected (final breakConditionMet: false)`)
+          if (shouldLog) console.log(`  ❌ No break detected (final breakConditionMet: false)`)
         }
       }
 
@@ -511,8 +518,11 @@ export const calculateVolumeProfileV3PL = ({
       if (breakSignal.isUpBreak) {
         const pointsSinceSell = i - lastSellIndex
         const canBuy = !isHolding && pointsSinceSell >= MIN_WINDOW_SIZE
+        const shouldLogPL = currentDate >= '2023-06-01' && currentDate <= '2023-07-31'
 
-        console.log(`[P&L] Break signal at ${currentDate}: isHolding=${isHolding}, pointsSinceSell=${pointsSinceSell}, MIN_REQUIRED=${MIN_WINDOW_SIZE}, canBuy=${canBuy}`)
+        if (shouldLogPL) {
+          console.log(`[P&L] Break signal at ${currentDate}: isHolding=${isHolding}, pointsSinceSell=${pointsSinceSell}, MIN_REQUIRED=${MIN_WINDOW_SIZE}, canBuy=${canBuy}`)
+        }
 
         // Breakup signal - BUY only if not already holding AND at least 75 points since last sell
         if (canBuy) {
@@ -537,12 +547,14 @@ export const calculateVolumeProfileV3PL = ({
             tradeId: currentTradeId
           })
 
-          console.log(`  ✅ BUY SIGNAL CREATED at ${currentDate}`)
+          if (shouldLogPL) console.log(`  ✅ BUY SIGNAL CREATED at ${currentDate}`)
         } else {
-          if (isHolding) {
-            console.log(`  ❌ REJECTED: Already holding (bought at ${buyDate})`)
-          } else if (pointsSinceSell < MIN_WINDOW_SIZE) {
-            console.log(`  ❌ REJECTED: Too soon after sell (only ${pointsSinceSell} points, need ${MIN_WINDOW_SIZE})`)
+          if (shouldLogPL) {
+            if (isHolding) {
+              console.log(`  ❌ REJECTED: Already holding (bought at ${buyDate})`)
+            } else if (pointsSinceSell < MIN_WINDOW_SIZE) {
+              console.log(`  ❌ REJECTED: Too soon after sell (only ${pointsSinceSell} points, need ${MIN_WINDOW_SIZE})`)
+            }
           }
         }
         // If consecutive breakup (already holding) or too soon after sell, ignore it
