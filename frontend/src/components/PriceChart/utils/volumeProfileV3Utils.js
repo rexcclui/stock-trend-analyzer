@@ -216,6 +216,9 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           console.log('  Merged zones:', mergedZones)
         }
 
+          // DEBUG: Log breakConditionMet status before support check
+          console.log(`  breakConditionMet after zone checks: ${breakConditionMet}, bestPrevZoneWeight: ${(bestPrevZoneWeight * 100).toFixed(2)}%`)
+
           // Additional threshold: require support zone (below) to have at least 10% of total window volume
           // This ensures we're breaking away from a significant support, not just noise
           // Note: bestPrevZoneWeight is already the weight (proportion), works for both individual and merged zones
@@ -229,6 +232,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           // Check upper zones: the 3 zones above (if exist) must have LESS volume than current zone
           // This confirms we're moving into progressively thinner resistance
           if (breakConditionMet) {
+            console.log(`  Checking upper zones... numPriceZones: ${numPriceZones}, currentZoneIdx: ${currentZoneIdx}`)
             const upperZones = []
             for (let m = 1; m <= ZONE_LOOKABOVE; m++) {
               const upperZoneIdx = currentZoneIdx + m
@@ -250,6 +254,11 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
             if (breakConditionMet && upperZones.length > 0) {
               console.log('  ✅ Upper zones clear:', upperZones)
             }
+            if (upperZones.length === 0) {
+              console.log('  ℹ️ No upper zones exist (at top of range)')
+            }
+          } else {
+            console.log('  ⏭️ Skipping upper zone check (breakConditionMet already false)')
           }
 
         if (breakConditionMet) {
@@ -265,6 +274,8 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
             maxVolumeWeight: bestPrevZoneWeight  // Volume weight of support zone
           })
           // Don't break - keep extending window to find more breaks
+        } else {
+          console.log(`  ❌ No break detected (final breakConditionMet: false)`)
         }
       }
 
