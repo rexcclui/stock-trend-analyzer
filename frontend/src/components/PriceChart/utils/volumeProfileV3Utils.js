@@ -501,8 +501,13 @@ export const calculateVolumeProfileV3PL = ({
     const breakSignal = breakSignalMap.get(currentDate)
     if (breakSignal) {
       if (breakSignal.isUpBreak) {
+        const pointsSinceSell = i - lastSellIndex
+        const canBuy = !isHolding && pointsSinceSell >= MIN_WINDOW_SIZE
+
+        console.log(`[P&L] Break signal at ${currentDate}: isHolding=${isHolding}, pointsSinceSell=${pointsSinceSell}, MIN_REQUIRED=${MIN_WINDOW_SIZE}, canBuy=${canBuy}`)
+
         // Breakup signal - BUY only if not already holding AND at least 75 points since last sell
-        if (!isHolding && (i - lastSellIndex) >= MIN_WINDOW_SIZE) {
+        if (canBuy) {
           isHolding = true
           buyPrice = breakSignal.price
           buyDate = breakSignal.date
@@ -523,6 +528,14 @@ export const calculateVolumeProfileV3PL = ({
             price: cutoffPrice,
             tradeId: currentTradeId
           })
+
+          console.log(`  ✅ BUY SIGNAL CREATED at ${currentDate}`)
+        } else {
+          if (isHolding) {
+            console.log(`  ❌ REJECTED: Already holding (bought at ${buyDate})`)
+          } else if (pointsSinceSell < MIN_WINDOW_SIZE) {
+            console.log(`  ❌ REJECTED: Too soon after sell (only ${pointsSinceSell} points, need ${MIN_WINDOW_SIZE})`)
+          }
         }
         // If consecutive breakup (already holding) or too soon after sell, ignore it
       } else {
