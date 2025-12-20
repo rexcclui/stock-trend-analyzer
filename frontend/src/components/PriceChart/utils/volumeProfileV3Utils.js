@@ -1,3 +1,6 @@
+// Module loaded timestamp - this will print when file is first imported
+console.log(`[V3Utils] volumeProfileV3Utils.js loaded at ${new Date().toISOString()} - VERSION WITH DEBUG LOGS`)
+
 /**
  * Calculate Volume Profile V3 windows and break signals
  *
