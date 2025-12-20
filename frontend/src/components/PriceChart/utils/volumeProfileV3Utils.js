@@ -329,7 +329,10 @@ export const calculateVolumeProfileV3PL = ({
   transactionFee = 0.003,
   cutoffPercent = 0.12
 }) => {
+  console.log(`[P&L] Starting P&L calculation with ${volumeProfileV3Breaks.length} breaks`)
+
   if (volumeProfileV3Breaks.length === 0) {
+    console.log(`[P&L] No breaks to process - returning early`)
     return {
       trades: [],
       totalPL: 0,
@@ -342,6 +345,8 @@ export const calculateVolumeProfileV3PL = ({
       isHolding: false
     }
   }
+
+  console.log(`[P&L] Break dates:`, volumeProfileV3Breaks.map(b => b.date).join(', '))
 
   const TRANSACTION_FEE = transactionFee
   const CUTOFF_PERCENT = cutoffPercent
@@ -619,8 +624,15 @@ export const calculateVolumeProfileV3PL = ({
  * Each window represents one complete trading cycle (buy to sell)
  */
 export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, transactionFee = 0.003, cutoffPercent = 0.12) => {
+  console.log(`[V3WithSells] Starting calculation with ${displayPrices.length} prices`)
+
   // Single pass: Calculate with one continuous window to find all breaks and trades
   const result = calculateVolumeProfileV3(displayPrices, zoomRange, [])
+  console.log(`[V3WithSells] First pass complete: found ${result.breaks.length} breaks`)
+  if (result.breaks.length > 0) {
+    console.log(`[V3WithSells] Break dates from first pass:`, result.breaks.map(b => b.date).join(', '))
+  }
+
   const plResult = calculateVolumeProfileV3PL({
     volumeProfileV3Breaks: result.breaks,
     volumeProfileV3Data: result.windows,
@@ -628,8 +640,10 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
     transactionFee,
     cutoffPercent
   })
+  console.log(`[V3WithSells] P&L calculation complete: ${plResult.buySignals.length} buy signals, ${plResult.sellSignals.length} sell signals`)
 
   if (plResult.trades.length === 0) {
+    console.log(`[V3WithSells] No trades found - returning original windows`)
     // No trades - return the original window
     return {
       windows: result.windows,
@@ -641,6 +655,7 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
   // Recalculate with windows split at sell dates to get separate windows with cumulative profiles
   // Windows MUST cover ENTIRE visible range with NO GAPS
   const sellDates = plResult.trades.map(t => t.sellDate)
+  console.log(`[V3WithSells] Recalculating with windows split at ${sellDates.length} sell dates`)
   const splitResult = calculateVolumeProfileV3(displayPrices, zoomRange, sellDates)
 
   const tradeWindows = []
