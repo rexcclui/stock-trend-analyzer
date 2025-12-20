@@ -138,38 +138,69 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
         let bestPrevZoneIdx = -1
         let bestPrevZoneWeight = 0
 
-        // Look back through zones, counting only non-zero zones
-        let nonZeroZonesFound = 0
+        // Collect non-zero zones below current zone for individual and merged checking
+        const nonZeroZonesBelow = []
         let k = 1
-        while (nonZeroZonesFound < ZONE_LOOKBACK && (currentZoneIdx - k) >= 0) {
-            const prevZoneIdx = currentZoneIdx - k
-            const prevZoneWeight = priceZones[prevZoneIdx].volumeWeight
+        while (nonZeroZonesBelow.length < ZONE_LOOKBACK && (currentZoneIdx - k) >= 0) {
+          const prevZoneIdx = currentZoneIdx - k
+          const prevZoneWeight = priceZones[prevZoneIdx].volumeWeight
 
-            // Skip zones with zero volume weight
-            if (prevZoneWeight > 0) {
-              nonZeroZonesFound++
-
-              const weightDiff = currentWeight - prevZoneWeight
-              // Break if current zone has at least 8% LESS volume than any non-zero zone below
-              if (weightDiff <= -BREAK_DIFF_THRESHOLD) {
-                breakConditionMet = true
-              }
-
-              // Track the zone with most negative difference (highest volume support zone)
-              if (weightDiff < minWeightDiff) {
-                minWeightDiff = weightDiff
-                bestPrevZoneIdx = prevZoneIdx
-                bestPrevZoneWeight = prevZoneWeight
-              }
-            }
-            k++
+          // Collect only non-zero zones
+          if (prevZoneWeight > 0) {
+            nonZeroZonesBelow.push({
+              zoneIdx: prevZoneIdx,
+              weight: prevZoneWeight
+            })
           }
+          k++
+        }
+
+        // PART 1: Check individual zones for 8% difference
+        for (let i = 0; i < nonZeroZonesBelow.length; i++) {
+          const zone = nonZeroZonesBelow[i]
+          const weightDiff = currentWeight - zone.weight
+
+          // Break if current zone has at least 8% LESS volume than individual zone
+          if (weightDiff <= -BREAK_DIFF_THRESHOLD) {
+            breakConditionMet = true
+          }
+
+          // Track the zone with most negative difference (highest volume support zone)
+          if (weightDiff < minWeightDiff) {
+            minWeightDiff = weightDiff
+            bestPrevZoneIdx = zone.zoneIdx
+            bestPrevZoneWeight = zone.weight
+          }
+        }
+
+        // PART 2: Check merged consecutive zones (zone[i] + zone[i+1])
+        for (let i = 0; i < nonZeroZonesBelow.length - 1; i++) {
+          const zone1 = nonZeroZonesBelow[i]
+          const zone2 = nonZeroZonesBelow[i + 1]
+
+          // Merge two consecutive zones
+          const mergedWeight = zone1.weight + zone2.weight
+          const weightDiff = currentWeight - mergedWeight
+
+          // Break if current zone has at least 8% LESS volume than merged zone
+          if (weightDiff <= -BREAK_DIFF_THRESHOLD) {
+            breakConditionMet = true
+          }
+
+          // Track merged zone if it's stronger support
+          if (weightDiff < minWeightDiff) {
+            minWeightDiff = weightDiff
+            // Use the lower zone index as the support level (zone closer to current price)
+            bestPrevZoneIdx = zone1.zoneIdx
+            bestPrevZoneWeight = mergedWeight
+          }
+        }
 
           // Additional threshold: require support zone (below) to have at least 10% of total window volume
           // This ensures we're breaking away from a significant support, not just noise
-          if (breakConditionMet && totalVolume > 0 && bestPrevZoneIdx >= 0) {
-            const supportZoneVolume = priceZones[bestPrevZoneIdx]?.volume || 0
-            if (supportZoneVolume / totalVolume < BREAK_VOLUME_THRESHOLD) {
+          // Note: bestPrevZoneWeight is already the weight (proportion), works for both individual and merged zones
+          if (breakConditionMet && bestPrevZoneWeight > 0) {
+            if (bestPrevZoneWeight < BREAK_VOLUME_THRESHOLD) {
               breakConditionMet = false
             }
           }
