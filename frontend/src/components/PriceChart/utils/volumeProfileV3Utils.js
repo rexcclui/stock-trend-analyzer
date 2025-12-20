@@ -673,32 +673,23 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
   console.log(`[V3WithSells] Recalculating with windows split at ${sellDates.length} sell dates`)
   const splitResult = calculateVolumeProfileV3(displayPrices, zoomRange, sellDates)
 
-  const tradeWindows = []
-  const tradeBreaks = []
+  console.log(`[V3WithSells] Second pass found ${splitResult.breaks.length} breaks (vs ${result.breaks.length} in first pass)`)
 
-  // Include ALL windows from split result - covering entire visible range
-  splitResult.windows.forEach((window, idx) => {
-    tradeWindows.push({
-      ...window,
-      windowIndex: idx
-    })
+  // IMPORTANT: Recalculate P&L using breaks from SECOND pass (windows that reset after each sell)
+  // This is the correct approach - breaks should be detected in fresh windows, not continuous ones
+  const finalPlResult = calculateVolumeProfileV3PL({
+    volumeProfileV3Breaks: splitResult.breaks,  // Use breaks from split windows!
+    volumeProfileV3Data: splitResult.windows,
+    prices: displayPrices,
+    transactionFee,
+    cutoffPercent
   })
+  console.log(`[V3WithSells] Final P&L: ${finalPlResult.buySignals.length} buy signals, ${finalPlResult.sellSignals.length} sell signals`)
 
-  // Map breaks from split result, using original break data for accuracy
-  splitResult.breaks.forEach((splitBreak) => {
-    const originalBreak = result.breaks.find(b => b.date === splitBreak.date)
-    if (originalBreak) {
-      tradeBreaks.push({
-        ...originalBreak,
-        windowIndex: splitBreak.windowIndex
-      })
-    }
-  })
-
-  // Use P&L from first pass (correct trade detection)
+  // Use windows and breaks from second pass
   return {
-    windows: tradeWindows,
-    breaks: tradeBreaks,
-    ...plResult
+    windows: splitResult.windows,
+    breaks: splitResult.breaks,
+    ...finalPlResult
   }
 }
