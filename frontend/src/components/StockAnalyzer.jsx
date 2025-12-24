@@ -2197,7 +2197,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                         delete newState[smaKey]
                         return newState
                       })
-                      if (optimalValue !== null) {
+                      if (optimalValue !== null && optimalValue !== undefined && !isNaN(optimalValue)) {
                         handleSimulateSma(chart.id, smaIndex, optimalValue)
                       }
                     }}
@@ -2228,7 +2228,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                               type="range"
                               min="3"
                               max="200"
-                              value={period}
+                              value={period || 10}
                               onChange={(e) => {
                                 const rawValue = parseInt(e.target.value)
                                 const snappedValue = snapToValidSmaValue(rawValue)

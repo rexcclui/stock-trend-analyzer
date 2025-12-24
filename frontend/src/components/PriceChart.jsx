@@ -2722,8 +2722,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         }
       }
 
-      // Call the callback with results
-      if (onSimulateComplete && bestSmaValue !== null) {
+      // Call the callback with results (always call to clear simulation state)
+      if (onSimulateComplete) {
         onSimulateComplete(smaIndex, bestSmaValue)
       }
     }, 100) // Small delay to let UI update
