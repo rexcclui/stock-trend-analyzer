@@ -1314,7 +1314,15 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
       .filter(entry => entry.status !== 'completed')
       .map(entry => getEntryKey(entry.symbol, entry.days))
 
-    if (pendingSymbols.length === 0) return
+    if (pendingSymbols.length === 0) {
+      // Clear scan state if nothing to scan
+      setScanQueue([])
+      setScanTotal(0)
+      setScanCompleted(0)
+      setIsScanning(false)
+      setIsPaused(false)
+      return
+    }
 
     setScanQueue(pendingSymbols)
     setScanTotal(pendingSymbols.length)
@@ -1628,13 +1636,12 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
   }
 
   const scanVisible = () => {
-    const visibleSymbols = sortedResults.map(r => r.symbol)
-    if (visibleSymbols.length === 0) return
+    const visibleEntryKeys = sortedResults.map(r => getEntryKey(r.symbol, r.days))
+    if (visibleEntryKeys.length === 0) return
 
     // Clear existing queue and scan only visible stocks
-    ensureEntries(visibleSymbols)
-    setScanQueue(visibleSymbols)
-    setScanTotal(visibleSymbols.length)
+    setScanQueue(visibleEntryKeys)
+    setScanTotal(visibleEntryKeys.length)
     setScanCompleted(0)
     setIsPaused(false)
     setIsScanning(true)
@@ -1650,7 +1657,12 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
   const removeVisible = () => {
     const visibleSymbols = new Set(sortedResults.map(r => r.symbol))
     setResults(prev => prev.filter(entry => !visibleSymbols.has(entry.symbol)))
-    setScanQueue(prev => prev.filter(symbol => !visibleSymbols.has(symbol)))
+    setScanQueue(prev => prev.filter(entryKey => {
+      // Extract symbol from entry key (handle symbols with hyphens)
+      const lastDashIndex = entryKey.lastIndexOf('-')
+      const symbol = entryKey.substring(0, lastDashIndex)
+      return !visibleSymbols.has(symbol)
+    }))
   }
 
   const bookmarkVisible = () => {
