@@ -2,8 +2,8 @@
  * Calculate Volume Profile V3 windows and break signals
  *
  * LOW-VOLUME BREAKOUT DETECTION:
- * - Windows extend continuously, detecting multiple breaks
- * - When a sell happens (in P&L calculation), a new window starts
+ * - Window extends continuously throughout the entire backtest period
+ * - Window keeps extending even when B/S signals are found (no new windows created)
  * - Divide price range evenly into 15-20 zones
  * - Detect when price breaks into a zone with LOW volume (≤8% less than zones below)
  * - This identifies price moving away from high-volume support into resistance
@@ -11,7 +11,7 @@
  *
  * @param {Array} displayPrices - Array of price data {date, close, volume}
  * @param {Object} zoomRange - {start, end} - Range of visible data
- * @param {Array} windowSplitDates - Optional dates where windows should split (e.g., sell dates)
+ * @param {Array} windowSplitDates - Optional dates where windows should split (empty array = single continuous window)
  * @returns {Object} {windows, breaks} - Windows with volume profile data and break signals
  */
 export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, end: null }, windowSplitDates = []) => {
@@ -571,63 +571,26 @@ export const calculateVolumeProfileV3PL = ({
 }
 
 /**
- * Single-pass calculation: Calculate once, then segment windows by actual trade boundaries
- * Each window represents one complete trading cycle (buy to sell)
+ * Single continuous window: Calculate volume profile over entire range without splitting
+ * Window extends continuously throughout the backtest period, even when B/S signals are found
  */
 export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, transactionFee = 0.003, cutoffPercent = 0.12) => {
-  // Iterative approach: converge to correct sell dates
-  // Start with no window splits, then iterate until sell dates stabilize
-  let currentSellDates = []
-  let previousSellDates = null
-  let iterations = 0
-  const MAX_ITERATIONS = 10  // Prevent infinite loops
+  // Calculate breaks with NO window splits - single continuous window
+  const result = calculateVolumeProfileV3(displayPrices, zoomRange, [])
 
-  let finalResult = null
-  let finalPlResult = null
+  // Calculate P&L based on these breaks
+  const plResult = calculateVolumeProfileV3PL({
+    volumeProfileV3Breaks: result.breaks,
+    volumeProfileV3Data: result.windows,
+    prices: displayPrices,
+    transactionFee,
+    cutoffPercent
+  })
 
-  while (iterations < MAX_ITERATIONS) {
-    // Calculate breaks with current window splits
-    const result = calculateVolumeProfileV3(displayPrices, zoomRange, currentSellDates)
-
-    // Calculate P&L based on these breaks
-    const plResult = calculateVolumeProfileV3PL({
-      volumeProfileV3Breaks: result.breaks,
-      volumeProfileV3Data: result.windows,
-      prices: displayPrices,
-      transactionFee,
-      cutoffPercent
-    })
-
-    // Extract sell dates from trades
-    const newSellDates = plResult.trades
-      .filter(t => !t.isOpen)  // Only closed trades
-      .map(t => t.sellDate)
-      .sort()
-
-    // Check if sell dates have converged
-    const converged = previousSellDates !== null &&
-      newSellDates.length === previousSellDates.length &&
-      newSellDates.every((date, idx) => date === previousSellDates[idx])
-
-    if (converged) {
-      // Converged! Use these results
-      finalResult = result
-      finalPlResult = plResult
-      break
-    }
-
-    // Not converged yet, iterate with new sell dates
-    previousSellDates = newSellDates
-    currentSellDates = newSellDates
-    finalResult = result
-    finalPlResult = plResult
-    iterations++
-  }
-
-  // Return final converged results
+  // Return results with single continuous window
   return {
-    windows: finalResult.windows,
-    breaks: finalResult.breaks,
-    ...finalPlResult
+    windows: result.windows,
+    breaks: result.breaks,
+    ...plResult
   }
 }
