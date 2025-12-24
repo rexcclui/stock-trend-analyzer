@@ -314,7 +314,6 @@ export const calculateVolumeProfileV3PL = ({
 
   const TRANSACTION_FEE = transactionFee
   const CUTOFF_PERCENT = cutoffPercent
-  const MIN_WINDOW_SIZE = 75 // Require 75 points after sell before next buy
 
   const trades = []
   const buySignals = []
@@ -327,7 +326,6 @@ export const calculateVolumeProfileV3PL = ({
   let cutoffPrice = null // Track the current cutoff price (trailing stop)
   let currentWindowIndex = null // Track which window we're in while holding
   let currentTradeId = 0 // Track which trade we're in for support line segmentation
-  let lastSellIndex = -MIN_WINDOW_SIZE // Track index of last sell (start at -75 so first buy can happen at index 0)
 
   // Get all prices in forward chronological order
   const reversedPrices = [...prices].reverse()
@@ -385,7 +383,6 @@ export const calculateVolumeProfileV3PL = ({
       buyDate = null
       cutoffPrice = null
       currentWindowIndex = null
-      lastSellIndex = i // Track sell index for 75-point requirement
 
       continue // Move to next point
     }
@@ -459,7 +456,6 @@ export const calculateVolumeProfileV3PL = ({
           cutoffPrice = null
           currentWindowIndex = null
           currentTradeId++
-          lastSellIndex = i // Track sell index for 75-point requirement
 
           continue // Move to next point
         }
@@ -470,8 +466,9 @@ export const calculateVolumeProfileV3PL = ({
     const breakSignal = breakSignalMap.get(currentDate)
     if (breakSignal) {
       if (breakSignal.isUpBreak) {
-        // Breakup signal - BUY only if not already holding AND at least 75 points since last sell
-        if (!isHolding && (i - lastSellIndex) >= MIN_WINDOW_SIZE) {
+        // Breakup signal - BUY only if not already holding
+        // No need to wait 75 points after sell since we maintain a continuous window
+        if (!isHolding) {
           isHolding = true
           buyPrice = breakSignal.price
           buyDate = breakSignal.date
@@ -493,7 +490,7 @@ export const calculateVolumeProfileV3PL = ({
             tradeId: currentTradeId
           })
         }
-        // If consecutive breakup (already holding) or too soon after sell, ignore it
+        // If consecutive breakup (already holding), ignore it
       } else {
         // Breakdown signal - SELL only if holding
         if (isHolding) {
@@ -526,7 +523,6 @@ export const calculateVolumeProfileV3PL = ({
           cutoffPrice = null
           currentWindowIndex = null
           currentTradeId++
-          lastSellIndex = i // Track sell index for 75-point requirement
         }
       }
     }
