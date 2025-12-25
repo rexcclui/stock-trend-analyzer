@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react'
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, ReferenceDot, Customized } from 'recharts'
 import { X, ArrowLeftRight, Hand } from 'lucide-react'
 import { findBestChannels, filterOverlappingChannels } from './PriceChart/utils/bestChannelFinder'
@@ -101,6 +101,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Hovered volume zone pill
   const [hoveredVolumeLegend, setHoveredVolumeLegend] = useState(null)
+
+  // Throttle mouse move events using requestAnimationFrame
+  const mouseMoveFrameRef = useRef(null)
+  const lastMouseEventRef = useRef(null)
 
   // Volume Profile V2 calculated data (only recalculates on manual refresh)
   const [volumeProfileV2Result, setVolumeProfileV2Result] = useState({ slots: [], breakouts: [] })
@@ -296,6 +300,15 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     }
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  // Cleanup animation frame on unmount
+  useEffect(() => {
+    return () => {
+      if (mouseMoveFrameRef.current) {
+        cancelAnimationFrame(mouseMoveFrameRef.current)
+      }
+    }
   }, [])
 
   // Calculate Resistance Line (Rolling POC)
@@ -3035,36 +3048,37 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     }
   }, [volumeProfileV3Result])
 
-  // Apply zoom range to chart data FIRST
-  const endIndex = zoomRange.end === null ? chartData.length : zoomRange.end
-  let visibleChartData = chartData.slice(zoomRange.start, endIndex)
+  // Apply zoom range to chart data FIRST - memoized for performance
+  const visibleChartData = useMemo(() => {
+    const endIndex = zoomRange.end === null ? chartData.length : zoomRange.end
+    let data = chartData.slice(zoomRange.start, endIndex)
 
-  // NOW calculate and inject comparison lines based on the ACTUAL visible data
-  // This ensures the baseline is ALWAYS the first VISIBLE point
-  if (comparisonMode === 'line' && comparisonStocks && comparisonStocks.length > 0 && visibleChartData.length > 0) {
-    // Get the FIRST VISIBLE data point as baseline
-    const firstVisiblePoint = visibleChartData[0]
-    const firstVisibleDate = firstVisiblePoint.date
-    const selectedFirstPrice = firstVisiblePoint.close
+    // NOW calculate and inject comparison lines based on the ACTUAL visible data
+    // This ensures the baseline is ALWAYS the first VISIBLE point
+    if (comparisonMode === 'line' && comparisonStocks && comparisonStocks.length > 0 && data.length > 0) {
+      // Get the FIRST VISIBLE data point as baseline
+      const firstVisiblePoint = data[0]
+      const firstVisibleDate = firstVisiblePoint.date
+      const selectedFirstPrice = firstVisiblePoint.close
 
-    if (selectedFirstPrice) {
-      comparisonStocks.forEach((compStock) => {
-        // Build a map of comparison stock prices by date
-        const compPriceByDate = {}
-        if (compStock.data && compStock.data.prices) {
-          compStock.data.prices.forEach(p => {
-            compPriceByDate[p.date] = p.close
-          })
-        }
+      if (selectedFirstPrice) {
+        comparisonStocks.forEach((compStock) => {
+          // Build a map of comparison stock prices by date
+          const compPriceByDate = {}
+          if (compStock.data && compStock.data.prices) {
+            compStock.data.prices.forEach(p => {
+              compPriceByDate[p.date] = p.close
+            })
+          }
 
-        // Get baseline comparison price at the SAME date
-        const compFirstPrice = compPriceByDate[firstVisibleDate]
-        if (!compFirstPrice) {
-          return
-        }
+          // Get baseline comparison price at the SAME date
+          const compFirstPrice = compPriceByDate[firstVisibleDate]
+          if (!compFirstPrice) {
+            return
+          }
 
-        // Inject comparison data into each visible point
-        visibleChartData = visibleChartData.map((point, index) => {
+          // Inject comparison data into each visible point
+          data = data.map((point, index) => {
           const compCurrentPrice = compPriceByDate[point.date]
 
           if (!compCurrentPrice || !point.close) {
@@ -3093,7 +3107,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           // Check if this is a crossover point by looking at previous point
           let isCrossover = false
           if (index > 0) {
-            const prevPoint = visibleChartData[index - 1]
+            const prevPoint = data[index - 1]
             const prevCompPrice = compPriceByDate[prevPoint.date]
 
             if (prevCompPrice && prevPoint.close) {
@@ -3117,10 +3131,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             [compPositiveKey]: (isAbove || isCrossover) ? lineValue : null,
             [compNegativeKey]: (!isAbove || isCrossover) ? lineValue : null
           }
+          })
         })
-      })
+      }
     }
-  }
+
+    return data
+  }, [chartData, zoomRange.start, zoomRange.end, comparisonMode, comparisonStocks])
 
   const revAllVisibleLength = visibleChartData.length
   const maxRevAllChannelEndIndex = revAllVisibleLength > 0 ? revAllVisibleLength - 1 : 0
@@ -3344,6 +3361,24 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
   const handleMouseMove = (e) => {
+    // Store the event for processing
+    lastMouseEventRef.current = e
+
+    // Cancel any pending frame
+    if (mouseMoveFrameRef.current) {
+      cancelAnimationFrame(mouseMoveFrameRef.current)
+    }
+
+    // Schedule processing on next animation frame (throttles to ~60fps)
+    mouseMoveFrameRef.current = requestAnimationFrame(() => {
+      const event = lastMouseEventRef.current
+      if (!event) return
+
+      processMouseMove(event)
+    })
+  }
+
+  const processMouseMove = (e) => {
     const activePayload = e?.activePayload?.[0]?.payload
     const hoveredVolumeZone = (() => {
       const hoveredDate = activePayload?.date
