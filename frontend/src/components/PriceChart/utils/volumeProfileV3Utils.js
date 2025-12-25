@@ -400,16 +400,17 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
  * BUY LOGIC: Buy on low-volume breakout (isUpBreak: true)
  * SELL LOGIC:
  * 1. Sell on low-volume breakdown (isUpBreak: false) - ONLY if 75+ points since window reset
- * 2. Sell on cutoff breach (trailing stop)
- * 3. Window resets when price reaches all-time high while holding
- * 4. After window reset, need 75+ points before sell signal can trigger
+ * 2. Window resets when price reaches all-time high while holding
+ * 3. After window reset, need 75+ points before sell signal can trigger
+ *
+ * NOTE: Cutoff (trailing stop) logic is currently DISABLED
  *
  * @param {Object} params - Parameters for P&L calculation
  * @param {Array} params.volumeProfileV3Breaks - Array of break signals {date, price, isUpBreak, supportLevel/resistanceLevel, windowIndex}
  * @param {Array} params.volumeProfileV3Data - Array of window data with price zones
  * @param {Array} params.prices - Array of price data {date, close, volume}
  * @param {number} params.transactionFee - Transaction fee as decimal (e.g., 0.003 for 0.3%)
- * @param {number} params.cutoffPercent - Initial cutoff percentage as decimal (e.g., 0.12 for 12%)
+ * @param {number} params.cutoffPercent - Initial cutoff percentage as decimal (e.g., 0.12 for 12%) - NOT USED (cutoff disabled)
  * @returns {Object} P&L calculation results
  */
 export const calculateVolumeProfileV3PL = ({
@@ -497,61 +498,63 @@ export const calculateVolumeProfileV3PL = ({
       pointsSinceWindowReset++
     }
 
+    // CUTOFF LOGIC DISABLED
     // Check for cutoff: if holding and price dropped below cutoff price, sell
-    if (isHolding && cutoffPrice !== null && currentPrice < cutoffPrice) {
-      const sellPrice = currentPrice
-      // Apply transaction fees: buy fee increases cost, sell fee decreases proceeds
-      const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
-      const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
-      const plPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100
+    // if (isHolding && cutoffPrice !== null && currentPrice < cutoffPrice) {
+    //   const sellPrice = currentPrice
+    //   // Apply transaction fees: buy fee increases cost, sell fee decreases proceeds
+    //   const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
+    //   const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
+    //   const plPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100
 
-      trades.push({
-        buyPrice,
-        buyDate,
-        sellPrice,
-        sellDate: currentDate,
-        plPercent,
-        isCutoff: true
-      })
+    //   trades.push({
+    //     buyPrice,
+    //     buyDate,
+    //     sellPrice,
+    //     sellDate: currentDate,
+    //     plPercent,
+    //     isCutoff: true
+    //   })
 
-      sellSignals.push({
-        date: currentDate,
-        price: sellPrice,
-        isCutoff: true,
-        reason: `Price $${currentPrice.toFixed(2)} < Cutoff $${cutoffPrice.toFixed(2)}`
-      })
+    //   sellSignals.push({
+    //     date: currentDate,
+    //     price: sellPrice,
+    //     isCutoff: true,
+    //     reason: `Price $${currentPrice.toFixed(2)} < Cutoff $${cutoffPrice.toFixed(2)}`
+    //   })
 
-      // Reset state
-      isHolding = false
-      buyPrice = null
-      buyDate = null
-      cutoffPrice = null
-      currentWindowIndex = null
-      pointsSinceWindowReset = 0
+    //   // Reset state
+    //   isHolding = false
+    //   buyPrice = null
+    //   buyDate = null
+    //   cutoffPrice = null
+    //   currentWindowIndex = null
+    //   pointsSinceWindowReset = 0
 
-      continue // Move to next point
-    }
+    //   continue // Move to next point
+    // }
 
+    // CUTOFF LOGIC DISABLED
     // If holding, update trailing stop dynamically
-    if (isHolding && cutoffPrice !== null) {
-      // Update trailing stop: if currentPrice * 0.92 > current cutoff, raise it
-      const potentialNewCutoff = currentPrice * 0.92
-      if (potentialNewCutoff > cutoffPrice) {
-        cutoffPrice = potentialNewCutoff
+    // if (isHolding && cutoffPrice !== null) {
+    //   // Update trailing stop: if currentPrice * 0.92 > current cutoff, raise it
+    //   const potentialNewCutoff = currentPrice * 0.92
+    //   if (potentialNewCutoff > cutoffPrice) {
+    //     cutoffPrice = potentialNewCutoff
 
-        supportUpdates.push({
-          date: currentDate,
-          price: cutoffPrice,
-          reason: 'Trailing stop update (92% of current price)'
-        })
+    //     supportUpdates.push({
+    //       date: currentDate,
+    //       price: cutoffPrice,
+    //       reason: 'Trailing stop update (92% of current price)'
+    //     })
 
-        cutoffPrices.push({
-          date: currentDate,
-          price: cutoffPrice,
-          tradeId: currentTradeId
-        })
-      }
-    }
+    //     cutoffPrices.push({
+    //       date: currentDate,
+    //       price: cutoffPrice,
+    //       tradeId: currentTradeId
+    //     })
+    //   }
+    // }
 
     // Check for break signals at this point
     const breakSignal = breakSignalMap.get(currentDate)
