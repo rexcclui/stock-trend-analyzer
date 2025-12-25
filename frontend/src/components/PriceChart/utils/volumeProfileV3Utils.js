@@ -7,16 +7,16 @@
  * - Divide price range evenly into 15-20 zones
  *
  * BUY SIGNALS (Low-volume breakout UP):
- * - Current zone must have ≥4% LESS volume than BOTH of the first two zones below
- * - Example: Current = 3%, Prior two = 7% & 8% → Buy triggers
- * - Example: Current = 3%, Prior two = 7% & 6% → No buy (only 3% less than 6%)
+ * - Current zone must have ≥3% LESS volume than BOTH of the first two zones below
+ * - Example: Current = 3%, Prior two = 6% & 7% → Buy triggers
+ * - Example: Current = 3%, Prior two = 6% & 5.5% → No buy (only 2.5% less than 5.5%)
  * - This identifies price moving away from strong high-volume support
  * - Breakup = buy signal (price escaping support with low volume = bullish)
  *
  * SELL SIGNALS (Low-volume breakdown DOWN):
- * - Current zone must have ≥4% LESS volume than BOTH of the first two zones above
- * - Example: Current = 3%, Upper two = 7% & 8% → Sell triggers
- * - Example: Current = 3%, Upper two = 7% & 6% → No sell (only 3% less than 6%)
+ * - Current zone must have ≥3% LESS volume than BOTH of the first two zones above
+ * - Example: Current = 3%, Upper two = 6% & 7% → Sell triggers
+ * - Example: Current = 3%, Upper two = 6% & 5.5% → No sell (only 2.5% less than 5.5%)
  * - This identifies price moving away from strong high-volume resistance
  * - Breakdown = sell signal (price escaping resistance with low volume = bearish)
  * - Requires at least 75 points since window reset (all-time high) before sell signal
@@ -39,7 +39,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
 
   const MIN_WINDOW_SIZE = 75  // Changed from 150 to 75
   const BREAK_VOLUME_THRESHOLD = 0.10 // 10%
-  const BREAK_DIFF_THRESHOLD = 0.04 // 4% - current zone must have LESS volume than individual zones (not merged)
+  const BREAK_DIFF_THRESHOLD = 0.03 // 3% - current zone must have LESS volume than individual zones (not merged)
   const ZONE_LOOKBACK = 10 // Check previous 10 zones for break detection
   const ZONE_LOOKABOVE = 3 // Check upper 3 zones - must have less volume than current
 
@@ -168,9 +168,9 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           k++
         }
 
-        // Check first TWO individual zones below - current must be 4% LESS than BOTH
-        // Example: Current = 3%, Prior two = 7% & 8% → Buy (3% < 7%-4% AND 3% < 8%-4%)
-        // Example: Current = 3%, Prior two = 7% & 6% → No buy (3% < 7%-4% BUT 3% >= 6%-4%)
+        // Check first TWO individual zones below - current must be 3% LESS than BOTH
+        // Example: Current = 3%, Prior two = 6% & 7% → Buy (3% < 6%-3% AND 3% < 7%-3%)
+        // Example: Current = 3%, Prior two = 6% & 5.5% → No buy (3% < 6%-3% BUT 3% >= 5.5%-3%)
         if (nonZeroZonesBelow.length >= 2) {
           const zone1 = nonZeroZonesBelow[0]  // Closest zone below
           const zone2 = nonZeroZonesBelow[1]  // Second zone below
@@ -178,7 +178,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           const weightDiff1 = currentWeight - zone1.weight
           const weightDiff2 = currentWeight - zone2.weight
 
-          // Both zones must have at least 4% MORE volume than current
+          // Both zones must have at least 3% MORE volume than current
           if (weightDiff1 <= -BREAK_DIFF_THRESHOLD && weightDiff2 <= -BREAK_DIFF_THRESHOLD) {
             buyBreakConditionMet = true
           }
@@ -262,9 +262,9 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           j++
         }
 
-        // Check first TWO individual zones above - current must be 4% LESS than BOTH
-        // Example: Current = 3%, Upper two = 7% & 8% → Sell (3% < 7%-4% AND 3% < 8%-4%)
-        // Example: Current = 3%, Upper two = 7% & 6% → No sell (3% < 7%-4% BUT 3% >= 6%-4%)
+        // Check first TWO individual zones above - current must be 3% LESS than BOTH
+        // Example: Current = 3%, Upper two = 6% & 7% → Sell (3% < 6%-3% AND 3% < 7%-3%)
+        // Example: Current = 3%, Upper two = 6% & 5.5% → No sell (3% < 6%-3% BUT 3% >= 5.5%-3%)
         if (nonZeroZonesAbove.length >= 2) {
           const zone1 = nonZeroZonesAbove[0]  // Closest zone above
           const zone2 = nonZeroZonesAbove[1]  // Second zone above
@@ -272,7 +272,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           const weightDiff1 = currentWeight - zone1.weight
           const weightDiff2 = currentWeight - zone2.weight
 
-          // Both zones must have at least 4% MORE volume than current
+          // Both zones must have at least 3% MORE volume than current
           if (weightDiff1 <= -BREAK_DIFF_THRESHOLD && weightDiff2 <= -BREAK_DIFF_THRESHOLD) {
             sellBreakConditionMet = true
           }
