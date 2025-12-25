@@ -7,14 +7,16 @@
  * - Divide price range evenly into 15-20 zones
  *
  * BUY SIGNALS (Low-volume breakout UP):
- * - Detect when price breaks into a zone with LOW volume (≤8% less than zones below)
+ * - Detect when price breaks into a zone with LOW volume (≥4% less than individual zones below)
  * - This identifies price moving away from high-volume support into resistance
  * - Breakup = buy signal (price escaping support with low volume = bullish)
+ * - Only compares to individual zones (not merged zones)
  *
  * SELL SIGNALS (Low-volume breakdown DOWN):
- * - Detect when price breaks into a zone with LOW volume (≤8% less than zones above)
+ * - Detect when price breaks into a zone with LOW volume (≥4% less than individual zones above)
  * - This identifies price moving away from high-volume resistance into support
  * - Breakdown = sell signal (price escaping resistance with low volume = bearish)
+ * - Only compares to individual zones (not merged zones)
  * - Requires at least 75 points since window reset (all-time high) before sell signal
  *
  * @param {Array} displayPrices - Array of price data {date, close, volume}
@@ -35,7 +37,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
 
   const MIN_WINDOW_SIZE = 75  // Changed from 150 to 75
   const BREAK_VOLUME_THRESHOLD = 0.10 // 10%
-  const BREAK_DIFF_THRESHOLD = 0.08 // 8% - current zone must have LESS volume than zones below
+  const BREAK_DIFF_THRESHOLD = 0.04 // 4% - current zone must have LESS volume than individual zones (not merged)
   const ZONE_LOOKBACK = 10 // Check previous 10 zones for break detection
   const ZONE_LOOKABOVE = 3 // Check upper 3 zones - must have less volume than current
 
@@ -164,12 +166,12 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           k++
         }
 
-        // PART 1: Check individual zones for 8% difference
+        // Check individual zones for 4% difference (trigger condition)
         for (let i = 0; i < nonZeroZonesBelow.length; i++) {
           const zone = nonZeroZonesBelow[i]
           const weightDiff = currentWeight - zone.weight
 
-          // Break if current zone has at least 8% LESS volume than individual zone
+          // Break if current zone has at least 4% LESS volume than individual zone
           if (weightDiff <= -BREAK_DIFF_THRESHOLD) {
             buyBreakConditionMet = true
           }
@@ -179,38 +181,6 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
             minWeightDiffBuy = weightDiff
             bestSupportZoneIdx = zone.zoneIdx
             bestSupportZoneWeight = zone.weight
-          }
-        }
-
-        // PART 2: Check merged consecutive zones (zone[i] + zone[i+1])
-        const mergedZones = []
-        for (let i = 0; i < nonZeroZonesBelow.length - 1; i++) {
-          const zone1 = nonZeroZonesBelow[i]
-          const zone2 = nonZeroZonesBelow[i + 1]
-
-          // Merge two consecutive zones
-          const mergedWeight = zone1.weight + zone2.weight
-          const weightDiff = currentWeight - mergedWeight
-
-          mergedZones.push({
-            pair: `[${i}+${i+1}]`,
-            weights: `${(zone1.weight * 100).toFixed(2)}% + ${(zone2.weight * 100).toFixed(2)}%`,
-            merged: `${(mergedWeight * 100).toFixed(2)}%`,
-            diff: `${(weightDiff * 100).toFixed(2)}%`,
-            triggers: weightDiff <= -BREAK_DIFF_THRESHOLD
-          })
-
-          // Break if current zone has at least 8% LESS volume than merged zone
-          if (weightDiff <= -BREAK_DIFF_THRESHOLD) {
-            buyBreakConditionMet = true
-          }
-
-          // Track merged zone if it's stronger support
-          if (weightDiff < minWeightDiffBuy) {
-            minWeightDiffBuy = weightDiff
-            // Use the lower zone index as the support level (zone closer to current price)
-            bestSupportZoneIdx = zone1.zoneIdx
-            bestSupportZoneWeight = mergedWeight
           }
         }
 
@@ -280,12 +250,12 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           j++
         }
 
-        // PART 1: Check individual zones above for 8% difference
+        // Check individual zones above for 4% difference (trigger condition)
         for (let i = 0; i < nonZeroZonesAbove.length; i++) {
           const zone = nonZeroZonesAbove[i]
           const weightDiff = currentWeight - zone.weight
 
-          // Break if current zone has at least 8% LESS volume than individual zone above
+          // Break if current zone has at least 4% LESS volume than individual zone above
           if (weightDiff <= -BREAK_DIFF_THRESHOLD) {
             sellBreakConditionMet = true
           }
@@ -295,29 +265,6 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
             minWeightDiffSell = weightDiff
             bestResistanceZoneIdx = zone.zoneIdx
             bestResistanceZoneWeight = zone.weight
-          }
-        }
-
-        // PART 2: Check merged consecutive zones above (zone[i] + zone[i+1])
-        for (let i = 0; i < nonZeroZonesAbove.length - 1; i++) {
-          const zone1 = nonZeroZonesAbove[i]
-          const zone2 = nonZeroZonesAbove[i + 1]
-
-          // Merge two consecutive zones
-          const mergedWeight = zone1.weight + zone2.weight
-          const weightDiff = currentWeight - mergedWeight
-
-          // Break if current zone has at least 8% LESS volume than merged zone
-          if (weightDiff <= -BREAK_DIFF_THRESHOLD) {
-            sellBreakConditionMet = true
-          }
-
-          // Track merged zone if it's stronger resistance
-          if (weightDiff < minWeightDiffSell) {
-            minWeightDiffSell = weightDiff
-            // Use the upper zone index as the resistance level (zone closer to current price)
-            bestResistanceZoneIdx = zone1.zoneIdx
-            bestResistanceZoneWeight = mergedWeight
           }
         }
 
