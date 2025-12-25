@@ -7,16 +7,18 @@
  * - Divide price range evenly into 15-20 zones
  *
  * BUY SIGNALS (Low-volume breakout UP):
- * - Detect when price breaks into a zone with LOW volume (≥4% less than individual zones below)
- * - This identifies price moving away from high-volume support into resistance
+ * - Current zone must have ≥4% LESS volume than BOTH of the first two zones below
+ * - Example: Current = 3%, Prior two = 7% & 8% → Buy triggers
+ * - Example: Current = 3%, Prior two = 7% & 6% → No buy (only 3% less than 6%)
+ * - This identifies price moving away from strong high-volume support
  * - Breakup = buy signal (price escaping support with low volume = bullish)
- * - Only compares to individual zones (not merged zones)
  *
  * SELL SIGNALS (Low-volume breakdown DOWN):
- * - Detect when price breaks into a zone with LOW volume (≥4% less than individual zones above)
- * - This identifies price moving away from high-volume resistance into support
+ * - Current zone must have ≥4% LESS volume than BOTH of the first two zones above
+ * - Example: Current = 3%, Upper two = 7% & 8% → Sell triggers
+ * - Example: Current = 3%, Upper two = 7% & 6% → No sell (only 3% less than 6%)
+ * - This identifies price moving away from strong high-volume resistance
  * - Breakdown = sell signal (price escaping resistance with low volume = bearish)
- * - Only compares to individual zones (not merged zones)
  * - Requires at least 75 points since window reset (all-time high) before sell signal
  *
  * @param {Array} displayPrices - Array of price data {date, close, volume}
@@ -166,17 +168,27 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           k++
         }
 
-        // Check individual zones for 4% difference (trigger condition)
+        // Check first TWO individual zones below - current must be 4% LESS than BOTH
+        // Example: Current = 3%, Prior two = 7% & 8% → Buy (3% < 7%-4% AND 3% < 8%-4%)
+        // Example: Current = 3%, Prior two = 7% & 6% → No buy (3% < 7%-4% BUT 3% >= 6%-4%)
+        if (nonZeroZonesBelow.length >= 2) {
+          const zone1 = nonZeroZonesBelow[0]  // Closest zone below
+          const zone2 = nonZeroZonesBelow[1]  // Second zone below
+
+          const weightDiff1 = currentWeight - zone1.weight
+          const weightDiff2 = currentWeight - zone2.weight
+
+          // Both zones must have at least 4% MORE volume than current
+          if (weightDiff1 <= -BREAK_DIFF_THRESHOLD && weightDiff2 <= -BREAK_DIFF_THRESHOLD) {
+            buyBreakConditionMet = true
+          }
+        }
+
+        // Track the zone with most negative difference (highest volume support zone)
         for (let i = 0; i < nonZeroZonesBelow.length; i++) {
           const zone = nonZeroZonesBelow[i]
           const weightDiff = currentWeight - zone.weight
 
-          // Break if current zone has at least 4% LESS volume than individual zone
-          if (weightDiff <= -BREAK_DIFF_THRESHOLD) {
-            buyBreakConditionMet = true
-          }
-
-          // Track the zone with most negative difference (highest volume support zone)
           if (weightDiff < minWeightDiffBuy) {
             minWeightDiffBuy = weightDiff
             bestSupportZoneIdx = zone.zoneIdx
@@ -250,17 +262,27 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           j++
         }
 
-        // Check individual zones above for 4% difference (trigger condition)
+        // Check first TWO individual zones above - current must be 4% LESS than BOTH
+        // Example: Current = 3%, Upper two = 7% & 8% → Sell (3% < 7%-4% AND 3% < 8%-4%)
+        // Example: Current = 3%, Upper two = 7% & 6% → No sell (3% < 7%-4% BUT 3% >= 6%-4%)
+        if (nonZeroZonesAbove.length >= 2) {
+          const zone1 = nonZeroZonesAbove[0]  // Closest zone above
+          const zone2 = nonZeroZonesAbove[1]  // Second zone above
+
+          const weightDiff1 = currentWeight - zone1.weight
+          const weightDiff2 = currentWeight - zone2.weight
+
+          // Both zones must have at least 4% MORE volume than current
+          if (weightDiff1 <= -BREAK_DIFF_THRESHOLD && weightDiff2 <= -BREAK_DIFF_THRESHOLD) {
+            sellBreakConditionMet = true
+          }
+        }
+
+        // Track the zone with most negative difference (highest volume resistance zone)
         for (let i = 0; i < nonZeroZonesAbove.length; i++) {
           const zone = nonZeroZonesAbove[i]
           const weightDiff = currentWeight - zone.weight
 
-          // Break if current zone has at least 4% LESS volume than individual zone above
-          if (weightDiff <= -BREAK_DIFF_THRESHOLD) {
-            sellBreakConditionMet = true
-          }
-
-          // Track the zone with most negative difference (highest volume resistance zone)
           if (weightDiff < minWeightDiffSell) {
             minWeightDiffSell = weightDiff
             bestResistanceZoneIdx = zone.zoneIdx
