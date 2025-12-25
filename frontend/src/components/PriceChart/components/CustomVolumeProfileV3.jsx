@@ -447,15 +447,21 @@ export const CustomVolumeProfileV3 = ({
         const isDowntrend = visibleData.length > 0 &&
           visibleData[0].close > visibleData[visibleData.length - 1].close
 
-        // Position at top right if downtrend, top left if uptrend
-        const xPos = isDowntrend ? offset.left + offset.width - 10 : offset.left + 10
-        const textAnchor = isDowntrend ? 'end' : 'start'
+        // Position at bottom left if downtrend, top left if uptrend
+        const xPos = offset.left + 10
+        const textAnchor = 'start'
+
+        // For downtrend: position at bottom-left (top-right to bottom-left diagonal)
+        // For uptrend: position at top-left
+        const yPos1 = isDowntrend ? offset.top + offset.height - 54 : offset.top + 20
+        const yPos2 = isDowntrend ? offset.top + offset.height - 36 : offset.top + 38
+        const yPos3 = isDowntrend ? offset.top + offset.height - 20 : offset.top + 54
 
         return (
           <g>
             <text
               x={xPos}
-              y={offset.top + 20}
+              y={yPos1}
               fill={v3PL.totalPL >= 0 ? '#10b981' : '#ef4444'}
               fontSize="14"
               fontWeight="700"
@@ -466,7 +472,7 @@ export const CustomVolumeProfileV3 = ({
             </text>
             <text
               x={xPos}
-              y={offset.top + 38}
+              y={yPos2}
               fill="#6ee7b7"
               fontSize="11"
               textAnchor={textAnchor}
@@ -476,7 +482,7 @@ export const CustomVolumeProfileV3 = ({
             </text>
             <text
               x={xPos}
-              y={offset.top + 54}
+              y={yPos3}
               fill={v3PL.marketChange >= 0 ? '#6ee7b7' : '#ef4444'}
               fontSize="10"
               textAnchor={textAnchor}
