@@ -414,8 +414,10 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
  * BUY LOGIC: Buy on low-volume breakout (isUpBreak: true)
  * SELL LOGIC:
  * 1. Sell on low-volume breakdown (isUpBreak: false)
- * 2. Window resets when price reaches all-time high while holding
- * 3. After all-time high window reset, need 75+ points before sell signal can trigger
+ * 2. Volume profile window RESETS when price reaches all-time high while holding
+ *    - Discards all previous cumulative data
+ *    - Starts fresh volume calculation from the ATH point
+ * 3. After window reset, need 75+ points before sell signal can trigger
  * 4. Sell signals can trigger immediately after buy (no waiting period)
  *
  * NOTE: Cutoff (trailing stop) logic is currently DISABLED
@@ -426,7 +428,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
  * @param {Array} params.prices - Array of price data {date, close, volume}
  * @param {number} params.transactionFee - Transaction fee as decimal (e.g., 0.003 for 0.3%)
  * @param {number} params.cutoffPercent - Initial cutoff percentage as decimal (e.g., 0.12 for 12%) - NOT USED (cutoff disabled)
- * @returns {Object} P&L calculation results
+ * @returns {Object} P&L calculation results including athResetDates array
  */
 export const calculateVolumeProfileV3PL = ({
   volumeProfileV3Breaks = [],
@@ -457,6 +459,7 @@ export const calculateVolumeProfileV3PL = ({
   const sellSignals = []
   const supportUpdates = [] // Track support level updates
   const cutoffPrices = [] // Track cutoff price over time for drawing support line
+  const athResetDates = [] // Track all-time high reset dates while holding
   let isHolding = false
   let buyPrice = null
   let buyDate = null
@@ -497,9 +500,10 @@ export const calculateVolumeProfileV3PL = ({
     if (currentPrice > allTimeHigh) {
       allTimeHigh = currentPrice
 
-      // If holding and reached new all-time high, reset window counter
+      // If holding and reached new all-time high, reset window counter AND mark for window split
       if (isHolding) {
         pointsSinceWindowReset = 0
+        athResetDates.push(currentDate) // Mark this date for volume profile window reset
         supportUpdates.push({
           date: currentDate,
           price: currentPrice,
@@ -674,30 +678,47 @@ export const calculateVolumeProfileV3PL = ({
   // Extract sell dates for window splitting
   const sellDates = sellSignals.map(s => s.date)
 
-  return { trades, totalPL, winRate, tradingSignals: buySignals.length, buySignals, sellSignals, supportUpdates, marketChange, cutoffPrices, sellDates }
+  return { trades, totalPL, winRate, tradingSignals: buySignals.length, buySignals, sellSignals, supportUpdates, marketChange, cutoffPrices, sellDates, athResetDates }
 }
 
 /**
- * Single continuous window: Calculate volume profile over entire range without splitting
- * Window extends continuously throughout the backtest period, even when B/S signals are found
+ * Multi-pass calculation: Calculate volume profile with window resets at sell dates and all-time highs while holding
+ *
+ * Pass 1: Calculate with no window splits to get initial P&L and identify ATH reset dates
+ * Pass 2: Recalculate with window splits at ATH dates to get updated breaks
+ * Pass 3: Final P&L calculation with ATH-aware volume profile
  */
 export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, transactionFee = 0.003, cutoffPercent = 0.12) => {
-  // Calculate breaks with NO window splits - single continuous window
-  const result = calculateVolumeProfileV3(displayPrices, zoomRange, [])
+  // PASS 1: Calculate breaks with NO window splits to identify all-time high reset dates
+  const initialResult = calculateVolumeProfileV3(displayPrices, zoomRange, [])
 
-  // Calculate P&L based on these breaks
-  const plResult = calculateVolumeProfileV3PL({
-    volumeProfileV3Breaks: result.breaks,
-    volumeProfileV3Data: result.windows,
+  const initialPL = calculateVolumeProfileV3PL({
+    volumeProfileV3Breaks: initialResult.breaks,
+    volumeProfileV3Data: initialResult.windows,
     prices: displayPrices,
     transactionFee,
     cutoffPercent
   })
 
-  // Return results with single continuous window
+  // PASS 2: Recalculate volume profile with window splits at all-time high reset dates
+  // This ensures fresh volume calculations after each ATH while holding
+  const athWindowSplitDates = initialPL.athResetDates || []
+
+  const finalResult = calculateVolumeProfileV3(displayPrices, zoomRange, athWindowSplitDates)
+
+  // PASS 3: Final P&L calculation with ATH-aware volume profile
+  const finalPL = calculateVolumeProfileV3PL({
+    volumeProfileV3Breaks: finalResult.breaks,
+    volumeProfileV3Data: finalResult.windows,
+    prices: displayPrices,
+    transactionFee,
+    cutoffPercent
+  })
+
+  // Return results with ATH-aware windowing
   return {
-    windows: result.windows,
-    breaks: result.breaks,
-    ...plResult
+    windows: finalResult.windows,
+    breaks: finalResult.breaks,
+    ...finalPL
   }
 }
