@@ -28,20 +28,23 @@
  * - Requires at least 75 points since window reset (all-time high) before sell signal
  *
  * @param {Array} displayPrices - Array of price data {date, close, volume}
- * @param {Object} zoomRange - {start, end} - NOT USED for data filtering, kept for API compatibility
+ * @param {Object} zoomRange - {start, end} - Defines the visible range for analysis (locked on first V3 enable)
  * @param {Array} windowSplitDates - Optional dates where windows should split (empty array = single continuous window)
  * @returns {Object} {windows, breaks} - Windows with volume profile data and break signals
  *
- * NOTE: V3 ALWAYS analyzes the FULL dataset regardless of zoom level.
- * This ensures consistent backtesting results. Zoom only affects visual display.
+ * NOTE: V3 analyzes the visible range specified by zoomRange parameter.
+ * This range is locked when V3 is first enabled and does NOT change on zoom.
+ * Signals will only appear within the original locked range.
  */
 export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, end: null }, windowSplitDates = []) => {
   if (!displayPrices || displayPrices.length === 0) return { windows: [], breaks: [] }
 
   const reversedDisplayPrices = [...displayPrices].reverse()
-  // ALWAYS use full dataset for V3 analysis (ignore zoomRange for data filtering)
-  // zoomRange is only used for visual display, not for calculations
-  const visibleData = reversedDisplayPrices
+  // Use the locked zoomRange from when V3 was first enabled
+  // This range is cached and does NOT change on subsequent zooms
+  const startIdx = zoomRange.start || 0
+  const endIdx = zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end
+  const visibleData = reversedDisplayPrices.slice(startIdx, endIdx)
 
   if (visibleData.length === 0) return { windows: [], breaks: [] }
 

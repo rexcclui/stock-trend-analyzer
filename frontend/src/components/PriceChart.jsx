@@ -98,6 +98,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Store the zoomRange snapshot for V3 calculations (doesn't trigger recalc on zoom)
   const v3ZoomRangeRef = useRef(zoomRange)
+  // Track whether V3 has been initialized to lock in the initial range
+  const v3InitializedRef = useRef(false)
 
   // Hovered volume zone pill
   const [hoveredVolumeLegend, setHoveredVolumeLegend] = useState(null)
@@ -2593,20 +2595,25 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Calculate Volume Profile V3 - only when manually refreshed or feature toggled
   // Uses two-pass calculation: first finds sell dates, then creates windows split at those dates
-  // Recalculates based on visible zoom range so user can compare with backtest period
+  // IMPORTANT: Calculates ONCE on initial visible range when V3 is first enabled
+  // Does NOT recalculate on zoom - signals remain locked to original range
   useEffect(() => {
     if (!volumeProfileV3Enabled) {
       setVolumeProfileV3Result({ windows: [], breaks: [] })
+      v3InitializedRef.current = false // Reset initialization flag when disabled
       return
     }
 
-    // Use the visible zoom range for V3 calculations
-    // User will manually select same period in backtest dropdown to compare
-    v3ZoomRangeRef.current = zoomRange
+    // Only capture zoomRange when V3 is FIRST enabled
+    // Subsequent zoom changes will NOT trigger recalculation
+    if (!v3InitializedRef.current) {
+      v3ZoomRangeRef.current = zoomRange
+      v3InitializedRef.current = true
+    }
 
     const result = calculateVolumeProfileV3WithSells(prices, v3ZoomRangeRef.current, 0.003, 0.12)
     setVolumeProfileV3Result(result)
-  }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, prices, zoomRange])  // zoomRange IS in dependencies!
+  }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, prices])  // zoomRange removed - no recalc on zoom!
 
   // SMA Simulation Logic - find optimal SMA value based on P&L
   useEffect(() => {
