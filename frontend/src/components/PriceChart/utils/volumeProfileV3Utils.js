@@ -471,7 +471,7 @@ export const calculateVolumeProfileV3PL = ({
   let cutoffPrice = null // Track the current cutoff price (trailing stop)
   let currentWindowIndex = null // Track which window we're in while holding
   let currentTradeId = 0 // Track which trade we're in for support line segmentation
-  let allTimeHigh = 0 // Track all-time high for current holding period (only updates while holding)
+  let allTimeHigh = 0 // Track GLOBAL all-time high across entire dataset (never resets)
   let pointsSinceWindowReset = 0 // Track points since last window reset (for 75-point minimum)
   let hasResetWindowThisHolding = false // Track if we've already reset window once in current holding period
   const MIN_POINTS_FOR_SELL = 75 // Minimum points required before sell signal after window reset
@@ -502,13 +502,13 @@ export const calculateVolumeProfileV3PL = ({
     const currentPrice = currentPoint.close
     const currentDate = currentPoint.date
 
-    // Track all-time high ONLY while holding
-    // Window reset happens ONCE per holding period when first reaching new ATH
-    if (isHolding && currentPrice > allTimeHigh) {
+    // Track GLOBAL all-time high across entire dataset
+    // Window reset ONLY when reaching new global ATH while holding (once per holding period)
+    if (currentPrice > allTimeHigh) {
       allTimeHigh = currentPrice
 
-      // Only reset window if we haven't already reset in this holding period
-      if (!hasResetWindowThisHolding) {
+      // Only reset window if holding AND haven't already reset in this holding period
+      if (isHolding && !hasResetWindowThisHolding) {
         pointsSinceWindowReset = 0
         hasResetWindowThisHolding = true // Mark that we've reset once in this holding period
         athResetDates.push(currentDate) // Mark this date for volume profile window reset
@@ -598,7 +598,6 @@ export const calculateVolumeProfileV3PL = ({
 
           currentWindowIndex = breakSignal.windowIndex // Track starting window
           pointsSinceWindowReset = MIN_POINTS_FOR_SELL // Set to 75 so sells can trigger immediately after buy
-          allTimeHigh = breakSignal.price // Initialize ATH to buy price for this holding period
           hasResetWindowThisHolding = false // Reset flag for new holding period
 
           buySignals.push({
@@ -646,7 +645,6 @@ export const calculateVolumeProfileV3PL = ({
           cutoffPrice = null
           currentWindowIndex = null
           pointsSinceWindowReset = 0
-          allTimeHigh = 0 // Reset ATH when exiting position
           hasResetWindowThisHolding = false // Reset flag for next holding period
           currentTradeId++
         }
