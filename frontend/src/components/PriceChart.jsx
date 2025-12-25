@@ -3156,6 +3156,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     const delta = e.deltaY
     const zoomFactor = 0.1 // 10% zoom per scroll
+    const endIndex = zoomRange.end === null ? chartData.length : zoomRange.end
     const currentRange = endIndex - zoomRange.start
     const zoomAmount = Math.max(1, Math.floor(currentRange * zoomFactor))
 
