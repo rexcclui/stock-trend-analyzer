@@ -1,13 +1,21 @@
 /**
  * Calculate Volume Profile V3 windows and break signals
  *
- * LOW-VOLUME BREAKOUT DETECTION:
+ * LOW-VOLUME BREAKOUT/BREAKDOWN DETECTION:
  * - Window extends continuously throughout the entire backtest period
  * - Window keeps extending even when B/S signals are found (no new windows created)
  * - Divide price range evenly into 15-20 zones
+ *
+ * BUY SIGNALS (Low-volume breakout UP):
  * - Detect when price breaks into a zone with LOW volume (≤8% less than zones below)
  * - This identifies price moving away from high-volume support into resistance
  * - Breakup = buy signal (price escaping support with low volume = bullish)
+ *
+ * SELL SIGNALS (Low-volume breakdown DOWN):
+ * - Detect when price breaks into a zone with LOW volume (≤8% less than zones above)
+ * - This identifies price moving away from high-volume resistance into support
+ * - Breakdown = sell signal (price escaping resistance with low volume = bearish)
+ * - Requires at least 75 points since window reset (all-time high) before sell signal
  *
  * @param {Array} displayPrices - Array of price data {date, close, volume}
  * @param {Object} zoomRange - {start, end} - Range of visible data
@@ -129,14 +137,15 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       const currentZone = priceZones[currentZoneIdx]
       const currentWeight = currentZone.volumeWeight
 
-      // Check break condition - require at least 150 data points before buy signal
+      // Check break condition - require at least 75 data points before buy/sell signal
       // This ensures sufficient volume profile history for meaningful detection
       if (i >= MIN_WINDOW_SIZE) {
+        // BUY SIGNAL DETECTION (Low-volume breakout UP)
         // Check the next 10 NON-ZERO volume zones below - current zone must have LESS volume (low-volume breakout)
-        let breakConditionMet = false
-        let minWeightDiff = 0  // Track most negative difference (strongest support zone)
-        let bestPrevZoneIdx = -1
-        let bestPrevZoneWeight = 0
+        let buyBreakConditionMet = false
+        let minWeightDiffBuy = 0  // Track most negative difference (strongest support zone)
+        let bestSupportZoneIdx = -1
+        let bestSupportZoneWeight = 0
 
         // Collect non-zero zones below current zone for individual and merged checking
         const nonZeroZonesBelow = []
@@ -162,14 +171,14 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
 
           // Break if current zone has at least 8% LESS volume than individual zone
           if (weightDiff <= -BREAK_DIFF_THRESHOLD) {
-            breakConditionMet = true
+            buyBreakConditionMet = true
           }
 
           // Track the zone with most negative difference (highest volume support zone)
-          if (weightDiff < minWeightDiff) {
-            minWeightDiff = weightDiff
-            bestPrevZoneIdx = zone.zoneIdx
-            bestPrevZoneWeight = zone.weight
+          if (weightDiff < minWeightDiffBuy) {
+            minWeightDiffBuy = weightDiff
+            bestSupportZoneIdx = zone.zoneIdx
+            bestSupportZoneWeight = zone.weight
           }
         }
 
@@ -193,56 +202,161 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
 
           // Break if current zone has at least 8% LESS volume than merged zone
           if (weightDiff <= -BREAK_DIFF_THRESHOLD) {
-            breakConditionMet = true
+            buyBreakConditionMet = true
           }
 
           // Track merged zone if it's stronger support
-          if (weightDiff < minWeightDiff) {
-            minWeightDiff = weightDiff
+          if (weightDiff < minWeightDiffBuy) {
+            minWeightDiffBuy = weightDiff
             // Use the lower zone index as the support level (zone closer to current price)
-            bestPrevZoneIdx = zone1.zoneIdx
-            bestPrevZoneWeight = mergedWeight
+            bestSupportZoneIdx = zone1.zoneIdx
+            bestSupportZoneWeight = mergedWeight
           }
         }
 
-          // Additional threshold: require support zone (below) to have at least 10% of total window volume
-          // This ensures we're breaking away from a significant support, not just noise
-          // Note: bestPrevZoneWeight is already the weight (proportion), works for both individual and merged zones
-          if (breakConditionMet && bestPrevZoneWeight > 0) {
-            if (bestPrevZoneWeight < BREAK_VOLUME_THRESHOLD) {
-              breakConditionMet = false
-            }
+        // Additional threshold: require support zone (below) to have at least 10% of total window volume
+        // This ensures we're breaking away from a significant support, not just noise
+        // Note: bestSupportZoneWeight is already the weight (proportion), works for both individual and merged zones
+        if (buyBreakConditionMet && bestSupportZoneWeight > 0) {
+          if (bestSupportZoneWeight < BREAK_VOLUME_THRESHOLD) {
+            buyBreakConditionMet = false
           }
+        }
 
-          // Check upper zones: the 3 zones above (if exist) must have LESS volume than current zone
-          // This confirms we're moving into progressively thinner resistance
-          if (breakConditionMet) {
-            for (let m = 1; m <= ZONE_LOOKABOVE; m++) {
-              const upperZoneIdx = currentZoneIdx + m
-              if (upperZoneIdx < numPriceZones) {
-                const upperZoneWeight = priceZones[upperZoneIdx].volumeWeight
-                // Skip zones with zero volume (price hasn't reached there yet)
-                if (upperZoneWeight > 0) {
-                  // Upper zone must have LESS volume than current zone
-                  if (upperZoneWeight >= currentWeight) {
-                    breakConditionMet = false
-                    break
-                  }
+        // Check upper zones: the 3 zones above (if exist) must have LESS volume than current zone
+        // This confirms we're moving into progressively thinner resistance
+        if (buyBreakConditionMet) {
+          for (let m = 1; m <= ZONE_LOOKABOVE; m++) {
+            const upperZoneIdx = currentZoneIdx + m
+            if (upperZoneIdx < numPriceZones) {
+              const upperZoneWeight = priceZones[upperZoneIdx].volumeWeight
+              // Skip zones with zero volume (price hasn't reached there yet)
+              if (upperZoneWeight > 0) {
+                // Upper zone must have LESS volume than current zone
+                if (upperZoneWeight >= currentWeight) {
+                  buyBreakConditionMet = false
+                  break
                 }
               }
             }
           }
+        }
 
-        if (breakConditionMet) {
-          // Record break but DON'T end the window - continue extending
+        if (buyBreakConditionMet) {
+          // Record buy break but DON'T end the window - continue extending
           breaks.push({
             date: dataPoint.date,
             price: currentPrice,
             isUpBreak: true, // Low-volume breakout - price moving away from high-volume support
             currentWeight: currentWeight,  // Low volume weight at break price
             windowIndex: windows.length,
-            supportLevel: priceZones[bestPrevZoneIdx]?.minPrice || minPrice,  // High-volume support zone below
-            maxVolumeWeight: bestPrevZoneWeight  // Volume weight of support zone
+            supportLevel: priceZones[bestSupportZoneIdx]?.minPrice || minPrice,  // High-volume support zone below
+            maxVolumeWeight: bestSupportZoneWeight  // Volume weight of support zone
+          })
+          // Don't break - keep extending window to find more breaks
+        }
+
+        // SELL SIGNAL DETECTION (Low-volume breakdown DOWN) - Reverse of buy logic
+        // Check the next 10 NON-ZERO volume zones above - current zone must have LESS volume (low-volume breakdown)
+        let sellBreakConditionMet = false
+        let minWeightDiffSell = 0  // Track most negative difference (strongest resistance zone)
+        let bestResistanceZoneIdx = -1
+        let bestResistanceZoneWeight = 0
+
+        // Collect non-zero zones above current zone for individual and merged checking
+        const nonZeroZonesAbove = []
+        let j = 1
+        while (nonZeroZonesAbove.length < ZONE_LOOKBACK && (currentZoneIdx + j) < numPriceZones) {
+          const nextZoneIdx = currentZoneIdx + j
+          const nextZoneWeight = priceZones[nextZoneIdx].volumeWeight
+
+          // Collect only non-zero zones
+          if (nextZoneWeight > 0) {
+            nonZeroZonesAbove.push({
+              zoneIdx: nextZoneIdx,
+              weight: nextZoneWeight
+            })
+          }
+          j++
+        }
+
+        // PART 1: Check individual zones above for 8% difference
+        for (let i = 0; i < nonZeroZonesAbove.length; i++) {
+          const zone = nonZeroZonesAbove[i]
+          const weightDiff = currentWeight - zone.weight
+
+          // Break if current zone has at least 8% LESS volume than individual zone above
+          if (weightDiff <= -BREAK_DIFF_THRESHOLD) {
+            sellBreakConditionMet = true
+          }
+
+          // Track the zone with most negative difference (highest volume resistance zone)
+          if (weightDiff < minWeightDiffSell) {
+            minWeightDiffSell = weightDiff
+            bestResistanceZoneIdx = zone.zoneIdx
+            bestResistanceZoneWeight = zone.weight
+          }
+        }
+
+        // PART 2: Check merged consecutive zones above (zone[i] + zone[i+1])
+        for (let i = 0; i < nonZeroZonesAbove.length - 1; i++) {
+          const zone1 = nonZeroZonesAbove[i]
+          const zone2 = nonZeroZonesAbove[i + 1]
+
+          // Merge two consecutive zones
+          const mergedWeight = zone1.weight + zone2.weight
+          const weightDiff = currentWeight - mergedWeight
+
+          // Break if current zone has at least 8% LESS volume than merged zone
+          if (weightDiff <= -BREAK_DIFF_THRESHOLD) {
+            sellBreakConditionMet = true
+          }
+
+          // Track merged zone if it's stronger resistance
+          if (weightDiff < minWeightDiffSell) {
+            minWeightDiffSell = weightDiff
+            // Use the upper zone index as the resistance level (zone closer to current price)
+            bestResistanceZoneIdx = zone1.zoneIdx
+            bestResistanceZoneWeight = mergedWeight
+          }
+        }
+
+        // Additional threshold: require resistance zone (above) to have at least 10% of total window volume
+        if (sellBreakConditionMet && bestResistanceZoneWeight > 0) {
+          if (bestResistanceZoneWeight < BREAK_VOLUME_THRESHOLD) {
+            sellBreakConditionMet = false
+          }
+        }
+
+        // Check lower zones: the 3 zones below (if exist) must have LESS volume than current zone
+        // This confirms we're moving into progressively thinner support
+        if (sellBreakConditionMet) {
+          for (let m = 1; m <= ZONE_LOOKABOVE; m++) {
+            const lowerZoneIdx = currentZoneIdx - m
+            if (lowerZoneIdx >= 0) {
+              const lowerZoneWeight = priceZones[lowerZoneIdx].volumeWeight
+              // Skip zones with zero volume
+              if (lowerZoneWeight > 0) {
+                // Lower zone must have LESS volume than current zone
+                if (lowerZoneWeight >= currentWeight) {
+                  sellBreakConditionMet = false
+                  break
+                }
+              }
+            }
+          }
+        }
+
+        if (sellBreakConditionMet) {
+          // Record sell break but DON'T end the window - continue extending
+          breaks.push({
+            date: dataPoint.date,
+            price: currentPrice,
+            isUpBreak: false, // Low-volume breakdown - price moving away from high-volume resistance
+            currentWeight: currentWeight,  // Low volume weight at break price
+            windowIndex: windows.length,
+            resistanceLevel: priceZones[bestResistanceZoneIdx]?.maxPrice || maxPrice,  // High-volume resistance zone above
+            maxVolumeWeight: bestResistanceZoneWeight  // Volume weight of resistance zone
           })
           // Don't break - keep extending window to find more breaks
         }
@@ -283,8 +397,15 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
 /**
  * Calculate P&L for Volume Profile V3 trading strategy
  *
+ * BUY LOGIC: Buy on low-volume breakout (isUpBreak: true)
+ * SELL LOGIC:
+ * 1. Sell on low-volume breakdown (isUpBreak: false) - ONLY if 75+ points since window reset
+ * 2. Sell on cutoff breach (trailing stop)
+ * 3. Window resets when price reaches all-time high while holding
+ * 4. After window reset, need 75+ points before sell signal can trigger
+ *
  * @param {Object} params - Parameters for P&L calculation
- * @param {Array} params.volumeProfileV3Breaks - Array of break signals {date, price, isUpBreak, supportLevel, windowIndex}
+ * @param {Array} params.volumeProfileV3Breaks - Array of break signals {date, price, isUpBreak, supportLevel/resistanceLevel, windowIndex}
  * @param {Array} params.volumeProfileV3Data - Array of window data with price zones
  * @param {Array} params.prices - Array of price data {date, close, volume}
  * @param {number} params.transactionFee - Transaction fee as decimal (e.g., 0.003 for 0.3%)
@@ -326,6 +447,9 @@ export const calculateVolumeProfileV3PL = ({
   let cutoffPrice = null // Track the current cutoff price (trailing stop)
   let currentWindowIndex = null // Track which window we're in while holding
   let currentTradeId = 0 // Track which trade we're in for support line segmentation
+  let allTimeHigh = 0 // Track all-time high price
+  let pointsSinceWindowReset = 0 // Track points since last window reset (for 75-point minimum)
+  const MIN_POINTS_FOR_SELL = 75 // Minimum points required before sell signal after window reset
 
   // Get all prices in forward chronological order
   const reversedPrices = [...prices].reverse()
@@ -352,6 +476,26 @@ export const calculateVolumeProfileV3PL = ({
     const currentPoint = reversedPrices[i]
     const currentPrice = currentPoint.close
     const currentDate = currentPoint.date
+
+    // Update all-time high
+    if (currentPrice > allTimeHigh) {
+      allTimeHigh = currentPrice
+
+      // If holding and reached new all-time high, reset window counter
+      if (isHolding) {
+        pointsSinceWindowReset = 0
+        supportUpdates.push({
+          date: currentDate,
+          price: currentPrice,
+          reason: 'All-time high - window reset'
+        })
+      }
+    }
+
+    // Increment points counter if holding
+    if (isHolding) {
+      pointsSinceWindowReset++
+    }
 
     // Check for cutoff: if holding and price dropped below cutoff price, sell
     if (isHolding && cutoffPrice !== null && currentPrice < cutoffPrice) {
@@ -383,6 +527,7 @@ export const calculateVolumeProfileV3PL = ({
       buyDate = null
       cutoffPrice = null
       currentWindowIndex = null
+      pointsSinceWindowReset = 0
 
       continue // Move to next point
     }
@@ -408,66 +553,11 @@ export const calculateVolumeProfileV3PL = ({
       }
     }
 
-    // Check for sell condition: price below heaviest zone
-    if (isHolding && currentWindowIndex !== null) {
-      const windowData = dateToWindowMap.get(currentDate)
-
-      if (windowData) {
-        const priceZones = windowData.priceZones
-
-        // Find the heaviest zone in the current window
-        let maxWeight = 0
-        let heaviestZone = null
-        priceZones.forEach(zone => {
-          if (zone.volumeWeight > maxWeight) {
-            maxWeight = zone.volumeWeight
-            heaviestZone = zone
-          }
-        })
-
-        // Sell if price drops below the heaviest zone's minimum price
-        if (heaviestZone && currentPrice < heaviestZone.minPrice) {
-          const sellPrice = currentPrice
-          const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
-          const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
-          const plPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100
-
-          trades.push({
-            buyPrice,
-            buyDate,
-            sellPrice,
-            sellDate: currentDate,
-            plPercent,
-            isCutoff: false,
-            reason: `Price below heaviest zone (${maxWeight.toFixed(2)} weight)`
-          })
-
-          sellSignals.push({
-            date: currentDate,
-            price: sellPrice,
-            isCutoff: false,
-            reason: `Price $${currentPrice.toFixed(2)} < Heaviest zone $${heaviestZone.minPrice.toFixed(2)}`
-          })
-
-          // Reset state
-          isHolding = false
-          buyPrice = null
-          buyDate = null
-          cutoffPrice = null
-          currentWindowIndex = null
-          currentTradeId++
-
-          continue // Move to next point
-        }
-      }
-    }
-
     // Check for break signals at this point
     const breakSignal = breakSignalMap.get(currentDate)
     if (breakSignal) {
       if (breakSignal.isUpBreak) {
         // Breakup signal - BUY only if not already holding
-        // No need to wait 75 points after sell since we maintain a continuous window
         if (!isHolding) {
           isHolding = true
           buyPrice = breakSignal.price
@@ -477,6 +567,7 @@ export const calculateVolumeProfileV3PL = ({
           cutoffPrice = breakSignal.price * (1 - CUTOFF_PERCENT)
 
           currentWindowIndex = breakSignal.windowIndex // Track starting window
+          pointsSinceWindowReset = 0 // Reset counter on new buy
 
           buySignals.push({
             date: breakSignal.date,
@@ -492,8 +583,8 @@ export const calculateVolumeProfileV3PL = ({
         }
         // If consecutive breakup (already holding), ignore it
       } else {
-        // Breakdown signal - SELL only if holding
-        if (isHolding) {
+        // Breakdown signal - SELL only if holding AND we have at least 75 points since window reset
+        if (isHolding && pointsSinceWindowReset >= MIN_POINTS_FOR_SELL) {
           const sellPrice = breakSignal.price
           // Apply transaction fees: buy fee increases cost, sell fee decreases proceeds
           const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
@@ -513,7 +604,7 @@ export const calculateVolumeProfileV3PL = ({
             date: breakSignal.date,
             price: breakSignal.price,
             isCutoff: false,
-            reason: 'Breakdown signal'
+            reason: 'Breakdown signal (low-volume breakdown)'
           })
 
           // Reset state
@@ -522,8 +613,10 @@ export const calculateVolumeProfileV3PL = ({
           buyDate = null
           cutoffPrice = null
           currentWindowIndex = null
+          pointsSinceWindowReset = 0
           currentTradeId++
         }
+        // If breakdown but not enough points since window reset, ignore it
       }
     }
   }
