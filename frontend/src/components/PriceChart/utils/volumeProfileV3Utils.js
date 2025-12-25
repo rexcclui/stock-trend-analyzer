@@ -399,9 +399,10 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
  *
  * BUY LOGIC: Buy on low-volume breakout (isUpBreak: true)
  * SELL LOGIC:
- * 1. Sell on low-volume breakdown (isUpBreak: false) - ONLY if 75+ points since window reset
+ * 1. Sell on low-volume breakdown (isUpBreak: false)
  * 2. Window resets when price reaches all-time high while holding
- * 3. After window reset, need 75+ points before sell signal can trigger
+ * 3. After all-time high window reset, need 75+ points before sell signal can trigger
+ * 4. Sell signals can trigger immediately after buy (no waiting period)
  *
  * NOTE: Cutoff (trailing stop) logic is currently DISABLED
  *
@@ -570,7 +571,7 @@ export const calculateVolumeProfileV3PL = ({
           cutoffPrice = breakSignal.price * (1 - CUTOFF_PERCENT)
 
           currentWindowIndex = breakSignal.windowIndex // Track starting window
-          pointsSinceWindowReset = 0 // Reset counter on new buy
+          pointsSinceWindowReset = MIN_POINTS_FOR_SELL // Set to 75 so sells can trigger immediately after buy
 
           buySignals.push({
             date: breakSignal.date,
