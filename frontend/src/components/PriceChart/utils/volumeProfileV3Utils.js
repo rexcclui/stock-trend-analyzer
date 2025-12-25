@@ -7,19 +7,21 @@
  * - Divide price range evenly into 15-20 zones
  *
  * BUY SIGNALS (Low-volume breakout UP):
- * - Current zone must have LESS volume than BOTH of the first two zones below (any amount)
- * - Example: Current = 3%, Prior two = 5% & 6% → Buy triggers
- * - Example: Current = 3%, Prior two = 5% & 2% → No buy (3% >= 2%)
- * - Additional filter: support zones must have at least 10% total window volume
+ * - Current zone must be 8% LESS than ANY support zone (from 10 non-zero zones below)
+ * - Individual zone check: Current = 2%, Support = 10.5% → Buy (10.5% - 2% = 8.5% > 8%)
+ * - Merged zone check: Current = 2%, Zone1 = 5%, Zone2 = 10.1% → Buy ((5% + 10.1%) - 2% = 13.1% > 8%)
+ * - Merged zone requirement: BOTH zones must be at least 2.5% more than current individually
+ * - Additional filter: best support zone must have at least 10% total window volume
  * - Additional filter: 3 zones above current must have less volume (thin resistance ahead)
  * - This identifies price moving away from strong high-volume support
  * - Breakup = buy signal (price escaping support with low volume = bullish)
  *
  * SELL SIGNALS (Low-volume breakdown DOWN):
- * - Current zone must have LESS volume than BOTH of the first two zones above (any amount)
- * - Example: Current = 3%, Upper two = 5% & 6% → Sell triggers
- * - Example: Current = 3%, Upper two = 5% & 2% → No sell (3% >= 2%)
- * - Additional filter: resistance zones must have at least 10% total window volume
+ * - Current zone must be 8% LESS than ANY resistance zone (from 10 non-zero zones above)
+ * - Individual zone check: Current = 2%, Resistance = 10.5% → Sell (10.5% - 2% = 8.5% > 8%)
+ * - Merged zone check: Current = 2%, Zone1 = 5%, Zone2 = 10.1% → Sell ((5% + 10.1%) - 2% = 13.1% > 8%)
+ * - Merged zone requirement: BOTH zones must be at least 2.5% more than current individually
+ * - Additional filter: best resistance zone must have at least 10% total window volume
  * - Additional filter: 3 zones below current must have less volume (thin support below)
  * - This identifies price moving away from strong high-volume resistance
  * - Breakdown = sell signal (price escaping resistance with low volume = bearish)
@@ -43,8 +45,9 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
 
   const MIN_WINDOW_SIZE = 75  // Changed from 150 to 75
   const BREAK_VOLUME_THRESHOLD = 0.10 // 10%
-  const BREAK_DIFF_THRESHOLD = 0.03 // 3% - current zone must have LESS volume than individual zones (not merged)
-  const ZONE_LOOKBACK = 10 // Check previous 10 zones for break detection
+  const BREAK_DIFF_THRESHOLD = 0.08 // 8% - current zone must have 8% LESS volume than support/resistance
+  const MERGED_ZONE_MIN_DIFF = 0.025 // 2.5% - each zone in merged pair must be at least 2.5% more than current
+  const ZONE_LOOKBACK = 10 // Check up to 10 non-zero zones for break detection
   const ZONE_LOOKABOVE = 3 // Check upper 3 zones - must have less volume than current
 
   const windows = []
@@ -172,31 +175,50 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           k++
         }
 
-        // Check first TWO individual zones below - current must be LESS than BOTH (any amount)
-        // Example: Current = 3%, Prior two = 5% & 6% → Buy (3% < 5% AND 3% < 6%)
-        // Example: Current = 3%, Prior two = 5% & 2% → No buy (3% < 5% BUT 3% >= 2%)
-        if (nonZeroZonesBelow.length >= 2) {
-          const zone1 = nonZeroZonesBelow[0]  // Closest zone below
-          const zone2 = nonZeroZonesBelow[1]  // Second zone below
-
-          const weightDiff1 = currentWeight - zone1.weight
-          const weightDiff2 = currentWeight - zone2.weight
-
-          // Both zones must have MORE volume than current (any amount)
-          if (weightDiff1 < 0 && weightDiff2 < 0) {
-            buyBreakConditionMet = true
-          }
-        }
-
-        // Track the zone with most negative difference (highest volume support zone)
+        // PART 1: Check individual zones - current must be 8% LESS than ANY zone below
+        // Example: Current = 2%, Zone = 10.5% → Buy (10.5% - 2% = 8.5% > 8%)
         for (let i = 0; i < nonZeroZonesBelow.length; i++) {
           const zone = nonZeroZonesBelow[i]
-          const weightDiff = currentWeight - zone.weight
+          const weightDiff = zone.weight - currentWeight  // Support minus current
 
-          if (weightDiff < minWeightDiffBuy) {
+          // Trigger if support zone has at least 8% MORE volume than current
+          if (weightDiff >= BREAK_DIFF_THRESHOLD) {
+            buyBreakConditionMet = true
+          }
+
+          // Track the zone with most positive difference (strongest support zone)
+          if (weightDiff > minWeightDiffBuy) {
             minWeightDiffBuy = weightDiff
             bestSupportZoneIdx = zone.zoneIdx
             bestSupportZoneWeight = zone.weight
+          }
+        }
+
+        // PART 2: Check merged consecutive zones (zone[i] + zone[i+1])
+        // Merged zone must be 8% MORE than current, AND each individual zone must be 2.5% MORE
+        for (let i = 0; i < nonZeroZonesBelow.length - 1; i++) {
+          const zone1 = nonZeroZonesBelow[i]
+          const zone2 = nonZeroZonesBelow[i + 1]
+
+          // Each individual zone must be at least 2.5% more than current
+          const diff1 = zone1.weight - currentWeight
+          const diff2 = zone2.weight - currentWeight
+
+          if (diff1 >= MERGED_ZONE_MIN_DIFF && diff2 >= MERGED_ZONE_MIN_DIFF) {
+            // Check if merged zone is 8% more than current
+            const mergedWeight = zone1.weight + zone2.weight
+            const mergedDiff = mergedWeight - currentWeight
+
+            if (mergedDiff >= BREAK_DIFF_THRESHOLD) {
+              buyBreakConditionMet = true
+
+              // Track merged zone if it's stronger support
+              if (mergedDiff > minWeightDiffBuy) {
+                minWeightDiffBuy = mergedDiff
+                bestSupportZoneIdx = zone1.zoneIdx  // Use first zone index
+                bestSupportZoneWeight = mergedWeight
+              }
+            }
           }
         }
 
@@ -266,31 +288,50 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
           j++
         }
 
-        // Check first TWO individual zones above - current must be LESS than BOTH (any amount)
-        // Example: Current = 3%, Upper two = 5% & 6% → Sell (3% < 5% AND 3% < 6%)
-        // Example: Current = 3%, Upper two = 5% & 2% → No sell (3% < 5% BUT 3% >= 2%)
-        if (nonZeroZonesAbove.length >= 2) {
-          const zone1 = nonZeroZonesAbove[0]  // Closest zone above
-          const zone2 = nonZeroZonesAbove[1]  // Second zone above
-
-          const weightDiff1 = currentWeight - zone1.weight
-          const weightDiff2 = currentWeight - zone2.weight
-
-          // Both zones must have MORE volume than current (any amount)
-          if (weightDiff1 < 0 && weightDiff2 < 0) {
-            sellBreakConditionMet = true
-          }
-        }
-
-        // Track the zone with most negative difference (highest volume resistance zone)
+        // PART 1: Check individual zones - current must be 8% LESS than ANY zone above
+        // Example: Current = 2%, Zone = 10.5% → Sell (10.5% - 2% = 8.5% > 8%)
         for (let i = 0; i < nonZeroZonesAbove.length; i++) {
           const zone = nonZeroZonesAbove[i]
-          const weightDiff = currentWeight - zone.weight
+          const weightDiff = zone.weight - currentWeight  // Resistance minus current
 
-          if (weightDiff < minWeightDiffSell) {
+          // Trigger if resistance zone has at least 8% MORE volume than current
+          if (weightDiff >= BREAK_DIFF_THRESHOLD) {
+            sellBreakConditionMet = true
+          }
+
+          // Track the zone with most positive difference (strongest resistance zone)
+          if (weightDiff > minWeightDiffSell) {
             minWeightDiffSell = weightDiff
             bestResistanceZoneIdx = zone.zoneIdx
             bestResistanceZoneWeight = zone.weight
+          }
+        }
+
+        // PART 2: Check merged consecutive zones (zone[i] + zone[i+1])
+        // Merged zone must be 8% MORE than current, AND each individual zone must be 2.5% MORE
+        for (let i = 0; i < nonZeroZonesAbove.length - 1; i++) {
+          const zone1 = nonZeroZonesAbove[i]
+          const zone2 = nonZeroZonesAbove[i + 1]
+
+          // Each individual zone must be at least 2.5% more than current
+          const diff1 = zone1.weight - currentWeight
+          const diff2 = zone2.weight - currentWeight
+
+          if (diff1 >= MERGED_ZONE_MIN_DIFF && diff2 >= MERGED_ZONE_MIN_DIFF) {
+            // Check if merged zone is 8% more than current
+            const mergedWeight = zone1.weight + zone2.weight
+            const mergedDiff = mergedWeight - currentWeight
+
+            if (mergedDiff >= BREAK_DIFF_THRESHOLD) {
+              sellBreakConditionMet = true
+
+              // Track merged zone if it's stronger resistance
+              if (mergedDiff > minWeightDiffSell) {
+                minWeightDiffSell = mergedDiff
+                bestResistanceZoneIdx = zone1.zoneIdx  // Use first zone index
+                bestResistanceZoneWeight = mergedWeight
+              }
+            }
           }
         }
 
