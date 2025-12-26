@@ -80,9 +80,18 @@ export const CustomVolumeProfileV3 = ({
         {volumeProfileV3Data.map((window, windowIdx) => {
           if (!window || !window.dataPoints || window.dataPoints.length === 0) return null
 
+          // Determine the end date for this window (when the next window starts)
+          const nextWindow = volumeProfileV3Data[windowIdx + 1]
+          const windowEndDate = nextWindow?.dataPoints?.[0]?.date
+
+          // Filter dataPoints to only show those within this window's active period
+          const activeDataPoints = windowEndDate
+            ? window.dataPoints.filter(point => point.date < windowEndDate)
+            : window.dataPoints // Last window shows all its dataPoints
+
           return (
             <g key={`volume-profile-v3-window-${windowIdx}`}>
-              {window.dataPoints.map((point, pointIdx) => {
+              {activeDataPoints.map((point, pointIdx) => {
                 if (!point || !point.priceZones) return null
 
                 // Get X position for this data point
@@ -91,8 +100,8 @@ export const CustomVolumeProfileV3 = ({
 
                 // Calculate bar width (distance to next point or a small default)
                 let barWidth = 3 // default width
-                if (pointIdx < window.dataPoints.length - 1) {
-                  const nextPointX = xAxis.scale(window.dataPoints[pointIdx + 1].date)
+                if (pointIdx < activeDataPoints.length - 1) {
+                  const nextPointX = xAxis.scale(activeDataPoints[pointIdx + 1].date)
                   if (nextPointX !== undefined) {
                     barWidth = Math.abs(nextPointX - pointX)
                   }
