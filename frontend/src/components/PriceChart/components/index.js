@@ -19,6 +19,7 @@ export { CustomManualChannelZoneLines } from './CustomManualChannelZoneLines'
 export { CustomManualChannelLabels } from './CustomManualChannelLabels'
 export { CustomBestChannelZoneLines } from './CustomBestChannelZoneLines'
 export { CustomBestChannelStdevLabels } from './CustomBestChannelStdevLabels'
+export { default as CustomLinearRegression } from './CustomLinearRegression'
 
 // Note: Additional components to be extracted later:
 // - CustomLegend

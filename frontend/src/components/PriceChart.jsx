@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, ReferenceDot, Customized } from 'recharts'
 import { X, ArrowLeftRight, Hand } from 'lucide-react'
 import { findBestChannels, filterOverlappingChannels } from './PriceChart/utils/bestChannelFinder'
+import { calculateLinearRegression, getRegressionLinePoints } from './PriceChart/utils/regressionUtils'
 import {
   CustomTooltip as ImportedCustomTooltip,
   CustomXAxisTick as ImportedCustomXAxisTick,
@@ -19,13 +20,14 @@ import {
   CustomManualChannelZoneLines as ImportedCustomManualChannelZoneLines,
   CustomManualChannelLabels as ImportedCustomManualChannelLabels,
   CustomBestChannelZoneLines as ImportedCustomBestChannelZoneLines,
-  CustomBestChannelStdevLabels as ImportedCustomBestChannelStdevLabels
+  CustomBestChannelStdevLabels as ImportedCustomBestChannelStdevLabels,
+  CustomLinearRegression as ImportedCustomLinearRegression
 } from './PriceChart/components'
 import VolumeLegendPills from './VolumeLegendPills'
 import { getVolumeColor } from './PriceChart/utils'
 import { calculateVolumeProfileV3WithSells } from './PriceChart/utils/volumeProfileV3Utils'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RefreshTrigger = 0, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RefreshTrigger = 0, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, linearRegressionEnabled = false, linearRegressionSelection = null, onLinearRegressionSelectionChange, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -83,6 +85,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const [isSelectingZoom, setIsSelectingZoom] = useState(false)
   const [zoomSelectionStart, setZoomSelectionStart] = useState(null)
   const [zoomSelectionEnd, setZoomSelectionEnd] = useState(null)
+
+  // Linear regression selection state
+  const [isSelectingRegression, setIsSelectingRegression] = useState(false)
+  const [regressionSelectionStart, setRegressionSelectionStart] = useState(null)
+  const [regressionSelectionEnd, setRegressionSelectionEnd] = useState(null)
 
   // Chart panning state
   const [isPanning, setIsPanning] = useState(false)
@@ -3560,6 +3567,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return
     }
 
+    // Handle linear regression selection
+    if (linearRegressionEnabled && isSelectingRegression && e && e.activeLabel && e.activePayload && e.activePayload.length > 0) {
+      setRegressionSelectionEnd({
+        date: e.activeLabel,
+        price: e.activePayload[0].payload.close,
+        chartX: e.chartX,
+        chartY: e.chartY
+      })
+      return
+    }
+
     // Handle manual channel selection
     if (manualChannelEnabled && manualChannelDragMode && isSelecting && e && e.activeLabel) {
       setSelectionEnd(e.activeLabel)
@@ -3595,7 +3613,25 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return
     }
 
-    // Manual channel selection - third priority
+    // Linear regression selection - third priority
+    if (linearRegressionEnabled && e && e.activeLabel && e.activePayload && e.activePayload.length > 0) {
+      setIsSelectingRegression(true)
+      setRegressionSelectionStart({
+        date: e.activeLabel,
+        price: e.activePayload[0].payload.close,
+        chartX: e.chartX,
+        chartY: e.chartY
+      })
+      setRegressionSelectionEnd({
+        date: e.activeLabel,
+        price: e.activePayload[0].payload.close,
+        chartX: e.chartX,
+        chartY: e.chartY
+      })
+      return
+    }
+
+    // Manual channel selection - fourth priority
     if (manualChannelEnabled && manualChannelDragMode && e && e.activeLabel) {
       setIsSelecting(true)
       setSelectionStart(e.activeLabel)
@@ -3641,6 +3677,58 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       setIsSelectingZoom(false)
       setZoomSelectionStart(null)
       setZoomSelectionEnd(null)
+      return
+    }
+
+    // Process linear regression selection
+    if (linearRegressionEnabled && isSelectingRegression && regressionSelectionStart && regressionSelectionEnd) {
+      // Get the reversed display prices (oldest first) for index calculation
+      const reversedDisplayPrices = [...displayPrices].reverse()
+      const startDateIndex = reversedDisplayPrices.findIndex(p => p.date === regressionSelectionStart.date)
+      const endDateIndex = reversedDisplayPrices.findIndex(p => p.date === regressionSelectionEnd.date)
+
+      if (startDateIndex !== -1 && endDateIndex !== -1) {
+        // Ensure correct order
+        const minDateIndex = Math.min(startDateIndex, endDateIndex)
+        const maxDateIndex = Math.max(startDateIndex, endDateIndex)
+        const minY = Math.min(regressionSelectionStart.price, regressionSelectionEnd.price)
+        const maxY = Math.max(regressionSelectionStart.price, regressionSelectionEnd.price)
+
+        // Filter data points within the rectangular selection
+        const selectedPoints = []
+        for (let i = minDateIndex; i <= maxDateIndex; i++) {
+          const point = reversedDisplayPrices[i]
+          if (point && point.close >= minY && point.close <= maxY) {
+            selectedPoints.push({
+              x: i,
+              y: point.close,
+              date: point.date
+            })
+          }
+        }
+
+        // Calculate linear regression if we have enough points
+        if (selectedPoints.length >= 2) {
+          const regression = calculateLinearRegression(selectedPoints)
+
+          if (regression) {
+            // Store the selection with regression data
+            onLinearRegressionSelectionChange({
+              startIndex: minDateIndex,
+              endIndex: maxDateIndex,
+              startY: minY,
+              endY: maxY,
+              regression: regression,
+              selectedPoints: selectedPoints
+            })
+          }
+        }
+      }
+
+      // Reset selection state
+      setIsSelectingRegression(false)
+      setRegressionSelectionStart(null)
+      setRegressionSelectionEnd(null)
       return
     }
 
@@ -5144,6 +5232,31 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 )
               }} />
             )}
+
+            {/* Linear Regression Selection and Line */}
+            <Customized component={(props) => {
+              const { xAxisMap, yAxisMap, chartWidth, chartHeight } = props
+              if (!xAxisMap || !yAxisMap) return null
+
+              const xAxis = xAxisMap[0]
+              const yAxis = yAxisMap[0]
+
+              if (!xAxis || !yAxis) return null
+
+              return (
+                <ImportedCustomLinearRegression
+                  xScale={xAxis.scale}
+                  yScale={yAxis.scale}
+                  chartWidth={chartWidth}
+                  chartHeight={chartHeight}
+                  isSelecting={isSelectingRegression}
+                  selectionStart={regressionSelectionStart}
+                  selectionEnd={regressionSelectionEnd}
+                  regressionData={linearRegressionSelection}
+                  displayPrices={displayPrices}
+                />
+              )
+            }} />
 
             {/* Last Channel Lines */}
             {slopeChannelEnabled && slopeChannelInfo && (

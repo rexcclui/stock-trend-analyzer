@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
-import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp, RefreshCw, Filter, Menu, ZoomIn } from 'lucide-react'
+import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp, RefreshCw, Filter, Menu, ZoomIn, LineChart } from 'lucide-react'
 import PriceChart from './PriceChart'
 import IndicatorsChart from './IndicatorsChart'
 import SignalsList from './SignalsList'
@@ -304,6 +304,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
             manualChannelEnabled: false,
             manualChannelDragMode: false,
             zoomMode: false,
+            linearRegressionEnabled: false,
+            linearRegressionSelection: null,
             bestChannelEnabled: false,
             bestChannelVolumeFilterEnabled: false,
             bestStdevEnabled: false,
@@ -621,6 +623,35 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
           return {
             ...chart,
             manualChannelEnabled: !chart.manualChannelEnabled
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const toggleLinearRegression = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            linearRegressionEnabled: !chart.linearRegressionEnabled,
+            linearRegressionSelection: !chart.linearRegressionEnabled ? null : chart.linearRegressionSelection
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const updateLinearRegressionSelection = (chartId, selection) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            linearRegressionSelection: selection
           }
         }
         return chart
@@ -1829,6 +1860,17 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                       </button>
                       <button
                         type="button"
+                        onClick={() => toggleLinearRegression(chart.id)}
+                        className={`px-2 py-1 text-sm rounded transition-colors ${chart.linearRegressionEnabled
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        title="Linear Regression - Drag to select a range and plot regression line"
+                      >
+                        <LineChart className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => openSlopeChannelDialog(chart.id)}
                         className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
                         title="Configure Last Channel"
@@ -2171,6 +2213,9 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                     manualChannelEnabled={chart.manualChannelEnabled}
                     manualChannelDragMode={chart.manualChannelDragMode}
                     zoomMode={chart.zoomMode}
+                    linearRegressionEnabled={chart.linearRegressionEnabled}
+                    linearRegressionSelection={chart.linearRegressionSelection}
+                    onLinearRegressionSelectionChange={(selection) => updateLinearRegressionSelection(chart.id, selection)}
                     bestChannelEnabled={chart.bestChannelEnabled}
                     bestChannelVolumeFilterEnabled={chart.bestChannelVolumeFilterEnabled}
                     bestStdevEnabled={chart.bestStdevEnabled}
