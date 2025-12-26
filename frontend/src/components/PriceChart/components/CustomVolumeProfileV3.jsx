@@ -413,25 +413,57 @@ export const CustomVolumeProfileV3 = ({
               )
             })}
 
-            {/* Mark support update points with small circles */}
+            {/* Mark support update points with small circles and ATH resets with vertical lines */}
             {v3PL.supportUpdates?.map((update, idx) => {
               const x = xAxis.scale(update.date)
               const y = yAxis.scale(update.price)
 
               if (x === undefined || y === undefined) return null
 
+              const isATHReset = update.reason?.includes('All-time high')
+
               return (
-                <circle
-                  key={`support-mark-${idx}`}
-                  cx={x}
-                  cy={y}
-                  r={2}
-                  fill="#FFD700"
-                  stroke="white"
-                  strokeWidth={2}
-                  opacity={1}
-                  style={{ pointerEvents: 'none' }}
-                />
+                <g key={`support-mark-${idx}`}>
+                  {/* Vertical line for ATH window resets */}
+                  {isATHReset && (
+                    <line
+                      x1={x}
+                      y1={offset.top}
+                      x2={x}
+                      y2={offset.top + offset.height}
+                      stroke="#FFD700"
+                      strokeWidth={2}
+                      strokeDasharray="4,4"
+                      opacity={0.6}
+                      style={{ pointerEvents: 'none' }}
+                    />
+                  )}
+                  {/* Circle marker */}
+                  <circle
+                    cx={x}
+                    cy={y}
+                    r={isATHReset ? 4 : 2}
+                    fill="#FFD700"
+                    stroke="white"
+                    strokeWidth={isATHReset ? 3 : 2}
+                    opacity={1}
+                    style={{ pointerEvents: 'none' }}
+                  />
+                  {/* Label for ATH resets */}
+                  {isATHReset && (
+                    <text
+                      x={x}
+                      y={offset.top - 5}
+                      fill="#FFD700"
+                      fontSize="11"
+                      fontWeight="700"
+                      textAnchor="middle"
+                      style={{ pointerEvents: 'none' }}
+                    >
+                      ATH Reset
+                    </text>
+                  )}
+                </g>
               )
             })}
           </g>
