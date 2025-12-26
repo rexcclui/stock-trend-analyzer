@@ -475,6 +475,7 @@ export const calculateVolumeProfileV3PL = ({
   let pointsSinceWindowReset = 0 // Track points since last window reset (for 75-point minimum)
   let hasResetWindowThisHolding = false // Track if we've already reset window once in current holding period
   const MIN_POINTS_FOR_SELL = 75 // Minimum points required before sell signal after window reset
+  const ATH_THRESHOLD = 0.05 // 5% - price must be at least 5% higher than previous ATH to avoid false breakthroughs
 
   // Get all prices in forward chronological order
   const reversedPrices = [...prices].reverse()
@@ -504,7 +505,9 @@ export const calculateVolumeProfileV3PL = ({
 
     // Track GLOBAL all-time high across entire dataset
     // Window reset ONLY when reaching new global ATH while holding (once per holding period)
-    if (currentPrice > allTimeHigh) {
+    // Requires 5% above previous ATH to avoid false breakthroughs
+    const athMinimumPrice = allTimeHigh * (1 + ATH_THRESHOLD)
+    if (currentPrice > athMinimumPrice) {
       allTimeHigh = currentPrice
 
       // Only reset window if holding AND haven't already reset in this holding period
