@@ -432,6 +432,7 @@ function optimizeSMAParams(prices, slots, breakouts) {
 function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, triggerBacktest, onBacktestProcessed }) {
   const [symbols, setSymbols] = useState('')
   const [days, setDays] = useState(DEFAULT_DAYS) // Default to 5Y
+  const [regressionThreshold, setRegressionThreshold] = useState(6) // Default 6% below trend line
   const [loading, setLoading] = useState(false)
   const [loadingTopSymbols, setLoadingTopSymbols] = useState(false)
   const [loadingHKSymbols, setLoadingHKSymbols] = useState(false)
@@ -1004,7 +1005,7 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
       }
 
       // Calculate V3 with window splitting at sell dates (two-pass calculation)
-      const v3Result = calculateVolumeProfileV3WithSells(priceData, { start: 0, end: null }, 0.003, 0.12)
+      const v3Result = calculateVolumeProfileV3WithSells(priceData, { start: 0, end: null }, 0.003, 0.12, regressionThreshold)
       const { windows, breaks } = v3Result
 
       if (breaks.length === 0) {
@@ -1975,6 +1976,25 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
               <option value="1095">3 Years</option>
               <option value="1825">5 Years</option>
             </select>
+          </div>
+          <div className="w-full md:w-48">
+            <label className="block text-sm font-medium text-slate-300 mb-2" title="Sell when price falls this % below the trend line from buy point to current point">
+              Regression Sell %
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="range"
+                min="2"
+                max="15"
+                step="0.5"
+                value={regressionThreshold}
+                onChange={(e) => setRegressionThreshold(Number(e.target.value))}
+                className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-purple-600"
+              />
+              <span className="text-sm font-medium text-slate-200 w-12 text-right">
+                {regressionThreshold}%
+              </span>
+            </div>
           </div>
           <div className="flex items-end">
             <label className="flex items-center gap-2 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg cursor-pointer hover:bg-slate-600 transition-colors">

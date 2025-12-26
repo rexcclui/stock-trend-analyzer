@@ -419,7 +419,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
  * BUY LOGIC: Buy on low-volume breakout (isUpBreak: true)
  * SELL LOGIC:
  * 1. Sell on low-volume breakdown (isUpBreak: false)
- * 2. Sell if current price is more than 6% below linear regression line from buy point to current point
+ * 2. Sell if current price is more than regressionThreshold% below linear regression line from buy point to current point
  * 3. Volume profile window RESETS when price reaches all-time high while holding
  *    - Discards all previous cumulative data
  *    - Starts fresh volume calculation from the ATH point
@@ -434,6 +434,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
  * @param {Array} params.prices - Array of price data {date, close, volume}
  * @param {number} params.transactionFee - Transaction fee as decimal (e.g., 0.003 for 0.3%)
  * @param {number} params.cutoffPercent - Initial cutoff percentage as decimal (e.g., 0.12 for 12%) - NOT USED (cutoff disabled)
+ * @param {number} params.regressionThreshold - Regression sell threshold as percentage (e.g., 6 for 6%)
  * @returns {Object} P&L calculation results including athResetDates array
  */
 export const calculateVolumeProfileV3PL = ({
@@ -441,7 +442,8 @@ export const calculateVolumeProfileV3PL = ({
   volumeProfileV3Data = [],
   prices = [],
   transactionFee = 0.003,
-  cutoffPercent = 0.12
+  cutoffPercent = 0.12,
+  regressionThreshold = 6
 }) => {
   if (volumeProfileV3Breaks.length === 0) {
     return {
@@ -587,7 +589,7 @@ export const calculateVolumeProfileV3PL = ({
     //   }
     // }
 
-    // REGRESSION SELL CHECK: Sell if current price is more than 6% below linear regression line from buy point
+    // REGRESSION SELL CHECK: Sell if current price is more than regressionThreshold% below linear regression line from buy point
     if (isHolding) {
       // Find the buy point index in the reversed prices array
       const buyIndex = reversedPrices.findIndex(p => p.date === buyDate)
@@ -617,10 +619,10 @@ export const calculateVolumeProfileV3PL = ({
         const currentX = n - 1
         const expectedPrice = slope * currentX + intercept
 
-        // Check if current price is more than 6% below regression line
+        // Check if current price is more than regressionThreshold% below regression line
         const deviationPercent = ((currentPrice - expectedPrice) / expectedPrice) * 100
 
-        if (deviationPercent < -6) {
+        if (deviationPercent < -regressionThreshold) {
           // Trigger regression sell
           const sellPrice = currentPrice
           const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
@@ -773,7 +775,7 @@ export const calculateVolumeProfileV3PL = ({
  * Pass 2: Recalculate with window splits at ATH dates to get updated breaks
  * Pass 3: Final P&L calculation with ATH-aware volume profile
  */
-export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, transactionFee = 0.003, cutoffPercent = 0.12) => {
+export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, transactionFee = 0.003, cutoffPercent = 0.12, regressionThreshold = 6) => {
   // PASS 1: Calculate breaks with NO window splits to identify all-time high reset dates
   const initialResult = calculateVolumeProfileV3(displayPrices, zoomRange, [])
 
@@ -782,7 +784,8 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
     volumeProfileV3Data: initialResult.windows,
     prices: displayPrices,
     transactionFee,
-    cutoffPercent
+    cutoffPercent,
+    regressionThreshold
   })
 
   // PASS 2: Recalculate volume profile with window splits at all-time high reset dates
@@ -797,7 +800,8 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
     volumeProfileV3Data: finalResult.windows,
     prices: displayPrices,
     transactionFee,
-    cutoffPercent
+    cutoffPercent,
+    regressionThreshold
   })
 
   // Return results with ATH-aware windowing
