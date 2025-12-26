@@ -2458,7 +2458,9 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                         typeof winRate === 'number'
                           ? winRate >= 70
                             ? 'text-emerald-300'
-                            : 'text-slate-200'
+                            : winRate < 50
+                              ? 'text-red-400'
+                              : 'text-slate-200'
                           : 'text-slate-400'
 
                       return (
