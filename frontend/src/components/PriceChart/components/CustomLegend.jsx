@@ -483,13 +483,15 @@ export const CustomLegend = ({
         )
       })()}
 
-      {hoveredVolumeLegend?.length > 0 && (
+      {(hoveredVolumeLegend?.length > 0 || (volumeProfileV3Enabled && onVolumeProfileV3RegressionThresholdChange)) && (
         <div className="flex justify-center items-center gap-3">
-          <VolumeLegendPills
-            legend={hoveredVolumeLegend}
-            keyPrefix="chart-hover-volume"
-            titleFormatter={hoveredVolumeTitleFormatter}
-          />
+          {hoveredVolumeLegend?.length > 0 && (
+            <VolumeLegendPills
+              legend={hoveredVolumeLegend}
+              keyPrefix="chart-hover-volume"
+              titleFormatter={hoveredVolumeTitleFormatter}
+            />
+          )}
 
           {/* V3 Regression Sell Threshold Slider */}
           {volumeProfileV3Enabled && onVolumeProfileV3RegressionThresholdChange && (
