@@ -515,22 +515,24 @@ export const calculateVolumeProfileV3PL = ({
     const currentDate = currentPoint.date
 
     // Track GLOBAL all-time high across entire dataset
-    // Window reset ONLY when reaching new global ATH while holding (once per holding period)
+    // Window reset on EVERY new global ATH (regardless of holding status)
     // Requires 5% above previous ATH to avoid false breakthroughs
     const athMinimumPrice = allTimeHigh * (1 + ATH_THRESHOLD)
     if (currentPrice > athMinimumPrice) {
       allTimeHigh = currentPrice
 
-      // Only reset window if holding AND haven't already reset in this holding period
-      if (isHolding && !hasResetWindowThisHolding) {
-        pointsSinceWindowReset = 0
-        hasResetWindowThisHolding = true // Mark that we've reset once in this holding period
-        athResetDates.push(currentDate) // Mark this date for volume profile window reset
-        supportUpdates.push({
-          date: currentDate,
-          price: currentPrice,
-          reason: 'All-time high - window reset'
-        })
+      // Reset window on every ATH
+      pointsSinceWindowReset = 0
+      athResetDates.push(currentDate) // Mark this date for volume profile window reset
+      supportUpdates.push({
+        date: currentDate,
+        price: currentPrice,
+        reason: 'All-time high - window reset'
+      })
+
+      // Mark that we've reset in this holding period (if holding)
+      if (isHolding) {
+        hasResetWindowThisHolding = true
       }
     }
 
