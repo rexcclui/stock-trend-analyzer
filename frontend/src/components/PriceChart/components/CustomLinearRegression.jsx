@@ -16,6 +16,9 @@ const CustomLinearRegression = ({
 }) => {
   if (!xScale || !yScale) return null
 
+  // Render all regression lines and selection rectangle
+  const elements = []
+
   // Render selection rectangle while dragging
   if (isSelecting && selectionStart && selectionEnd) {
     const x1 = selectionStart.chartX || 0
@@ -28,54 +31,56 @@ const CustomLinearRegression = ({
     const rectWidth = Math.abs(x2 - x1)
     const rectHeight = Math.abs(y2 - y1)
 
-    return (
-      <g>
-        <rect
-          x={rectX}
-          y={rectY}
-          width={rectWidth}
-          height={rectHeight}
-          fill="rgba(168, 85, 247, 0.1)"
-          stroke="rgba(168, 85, 247, 0.6)"
-          strokeWidth={2}
-          strokeDasharray="5,5"
-          pointerEvents="none"
-        />
-      </g>
+    elements.push(
+      <rect
+        key="selection-rect"
+        x={rectX}
+        y={rectY}
+        width={rectWidth}
+        height={rectHeight}
+        fill="rgba(168, 85, 247, 0.15)"
+        stroke="rgba(168, 85, 247, 0.8)"
+        strokeWidth={2}
+        strokeDasharray="5,5"
+        pointerEvents="none"
+      />
     )
   }
 
-  // Render regression line after selection is complete
-  if (regressionData && regressionData.regression && displayPrices && displayPrices.length > 0) {
-    const { regression, startIndex, endIndex } = regressionData
-    const { slope, intercept, r2 } = regression
+  // Render all regression lines
+  if (Array.isArray(regressionData) && regressionData.length > 0 && displayPrices && displayPrices.length > 0) {
+    regressionData.forEach((data, idx) => {
+      if (!data || !data.regression) return
 
-    // Get the reversed display prices (oldest first) to match the index system
-    const reversedDisplayPrices = [...displayPrices].reverse()
+      const { regression, startIndex, endIndex } = data
+      const { slope, intercept, r2 } = regression
 
-    // Calculate regression line endpoints
-    const startPoint = reversedDisplayPrices[startIndex]
-    const endPoint = reversedDisplayPrices[endIndex]
+      // Get the reversed display prices (oldest first) to match the index system
+      const reversedDisplayPrices = [...displayPrices].reverse()
 
-    if (!startPoint || !endPoint) return null
+      // Calculate regression line endpoints
+      const startPoint = reversedDisplayPrices[startIndex]
+      const endPoint = reversedDisplayPrices[endIndex]
 
-    // Calculate Y values for the regression line at start and end X positions
-    const startY = slope * startIndex + intercept
-    const endY = slope * endIndex + intercept
+      if (!startPoint || !endPoint) return
 
-    // Convert to chart coordinates
-    const x1 = xScale(startPoint.date)
-    const y1 = yScale(startY)
-    const x2 = xScale(endPoint.date)
-    const y2 = yScale(endY)
+      // Calculate Y values for the regression line at start and end X positions
+      const startY = slope * startIndex + intercept
+      const endY = slope * endIndex + intercept
 
-    // Only render if coordinates are valid
-    if (isNaN(x1) || isNaN(y1) || isNaN(x2) || isNaN(y2)) return null
+      // Convert to chart coordinates
+      const x1 = xScale(startPoint.date)
+      const y1 = yScale(startY)
+      const x2 = xScale(endPoint.date)
+      const y2 = yScale(endY)
 
-    return (
-      <g>
-        {/* Regression line */}
+      // Only render if coordinates are valid
+      if (isNaN(x1) || isNaN(y1) || isNaN(x2) || isNaN(y2)) return
+
+      // Regression line
+      elements.push(
         <line
+          key={`regression-line-${idx}`}
           x1={x1}
           y1={y1}
           x2={x2}
@@ -84,24 +89,29 @@ const CustomLinearRegression = ({
           strokeWidth={2}
           pointerEvents="none"
         />
+      )
 
-        {/* Selection rectangle outline (faint) */}
-        {regressionData.startY !== undefined && regressionData.endY !== undefined && (
+      // Selection rectangle outline (faint)
+      if (data.startY !== undefined && data.endY !== undefined) {
+        elements.push(
           <rect
+            key={`regression-rect-${idx}`}
             x={x1}
-            y={yScale(Math.max(regressionData.startY, regressionData.endY))}
+            y={yScale(Math.max(data.startY, data.endY))}
             width={x2 - x1}
-            height={Math.abs(yScale(regressionData.startY) - yScale(regressionData.endY))}
+            height={Math.abs(yScale(data.startY) - yScale(data.endY))}
             fill="none"
             stroke="rgba(168, 85, 247, 0.3)"
             strokeWidth={1}
             strokeDasharray="3,3"
             pointerEvents="none"
           />
-        )}
+        )
+      }
 
-        {/* R² value label */}
-        <g transform={`translate(${x2 + 5}, ${y2})`}>
+      // R² value label
+      elements.push(
+        <g key={`r2-label-${idx}`} transform={`translate(${x2 + 5}, ${y2})`}>
           <rect
             x={0}
             y={-10}
@@ -120,9 +130,11 @@ const CustomLinearRegression = ({
             R² = {r2.toFixed(4)}
           </text>
         </g>
+      )
 
-        {/* Slope label */}
-        <g transform={`translate(${x1}, ${y1 - 15})`}>
+      // Slope label
+      elements.push(
+        <g key={`slope-label-${idx}`} transform={`translate(${x1}, ${y1 - 15})`}>
           <rect
             x={0}
             y={-10}
@@ -140,11 +152,11 @@ const CustomLinearRegression = ({
             m = {slope.toFixed(6)}
           </text>
         </g>
-      </g>
-    )
+      )
+    })
   }
 
-  return null
+  return elements.length > 0 ? <g>{elements}</g> : null
 }
 
 export default CustomLinearRegression

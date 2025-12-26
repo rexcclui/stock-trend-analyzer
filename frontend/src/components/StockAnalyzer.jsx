@@ -305,7 +305,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
             manualChannelDragMode: false,
             zoomMode: false,
             linearRegressionEnabled: false,
-            linearRegressionSelection: null,
+            linearRegressionSelections: [],
             bestChannelEnabled: false,
             bestChannelVolumeFilterEnabled: false,
             bestStdevEnabled: false,
@@ -636,8 +636,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
         if (chart.id === chartId) {
           return {
             ...chart,
-            linearRegressionEnabled: !chart.linearRegressionEnabled,
-            linearRegressionSelection: !chart.linearRegressionEnabled ? null : chart.linearRegressionSelection
+            linearRegressionEnabled: !chart.linearRegressionEnabled
           }
         }
         return chart
@@ -645,13 +644,41 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     )
   }
 
-  const updateLinearRegressionSelection = (chartId, selection) => {
+  const addLinearRegressionSelection = (chartId, selection) => {
     setCharts(prevCharts =>
       prevCharts.map(chart => {
         if (chart.id === chartId) {
           return {
             ...chart,
-            linearRegressionSelection: selection
+            linearRegressionSelections: [...chart.linearRegressionSelections, selection]
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const clearLinearRegressionSelections = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            linearRegressionSelections: []
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const removeLinearRegressionSelection = (chartId, index) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            linearRegressionSelections: chart.linearRegressionSelections.filter((_, i) => i !== index)
           }
         }
         return chart
@@ -1869,6 +1896,16 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                       >
                         <LineChart className="w-4 h-4" />
                       </button>
+                      {chart.linearRegressionEnabled && chart.linearRegressionSelections.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => clearLinearRegressionSelections(chart.id)}
+                          className="px-2 py-1 text-xs rounded font-medium transition-colors bg-red-600 text-white hover:bg-red-700"
+                          title="Clear all regression lines"
+                        >
+                          Clear All
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => openSlopeChannelDialog(chart.id)}
@@ -2214,8 +2251,10 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                     manualChannelDragMode={chart.manualChannelDragMode}
                     zoomMode={chart.zoomMode}
                     linearRegressionEnabled={chart.linearRegressionEnabled}
-                    linearRegressionSelection={chart.linearRegressionSelection}
-                    onLinearRegressionSelectionChange={(selection) => updateLinearRegressionSelection(chart.id, selection)}
+                    linearRegressionSelections={chart.linearRegressionSelections}
+                    onAddLinearRegressionSelection={(selection) => addLinearRegressionSelection(chart.id, selection)}
+                    onClearLinearRegressionSelections={() => clearLinearRegressionSelections(chart.id)}
+                    onRemoveLinearRegressionSelection={(index) => removeLinearRegressionSelection(chart.id, index)}
                     bestChannelEnabled={chart.bestChannelEnabled}
                     bestChannelVolumeFilterEnabled={chart.bestChannelVolumeFilterEnabled}
                     bestStdevEnabled={chart.bestStdevEnabled}
