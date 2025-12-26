@@ -157,8 +157,12 @@ const CustomLinearRegression = ({
           <g
             key={`delete-btn-${idx}`}
             transform={`translate(${x2 + 82}, ${y2})`}
-            onClick={() => onRemoveRegression(idx)}
-            style={{ cursor: 'pointer' }}
+            onMouseDown={(e) => {
+              e.stopPropagation()
+              onRemoveRegression(idx)
+            }}
+            pointerEvents="all"
+            cursor="pointer"
           >
             {/* Background circle */}
             <circle
@@ -168,6 +172,7 @@ const CustomLinearRegression = ({
               fill="rgba(239, 68, 68, 0.9)"
               stroke="rgba(255, 255, 255, 0.8)"
               strokeWidth={1}
+              pointerEvents="all"
             />
             {/* X icon */}
             <line
@@ -178,6 +183,7 @@ const CustomLinearRegression = ({
               stroke="white"
               strokeWidth={2}
               strokeLinecap="round"
+              pointerEvents="none"
             />
             <line
               x1={4}
@@ -187,6 +193,7 @@ const CustomLinearRegression = ({
               stroke="white"
               strokeWidth={2}
               strokeLinecap="round"
+              pointerEvents="none"
             />
           </g>
         )
