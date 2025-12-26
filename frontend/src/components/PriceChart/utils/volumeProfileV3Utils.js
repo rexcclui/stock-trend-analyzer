@@ -77,6 +77,8 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
     // Process data from currentWindowStart to windowEnd
     let windowData = visibleData.slice(currentWindowStart, windowEnd)
 
+    console.log(`Window ${windows.length}: start=${currentWindowStart}, end=${windowEnd}, dataLength=${windowData.length}, firstDate=${windowData[0]?.date}, lastDate=${windowData[windowData.length-1]?.date}`)
+
     if (windowData.length === 0) break
 
     // Process each data point in the window to detect breaks
@@ -95,6 +97,10 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       const cumulativePrices = cumulativeData.map(p => p.close)
       const minPrice = Math.min(...cumulativePrices)
       const maxPrice = Math.max(...cumulativePrices)
+
+      if (i === 0) {
+        console.log(`  Window ${windows.length} first point: date=${dataPoint.date}, price=${dataPoint.close}, minPrice=${minPrice}, maxPrice=${maxPrice}`)
+      }
       const priceRange = maxPrice - minPrice
 
       // Skip if no price movement yet
