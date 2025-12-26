@@ -161,6 +161,39 @@ export const CustomVolumeProfileV3 = ({
                   </g>
                 )
               })}
+
+              {/* Window boundary marker - show vertical line at start of window (except first window) */}
+              {windowIdx > 0 && window.dataPoints.length > 0 && (() => {
+                const windowStartDate = window.dataPoints[0]?.date
+                const x = xAxis.scale(windowStartDate)
+                if (x === undefined) return null
+
+                return (
+                  <g>
+                    <line
+                      x1={x}
+                      y1={offset.top}
+                      x2={x}
+                      y2={offset.top + offset.height}
+                      stroke="#9333ea"
+                      strokeWidth={2}
+                      strokeDasharray="8,4"
+                      opacity={0.7}
+                      style={{ pointerEvents: 'none' }}
+                    />
+                    <text
+                      x={x + 5}
+                      y={offset.top + 15}
+                      fill="#9333ea"
+                      fontSize="10"
+                      fontWeight="700"
+                      style={{ pointerEvents: 'none' }}
+                    >
+                      Window {windowIdx + 1}
+                    </text>
+                  </g>
+                )
+              })()}
             </g>
           )
         })}
