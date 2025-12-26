@@ -24,7 +24,8 @@ const CustomLinearRegression = ({
   selectionStart,
   selectionEnd,
   regressionData,
-  displayPrices
+  displayPrices,
+  onRemoveRegression
 }) => {
   if (!xScale || !yScale) return null
 
@@ -127,7 +128,7 @@ const CustomLinearRegression = ({
         )
       }
 
-      // R² value label
+      // R² value label with delete button
       elements.push(
         <g key={`r2-label-${idx}`} transform={`translate(${x2 + 5}, ${y2})`}>
           <rect
@@ -149,6 +150,47 @@ const CustomLinearRegression = ({
           </text>
         </g>
       )
+
+      // Delete button (X icon)
+      if (onRemoveRegression) {
+        elements.push(
+          <g
+            key={`delete-btn-${idx}`}
+            transform={`translate(${x2 + 82}, ${y2})`}
+            onClick={() => onRemoveRegression(idx)}
+            style={{ cursor: 'pointer' }}
+          >
+            {/* Background circle */}
+            <circle
+              cx={0}
+              cy={0}
+              r={8}
+              fill="rgba(239, 68, 68, 0.9)"
+              stroke="rgba(255, 255, 255, 0.8)"
+              strokeWidth={1}
+            />
+            {/* X icon */}
+            <line
+              x1={-4}
+              y1={-4}
+              x2={4}
+              y2={4}
+              stroke="white"
+              strokeWidth={2}
+              strokeLinecap="round"
+            />
+            <line
+              x1={4}
+              y1={-4}
+              x2={-4}
+              y2={4}
+              stroke="white"
+              strokeWidth={2}
+              strokeLinecap="round"
+            />
+          </g>
+        )
+      }
 
       // Slope label
       elements.push(

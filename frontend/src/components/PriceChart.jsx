@@ -5254,6 +5254,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   selectionEnd={regressionSelectionEnd}
                   regressionData={linearRegressionSelections}
                   displayPrices={displayPrices}
+                  onRemoveRegression={onRemoveLinearRegressionSelection}
                 />
               )
             }} />
