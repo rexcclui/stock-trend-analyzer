@@ -66,7 +66,9 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
     // Find the next split point (ATH reset date) or end of data
     let windowEnd = visibleData.length
     for (let i = currentWindowStart; i < visibleData.length; i++) {
-      if (splitDateSet.has(visibleData[i].date)) {
+      // Only split if we've processed at least one point (i > currentWindowStart)
+      // This prevents immediately re-splitting on the ATH date that started this window
+      if (i > currentWindowStart && splitDateSet.has(visibleData[i].date)) {
         windowEnd = i  // EXCLUDE the ATH date from current window - it starts the next window
         break
       }
