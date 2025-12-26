@@ -419,11 +419,12 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
  * BUY LOGIC: Buy on low-volume breakout (isUpBreak: true)
  * SELL LOGIC:
  * 1. Sell on low-volume breakdown (isUpBreak: false)
- * 2. Volume profile window RESETS when price reaches all-time high while holding
+ * 2. Sell if current price is more than 8% below linear regression line from buy point to current point
+ * 3. Volume profile window RESETS when price reaches all-time high while holding
  *    - Discards all previous cumulative data
  *    - Starts fresh volume calculation from the ATH point
- * 3. After window reset, need 75+ points before sell signal can trigger
- * 4. Sell signals can trigger immediately after buy (no waiting period)
+ * 4. After window reset, need 75+ points before breakdown sell signal can trigger (regression sell always active)
+ * 5. Sell signals can trigger immediately after buy (no waiting period)
  *
  * NOTE: Cutoff (trailing stop) logic is currently DISABLED
  *
@@ -585,6 +586,77 @@ export const calculateVolumeProfileV3PL = ({
     //     })
     //   }
     // }
+
+    // REGRESSION SELL CHECK: Sell if current price is more than 8% below linear regression line from buy point
+    if (isHolding) {
+      // Find the buy point index in the reversed prices array
+      const buyIndex = reversedPrices.findIndex(p => p.date === buyDate)
+
+      // Need at least 2 points to calculate regression (buy point + current point)
+      if (buyIndex !== -1 && i > buyIndex) {
+        const regressionData = reversedPrices.slice(buyIndex, i + 1)
+        const n = regressionData.length
+
+        // Calculate linear regression using least squares method
+        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0
+
+        regressionData.forEach((point, index) => {
+          const x = index
+          const y = point.close
+          sumX += x
+          sumY += y
+          sumXY += x * y
+          sumX2 += x * x
+        })
+
+        // Calculate slope and intercept
+        const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX)
+        const intercept = (sumY - slope * sumX) / n
+
+        // Calculate expected price at current point based on regression line
+        const currentX = n - 1
+        const expectedPrice = slope * currentX + intercept
+
+        // Check if current price is more than 8% below regression line
+        const deviationPercent = ((currentPrice - expectedPrice) / expectedPrice) * 100
+
+        if (deviationPercent < -8) {
+          // Trigger regression sell
+          const sellPrice = currentPrice
+          const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
+          const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
+          const plPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100
+
+          trades.push({
+            buyPrice,
+            buyDate,
+            sellPrice,
+            sellDate: currentDate,
+            plPercent,
+            isCutoff: false
+          })
+
+          sellSignals.push({
+            date: currentDate,
+            price: sellPrice,
+            isCutoff: false,
+            reason: `Regression sell (${Math.abs(deviationPercent).toFixed(1)}% below trend line)`
+          })
+
+          // Reset state
+          isHolding = false
+          buyPrice = null
+          buyDate = null
+          cutoffPrice = null
+          currentWindowIndex = null
+          pointsSinceWindowReset = 0
+          hasResetWindowThisHolding = false
+          currentTradeId++
+
+          continue // Skip breakdown check and move to next point
+        }
+      }
+    }
 
     // Check for break signals at this point
     const breakSignal = breakSignalMap.get(currentDate)
