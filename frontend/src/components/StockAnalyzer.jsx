@@ -650,7 +650,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
         if (chart.id === chartId) {
           return {
             ...chart,
-            linearRegressionSelections: [...chart.linearRegressionSelections, selection]
+            linearRegressionSelections: [...(chart.linearRegressionSelections || []), selection]
           }
         }
         return chart
@@ -678,7 +678,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
         if (chart.id === chartId) {
           return {
             ...chart,
-            linearRegressionSelections: chart.linearRegressionSelections.filter((_, i) => i !== index)
+            linearRegressionSelections: (chart.linearRegressionSelections || []).filter((_, i) => i !== index)
           }
         }
         return chart
@@ -1896,7 +1896,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                       >
                         <LineChart className="w-4 h-4" />
                       </button>
-                      {chart.linearRegressionEnabled && chart.linearRegressionSelections.length > 0 && (
+                      {chart.linearRegressionEnabled && chart.linearRegressionSelections?.length > 0 && (
                         <button
                           type="button"
                           onClick={() => clearLinearRegressionSelections(chart.id)}
@@ -2251,7 +2251,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                     manualChannelDragMode={chart.manualChannelDragMode}
                     zoomMode={chart.zoomMode}
                     linearRegressionEnabled={chart.linearRegressionEnabled}
-                    linearRegressionSelections={chart.linearRegressionSelections}
+                    linearRegressionSelections={chart.linearRegressionSelections || []}
                     onAddLinearRegressionSelection={(selection) => addLinearRegressionSelection(chart.id, selection)}
                     onClearLinearRegressionSelections={() => clearLinearRegressionSelections(chart.id)}
                     onRemoveLinearRegressionSelection={(index) => removeLinearRegressionSelection(chart.id, index)}
