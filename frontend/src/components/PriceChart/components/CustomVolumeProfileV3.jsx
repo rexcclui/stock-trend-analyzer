@@ -77,11 +77,14 @@ export const CustomVolumeProfileV3 = ({
       </defs>
 
       <g clipPath="url(#volPrfV3-clip)" mask="url(#volPrfV3-mask)">
-        {volumeProfileV3Data.map((window, windowIdx) => {
-          if (!window || !window.dataPoints || window.dataPoints.length === 0) return null
+        {volumeProfileV3Data
+          .filter((window, idx) => idx === volumeProfileV3Data.length - 1) // Only render the current/active window
+          .map((window) => {
+            const windowIdx = volumeProfileV3Data.length - 1 // Use actual window index for keys
+            if (!window || !window.dataPoints || window.dataPoints.length === 0) return null
 
-          return (
-            <g key={`volume-profile-v3-window-${windowIdx}`}>
+            return (
+              <g key={`volume-profile-v3-window-${windowIdx}`}>
               {window.dataPoints.map((point, pointIdx) => {
                 if (!point || !point.priceZones) return null
 
