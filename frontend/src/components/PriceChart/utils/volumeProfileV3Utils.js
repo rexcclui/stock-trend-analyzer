@@ -419,7 +419,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
  * BUY LOGIC: Buy on low-volume breakout (isUpBreak: true)
  * SELL LOGIC:
  * 1. Sell on low-volume breakdown (isUpBreak: false)
- * 2. Sell if current price is more than regressionThreshold% below linear regression line from buy point to current point
+ * 2. Sell if current price is more than regressionThreshold% below linear regression line from window start to current point
  * 3. Volume profile window RESETS when price reaches all-time high while holding
  *    - Discards all previous cumulative data
  *    - Starts fresh volume calculation from the ATH point
@@ -589,14 +589,20 @@ export const calculateVolumeProfileV3PL = ({
     //   }
     // }
 
-    // REGRESSION SELL CHECK: Sell if current price is more than regressionThreshold% below linear regression line from buy point
+    // REGRESSION SELL CHECK: Sell if current price is more than regressionThreshold% below linear regression line from window start
     if (isHolding) {
-      // Find the buy point index in the reversed prices array
-      const buyIndex = reversedPrices.findIndex(p => p.date === buyDate)
+      // Find the current window's start date
+      const currentWindow = volumeProfileV3Data.find(w => w.windowIndex === currentWindowIndex)
+      const windowStartDate = currentWindow?.dataPoints?.[0]?.date
 
-      // Need at least 2 points to calculate regression (buy point + current point)
-      if (buyIndex !== -1 && i > buyIndex) {
-        const regressionData = reversedPrices.slice(buyIndex, i + 1)
+      // Find the window start point index in the reversed prices array
+      const windowStartIndex = windowStartDate
+        ? reversedPrices.findIndex(p => p.date === windowStartDate)
+        : -1
+
+      // Need at least 2 points to calculate regression (window start + current point)
+      if (windowStartIndex !== -1 && i > windowStartIndex) {
+        const regressionData = reversedPrices.slice(windowStartIndex, i + 1)
         const n = regressionData.length
 
         // Calculate linear regression using least squares method
