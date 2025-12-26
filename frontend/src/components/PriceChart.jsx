@@ -27,7 +27,7 @@ import VolumeLegendPills from './VolumeLegendPills'
 import { getVolumeColor } from './PriceChart/utils'
 import { calculateVolumeProfileV3WithSells } from './PriceChart/utils/volumeProfileV3Utils'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RefreshTrigger = 0, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, linearRegressionEnabled = false, linearRegressionSelections = [], onAddLinearRegressionSelection, onClearLinearRegressionSelections, onRemoveLinearRegressionSelection, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RefreshTrigger = 0, volumeProfileV3RegressionThreshold = 6, onVolumeProfileV3RegressionThresholdChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, linearRegressionEnabled = false, linearRegressionSelections = [], onAddLinearRegressionSelection, onClearLinearRegressionSelections, onRemoveLinearRegressionSelection, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -2618,9 +2618,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       v3InitializedRef.current = true
     }
 
-    const result = calculateVolumeProfileV3WithSells(prices, v3ZoomRangeRef.current, 0.003, 0.12)
+    const result = calculateVolumeProfileV3WithSells(prices, v3ZoomRangeRef.current, 0.003, 0.12, volumeProfileV3RegressionThreshold)
     setVolumeProfileV3Result(result)
-  }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, prices])  // zoomRange removed - no recalc on zoom!
+  }, [volumeProfileV3Enabled, volumeProfileV3RefreshTrigger, volumeProfileV3RegressionThreshold, prices])  // zoomRange removed - no recalc on zoom!
 
   // SMA Simulation Logic - find optimal SMA value based on P&L
   useEffect(() => {
@@ -5002,14 +5002,109 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         )
       })()}
 
+      {/* Volume Profile V3 Regression Threshold Slider */}
+      {volumeProfileV3Enabled && onVolumeProfileV3RegressionThresholdChange && (() => {
+        const topOffset = (() => {
+          const hasRevSlider = revAllChannelEnabled && revAllVisibleLength > 1
+          const hasVolV2Slider = volumeProfileV2Enabled && displayPrices.length > 0
+          if (hasRevSlider && hasVolV2Slider) return '88px'
+          if (hasRevSlider || hasVolV2Slider) return '46px'
+          return '4px'
+        })()
+
+        return (
+          <div
+            style={{
+              position: 'absolute',
+              top: topOffset,
+              left: '60px',
+              right: '20px',
+              zIndex: 7,
+              pointerEvents: 'none'
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                width: '100%',
+                background: 'rgba(30, 41, 59, 0.75)',
+                border: '1px solid rgba(168, 85, 247, 0.4)',
+                borderRadius: '8px',
+                padding: '6px 10px',
+                backdropFilter: 'blur(4px)',
+                boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
+                pointerEvents: 'auto'
+              }}
+            >
+              <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700, whiteSpace: 'nowrap' }}>Regression Sell</span>
+
+              <div style={{ flex: 1, position: 'relative', height: '24px', display: 'flex', alignItems: 'center' }}>
+                <input
+                  type="range"
+                  min={2}
+                  max={15}
+                  step={0.5}
+                  value={volumeProfileV3RegressionThreshold}
+                  onChange={(e) => onVolumeProfileV3RegressionThresholdChange(Number(e.target.value))}
+                  title={`Regression sell threshold: ${volumeProfileV3RegressionThreshold}%`}
+                  style={{
+                    width: '100%',
+                    height: '6px',
+                    margin: 0,
+                    padding: 0,
+                    cursor: 'pointer',
+                    WebkitAppearance: 'none',
+                    appearance: 'none',
+                    background: 'linear-gradient(to right, #a855f7 0%, #a855f7 100%)',
+                    borderRadius: '3px'
+                  }}
+                />
+                <style>{`
+                  input[type="range"]::-webkit-slider-thumb {
+                    -webkit-appearance: none;
+                    appearance: none;
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 50%;
+                    background: #a855f7;
+                    border: 2px solid #fff;
+                    cursor: pointer;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                  }
+
+                  input[type="range"]::-moz-range-thumb {
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 50%;
+                    background: #a855f7;
+                    border: 2px solid #fff;
+                    cursor: pointer;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                  }
+                `}</style>
+              </div>
+
+              <span style={{ fontSize: '13px', color: '#e2e8f0', fontWeight: 700, minWidth: '40px', textAlign: 'right' }}>
+                {volumeProfileV3RegressionThreshold}%
+              </span>
+            </div>
+          </div>
+        )
+      })()}
+
       <div style={{
         width: '100%',
         height: '100%',
         paddingTop: (() => {
           const hasRevSlider = revAllChannelEnabled && revAllVisibleLength > 1
           const hasVolV2Slider = volumeProfileV2Enabled && displayPrices.length > 0
-          if (hasRevSlider && hasVolV2Slider) return '84px' // Rev slider + Vol V2 slider
-          if (hasRevSlider || hasVolV2Slider) return '42px' // One slider
+          const hasVolV3Slider = volumeProfileV3Enabled && onVolumeProfileV3RegressionThresholdChange
+          const sliderCount = [hasRevSlider, hasVolV2Slider, hasVolV3Slider].filter(Boolean).length
+          if (sliderCount >= 3) return '126px' // All three sliders
+          if (sliderCount === 2) return '84px' // Two sliders
+          if (sliderCount === 1) return '42px' // One slider
           return '0' // No sliders
         })()
       }}>

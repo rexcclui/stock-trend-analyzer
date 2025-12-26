@@ -286,6 +286,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
             volumeProfileV2Params: params?.volumeProfileV3Enabled ? null : (hasOptimalParams || forceVolumeProfileV2 ? params : null),
             volumeProfileV3Enabled: params?.volumeProfileV3Enabled || false,
             volumeProfileV3RefreshTrigger: 0,
+            volumeProfileV3RegressionThreshold: 6,
             spyData: null,
             performanceComparisonEnabled: false,
             performanceComparisonBenchmark: 'SPY',
@@ -917,6 +918,16 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
       prevCharts.map(chart =>
         chart.id === chartId
           ? { ...chart, volumeProfileV2EndDate: endDate }
+          : chart
+      )
+    )
+  }
+
+  const updateVolumeProfileV3RegressionThreshold = (chartId, threshold) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart =>
+        chart.id === chartId
+          ? { ...chart, volumeProfileV3RegressionThreshold: threshold }
           : chart
       )
     )
@@ -2230,6 +2241,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                     onVolumeProfileV2EndChange={(value) => updateVolumeProfileV2End(chart.id, value)}
                     volumeProfileV3Enabled={chart.volumeProfileV3Enabled}
                     volumeProfileV3RefreshTrigger={chart.volumeProfileV3RefreshTrigger}
+                    volumeProfileV3RegressionThreshold={chart.volumeProfileV3RegressionThreshold}
+                    onVolumeProfileV3RegressionThresholdChange={(value) => updateVolumeProfileV3RegressionThreshold(chart.id, value)}
                     spyData={chart.spyData}
                     performanceComparisonEnabled={chart.performanceComparisonEnabled}
                     performanceComparisonBenchmark={chart.performanceComparisonBenchmark}
