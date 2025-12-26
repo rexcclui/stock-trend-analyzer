@@ -419,7 +419,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
  * BUY LOGIC: Buy on low-volume breakout (isUpBreak: true)
  * SELL LOGIC:
  * 1. Sell on low-volume breakdown (isUpBreak: false)
- * 2. Sell if current price is more than 8% below linear regression line from buy point to current point
+ * 2. Sell if current price is more than 6% below linear regression line from buy point to current point
  * 3. Volume profile window RESETS when price reaches all-time high while holding
  *    - Discards all previous cumulative data
  *    - Starts fresh volume calculation from the ATH point
@@ -587,7 +587,7 @@ export const calculateVolumeProfileV3PL = ({
     //   }
     // }
 
-    // REGRESSION SELL CHECK: Sell if current price is more than 8% below linear regression line from buy point
+    // REGRESSION SELL CHECK: Sell if current price is more than 6% below linear regression line from buy point
     if (isHolding) {
       // Find the buy point index in the reversed prices array
       const buyIndex = reversedPrices.findIndex(p => p.date === buyDate)
@@ -617,10 +617,10 @@ export const calculateVolumeProfileV3PL = ({
         const currentX = n - 1
         const expectedPrice = slope * currentX + intercept
 
-        // Check if current price is more than 8% below regression line
+        // Check if current price is more than 6% below regression line
         const deviationPercent = ((currentPrice - expectedPrice) / expectedPrice) * 100
 
-        if (deviationPercent < -8) {
+        if (deviationPercent < -6) {
           // Trigger regression sell
           const sellPrice = currentPrice
           const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
