@@ -64,6 +64,8 @@ export const CustomLegend = ({
   extendManualChannel,
   volumeProfileV2Enabled,
   volumeProfileV3Enabled,
+  volumeProfileV3RegressionThreshold,
+  onVolumeProfileV3RegressionThresholdChange,
   isMobile,
   displayPrices,
   zoomRange,
@@ -482,12 +484,54 @@ export const CustomLegend = ({
       })()}
 
       {hoveredVolumeLegend?.length > 0 && (
-        <div className="flex justify-center">
+        <div className="flex justify-center items-center gap-3">
           <VolumeLegendPills
             legend={hoveredVolumeLegend}
             keyPrefix="chart-hover-volume"
             titleFormatter={hoveredVolumeTitleFormatter}
           />
+
+          {/* V3 Regression Sell Threshold Slider */}
+          {volumeProfileV3Enabled && onVolumeProfileV3RegressionThresholdChange && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                background: 'rgba(30, 41, 59, 0.75)',
+                border: '1px solid rgba(168, 85, 247, 0.4)',
+                borderRadius: '6px',
+                padding: '4px 10px',
+                backdropFilter: 'blur(4px)',
+                boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+              }}
+            >
+              <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700, whiteSpace: 'nowrap' }}>Regression</span>
+              <input
+                type="range"
+                min={2}
+                max={15}
+                step={0.5}
+                value={volumeProfileV3RegressionThreshold}
+                onChange={(e) => onVolumeProfileV3RegressionThresholdChange(Number(e.target.value))}
+                title={`Regression sell threshold: ${volumeProfileV3RegressionThreshold}%`}
+                style={{
+                  width: '100px',
+                  height: '4px',
+                  margin: 0,
+                  padding: 0,
+                  cursor: 'pointer',
+                  WebkitAppearance: 'none',
+                  appearance: 'none',
+                  background: 'linear-gradient(to right, #a855f7 0%, #a855f7 100%)',
+                  borderRadius: '2px'
+                }}
+              />
+              <span style={{ fontSize: '12px', color: '#e2e8f0', fontWeight: 700, minWidth: '35px', textAlign: 'right' }}>
+                {volumeProfileV3RegressionThreshold}%
+              </span>
+            </div>
+          )}
         </div>
       )}
     </div>

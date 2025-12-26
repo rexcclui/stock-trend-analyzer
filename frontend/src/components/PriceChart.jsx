@@ -5002,109 +5002,14 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         )
       })()}
 
-      {/* Volume Profile V3 Regression Threshold Slider */}
-      {volumeProfileV3Enabled && onVolumeProfileV3RegressionThresholdChange && (() => {
-        const topOffset = (() => {
-          const hasRevSlider = revAllChannelEnabled && revAllVisibleLength > 1
-          const hasVolV2Slider = volumeProfileV2Enabled && displayPrices.length > 0
-          if (hasRevSlider && hasVolV2Slider) return '88px'
-          if (hasRevSlider || hasVolV2Slider) return '46px'
-          return '4px'
-        })()
-
-        return (
-          <div
-            style={{
-              position: 'absolute',
-              top: topOffset,
-              left: '60px',
-              right: '20px',
-              zIndex: 7,
-              pointerEvents: 'none'
-            }}
-          >
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                width: '100%',
-                background: 'rgba(30, 41, 59, 0.75)',
-                border: '1px solid rgba(168, 85, 247, 0.4)',
-                borderRadius: '8px',
-                padding: '6px 10px',
-                backdropFilter: 'blur(4px)',
-                boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
-                pointerEvents: 'auto'
-              }}
-            >
-              <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700, whiteSpace: 'nowrap' }}>Regression Sell</span>
-
-              <div style={{ flex: 1, position: 'relative', height: '24px', display: 'flex', alignItems: 'center' }}>
-                <input
-                  type="range"
-                  min={2}
-                  max={15}
-                  step={0.5}
-                  value={volumeProfileV3RegressionThreshold}
-                  onChange={(e) => onVolumeProfileV3RegressionThresholdChange(Number(e.target.value))}
-                  title={`Regression sell threshold: ${volumeProfileV3RegressionThreshold}%`}
-                  style={{
-                    width: '100%',
-                    height: '6px',
-                    margin: 0,
-                    padding: 0,
-                    cursor: 'pointer',
-                    WebkitAppearance: 'none',
-                    appearance: 'none',
-                    background: 'linear-gradient(to right, #a855f7 0%, #a855f7 100%)',
-                    borderRadius: '3px'
-                  }}
-                />
-                <style>{`
-                  input[type="range"]::-webkit-slider-thumb {
-                    -webkit-appearance: none;
-                    appearance: none;
-                    width: 16px;
-                    height: 16px;
-                    border-radius: 50%;
-                    background: #a855f7;
-                    border: 2px solid #fff;
-                    cursor: pointer;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                  }
-
-                  input[type="range"]::-moz-range-thumb {
-                    width: 16px;
-                    height: 16px;
-                    border-radius: 50%;
-                    background: #a855f7;
-                    border: 2px solid #fff;
-                    cursor: pointer;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                  }
-                `}</style>
-              </div>
-
-              <span style={{ fontSize: '13px', color: '#e2e8f0', fontWeight: 700, minWidth: '40px', textAlign: 'right' }}>
-                {volumeProfileV3RegressionThreshold}%
-              </span>
-            </div>
-          </div>
-        )
-      })()}
-
       <div style={{
         width: '100%',
         height: '100%',
         paddingTop: (() => {
           const hasRevSlider = revAllChannelEnabled && revAllVisibleLength > 1
           const hasVolV2Slider = volumeProfileV2Enabled && displayPrices.length > 0
-          const hasVolV3Slider = volumeProfileV3Enabled && onVolumeProfileV3RegressionThresholdChange
-          const sliderCount = [hasRevSlider, hasVolV2Slider, hasVolV3Slider].filter(Boolean).length
-          if (sliderCount >= 3) return '126px' // All three sliders
-          if (sliderCount === 2) return '84px' // Two sliders
-          if (sliderCount === 1) return '42px' // One slider
+          if (hasRevSlider && hasVolV2Slider) return '84px' // Rev slider + Vol V2 slider
+          if (hasRevSlider || hasVolV2Slider) return '42px' // One slider
           return '0' // No sliders
         })()
       }}>
@@ -5171,6 +5076,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               extendManualChannel={extendManualChannel}
               volumeProfileV2Enabled={volumeProfileV2Enabled}
               volumeProfileV3Enabled={volumeProfileV3Enabled}
+              volumeProfileV3RegressionThreshold={volumeProfileV3RegressionThreshold}
+              onVolumeProfileV3RegressionThresholdChange={onVolumeProfileV3RegressionThresholdChange}
               isMobile={isMobile}
               displayPrices={displayPrices}
               zoomRange={zoomRange}
