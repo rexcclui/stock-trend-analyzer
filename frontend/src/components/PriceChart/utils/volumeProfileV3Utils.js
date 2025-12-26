@@ -63,11 +63,11 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
   const splitDateSet = new Set(windowSplitDates)
 
   while (currentWindowStart < visibleData.length) {
-    // Find the next split point (sell date) or end of data
+    // Find the next split point (ATH reset date) or end of data
     let windowEnd = visibleData.length
     for (let i = currentWindowStart; i < visibleData.length; i++) {
       if (splitDateSet.has(visibleData[i].date)) {
-        windowEnd = i + 1  // INCLUDE the sell date in the current window
+        windowEnd = i  // EXCLUDE the ATH date from current window - it starts the next window
         break
       }
     }
@@ -402,9 +402,9 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       })
     }
 
-    // Move to next window (starts right after the current window ends)
+    // Move to next window (starts at the ATH reset date)
     if (windowEnd < visibleData.length) {
-      currentWindowStart = windowEnd  // Start at next data point (window already includes sell date)
+      currentWindowStart = windowEnd  // Start at ATH date (excluded from previous window)
     } else {
       break  // Reached end of data
     }
