@@ -739,12 +739,6 @@ export const calculateVolumeProfileV3PL = ({
           price: currentPrice,
           reason: 'All-time high - window reset'
         })
-      } else {
-        supportUpdates.push({
-          date: currentDate,
-          price: currentPrice,
-          reason: 'All-time high - recorded (no window reset)'
-        })
       }
     }
   }
