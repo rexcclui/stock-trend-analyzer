@@ -487,6 +487,7 @@ export const calculateVolumeProfileV3PL = ({
   let buyPrice = null
   let buyDate = null
   let cutoffPrice = null // Track the current cutoff price (trailing stop)
+  let buyBufferPrice = null // BBP: 8% below buy price, required for sell criteria
   let currentWindowIndex = null // Track which window we're in while holding
   let currentTradeId = 0 // Track which trade we're in for support line segmentation
   let allTimeHigh = 0 // Track ATH within the locked visible range (starts at range start)
@@ -640,9 +641,12 @@ export const calculateVolumeProfileV3PL = ({
         // Check if current price is more than regressionThreshold% below regression line
         const deviationPercent = ((currentPrice - expectedPrice) / expectedPrice) * 100
 
-        if (deviationPercent < -regressionThreshold) {
-          // Trigger regression sell
-          const sellPrice = currentPrice
+      if (deviationPercent < -regressionThreshold) {
+        if (buyBufferPrice === null || currentPrice >= buyBufferPrice) {
+          continue
+        }
+        // Trigger regression sell
+        const sellPrice = currentPrice
           const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
           const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
           const plPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100
@@ -691,6 +695,7 @@ export const calculateVolumeProfileV3PL = ({
 
           // Initial cutoff = buyPrice * (1 - cutoffPercent) - NEVER use zone support
           cutoffPrice = breakSignal.price * (1 - CUTOFF_PERCENT)
+          buyBufferPrice = breakSignal.price * 0.92
 
           currentWindowIndex = breakSignal.windowIndex // Track starting window
           pointsSinceWindowReset = MIN_POINTS_FOR_SELL // Set to 75 so sells can trigger immediately after buy
@@ -713,6 +718,9 @@ export const calculateVolumeProfileV3PL = ({
         // Breakdown signal - SELL only if holding AND we have at least 75 points since window reset
         if (isHolding && pointsSinceWindowReset >= MIN_POINTS_FOR_SELL) {
           const sellPrice = breakSignal.price
+          if (buyBufferPrice === null || sellPrice >= buyBufferPrice) {
+            continue
+          }
           // Apply transaction fees: buy fee increases cost, sell fee decreases proceeds
           const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
           const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
@@ -739,6 +747,7 @@ export const calculateVolumeProfileV3PL = ({
           buyPrice = null
           buyDate = null
           cutoffPrice = null
+          buyBufferPrice = null
           currentWindowIndex = null
           pointsSinceWindowReset = 0
           hasResetWindowThisHolding = false // Reset flag for next holding period
