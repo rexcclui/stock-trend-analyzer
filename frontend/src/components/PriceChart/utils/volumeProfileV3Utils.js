@@ -38,6 +38,7 @@
  */
 export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, end: null }, windowSplitDates = []) => {
   if (!displayPrices || displayPrices.length === 0) return { windows: [], breaks: [] }
+  const DEBUG_BNWP_DATE = '2024-01-08'
 
   const reversedDisplayPrices = [...displayPrices].reverse()
   // Use the locked zoomRange from when V3 was first enabled
@@ -61,6 +62,13 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
 
   // Create a set of split dates for quick lookup
   const splitDateSet = new Set(windowSplitDates)
+  if (splitDateSet.has(DEBUG_BNWP_DATE)) {
+    console.log('[V3][BNWP][SplitDates]', {
+      date: DEBUG_BNWP_DATE,
+      inVisibleData: visibleData.some(point => point.date === DEBUG_BNWP_DATE),
+      splitDatesCount: windowSplitDates.length
+    })
+  }
 
   while (currentWindowStart < visibleData.length) {
     // Find the next split point (ATH reset date) or end of data
@@ -70,6 +78,14 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       // This prevents immediately re-splitting on the ATH date that started this window
       if (i > currentWindowStart && splitDateSet.has(visibleData[i].date)) {
         windowEnd = i  // EXCLUDE the ATH date from current window - it starts the next window
+        if (visibleData[i].date === DEBUG_BNWP_DATE) {
+          console.log('[V3][BNWP][Split]', {
+            date: visibleData[i].date,
+            previousWindowStart: visibleData[currentWindowStart]?.date,
+            previousWindowEnd: visibleData[i - 1]?.date,
+            nextWindowStart: visibleData[i]?.date
+          })
+        }
         break
       }
     }
