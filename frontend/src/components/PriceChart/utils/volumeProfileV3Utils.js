@@ -483,6 +483,7 @@ export const calculateVolumeProfileV3PL = ({
   let hasResetWindowThisHolding = false // Track if we've already reset window once in current holding period
   const MIN_POINTS_FOR_SELL = 75 // Minimum points required before sell signal after window reset
   const ATH_THRESHOLD = 0.05 // 5% - price must be more than 5% higher than previous ATH to trigger BNWP
+  const DEBUG_BNWP_DATE = '2024-01-08'
 
   // Get all prices in forward chronological order
   const reversedPrices = [...prices].reverse()
@@ -520,6 +521,20 @@ export const calculateVolumeProfileV3PL = ({
     const athHit = currentPrice > athMinimumPrice
     if (athHit) {
       allTimeHigh = currentPrice
+    }
+    if (currentDate === DEBUG_BNWP_DATE) {
+      console.log('[V3][BNWP][Debug]', {
+        date: currentDate,
+        price: currentPrice,
+        allTimeHigh,
+        athMinimumPrice,
+        athHit,
+        isHolding,
+        hasResetWindowThisHolding,
+        pointsSinceWindowReset,
+        breakSignal: breakSignalMap.get(currentDate) || null,
+        lastBuyDate: buyDate
+      })
     }
 
     // Increment points counter if holding
@@ -683,6 +698,11 @@ export const calculateVolumeProfileV3PL = ({
             date: breakSignal.date,
             price: breakSignal.price
           })
+          console.log('[V3][BNWP][Buy]', {
+            date: breakSignal.date,
+            price: breakSignal.price,
+            windowIndex: breakSignal.windowIndex
+          })
 
           // Add initial cutoff point
           cutoffPrices.push({
@@ -725,6 +745,11 @@ export const calculateVolumeProfileV3PL = ({
           pointsSinceWindowReset = 0
           hasResetWindowThisHolding = false // Reset flag for next holding period
           currentTradeId++
+          console.log('[V3][BNWP][Sell]', {
+            date: breakSignal.date,
+            price: breakSignal.price,
+            windowIndex: breakSignal.windowIndex
+          })
         }
         // If breakdown but not enough points since window reset, ignore it
       }
@@ -743,6 +768,23 @@ export const calculateVolumeProfileV3PL = ({
           date: currentDate,
           price: currentPrice,
           reason: 'BNWP - window reset'
+        })
+        console.log('[V3][BNWP][Reset]', {
+          date: currentDate,
+          price: currentPrice,
+          allTimeHigh,
+          athMinimumPrice,
+          windowIndex: resetWindow?.windowIndex ?? null
+        })
+      } else {
+        console.log('[V3][BNWP][Blocked]', {
+          date: currentDate,
+          price: currentPrice,
+          allTimeHigh,
+          athMinimumPrice,
+          isHolding,
+          hasResetWindowThisHolding,
+          lastBuyDate: buyDate
         })
       }
     }
