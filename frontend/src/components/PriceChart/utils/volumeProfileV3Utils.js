@@ -823,10 +823,13 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
 
   // PASS 2: Recalculate volume profile with window splits at all-time high reset dates
   // This ensures fresh volume calculations after each ATH while holding
-  const initialSplitDates = initialPL.athResetDates || []
-  console.log('BNWP Reset Dates:', initialSplitDates)
+  const bnwpSupportDates = (initialPL.supportUpdates || [])
+    .filter(update => update.reason?.includes('BNWP'))
+    .map(update => update.date)
+  const bnwpSplitDates = Array.from(new Set(bnwpSupportDates))
+  console.log('BNWP Reset Dates:', bnwpSplitDates)
 
-  const finalResult = calculateVolumeProfileV3(displayPrices, zoomRange, initialSplitDates)
+  const finalResult = calculateVolumeProfileV3(displayPrices, zoomRange, bnwpSplitDates)
   console.log('Windows after split:', finalResult.windows.length, finalResult.windows.map(w => ({start: w.startDate, end: w.endDate, points: w.dataPoints.length})))
 
   // PASS 3: Final P&L calculation with BNWP-aware volume profile
