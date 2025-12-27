@@ -214,8 +214,6 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
         return
       }
 
-      console.log(`[Input] Processing ${symbols.length} symbol(s):`, symbols.join(', '))
-
       // Smart pre-loading: fetch more data than displayed to enable smooth panning
       // Use days from params if provided (from backtest results), otherwise use state
       const displayDays = params?.days || days
@@ -243,14 +241,10 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
           const expectedLatestDate = params?.expectedLatestDate
           const cachedLatestDate = data?.prices?.[0]?.date
           if (data && expectedLatestDate && cachedLatestDate && cachedLatestDate !== expectedLatestDate) {
-            console.log(`[Cache] Stale for ${upperSymbol}:${fetchDays} (cached latest ${cachedLatestDate} vs expected ${expectedLatestDate}) - refetching`)
             data = null
           }
 
-          if (data) {
-            console.log(`[Cache] ✅ Cache available for ${upperSymbol}:${fetchDays}`)
-          } else {
-            console.log(`[Cache] ❌ Cache MISS for ${upperSymbol}:${fetchDays}, fetching from server...`)
+          if (!data) {
             const response = await axios.get(joinUrl(API_URL, '/analyze'), {
               params: {
                 symbol: upperSymbol,
@@ -411,7 +405,6 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
   }
 
   const handleSimulateSma = (chartId, smaIndex, optimalValue) => {
-    console.log(`[Simulate] Optimal SMA value for chart ${chartId}, index ${smaIndex}: ${optimalValue}`)
     setCharts(prevCharts =>
       prevCharts.map(chart => {
         if (chart.id === chartId) {
@@ -798,7 +791,6 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
         let spyData = apiCache.get('SPY', days)
 
         if (!spyData) {
-          console.log(`[Cache] ❌ Cache MISS for SPY:${days}, fetching from server...`)
           const response = await axios.get(joinUrl(API_URL, '/analyze'), {
             params: {
               symbol: 'SPY',
@@ -807,8 +799,6 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
           })
           spyData = response.data
           apiCache.set('SPY', days, spyData)
-        } else {
-          console.log(`[Cache] ✅ Cache HIT for SPY:${days}`)
         }
 
         setCharts(prevCharts =>
@@ -1081,7 +1071,6 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
         let spyData = apiCache.get('SPY', days)
 
         if (!spyData) {
-          console.log(`[Cache] ❌ Cache MISS for SPY:${days}, fetching from server...`)
           const response = await axios.get(joinUrl(API_URL, '/analyze'), {
             params: {
               symbol: 'SPY',
@@ -1090,8 +1079,6 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
           })
           spyData = response.data
           apiCache.set('SPY', days, spyData)
-        } else {
-          console.log(`[Cache] ✅ Cache HIT for SPY:${days}`)
         }
 
         setCharts(prevCharts =>
@@ -1163,7 +1150,6 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
       let benchmarkData = apiCache.get(benchmarkSymbol, days)
 
       if (!benchmarkData) {
-        console.log(`[Cache] ❌ Cache MISS for ${benchmarkSymbol}:${days}, fetching from server...`)
         const response = await axios.get(joinUrl(API_URL, '/analyze'), {
           params: {
             symbol: benchmarkSymbol,
@@ -1172,8 +1158,6 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
         })
         benchmarkData = response.data
         apiCache.set(benchmarkSymbol, days, benchmarkData)
-      } else {
-        console.log(`[Cache] ✅ Cache HIT for ${benchmarkSymbol}:${days}`)
       }
 
       setCharts(prevCharts =>
@@ -1197,8 +1181,6 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     const chart = charts.find(c => c.id === chartId)
     if (!chart) return
 
-    console.log(`[Comparison] Adding comparison stock: ${symbol}`)
-
     // Check if symbol already exists
     if (chart.comparisonStocks.some(s => s.symbol === symbol)) {
       setError(`${symbol} is already added for comparison`)
@@ -1217,7 +1199,6 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
       let stockData = apiCache.get(symbol, maxDays)
 
       if (!stockData) {
-        console.log(`[Cache] ❌ Cache MISS for ${symbol}:${maxDays}, fetching from server...`)
         const response = await axios.get(joinUrl(API_URL, '/analyze'), {
           params: {
             symbol: symbol,
@@ -1226,11 +1207,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
         })
         stockData = response.data
         apiCache.set(symbol, maxDays, stockData)
-      } else {
-        console.log(`[Cache] ✅ Cache HIT for ${symbol}:${maxDays}`)
       }
-
-      console.log(`[Comparison] Successfully added ${symbol} to comparison stocks`)
 
       setCharts(prevCharts =>
         prevCharts.map(c => {
@@ -1312,7 +1289,6 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
         // Fetch SPY data using smart loading
         spyDataForPeriod = apiCache.get('SPY', fetchDays)
         if (!spyDataForPeriod) {
-          console.log(`[Cache] ❌ Cache MISS for SPY:${fetchDays}, fetching from server...`)
           const response = await axios.get(joinUrl(API_URL, '/analyze'), {
             params: {
               symbol: 'SPY',
@@ -1321,8 +1297,6 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
           })
           spyDataForPeriod = response.data
           apiCache.set('SPY', fetchDays, spyDataForPeriod)
-        } else {
-          console.log(`[Cache] ✅ Cache available for SPY:${fetchDays}`)
         }
       }
 
@@ -1330,10 +1304,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
         // Try to get from cache first using fetch period
         let data = apiCache.get(chart.symbol, fetchDays)
 
-        if (data) {
-          console.log(`[Cache] ✅ Cache available for ${chart.symbol}:${fetchDays}`)
-        } else {
-          console.log(`[Cache] ❌ Cache MISS for ${chart.symbol}:${fetchDays}, fetching from server...`)
+        if (!data) {
           const response = await axios.get(joinUrl(API_URL, '/analyze'), {
             params: {
               symbol: chart.symbol,
@@ -1831,10 +1802,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                               placeholder="Type symbol, press Enter"
                               className="w-32 px-2 py-1 text-xs bg-slate-600 border border-slate-500 text-slate-100 rounded focus:ring-1 focus:ring-blue-500 focus:border-transparent"
                               onKeyPress={(e) => {
-                                console.log(`[Input] Key pressed: ${e.key}, value: ${e.target.value}`)
                                 if (e.key === 'Enter' && e.target.value.trim()) {
                                   const symbol = e.target.value.toUpperCase().trim()
-                                  console.log(`[Input] Enter pressed, adding symbol: ${symbol}`)
                                   e.target.value = ''
                                   addComparisonStock(chart.id, symbol)
                                 }
