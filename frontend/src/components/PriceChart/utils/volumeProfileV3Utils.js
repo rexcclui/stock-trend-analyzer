@@ -38,12 +38,10 @@
  */
 export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, end: null }, windowSplitDates = []) => {
   if (!displayPrices || displayPrices.length === 0) return { windows: [], breaks: [] }
-  const DEBUG_BNWP_DATE = '2024-01-08'
-
   const reversedDisplayPrices = [...displayPrices].reverse()
   // Use the locked zoomRange from when V3 was first enabled
   // This range is cached and does NOT change on subsequent zooms
-  const startIdx = zoomRange.start || 0
+  let startIdx = zoomRange.start || 0
   const endIdx = zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end
   const visibleData = reversedDisplayPrices.slice(startIdx, endIdx)
 
@@ -62,36 +60,25 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
 
   // Create a set of split dates for quick lookup
   const splitDateSet = new Set(windowSplitDates)
-  if (splitDateSet.has(DEBUG_BNWP_DATE)) {
-    console.log('[V3][BNWP][SplitDates]', {
-      date: DEBUG_BNWP_DATE,
-      inVisibleData: visibleData.some(point => point.date === DEBUG_BNWP_DATE),
-      splitDatesCount: windowSplitDates.length
-    })
+  if (visibleData.length > 0 && splitDateSet.has(visibleData[0].date) && startIdx > 0) {
+    startIdx -= 1
   }
+  const adjustedVisibleData = reversedDisplayPrices.slice(startIdx, endIdx)
 
-  while (currentWindowStart < visibleData.length) {
+  while (currentWindowStart < adjustedVisibleData.length) {
     // Find the next split point (ATH reset date) or end of data
-    let windowEnd = visibleData.length
-    for (let i = currentWindowStart; i < visibleData.length; i++) {
+    let windowEnd = adjustedVisibleData.length
+    for (let i = currentWindowStart; i < adjustedVisibleData.length; i++) {
       // Only split if we've processed at least one point (i > currentWindowStart)
       // This prevents immediately re-splitting on the ATH date that started this window
-      if (i > currentWindowStart && splitDateSet.has(visibleData[i].date)) {
+      if (i > currentWindowStart && splitDateSet.has(adjustedVisibleData[i].date)) {
         windowEnd = i  // EXCLUDE the ATH date from current window - it starts the next window
-        if (visibleData[i].date === DEBUG_BNWP_DATE) {
-          console.log('[V3][BNWP][Split]', {
-            date: visibleData[i].date,
-            previousWindowStart: visibleData[currentWindowStart]?.date,
-            previousWindowEnd: visibleData[i - 1]?.date,
-            nextWindowStart: visibleData[i]?.date
-          })
-        }
         break
       }
     }
 
     // Process data from currentWindowStart to windowEnd
-    let windowData = visibleData.slice(currentWindowStart, windowEnd)
+    let windowData = adjustedVisibleData.slice(currentWindowStart, windowEnd)
 
     if (windowData.length === 0) break
 
@@ -499,7 +486,6 @@ export const calculateVolumeProfileV3PL = ({
   let hasResetWindowThisHolding = false // Track if we've already reset window once in current holding period
   const MIN_POINTS_FOR_SELL = 75 // Minimum points required before sell signal after window reset
   const ATH_THRESHOLD = 0.05 // 5% - price must be more than 5% higher than previous ATH to trigger BNWP
-  const DEBUG_BNWP_DATE = '2024-01-08'
 
   // Get all prices in forward chronological order
   const reversedPrices = [...prices].reverse()
@@ -537,20 +523,6 @@ export const calculateVolumeProfileV3PL = ({
     const athHit = currentPrice > athMinimumPrice
     if (athHit) {
       allTimeHigh = currentPrice
-    }
-    if (currentDate === DEBUG_BNWP_DATE) {
-      console.log('[V3][BNWP][Debug]', {
-        date: currentDate,
-        price: currentPrice,
-        allTimeHigh,
-        athMinimumPrice,
-        athHit,
-        isHolding,
-        hasResetWindowThisHolding,
-        pointsSinceWindowReset,
-        breakSignal: breakSignalMap.get(currentDate) || null,
-        lastBuyDate: buyDate
-      })
     }
 
     // Increment points counter if holding
@@ -714,11 +686,6 @@ export const calculateVolumeProfileV3PL = ({
             date: breakSignal.date,
             price: breakSignal.price
           })
-          console.log('[V3][BNWP][Buy]', {
-            date: breakSignal.date,
-            price: breakSignal.price,
-            windowIndex: breakSignal.windowIndex
-          })
 
           // Add initial cutoff point
           cutoffPrices.push({
@@ -761,11 +728,6 @@ export const calculateVolumeProfileV3PL = ({
           pointsSinceWindowReset = 0
           hasResetWindowThisHolding = false // Reset flag for next holding period
           currentTradeId++
-          console.log('[V3][BNWP][Sell]', {
-            date: breakSignal.date,
-            price: breakSignal.price,
-            windowIndex: breakSignal.windowIndex
-          })
         }
         // If breakdown but not enough points since window reset, ignore it
       }
@@ -784,23 +746,6 @@ export const calculateVolumeProfileV3PL = ({
           date: currentDate,
           price: currentPrice,
           reason: 'BNWP - window reset'
-        })
-        console.log('[V3][BNWP][Reset]', {
-          date: currentDate,
-          price: currentPrice,
-          allTimeHigh,
-          athMinimumPrice,
-          windowIndex: resetWindow?.windowIndex ?? null
-        })
-      } else {
-        console.log('[V3][BNWP][Blocked]', {
-          date: currentDate,
-          price: currentPrice,
-          allTimeHigh,
-          athMinimumPrice,
-          isHolding,
-          hasResetWindowThisHolding,
-          lastBuyDate: buyDate
         })
       }
     }
