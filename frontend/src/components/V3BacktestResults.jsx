@@ -2527,7 +2527,6 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                           {renderSortIndicator('regressionThreshold')}
                         </span>
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase" title="Optimized parameters: Th=Breakout Threshold %, LB=Lookback Zones, SMA=SMA Period">Optimal Params</th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase" title="Timestamp of when this backtest was last run (red if >7 days old)">Last Scan</th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase" title="Actions: Load in Volume tab, Rescan, Erase results, Remove from table">Action</th>
                     </tr>
@@ -2703,15 +2702,6 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                               <span className="text-purple-400 font-medium">
                                 {result.optimalRegressionThreshold.toFixed(1)}%
                               </span>
-                            ) : (
-                              <span className="text-slate-500">—</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-slate-400 text-left">
-                            {hasData && hasParams && hasOptimalSMAs ? (
-                              <div className="whitespace-nowrap">
-                                Th:{(result.optimalParams.breakoutThreshold * 100).toFixed(0)}% LB:{result.optimalParams.lookbackZones} <span className="text-blue-400 font-medium">SMA:{result.optimalSMAs.period}</span>
-                              </div>
                             ) : (
                               <span className="text-slate-500">—</span>
                             )}
