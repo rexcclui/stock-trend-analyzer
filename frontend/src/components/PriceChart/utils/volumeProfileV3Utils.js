@@ -512,24 +512,9 @@ export const calculateVolumeProfileV3PL = ({
     // Window reset ONLY when reaching new global ATH while holding (once per holding period)
     // Requires 5% above previous ATH to avoid false breakthroughs
     const athMinimumPrice = allTimeHigh * (1 + ATH_THRESHOLD)
-    if (currentPrice > athMinimumPrice) {
+    const athHit = currentPrice > athMinimumPrice
+    if (athHit) {
       allTimeHigh = currentPrice
-
-      // Only reset window if holding AND haven't already reset since last buy signal
-      if (isHolding && !hasResetWindowThisHolding) {
-        pointsSinceWindowReset = 0
-        hasResetWindowThisHolding = true // Mark that we've reset once in this holding period
-        const resetWindow = dateToWindowMap.get(currentDate)
-        if (resetWindow) {
-          currentWindowIndex = resetWindow.windowIndex
-        }
-        athResetDates.push(currentDate) // Mark this date for volume profile window reset
-        supportUpdates.push({
-          date: currentDate,
-          price: currentPrice,
-          reason: 'All-time high - window reset'
-        })
-      }
     }
 
     // Increment points counter if holding
@@ -738,6 +723,21 @@ export const calculateVolumeProfileV3PL = ({
         }
         // If breakdown but not enough points since window reset, ignore it
       }
+    }
+
+    if (athHit && isHolding && !hasResetWindowThisHolding) {
+      pointsSinceWindowReset = 0
+      hasResetWindowThisHolding = true // Mark that we've reset once in this holding period
+      const resetWindow = dateToWindowMap.get(currentDate)
+      if (resetWindow) {
+        currentWindowIndex = resetWindow.windowIndex
+      }
+      athResetDates.push(currentDate) // Mark this date for volume profile window reset
+      supportUpdates.push({
+        date: currentDate,
+        price: currentPrice,
+        reason: 'All-time high - window reset'
+      })
     }
   }
 
