@@ -512,7 +512,7 @@ export const calculateVolumeProfileV3PL = ({
     // Window reset ONLY when reaching new global ATH while holding (once per holding period)
     // Requires 5% above previous ATH to avoid false breakthroughs
     const athMinimumPrice = allTimeHigh * (1 + ATH_THRESHOLD)
-    const athHit = currentPrice > athMinimumPrice
+    const athHit = currentPrice >= athMinimumPrice
     if (athHit) {
       allTimeHigh = currentPrice
     }
