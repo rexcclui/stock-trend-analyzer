@@ -38,7 +38,6 @@
  */
 export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, end: null }, windowSplitDates = []) => {
   if (!displayPrices || displayPrices.length === 0) return { windows: [], breaks: [] }
-  const DEBUG_BNWP_DATE = '2024-01-08'
   const reversedDisplayPrices = [...displayPrices].reverse()
   // Use the locked zoomRange from when V3 was first enabled
   // This range is cached and does NOT change on subsequent zooms
@@ -73,14 +72,6 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
     .map(date => dateToIndex.get(date))
     .filter(index => index !== undefined)
     .sort((a, b) => a - b)
-  if (dateToIndex.has(DEBUG_BNWP_DATE)) {
-    console.log('[V3][BNWP][SplitIndex]', {
-      date: DEBUG_BNWP_DATE,
-      index: dateToIndex.get(DEBUG_BNWP_DATE),
-      firstVisibleDate: adjustedVisibleData[0]?.date,
-      splitIndices: splitIndices.slice(0, 5)
-    })
-  }
 
   while (currentWindowStart < adjustedVisibleData.length) {
     // Find the next split point (BNWP reset date) or end of data
@@ -422,12 +413,6 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
         dataPoints: windowPoints,  // Use cumulative profiles from windowPoints
         breakDetected: breaks.length > 0
       })
-      if (windowPoints[0].date === DEBUG_BNWP_DATE) {
-        console.log('[V3][BNWP][WindowStart]', {
-          date: DEBUG_BNWP_DATE,
-          windowIndex: windows.length - 1
-        })
-      }
     }
 
     // Move to next window (starts at the ATH reset date)
@@ -509,7 +494,6 @@ export const calculateVolumeProfileV3PL = ({
   let hasResetWindowThisHolding = false // Track if we've already reset window once in current holding period
   const MIN_POINTS_FOR_SELL = 75 // Minimum points required before sell signal after window reset
   const ATH_THRESHOLD = 0.05 // 5% - price must be more than 5% higher than previous ATH to trigger BNWP
-  const DEBUG_BNWP_DATE = '2024-01-08'
 
   // Get all prices in forward chronological order
   const reversedPrices = [...prices].reverse()
@@ -547,18 +531,6 @@ export const calculateVolumeProfileV3PL = ({
     const athHit = currentPrice > athMinimumPrice
     if (athHit) {
       allTimeHigh = currentPrice
-    }
-    if (currentDate === DEBUG_BNWP_DATE) {
-      console.log('[V3][BNWP][PL]', {
-        date: currentDate,
-        price: currentPrice,
-        allTimeHigh,
-        athMinimumPrice,
-        athHit,
-        isHolding,
-        hasResetWindowThisHolding,
-        lastBuyDate: buyDate
-      })
     }
 
     // Increment points counter if holding
@@ -832,6 +804,13 @@ export const calculateVolumeProfileV3PL = ({
  * Pass 2: Recalculate with window splits at ATH dates to get updated breaks
  * Pass 3: Final P&L calculation with ATH-aware volume profile
  */
+const getBnwpResetDates = (plResult = {}) => {
+  const bnwpSupportDates = (plResult.supportUpdates || [])
+    .filter(update => update.reason?.includes('BNWP'))
+    .map(update => update.date)
+  return Array.from(new Set([...(plResult.athResetDates || []), ...bnwpSupportDates]))
+}
+
 export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, transactionFee = 0.003, cutoffPercent = 0.12, regressionThreshold = 6) => {
   // PASS 1: Calculate breaks with NO window splits to identify all-time high reset dates
   const initialResult = calculateVolumeProfileV3(displayPrices, zoomRange, [])
@@ -848,19 +827,16 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
 
   // PASS 2: Recalculate volume profile with window splits at all-time high reset dates
   // This ensures fresh volume calculations after each ATH while holding
-  const bnwpSupportDates = (initialPL.supportUpdates || [])
-    .filter(update => update.reason?.includes('BNWP'))
-    .map(update => update.date)
-  const athWindowSplitDates = Array.from(new Set([...(initialPL.athResetDates || []), ...bnwpSupportDates]))
-  console.log('BNWP Reset Dates:', athWindowSplitDates)
+  const initialSplitDates = getBnwpResetDates(initialPL)
+  console.log('BNWP Reset Dates:', initialSplitDates)
 
-  const finalResult = calculateVolumeProfileV3(displayPrices, zoomRange, athWindowSplitDates)
-  console.log('Windows after split:', finalResult.windows.length, finalResult.windows.map(w => ({start: w.startDate, end: w.endDate, points: w.dataPoints.length})))
+  const firstSplitResult = calculateVolumeProfileV3(displayPrices, zoomRange, initialSplitDates)
+  console.log('Windows after split:', firstSplitResult.windows.length, firstSplitResult.windows.map(w => ({start: w.startDate, end: w.endDate, points: w.dataPoints.length})))
 
-  // PASS 3: Final P&L calculation with ATH-aware volume profile
-  const finalPL = calculateVolumeProfileV3PL({
-    volumeProfileV3Breaks: finalResult.breaks,
-    volumeProfileV3Data: finalResult.windows,
+  // PASS 3: Final P&L calculation with BNWP-aware volume profile
+  const firstSplitPL = calculateVolumeProfileV3PL({
+    volumeProfileV3Breaks: firstSplitResult.breaks,
+    volumeProfileV3Data: firstSplitResult.windows,
     prices: displayPrices,
     transactionFee,
     cutoffPercent,
@@ -868,10 +844,30 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
     zoomRange
   })
 
-  // Return results with ATH-aware windowing
+  const finalSplitDates = getBnwpResetDates(firstSplitPL)
+  if (finalSplitDates.length > initialSplitDates.length) {
+    const finalResult = calculateVolumeProfileV3(displayPrices, zoomRange, finalSplitDates)
+    const finalPL = calculateVolumeProfileV3PL({
+      volumeProfileV3Breaks: finalResult.breaks,
+      volumeProfileV3Data: finalResult.windows,
+      prices: displayPrices,
+      transactionFee,
+      cutoffPercent,
+      regressionThreshold,
+      zoomRange
+    })
+
+    return {
+      windows: finalResult.windows,
+      breaks: finalResult.breaks,
+      ...finalPL
+    }
+  }
+
+  // Return results with BNWP-aware windowing
   return {
-    windows: finalResult.windows,
-    breaks: finalResult.breaks,
-    ...finalPL
+    windows: firstSplitResult.windows,
+    breaks: firstSplitResult.breaks,
+    ...firstSplitPL
   }
 }
