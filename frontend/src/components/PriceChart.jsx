@@ -103,6 +103,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // Volume Profile V3 hover state
   const [volV3HoveredBar, setVolV3HoveredBar] = useState(null)
 
+  // Volume Profile V3 regression simulation state
+  const [simulatingV3Regression, setSimulatingV3Regression] = useState(false)
+
   // Store the zoomRange snapshot for V3 calculations (doesn't trigger recalc on zoom)
   const v3ZoomRangeRef = useRef(zoomRange)
   // Track whether V3 has been initialized to lock in the initial range
@@ -2757,6 +2760,55 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   }, [simulatingSma, chartId, volumeProfileV2Enabled, onSimulateComplete, displayPrices, volumeProfileV2Data, volumeProfileV2Breakouts])
 
+  // V3 Regression Threshold Optimization - find optimal threshold for best P/L
+  const handleSimulateV3RegressionThreshold = () => {
+    if (!volumeProfileV3Enabled || !displayPrices || displayPrices.length === 0) return
+
+    setSimulatingV3Regression(true)
+
+    // Run simulation asynchronously to keep UI responsive
+    setTimeout(() => {
+      const testThresholds = []
+      for (let threshold = 2; threshold <= 15; threshold += 0.5) {
+        testThresholds.push(threshold)
+      }
+
+      let bestThreshold = volumeProfileV3RegressionThreshold
+      let bestPL = -Infinity
+
+      for (const threshold of testThresholds) {
+        try {
+          const v3Result = calculateVolumeProfileV3WithSells(
+            displayPrices,
+            v3ZoomRangeRef.current,
+            0.003,
+            0.12,
+            threshold
+          )
+
+          if (v3Result.breaks && v3Result.breaks.length > 0) {
+            const pl = v3Result.totalPL
+
+            if (typeof pl === 'number' && pl > bestPL) {
+              bestPL = pl
+              bestThreshold = threshold
+            }
+          }
+        } catch (error) {
+          // Skip this threshold if calculation fails
+          continue
+        }
+      }
+
+      // Update to best threshold
+      if (onVolumeProfileV3RegressionThresholdChange && bestPL > -Infinity) {
+        onVolumeProfileV3RegressionThresholdChange(bestThreshold)
+      }
+
+      setSimulatingV3Regression(false)
+    }, 100) // Small delay to let UI update
+  }
+
   // Calculate performance variance for each point (configurable rolling period)
   const performanceVariances = (() => {
     if (!performanceComparisonEnabled || !spyData || comparisonMode !== 'color') return []
@@ -5078,6 +5130,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               volumeProfileV3Enabled={volumeProfileV3Enabled}
               volumeProfileV3RegressionThreshold={volumeProfileV3RegressionThreshold}
               onVolumeProfileV3RegressionThresholdChange={onVolumeProfileV3RegressionThresholdChange}
+              onSimulateV3RegressionThreshold={handleSimulateV3RegressionThreshold}
+              simulatingV3Regression={simulatingV3Regression}
               isMobile={isMobile}
               displayPrices={displayPrices}
               zoomRange={zoomRange}

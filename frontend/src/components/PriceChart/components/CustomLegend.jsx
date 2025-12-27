@@ -1,5 +1,5 @@
 import React from 'react'
-import { X, ArrowLeftRight } from 'lucide-react'
+import { X, ArrowLeftRight, Minus, Plus, RotateCw } from 'lucide-react'
 import VolumeLegendPills from '../../VolumeLegendPills'
 
 /**
@@ -33,6 +33,10 @@ import VolumeLegendPills from '../../VolumeLegendPills'
  * @param {Function} props.extendManualChannel - Function to extend manual channel
  * @param {boolean} props.volumeProfileV2Enabled - Whether volume profile V2 is enabled
  * @param {boolean} props.volumeProfileV3Enabled - Whether volume profile V3 is enabled
+ * @param {number} props.volumeProfileV3RegressionThreshold - Current regression threshold value
+ * @param {Function} props.onVolumeProfileV3RegressionThresholdChange - Handler for regression threshold changes
+ * @param {Function} props.onSimulateV3RegressionThreshold - Handler to simulate optimal regression threshold
+ * @param {boolean} props.simulatingV3Regression - Whether V3 regression simulation is in progress
  * @param {boolean} props.isMobile - Whether the view is mobile
  * @param {Array} props.displayPrices - Price data for display
  * @param {Object} props.zoomRange - Current zoom range {start, end}
@@ -66,6 +70,8 @@ export const CustomLegend = ({
   volumeProfileV3Enabled,
   volumeProfileV3RegressionThreshold,
   onVolumeProfileV3RegressionThresholdChange,
+  onSimulateV3RegressionThreshold,
+  simulatingV3Regression,
   isMobile,
   displayPrices,
   zoomRange,
@@ -499,7 +505,7 @@ export const CustomLegend = ({
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
+                gap: '6px',
                 background: 'rgba(30, 41, 59, 0.75)',
                 border: '1px solid rgba(168, 85, 247, 0.4)',
                 borderRadius: '6px',
@@ -509,6 +515,28 @@ export const CustomLegend = ({
               }}
             >
               <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700, whiteSpace: 'nowrap' }}>Regression</span>
+              <button
+                onClick={() => {
+                  const newValue = Math.max(2, volumeProfileV3RegressionThreshold - 0.5)
+                  onVolumeProfileV3RegressionThresholdChange(newValue)
+                }}
+                disabled={volumeProfileV3RegressionThreshold <= 2 || simulatingV3Regression}
+                title="Decrease regression threshold"
+                style={{
+                  background: 'rgba(100, 116, 139, 0.5)',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '2px 4px',
+                  cursor: volumeProfileV3RegressionThreshold <= 2 || simulatingV3Regression ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: volumeProfileV3RegressionThreshold <= 2 || simulatingV3Regression ? 0.3 : 1,
+                  color: '#cbd5e1'
+                }}
+              >
+                <Minus size={14} />
+              </button>
               <input
                 type="range"
                 min={2}
@@ -516,22 +544,70 @@ export const CustomLegend = ({
                 step={0.5}
                 value={volumeProfileV3RegressionThreshold}
                 onChange={(e) => onVolumeProfileV3RegressionThresholdChange(Number(e.target.value))}
+                disabled={simulatingV3Regression}
                 title={`Regression sell threshold: ${volumeProfileV3RegressionThreshold}%`}
                 style={{
                   width: '100px',
                   height: '4px',
                   margin: 0,
                   padding: 0,
-                  cursor: 'pointer',
+                  cursor: simulatingV3Regression ? 'not-allowed' : 'pointer',
                   WebkitAppearance: 'none',
                   appearance: 'none',
                   background: 'linear-gradient(to right, #a855f7 0%, #a855f7 100%)',
-                  borderRadius: '2px'
+                  borderRadius: '2px',
+                  opacity: simulatingV3Regression ? 0.5 : 1
                 }}
               />
+              <button
+                onClick={() => {
+                  const newValue = Math.min(15, volumeProfileV3RegressionThreshold + 0.5)
+                  onVolumeProfileV3RegressionThresholdChange(newValue)
+                }}
+                disabled={volumeProfileV3RegressionThreshold >= 15 || simulatingV3Regression}
+                title="Increase regression threshold"
+                style={{
+                  background: 'rgba(100, 116, 139, 0.5)',
+                  border: 'none',
+                  borderRadius: '4px',
+                  padding: '2px 4px',
+                  cursor: volumeProfileV3RegressionThreshold >= 15 || simulatingV3Regression ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: volumeProfileV3RegressionThreshold >= 15 || simulatingV3Regression ? 0.3 : 1,
+                  color: '#cbd5e1'
+                }}
+              >
+                <Plus size={14} />
+              </button>
               <span style={{ fontSize: '12px', color: '#e2e8f0', fontWeight: 700, minWidth: '35px', textAlign: 'right' }}>
                 {volumeProfileV3RegressionThreshold}%
               </span>
+              {onSimulateV3RegressionThreshold && (
+                <button
+                  onClick={onSimulateV3RegressionThreshold}
+                  disabled={simulatingV3Regression}
+                  title="Simulate optimal regression threshold for best P/L"
+                  style={{
+                    background: simulatingV3Regression ? 'rgba(251, 191, 36, 0.8)' : 'rgba(37, 99, 235, 0.8)',
+                    border: 'none',
+                    borderRadius: '4px',
+                    padding: '3px 8px',
+                    cursor: simulatingV3Regression ? 'wait' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    color: '#fff',
+                    fontSize: '11px',
+                    fontWeight: 600
+                  }}
+                >
+                  <RotateCw size={12} className={simulatingV3Regression ? 'animate-spin' : ''} />
+                  Sim
+                </button>
+              )}
             </div>
           )}
         </div>
