@@ -519,6 +519,10 @@ export const calculateVolumeProfileV3PL = ({
       if (isHolding && !hasResetWindowThisHolding) {
         pointsSinceWindowReset = 0
         hasResetWindowThisHolding = true // Mark that we've reset once in this holding period
+        const resetWindow = dateToWindowMap.get(currentDate)
+        if (resetWindow) {
+          currentWindowIndex = resetWindow.windowIndex
+        }
         athResetDates.push(currentDate) // Mark this date for volume profile window reset
         supportUpdates.push({
           date: currentDate,
