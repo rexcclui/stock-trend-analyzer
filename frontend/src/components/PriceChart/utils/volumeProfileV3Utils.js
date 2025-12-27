@@ -437,6 +437,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
  * @param {number} params.transactionFee - Transaction fee as decimal (e.g., 0.003 for 0.3%)
  * @param {number} params.cutoffPercent - Initial cutoff percentage as decimal (e.g., 0.12 for 12%) - NOT USED (cutoff disabled)
  * @param {number} params.regressionThreshold - Regression sell threshold as percentage (e.g., 6 for 6%)
+ * @param {Object} params.zoomRange - Visible range for V3 (used to scope BNWP resets)
  * @returns {Object} P&L calculation results including athResetDates array
  */
 export const calculateVolumeProfileV3PL = ({
@@ -445,7 +446,8 @@ export const calculateVolumeProfileV3PL = ({
   prices = [],
   transactionFee = 0.003,
   cutoffPercent = 0.12,
-  regressionThreshold = 6
+  regressionThreshold = 6,
+  zoomRange = { start: 0, end: null }
 }) => {
   if (volumeProfileV3Breaks.length === 0) {
     return {
@@ -481,10 +483,12 @@ export const calculateVolumeProfileV3PL = ({
   let hasResetWindowThisHolding = false // Track if we've already reset window once in current holding period
   const MIN_POINTS_FOR_SELL = 75 // Minimum points required before sell signal after window reset
   const ATH_THRESHOLD = 0.05 // 5% - price must be more than 5% higher than previous ATH to trigger BNWP
-  const DEBUG_BNWP_DATE = '2024-01-08'
 
   // Get all prices in forward chronological order
   const reversedPrices = [...prices].reverse()
+  const startIdx = Math.max(0, zoomRange?.start ?? 0)
+  const endIdx = zoomRange?.end ?? reversedPrices.length
+  const scopedPrices = reversedPrices.slice(startIdx, endIdx)
 
   // Create a map of break signals by date for quick lookup
   const breakSignalMap = new Map()
@@ -504,8 +508,8 @@ export const calculateVolumeProfileV3PL = ({
   })
 
   // Iterate through all price points in chronological order
-  for (let i = 0; i < reversedPrices.length; i++) {
-    const currentPoint = reversedPrices[i]
+  for (let i = 0; i < scopedPrices.length; i++) {
+    const currentPoint = scopedPrices[i]
     const currentPrice = currentPoint.close
     const currentDate = currentPoint.date
 
@@ -516,18 +520,6 @@ export const calculateVolumeProfileV3PL = ({
     const athHit = currentPrice > athMinimumPrice
     if (athHit) {
       allTimeHigh = currentPrice
-    }
-    if (currentDate === DEBUG_BNWP_DATE) {
-      console.log('[V3][BNWP][Debug]', {
-        date: currentDate,
-        price: currentPrice,
-        allTimeHigh,
-        athMinimumPrice,
-        athHit,
-        isHolding,
-        hasResetWindowThisHolding,
-        breakSignal: breakSignalMap.get(currentDate) || null
-      })
     }
 
     // Increment points counter if holding
@@ -601,12 +593,12 @@ export const calculateVolumeProfileV3PL = ({
 
       // Find the window start point index in the reversed prices array
       const windowStartIndex = windowStartDate
-        ? reversedPrices.findIndex(p => p.date === windowStartDate)
+        ? scopedPrices.findIndex(p => p.date === windowStartDate)
         : -1
 
       // Need at least 2 points to calculate regression (window start + current point)
       if (windowStartIndex !== -1 && i > windowStartIndex) {
-        const regressionData = reversedPrices.slice(windowStartIndex, i + 1)
+        const regressionData = scopedPrices.slice(windowStartIndex, i + 1)
         const n = regressionData.length
 
         // Calculate linear regression using least squares method
@@ -752,22 +744,13 @@ export const calculateVolumeProfileV3PL = ({
           price: currentPrice,
           reason: 'BNWP - window reset'
         })
-      } else {
-        console.log('[V3][BNWP][Blocked]', {
-          date: currentDate,
-          price: currentPrice,
-          allTimeHigh,
-          athMinimumPrice,
-          isHolding,
-          hasResetWindowThisHolding
-        })
       }
     }
   }
 
   // If still holding at the end, mark as open position
-  if (isHolding && reversedPrices.length > 0) {
-    const lastPrice = reversedPrices[reversedPrices.length - 1]
+  if (isHolding && scopedPrices.length > 0) {
+    const lastPrice = scopedPrices[scopedPrices.length - 1]
     const currentPrice = lastPrice.close
     const plPercent = ((currentPrice - buyPrice) / buyPrice) * 100
 
@@ -820,7 +803,8 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
     prices: displayPrices,
     transactionFee,
     cutoffPercent,
-    regressionThreshold
+    regressionThreshold,
+    zoomRange
   })
 
   // PASS 2: Recalculate volume profile with window splits at all-time high reset dates
@@ -838,7 +822,8 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
     prices: displayPrices,
     transactionFee,
     cutoffPercent,
-    regressionThreshold
+    regressionThreshold,
+    zoomRange
   })
 
   // Return results with ATH-aware windowing
