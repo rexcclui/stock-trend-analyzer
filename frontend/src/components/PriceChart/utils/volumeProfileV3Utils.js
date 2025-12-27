@@ -38,6 +38,7 @@
  */
 export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, end: null }, windowSplitDates = []) => {
   if (!displayPrices || displayPrices.length === 0) return { windows: [], breaks: [] }
+  const DEBUG_BNWP_DATE = '2024-01-08'
   const reversedDisplayPrices = [...displayPrices].reverse()
   // Use the locked zoomRange from when V3 was first enabled
   // This range is cached and does NOT change on subsequent zooms
@@ -72,6 +73,14 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
     .map(date => dateToIndex.get(date))
     .filter(index => index !== undefined)
     .sort((a, b) => a - b)
+  if (dateToIndex.has(DEBUG_BNWP_DATE)) {
+    console.log('[V3][BNWP][SplitIndex]', {
+      date: DEBUG_BNWP_DATE,
+      index: dateToIndex.get(DEBUG_BNWP_DATE),
+      firstVisibleDate: adjustedVisibleData[0]?.date,
+      splitIndices: splitIndices.slice(0, 5)
+    })
+  }
 
   while (currentWindowStart < adjustedVisibleData.length) {
     // Find the next split point (BNWP reset date) or end of data
@@ -413,6 +422,12 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
         dataPoints: windowPoints,  // Use cumulative profiles from windowPoints
         breakDetected: breaks.length > 0
       })
+      if (windowPoints[0].date === DEBUG_BNWP_DATE) {
+        console.log('[V3][BNWP][WindowStart]', {
+          date: DEBUG_BNWP_DATE,
+          windowIndex: windows.length - 1
+        })
+      }
     }
 
     // Move to next window (starts at the ATH reset date)
@@ -494,6 +509,7 @@ export const calculateVolumeProfileV3PL = ({
   let hasResetWindowThisHolding = false // Track if we've already reset window once in current holding period
   const MIN_POINTS_FOR_SELL = 75 // Minimum points required before sell signal after window reset
   const ATH_THRESHOLD = 0.05 // 5% - price must be more than 5% higher than previous ATH to trigger BNWP
+  const DEBUG_BNWP_DATE = '2024-01-08'
 
   // Get all prices in forward chronological order
   const reversedPrices = [...prices].reverse()
@@ -531,6 +547,18 @@ export const calculateVolumeProfileV3PL = ({
     const athHit = currentPrice > athMinimumPrice
     if (athHit) {
       allTimeHigh = currentPrice
+    }
+    if (currentDate === DEBUG_BNWP_DATE) {
+      console.log('[V3][BNWP][PL]', {
+        date: currentDate,
+        price: currentPrice,
+        allTimeHigh,
+        athMinimumPrice,
+        athHit,
+        isHolding,
+        hasResetWindowThisHolding,
+        lastBuyDate: buyDate
+      })
     }
 
     // Increment points counter if holding
