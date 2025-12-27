@@ -813,12 +813,19 @@ export const calculateVolumeProfileV3PL = ({
  * Pass 3: Final P&L calculation with BNWP-aware volume profile
  */
 export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, transactionFee = 0.003, cutoffPercent = 0.12, regressionThreshold = 6) => {
-  // PASS 1: Calculate breaks with NO window splits to identify BNWP reset dates
-  const initialResult = calculateVolumeProfileV3(displayPrices, zoomRange, [])
+  const getBnwpSplitDates = (plResult = {}) => {
+    const bnwpSupportDates = (plResult.supportUpdates || [])
+      .filter(update => update.reason?.includes('BNWP'))
+      .map(update => update.date)
+    return Array.from(new Set(bnwpSupportDates))
+  }
 
-  const initialPL = calculateVolumeProfileV3PL({
-    volumeProfileV3Breaks: initialResult.breaks,
-    volumeProfileV3Data: initialResult.windows,
+  const MAX_BNWP_SPLIT_PASSES = 3
+  let bnwpSplitDates = []
+  let currentResult = calculateVolumeProfileV3(displayPrices, zoomRange, bnwpSplitDates)
+  let currentPL = calculateVolumeProfileV3PL({
+    volumeProfileV3Breaks: currentResult.breaks,
+    volumeProfileV3Data: currentResult.windows,
     prices: displayPrices,
     transactionFee,
     cutoffPercent,
@@ -826,32 +833,29 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
     zoomRange
   })
 
-  // PASS 2: Recalculate volume profile with window splits at BNWP reset dates
-  // This ensures fresh volume calculations after each BNWP while holding
-  const bnwpSupportDates = (initialPL.supportUpdates || [])
-    .filter(update => update.reason?.includes('BNWP'))
-    .map(update => update.date)
-  const bnwpSplitDates = Array.from(new Set(bnwpSupportDates))
-  console.log('BNWP Reset Dates:', bnwpSplitDates)
+  for (let pass = 0; pass < MAX_BNWP_SPLIT_PASSES; pass++) {
+    const nextBnwpSplitDates = getBnwpSplitDates(currentPL)
+    if (nextBnwpSplitDates.length === bnwpSplitDates.length) {
+      break
+    }
+    bnwpSplitDates = nextBnwpSplitDates
+    console.log('BNWP Reset Dates:', bnwpSplitDates)
+    currentResult = calculateVolumeProfileV3(displayPrices, zoomRange, bnwpSplitDates)
+    console.log('Windows after split:', currentResult.windows.length, currentResult.windows.map(w => ({start: w.startDate, end: w.endDate, points: w.dataPoints.length})))
+    currentPL = calculateVolumeProfileV3PL({
+      volumeProfileV3Breaks: currentResult.breaks,
+      volumeProfileV3Data: currentResult.windows,
+      prices: displayPrices,
+      transactionFee,
+      cutoffPercent,
+      regressionThreshold,
+      zoomRange
+    })
+  }
 
-  const finalResult = calculateVolumeProfileV3(displayPrices, zoomRange, bnwpSplitDates)
-  console.log('Windows after split:', finalResult.windows.length, finalResult.windows.map(w => ({start: w.startDate, end: w.endDate, points: w.dataPoints.length})))
-
-  // PASS 3: Final P&L calculation with BNWP-aware volume profile
-  const finalPL = calculateVolumeProfileV3PL({
-    volumeProfileV3Breaks: finalResult.breaks,
-    volumeProfileV3Data: finalResult.windows,
-    prices: displayPrices,
-    transactionFee,
-    cutoffPercent,
-    regressionThreshold,
-    zoomRange
-  })
-
-  // Return results with BNWP-aware windowing
   return {
-    windows: finalResult.windows,
-    breaks: finalResult.breaks,
-    ...finalPL
+    windows: currentResult.windows,
+    breaks: currentResult.breaks,
+    ...currentPL
   }
 }
