@@ -696,7 +696,6 @@ export const calculateVolumeProfileV3PL = ({
             price: cutoffPrice,
             tradeId: currentTradeId
           })
-        }
         } else {
           // If consecutive breakup while holding, allow another ATH reset to occur later
           hasResetWindowThisHolding = false
