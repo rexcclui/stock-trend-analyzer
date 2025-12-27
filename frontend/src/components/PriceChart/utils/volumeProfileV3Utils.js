@@ -408,7 +408,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
     }
 
     // Move to next window (starts at the ATH reset date)
-    if (windowEnd < visibleData.length) {
+    if (windowEnd < adjustedVisibleData.length) {
       currentWindowStart = windowEnd  // Start at ATH date (excluded from previous window)
     } else {
       break  // Reached end of data
