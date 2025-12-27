@@ -851,9 +851,7 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
       break
     }
     bnwpSplitDates = nextBnwpSplitDates
-    console.log('BNWP Reset Dates:', bnwpSplitDates)
     currentResult = calculateVolumeProfileV3(displayPrices, zoomRange, bnwpSplitDates)
-    console.log('Windows after split:', currentResult.windows.length, currentResult.windows.map(w => ({start: w.startDate, end: w.endDate, points: w.dataPoints.length})))
     currentPL = calculateVolumeProfileV3PL({
       volumeProfileV3Breaks: currentResult.breaks,
       volumeProfileV3Data: currentResult.windows,

@@ -2270,7 +2270,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                   />
 
                   {/* SMA Slider Controls */}
-                  {!chart.collapsed && chart.smaPeriods && chart.smaPeriods.length > 0 && (
+                  {!chart.collapsed && chart.smaPeriods && chart.smaPeriods.length > 0 && !chart.volumeProfileV3Enabled && (
                     <div className="mt-3 px-2 flex flex-wrap gap-2">
                       {chart.smaPeriods.map((period, index) => {
                         const smaKey = `${chart.id}-${index}`
