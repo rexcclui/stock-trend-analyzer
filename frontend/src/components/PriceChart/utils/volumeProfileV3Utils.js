@@ -25,7 +25,7 @@
  * - Additional filter: 3 zones below current must have less volume (thin support below)
  * - This identifies price moving away from strong high-volume resistance
  * - Breakdown = sell signal (price escaping resistance with low volume = bearish)
- * - Requires at least 75 points since window reset (all-time high) before sell signal
+ * - Requires at least 75 points since window reset (BNWP) before sell signal
  *
  * @param {Array} displayPrices - Array of price data {date, close, volume}
  * @param {Object} zoomRange - {start, end} - Defines the visible range for analysis (locked on first V3 enable)
@@ -415,9 +415,9 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
       })
     }
 
-    // Move to next window (starts at the ATH reset date)
+    // Move to next window (starts at the BNWP reset date)
     if (windowEnd < adjustedVisibleData.length) {
-      currentWindowStart = windowEnd  // Start at ATH date (excluded from previous window)
+      currentWindowStart = windowEnd  // Start at BNWP date (excluded from previous window)
     } else {
       break  // Reached end of data
     }
@@ -433,9 +433,9 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
  * SELL LOGIC:
  * 1. Sell on low-volume breakdown (isUpBreak: false)
  * 2. Sell if current price is more than regressionThreshold% below linear regression line from window start to current point
- * 3. Volume profile window RESETS when price reaches all-time high while holding
+ * 3. Volume profile window RESETS when BNWP triggers while holding
  *    - Discards all previous cumulative data
- *    - Starts fresh volume calculation from the ATH point
+ *    - Starts fresh volume calculation from the BNWP point
  * 4. After window reset, need 75+ points before breakdown sell signal can trigger (regression sell always active)
  * 5. Sell signals can trigger immediately after buy (no waiting period)
  *
@@ -492,8 +492,9 @@ export const calculateVolumeProfileV3PL = ({
   let allTimeHigh = 0 // Track ATH within the locked visible range (starts at range start)
   let pointsSinceWindowReset = 0 // Track points since last window reset (for 75-point minimum)
   let hasResetWindowThisHolding = false // Track if we've already reset window once in current holding period
+  let athHitsInHolding = 0 // Track ATH hits during a holding period
   const MIN_POINTS_FOR_SELL = 75 // Minimum points required before sell signal after window reset
-  const ATH_THRESHOLD = 0.05 // 5% - price must be more than 5% higher than previous ATH to trigger BNWP
+  const ATH_HITS_FOR_BNWP = 5 // BNWP triggers after 5 ATH hits while holding
 
   // Get all prices in forward chronological order
   const reversedPrices = [...prices].reverse()
@@ -528,12 +529,13 @@ export const calculateVolumeProfileV3PL = ({
     const currentDate = currentPoint.date
 
     // Track ATH within the locked visible range
-    // Window reset ONLY when reaching BNWP while holding (once per holding period)
-    // Requires more than 5% above previous ATH to avoid false breakthroughs
-    const athMinimumPrice = allTimeHigh * (1 + ATH_THRESHOLD)
-    const athHit = currentPrice > athMinimumPrice
-    if (currentPrice > allTimeHigh) {
+    // BNWP triggers after 5 ATH hits while holding (once per holding period)
+    const athHit = currentPrice > allTimeHigh
+    if (athHit) {
       allTimeHigh = currentPrice
+      if (isHolding) {
+        athHitsInHolding++
+      }
     }
 
     // Increment points counter if holding
@@ -669,6 +671,7 @@ export const calculateVolumeProfileV3PL = ({
           currentWindowIndex = null
           pointsSinceWindowReset = 0
           hasResetWindowThisHolding = false
+          athHitsInHolding = 0
           currentTradeId++
 
           continue // Skip breakdown check and move to next point
@@ -692,6 +695,7 @@ export const calculateVolumeProfileV3PL = ({
           currentWindowIndex = breakSignal.windowIndex // Track starting window
           pointsSinceWindowReset = MIN_POINTS_FOR_SELL // Set to 75 so sells can trigger immediately after buy
           hasResetWindowThisHolding = false // Reset flag for new holding period
+          athHitsInHolding = 0
 
           buySignals.push({
             date: breakSignal.date,
@@ -738,13 +742,14 @@ export const calculateVolumeProfileV3PL = ({
           currentWindowIndex = null
           pointsSinceWindowReset = 0
           hasResetWindowThisHolding = false // Reset flag for next holding period
+          athHitsInHolding = 0
           currentTradeId++
         }
         // If breakdown but not enough points since window reset, ignore it
       }
     }
 
-    if (athHit && isHolding) {
+    if (isHolding && athHitsInHolding >= ATH_HITS_FOR_BNWP) {
       if (!hasResetWindowThisHolding) {
         pointsSinceWindowReset = 0
         hasResetWindowThisHolding = true // Mark that we've reset once in this holding period
@@ -801,14 +806,14 @@ export const calculateVolumeProfileV3PL = ({
 }
 
 /**
- * Multi-pass calculation: Calculate volume profile with window resets at sell dates and all-time highs while holding
+ * Multi-pass calculation: Calculate volume profile with window resets at BNWP events while holding
  *
- * Pass 1: Calculate with no window splits to get initial P&L and identify ATH reset dates
- * Pass 2: Recalculate with window splits at ATH dates to get updated breaks
- * Pass 3: Final P&L calculation with ATH-aware volume profile
+ * Pass 1: Calculate with no window splits to get initial P&L and identify BNWP reset dates
+ * Pass 2: Recalculate with window splits at BNWP dates to get updated breaks
+ * Pass 3: Final P&L calculation with BNWP-aware volume profile
  */
 export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, transactionFee = 0.003, cutoffPercent = 0.12, regressionThreshold = 6) => {
-  // PASS 1: Calculate breaks with NO window splits to identify all-time high reset dates
+  // PASS 1: Calculate breaks with NO window splits to identify BNWP reset dates
   const initialResult = calculateVolumeProfileV3(displayPrices, zoomRange, [])
 
   const initialPL = calculateVolumeProfileV3PL({
@@ -821,8 +826,8 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
     zoomRange
   })
 
-  // PASS 2: Recalculate volume profile with window splits at all-time high reset dates
-  // This ensures fresh volume calculations after each ATH while holding
+  // PASS 2: Recalculate volume profile with window splits at BNWP reset dates
+  // This ensures fresh volume calculations after each BNWP while holding
   const bnwpSupportDates = (initialPL.supportUpdates || [])
     .filter(update => update.reason?.includes('BNWP'))
     .map(update => update.date)
