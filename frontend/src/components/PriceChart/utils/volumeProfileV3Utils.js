@@ -64,15 +64,23 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
     startIdx -= 1
   }
   const adjustedVisibleData = reversedDisplayPrices.slice(startIdx, endIdx)
+  const dateToIndex = new Map()
+  adjustedVisibleData.forEach((point, idx) => {
+    dateToIndex.set(point.date, idx)
+  })
+  const splitIndices = windowSplitDates
+    .map(date => dateToIndex.get(date))
+    .filter(index => index !== undefined)
+    .sort((a, b) => a - b)
 
   while (currentWindowStart < adjustedVisibleData.length) {
-    // Find the next split point (ATH reset date) or end of data
+    // Find the next split point (BNWP reset date) or end of data
     let windowEnd = adjustedVisibleData.length
-    for (let i = currentWindowStart; i < adjustedVisibleData.length; i++) {
-      // Only split if we've processed at least one point (i > currentWindowStart)
-      // This prevents immediately re-splitting on the ATH date that started this window
-      if (i > currentWindowStart && splitDateSet.has(adjustedVisibleData[i].date)) {
-        windowEnd = i  // EXCLUDE the ATH date from current window - it starts the next window
+    for (const splitIndex of splitIndices) {
+      // Only split if we've processed at least one point (splitIndex > currentWindowStart)
+      // This prevents immediately re-splitting on the BNWP date that started this window
+      if (splitIndex > currentWindowStart) {
+        windowEnd = splitIndex // EXCLUDE the BNWP date from current window - it starts the next window
         break
       }
     }
