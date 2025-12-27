@@ -525,7 +525,24 @@ export const calculateVolumeProfileV3PL = ({
           price: currentPrice,
           reason: 'All-time high - window reset'
         })
+      } else {
+        console.log('[V3][ATH] New ATH but no reset', {
+          date: currentDate,
+          price: currentPrice,
+          athMinimumPrice,
+          isHolding,
+          hasResetWindowThisHolding
+        })
       }
+    } else if (currentDate === '2024-01-09') {
+      console.log('[V3][ATH] 2024-01-09 check', {
+        date: currentDate,
+        price: currentPrice,
+        allTimeHigh,
+        athMinimumPrice,
+        isHolding,
+        hasResetWindowThisHolding
+      })
     }
 
     // Increment points counter if holding
