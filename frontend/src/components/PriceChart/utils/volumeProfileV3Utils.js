@@ -725,19 +725,27 @@ export const calculateVolumeProfileV3PL = ({
       }
     }
 
-    if (athHit && isHolding && !hasResetWindowThisHolding) {
-      pointsSinceWindowReset = 0
-      hasResetWindowThisHolding = true // Mark that we've reset once in this holding period
-      const resetWindow = dateToWindowMap.get(currentDate)
-      if (resetWindow) {
-        currentWindowIndex = resetWindow.windowIndex
+    if (athHit && isHolding) {
+      if (!hasResetWindowThisHolding) {
+        pointsSinceWindowReset = 0
+        hasResetWindowThisHolding = true // Mark that we've reset once in this holding period
+        const resetWindow = dateToWindowMap.get(currentDate)
+        if (resetWindow) {
+          currentWindowIndex = resetWindow.windowIndex
+        }
+        athResetDates.push(currentDate) // Mark this date for volume profile window reset
+        supportUpdates.push({
+          date: currentDate,
+          price: currentPrice,
+          reason: 'All-time high - window reset'
+        })
+      } else {
+        supportUpdates.push({
+          date: currentDate,
+          price: currentPrice,
+          reason: 'All-time high - recorded (no window reset)'
+        })
       }
-      athResetDates.push(currentDate) // Mark this date for volume profile window reset
-      supportUpdates.push({
-        date: currentDate,
-        price: currentPrice,
-        reason: 'All-time high - window reset'
-      })
     }
   }
 
