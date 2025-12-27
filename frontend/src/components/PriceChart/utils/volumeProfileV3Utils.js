@@ -436,7 +436,7 @@ export const calculateVolumeProfileV3 = (displayPrices, zoomRange = { start: 0, 
  * 3. Volume profile window RESETS when BNWP triggers while holding
  *    - Discards all previous cumulative data
  *    - Starts fresh volume calculation from the BNWP point
- * 4. After window reset, need 75+ points before breakdown sell signal can trigger (regression sell always active)
+ * 4. After window reset, need 75+ points before breakdown sell signal can trigger
  * 5. Sell signals can trigger immediately after buy (no waiting period)
  *
  * NOTE: Cutoff (trailing stop) logic is currently DISABLED
@@ -487,7 +487,7 @@ export const calculateVolumeProfileV3PL = ({
   let buyPrice = null
   let buyDate = null
   let cutoffPrice = null // Track the current cutoff price (trailing stop)
-  let buyBufferPrice = null // BBP: 8% below buy price, required for sell criteria
+  let hasCrossedAboveRegression = false // Track if price crossed above regression since buy
   let currentWindowIndex = null // Track which window we're in while holding
   let currentTradeId = 0 // Track which trade we're in for support line segmentation
   let allTimeHigh = 0 // Track ATH within the locked visible range (starts at range start)
@@ -544,41 +544,44 @@ export const calculateVolumeProfileV3PL = ({
       pointsSinceWindowReset++
     }
 
-    // CUTOFF LOGIC DISABLED
     // Check for cutoff: if holding and price dropped below cutoff price, sell
-    // if (isHolding && cutoffPrice !== null && currentPrice < cutoffPrice) {
-    //   const sellPrice = currentPrice
-    //   // Apply transaction fees: buy fee increases cost, sell fee decreases proceeds
-    //   const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
-    //   const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
-    //   const plPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100
+    if (isHolding && cutoffPrice !== null && currentPrice < cutoffPrice) {
+      const sellPrice = currentPrice
+      // Apply transaction fees: buy fee increases cost, sell fee decreases proceeds
+      const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
+      const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
+      const plPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100
 
-    //   trades.push({
-    //     buyPrice,
-    //     buyDate,
-    //     sellPrice,
-    //     sellDate: currentDate,
-    //     plPercent,
-    //     isCutoff: true
-    //   })
+      trades.push({
+        buyPrice,
+        buyDate,
+        sellPrice,
+        sellDate: currentDate,
+        plPercent,
+        isCutoff: true
+      })
 
-    //   sellSignals.push({
-    //     date: currentDate,
-    //     price: sellPrice,
-    //     isCutoff: true,
-    //     reason: `Price $${currentPrice.toFixed(2)} < Cutoff $${cutoffPrice.toFixed(2)}`
-    //   })
+      sellSignals.push({
+        date: currentDate,
+        price: sellPrice,
+        isCutoff: true,
+        reason: `Price $${currentPrice.toFixed(2)} < Cutoff $${cutoffPrice.toFixed(2)}`
+      })
 
-    //   // Reset state
-    //   isHolding = false
-    //   buyPrice = null
-    //   buyDate = null
-    //   cutoffPrice = null
-    //   currentWindowIndex = null
-    //   pointsSinceWindowReset = 0
+      // Reset state
+      isHolding = false
+      buyPrice = null
+      buyDate = null
+      cutoffPrice = null
+      currentWindowIndex = null
+      pointsSinceWindowReset = 0
+      hasResetWindowThisHolding = false
+      athHitsInHolding = 0
+      hasCrossedAboveRegression = false
+      currentTradeId++
 
-    //   continue // Move to next point
-    // }
+      continue // Move to next point
+    }
 
     // CUTOFF LOGIC DISABLED
     // If holding, update trailing stop dynamically
@@ -602,7 +605,8 @@ export const calculateVolumeProfileV3PL = ({
     //   }
     // }
 
-    // REGRESSION SELL CHECK: Sell if current price is more than regressionThreshold% below linear regression line from window start
+    // REGRESSION SELL CHECK: After price crosses above regression line since buy,
+    // sell if current price is more than regressionThreshold% below regression line
     if (isHolding) {
       // Find the current window's start date
       const currentWindow = volumeProfileV3Data.find(w => w.windowIndex === currentWindowIndex)
@@ -638,15 +642,16 @@ export const calculateVolumeProfileV3PL = ({
         const currentX = n - 1
         const expectedPrice = slope * currentX + intercept
 
+        if (currentPrice > expectedPrice) {
+          hasCrossedAboveRegression = true
+        }
+
         // Check if current price is more than regressionThreshold% below regression line
         const deviationPercent = ((currentPrice - expectedPrice) / expectedPrice) * 100
 
-      if (deviationPercent < -regressionThreshold) {
-        if (buyBufferPrice === null || currentPrice >= buyBufferPrice) {
-          continue
-        }
-        // Trigger regression sell
-        const sellPrice = currentPrice
+        if (hasCrossedAboveRegression && deviationPercent < -regressionThreshold) {
+          // Trigger regression sell
+          const sellPrice = currentPrice
           const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
           const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
           const plPercent = ((effectiveSellPrice - effectiveBuyPrice) / effectiveBuyPrice) * 100
@@ -676,6 +681,7 @@ export const calculateVolumeProfileV3PL = ({
           pointsSinceWindowReset = 0
           hasResetWindowThisHolding = false
           athHitsInHolding = 0
+          hasCrossedAboveRegression = false
           currentTradeId++
 
           continue // Skip breakdown check and move to next point
@@ -693,14 +699,14 @@ export const calculateVolumeProfileV3PL = ({
           buyPrice = breakSignal.price
           buyDate = breakSignal.date
 
-          // Initial cutoff = buyPrice * (1 - cutoffPercent) - NEVER use zone support
-          cutoffPrice = breakSignal.price * (1 - CUTOFF_PERCENT)
-          buyBufferPrice = breakSignal.price * 0.92
+          // Initial cutoff = buyPrice * 0.90 (10% below buy) - NEVER use zone support
+          cutoffPrice = breakSignal.price * 0.90
 
           currentWindowIndex = breakSignal.windowIndex // Track starting window
           pointsSinceWindowReset = MIN_POINTS_FOR_SELL // Set to 75 so sells can trigger immediately after buy
           hasResetWindowThisHolding = false // Reset flag for new holding period
           athHitsInHolding = 0
+          hasCrossedAboveRegression = false
 
           buySignals.push({
             date: breakSignal.date,
@@ -718,9 +724,6 @@ export const calculateVolumeProfileV3PL = ({
         // Breakdown signal - SELL only if holding AND we have at least 75 points since window reset
         if (isHolding && pointsSinceWindowReset >= MIN_POINTS_FOR_SELL) {
           const sellPrice = breakSignal.price
-          if (buyBufferPrice === null || sellPrice >= buyBufferPrice) {
-            continue
-          }
           // Apply transaction fees: buy fee increases cost, sell fee decreases proceeds
           const effectiveBuyPrice = buyPrice * (1 + TRANSACTION_FEE)
           const effectiveSellPrice = sellPrice * (1 - TRANSACTION_FEE)
@@ -747,11 +750,11 @@ export const calculateVolumeProfileV3PL = ({
           buyPrice = null
           buyDate = null
           cutoffPrice = null
-          buyBufferPrice = null
           currentWindowIndex = null
           pointsSinceWindowReset = 0
           hasResetWindowThisHolding = false // Reset flag for next holding period
           athHitsInHolding = 0
+          hasCrossedAboveRegression = false
           currentTradeId++
         }
         // If breakdown but not enough points since window reset, ignore it
