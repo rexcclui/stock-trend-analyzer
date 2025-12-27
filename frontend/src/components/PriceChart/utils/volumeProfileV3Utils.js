@@ -492,6 +492,7 @@ export const calculateVolumeProfileV3PL = ({
   let allTimeHigh = 0 // Track GLOBAL all-time high across entire dataset (never resets)
   let pointsSinceWindowReset = 0 // Track points since last window reset (for 75-point minimum)
   let hasResetWindowThisHolding = false // Track if we've already reset window once in current holding period
+  let nextBnwpMinPrice = null // Track next BNWP threshold within a holding period
   const MIN_POINTS_FOR_SELL = 75 // Minimum points required before sell signal after window reset
   const ATH_THRESHOLD = 0.05 // 5% - price must be more than 5% higher than previous ATH to trigger BNWP
 
@@ -528,7 +529,8 @@ export const calculateVolumeProfileV3PL = ({
     // Window reset ONLY when reaching BNWP while holding (once per holding period)
     // Requires more than 5% above previous ATH to avoid false breakthroughs
     const athMinimumPrice = allTimeHigh * (1 + ATH_THRESHOLD)
-    const athHit = currentPrice > athMinimumPrice
+    const bnwpThreshold = nextBnwpMinPrice ?? athMinimumPrice
+    const athHit = currentPrice > bnwpThreshold
     if (athHit) {
       allTimeHigh = currentPrice
     }
@@ -666,6 +668,7 @@ export const calculateVolumeProfileV3PL = ({
           currentWindowIndex = null
           pointsSinceWindowReset = 0
           hasResetWindowThisHolding = false
+          nextBnwpMinPrice = null
           currentTradeId++
 
           continue // Skip breakdown check and move to next point
@@ -689,6 +692,7 @@ export const calculateVolumeProfileV3PL = ({
           currentWindowIndex = breakSignal.windowIndex // Track starting window
           pointsSinceWindowReset = MIN_POINTS_FOR_SELL // Set to 75 so sells can trigger immediately after buy
           hasResetWindowThisHolding = false // Reset flag for new holding period
+          nextBnwpMinPrice = null
 
           buySignals.push({
             date: breakSignal.date,
@@ -735,6 +739,7 @@ export const calculateVolumeProfileV3PL = ({
           currentWindowIndex = null
           pointsSinceWindowReset = 0
           hasResetWindowThisHolding = false // Reset flag for next holding period
+          nextBnwpMinPrice = null
           currentTradeId++
         }
         // If breakdown but not enough points since window reset, ignore it
@@ -745,6 +750,7 @@ export const calculateVolumeProfileV3PL = ({
       if (!hasResetWindowThisHolding) {
         pointsSinceWindowReset = 0
         hasResetWindowThisHolding = true // Mark that we've reset once in this holding period
+        nextBnwpMinPrice = currentPrice * (1 + ATH_THRESHOLD)
         const resetWindow = dateToWindowMap.get(currentDate)
         if (resetWindow) {
           currentWindowIndex = resetWindow.windowIndex
