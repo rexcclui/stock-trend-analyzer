@@ -469,7 +469,7 @@ export const calculateVolumeProfileV3PL = ({
   const sellSignals = []
   const supportUpdates = [] // Track support level updates
   const cutoffPrices = [] // Track cutoff price over time for drawing support line
-  const athResetDates = [] // Track all-time high reset dates while holding
+  const athResetDates = [] // Track BNWP reset dates while holding
   let isHolding = false
   let buyPrice = null
   let buyDate = null
@@ -480,7 +480,7 @@ export const calculateVolumeProfileV3PL = ({
   let pointsSinceWindowReset = 0 // Track points since last window reset (for 75-point minimum)
   let hasResetWindowThisHolding = false // Track if we've already reset window once in current holding period
   const MIN_POINTS_FOR_SELL = 75 // Minimum points required before sell signal after window reset
-  const ATH_THRESHOLD = 0.05 // 5% - price must be at least 5% higher than previous ATH to avoid false breakthroughs
+  const ATH_THRESHOLD = 0.05 // 5% - price must be more than 5% higher than previous ATH to trigger BNWP
 
   // Get all prices in forward chronological order
   const reversedPrices = [...prices].reverse()
@@ -509,10 +509,10 @@ export const calculateVolumeProfileV3PL = ({
     const currentDate = currentPoint.date
 
     // Track GLOBAL all-time high across entire dataset
-    // Window reset ONLY when reaching new global ATH while holding (once per holding period)
-    // Requires 5% above previous ATH to avoid false breakthroughs
+    // Window reset ONLY when reaching BNWP while holding (once per holding period)
+    // Requires more than 5% above previous ATH to avoid false breakthroughs
     const athMinimumPrice = allTimeHigh * (1 + ATH_THRESHOLD)
-    const athHit = currentPrice >= athMinimumPrice
+    const athHit = currentPrice > athMinimumPrice
     if (athHit) {
       allTimeHigh = currentPrice
     }
@@ -733,11 +733,11 @@ export const calculateVolumeProfileV3PL = ({
         if (resetWindow) {
           currentWindowIndex = resetWindow.windowIndex
         }
-        athResetDates.push(currentDate) // Mark this date for volume profile window reset
+        athResetDates.push(currentDate) // Mark this date for volume profile window reset (BNWP)
         supportUpdates.push({
           date: currentDate,
           price: currentPrice,
-          reason: 'All-time high - window reset'
+          reason: 'BNWP - window reset'
         })
       }
     }
@@ -804,7 +804,7 @@ export const calculateVolumeProfileV3WithSells = (displayPrices, zoomRange, tran
   // PASS 2: Recalculate volume profile with window splits at all-time high reset dates
   // This ensures fresh volume calculations after each ATH while holding
   const athWindowSplitDates = initialPL.athResetDates || []
-  console.log('ATH Reset Dates:', athWindowSplitDates)
+  console.log('BNWP Reset Dates:', athWindowSplitDates)
 
   const finalResult = calculateVolumeProfileV3(displayPrices, zoomRange, athWindowSplitDates)
   console.log('Windows after split:', finalResult.windows.length, finalResult.windows.map(w => ({start: w.startDate, end: w.endDate, points: w.dataPoints.length})))

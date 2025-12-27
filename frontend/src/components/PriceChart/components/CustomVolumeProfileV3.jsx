@@ -455,44 +455,30 @@ export const CustomVolumeProfileV3 = ({
               )
             })}
 
-            {/* Mark support update points with small circles and ATH resets with vertical lines */}
+            {/* Mark support update points with small circles and BNWP resets */}
             {v3PL.supportUpdates?.map((update, idx) => {
               const x = xAxis.scale(update.date)
               const y = yAxis.scale(update.price)
 
               if (x === undefined || y === undefined) return null
 
-              const isATHReset = update.reason?.includes('All-time high')
+              const isBNWPReset = update.reason?.includes('BNWP')
 
               return (
                 <g key={`support-mark-${idx}`}>
-                  {/* Vertical line for ATH window resets */}
-                  {isATHReset && (
-                    <line
-                      x1={x}
-                      y1={offset.top}
-                      x2={x}
-                      y2={offset.top + offset.height}
-                      stroke="#FFD700"
-                      strokeWidth={2}
-                      strokeDasharray="4,4"
-                      opacity={0.6}
-                      style={{ pointerEvents: 'none' }}
-                    />
-                  )}
                   {/* Circle marker */}
                   <circle
                     cx={x}
                     cy={y}
-                    r={isATHReset ? 4 : 2}
-                    fill="#FFD700"
-                    stroke="white"
-                    strokeWidth={isATHReset ? 3 : 2}
+                    r={isBNWPReset ? 4 : 2}
+                    fill={isBNWPReset ? '#ffffff' : '#FFD700'}
+                    stroke={isBNWPReset ? '#ffffff' : 'white'}
+                    strokeWidth={isBNWPReset ? 3 : 2}
                     opacity={1}
                     style={{ pointerEvents: 'none' }}
                   />
-                  {/* Label for ATH resets */}
-                  {isATHReset && (
+                  {/* Label for BNWP resets */}
+                  {isBNWPReset && (
                     <text
                       x={x}
                       y={offset.top - 5}
@@ -502,7 +488,7 @@ export const CustomVolumeProfileV3 = ({
                       textAnchor="middle"
                       style={{ pointerEvents: 'none' }}
                     >
-                      ATH Reset
+                      BNWP
                     </text>
                   )}
                 </g>
