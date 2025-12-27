@@ -696,9 +696,6 @@ export const calculateVolumeProfileV3PL = ({
             price: cutoffPrice,
             tradeId: currentTradeId
           })
-        } else {
-          // If consecutive breakup while holding, allow another ATH reset to occur later
-          hasResetWindowThisHolding = false
         }
       } else {
         // Breakdown signal - SELL only if holding AND we have at least 75 points since window reset
