@@ -433,6 +433,7 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
   const [symbols, setSymbols] = useState('')
   const [days, setDays] = useState(DEFAULT_DAYS) // Default to 5Y
   const [regressionThreshold, setRegressionThreshold] = useState(6) // Default 6% below trend line
+  const [isSimulatingRegression, setIsSimulatingRegression] = useState(false)
   const [loading, setLoading] = useState(false)
   const [loadingTopSymbols, setLoadingTopSymbols] = useState(false)
   const [loadingHKSymbols, setLoadingHKSymbols] = useState(false)
@@ -968,6 +969,45 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
     }
   }
 
+  // Simulate different regression thresholds to optimize P/L
+  const optimizeRegressionThreshold = (priceData) => {
+    // Test regression thresholds from 2% to 15% in 0.5% increments
+    const testThresholds = []
+    for (let threshold = 2; threshold <= 15; threshold += 0.5) {
+      testThresholds.push(threshold)
+    }
+
+    let bestThreshold = 6 // Default
+    let bestPL = -Infinity
+    let bestResult = null
+
+    for (const threshold of testThresholds) {
+      try {
+        const v3Result = calculateVolumeProfileV3WithSells(priceData, { start: 0, end: null }, 0.003, 0.12, threshold)
+
+        // Only consider if we have breakouts
+        if (v3Result.breaks && v3Result.breaks.length > 0) {
+          const pl = v3Result.totalPL
+
+          if (typeof pl === 'number' && pl > bestPL) {
+            bestPL = pl
+            bestThreshold = threshold
+            bestResult = v3Result
+          }
+        }
+      } catch (error) {
+        // Skip this threshold if calculation fails
+        continue
+      }
+    }
+
+    return {
+      optimalThreshold: bestThreshold,
+      optimalPL: bestPL,
+      optimalResult: bestResult
+    }
+  }
+
   const runBacktestForSymbol = async (symbol, entryDays = null) => {
     // Use provided entryDays or current days state
     const targetDays = normalizeDays(entryDays ?? days) ?? DEFAULT_DAYS
@@ -1004,8 +1044,12 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
         throw new Error(`Insufficient data: only ${priceData.length} days (need 250+)`)
       }
 
-      // Calculate V3 with window splitting at sell dates (two-pass calculation)
-      const v3Result = calculateVolumeProfileV3WithSells(priceData, { start: 0, end: null }, 0.003, 0.12, regressionThreshold)
+      // Optimize regression threshold to maximize P/L
+      const optimization = optimizeRegressionThreshold(priceData)
+      const optimalRegressionThreshold = optimization.optimalThreshold
+
+      // Calculate V3 with optimized regression threshold
+      const v3Result = optimization.optimalResult || calculateVolumeProfileV3WithSells(priceData, { start: 0, end: null }, 0.003, 0.12, optimalRegressionThreshold)
       const { windows, breaks } = v3Result
 
       if (breaks.length === 0) {
@@ -1112,6 +1156,7 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
         priceData,
         optimalParams: null,  // V3 doesn't use parameter optimization
         optimalSMAs,
+        optimalRegressionThreshold,  // Store optimal regression threshold
         marketChange,
         durationMs,
         days: targetDays,
@@ -1747,6 +1792,8 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
         return entry.bookmarked ? 1 : 0
       case 'period':
         return entry.days ?? -Infinity
+      case 'regressionThreshold':
+        return typeof entry.optimalRegressionThreshold === 'number' ? entry.optimalRegressionThreshold : -Infinity
       default:
         return 0
     }
@@ -1990,10 +2037,61 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                 value={regressionThreshold}
                 onChange={(e) => setRegressionThreshold(Number(e.target.value))}
                 className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                disabled={isSimulatingRegression}
               />
               <span className="text-sm font-medium text-slate-200 w-12 text-right">
                 {regressionThreshold}%
               </span>
+              <button
+                onClick={async () => {
+                  if (!results || results.length === 0) {
+                    showToast('No stocks to simulate. Add stocks first.')
+                    return
+                  }
+                  setIsSimulatingRegression(true)
+                  try {
+                    // Aggregate optimal thresholds from all completed results
+                    let totalOptimalThreshold = 0
+                    let count = 0
+
+                    for (const result of results) {
+                      if (result.status === 'completed' && result.priceData && result.priceData.length >= 250) {
+                        const optimization = optimizeRegressionThreshold(result.priceData)
+                        totalOptimalThreshold += optimization.optimalThreshold
+                        count++
+                      }
+                    }
+
+                    if (count > 0) {
+                      const avgOptimalThreshold = Math.round((totalOptimalThreshold / count) * 2) / 2 // Round to nearest 0.5
+                      setRegressionThreshold(avgOptimalThreshold)
+                      showToast(`Optimal regression threshold: ${avgOptimalThreshold}% (avg from ${count} stocks)`)
+                    } else {
+                      showToast('No completed stocks to simulate')
+                    }
+                  } catch (error) {
+                    console.error('Simulation error:', error)
+                    showToast('Error during simulation')
+                  } finally {
+                    setIsSimulatingRegression(false)
+                  }
+                }}
+                disabled={isSimulatingRegression || !results || results.length === 0}
+                className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+                title="Simulate optimal regression threshold from completed stocks"
+              >
+                {isSimulatingRegression ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Sim...
+                  </>
+                ) : (
+                  <>
+                    <RotateCw className="w-4 h-4" />
+                    Sim
+                  </>
+                )}
+              </button>
             </div>
           </div>
           <div className="flex items-end">
@@ -2423,6 +2521,12 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                       <th onClick={() => handleSort('pl')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Profit/Loss % from the Vol Prf V3 + SMA trading strategy">P/L {renderSortIndicator('pl')}</th>
                       <th onClick={() => handleSort('marketChange')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Buy-and-hold % change over the entire backtest period (oldest to newest price)">Mkt% {renderSortIndicator('marketChange')}</th>
                       <th onClick={() => handleSort('perf')} className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Does this stock meet performance criteria? Win Rate ≥ 60%, P/L and signals thresholds. Click to sort by performance">Perf {renderSortIndicator('perf')}</th>
+                      <th onClick={() => handleSort('regressionThreshold')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Optimized Linear Regression sell threshold %">
+                        <span className="flex items-center gap-1 justify-end">
+                          <TrendingDown className="w-4 h-4" />
+                          {renderSortIndicator('regressionThreshold')}
+                        </span>
+                      </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase" title="Optimized parameters: Th=Breakout Threshold %, LB=Lookback Zones, SMA=SMA Period">Optimal Params</th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase" title="Timestamp of when this backtest was last run (red if >7 days old)">Last Scan</th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase" title="Actions: Load in Volume tab, Rescan, Erase results, Remove from table">Action</th>
@@ -2475,6 +2579,7 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                             smaPeriods: [result.optimalSMAs?.period],
                             days: result.days,
                             volumeProfileV3Enabled: true,
+                            regressionThreshold: result.optimalRegressionThreshold,
                             expectedLatestDate: result.priceData?.[0]?.date || result.latestBreakout?.date || null
                           })
                         }}
@@ -2591,6 +2696,15 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                               </button>
                             ) : (
                               <span className="text-slate-500 text-xs">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-400 text-right">
+                            {typeof result.optimalRegressionThreshold === 'number' ? (
+                              <span className="text-purple-400 font-medium">
+                                {result.optimalRegressionThreshold.toFixed(1)}%
+                              </span>
+                            ) : (
+                              <span className="text-slate-500">—</span>
                             )}
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-400 text-left">

@@ -286,7 +286,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
             volumeProfileV2Params: params?.volumeProfileV3Enabled ? null : (hasOptimalParams || forceVolumeProfileV2 ? params : null),
             volumeProfileV3Enabled: params?.volumeProfileV3Enabled || false,
             volumeProfileV3RefreshTrigger: 0,
-            volumeProfileV3RegressionThreshold: 6,
+            volumeProfileV3RegressionThreshold: params?.regressionThreshold ?? 6,
             spyData: null,
             performanceComparisonEnabled: false,
             performanceComparisonBenchmark: 'SPY',
