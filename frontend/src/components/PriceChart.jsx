@@ -222,48 +222,41 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         const prevSMA = dateToSMA.get(prevDate)
         const currentSlope = getSMASlope(currentDate, prevDate)
 
-        // Calculate slope sign changes while holding
-        if (prevSlopeWhileHolding === null) {
-          prevSlopeWhileHolding = currentSlope
+        // Sell when slope turns negative from non-negative (matches backtest logic)
+        if (currentSlope !== null && prevSlopeWhileHolding !== null && prevSlopeWhileHolding >= 0 && currentSlope < 0) {
+          const sellPrice = currentClose
+          const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
+          const holdingDays = i - reversedPrices.findIndex(p => p.date === buyDate)
+
+          trades.push({
+            buyDate,
+            buyPrice,
+            sellDate: currentDate,
+            sellPrice,
+            plPercent,
+            holdingDays,
+            buySlotIdx
+          })
+
+          sellSignals.push({
+            date: currentDate,
+            price: sellPrice,
+            slope: currentSlope,
+            prevSlope: prevSlopeWhileHolding,
+            sma: currentSMA,
+            smaKey
+          })
+
+          isHolding = false
+          buyPrice = null
+          buyDate = null
+          buySlotIdx = null
+          prevSlopeWhileHolding = null
         }
 
-        // Sell when slope turns negative from non-negative, or becomes more negative
+        // Update prevSlopeWhileHolding for next iteration
         if (currentSlope !== null) {
-          const slopeSignChanged = prevSlopeWhileHolding >= 0 && currentSlope < 0
-          const slopeMoreNegative = prevSlopeWhileHolding < 0 && currentSlope < prevSlopeWhileHolding
-
-          if (slopeSignChanged || slopeMoreNegative) {
-            const sellPrice = currentClose
-            const plPercent = ((sellPrice - buyPrice) / buyPrice) * 100
-            const holdingDays = i - reversedPrices.findIndex(p => p.date === buyDate)
-
-            trades.push({
-              buyDate,
-              buyPrice,
-              sellDate: currentDate,
-              sellPrice,
-              plPercent,
-              holdingDays,
-              buySlotIdx
-            })
-
-            sellSignals.push({
-              date: currentDate,
-              price: sellPrice,
-              slope: currentSlope,
-              prevSlope: prevSlopeWhileHolding,
-              sma: currentSMA,
-              smaKey
-            })
-
-            isHolding = false
-            buyPrice = null
-            buyDate = null
-            buySlotIdx = null
-            prevSlopeWhileHolding = null
-          } else {
-            prevSlopeWhileHolding = currentSlope
-          }
+          prevSlopeWhileHolding = currentSlope
         }
       }
     }
