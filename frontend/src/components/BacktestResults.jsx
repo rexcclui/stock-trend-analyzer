@@ -469,6 +469,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
   })
   const [isScanning, setIsScanning] = useState(false) // Always start paused on page load
   const [isPaused, setIsPaused] = useState(false)
+  const [scanLimit, setScanLimit] = useState(5) // Default scan limit
   const [scanCompleted, setScanCompleted] = useState(() => {
     if (typeof window === 'undefined' || typeof localStorage === 'undefined') return 0
     try {
@@ -1350,11 +1351,16 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
 
     setResults(prev => pruneDisallowedEntries(prev))
 
-    const pendingSymbols = pruneDisallowedEntries(nonErrorResults)
+    let pendingSymbols = pruneDisallowedEntries(nonErrorResults)
       .filter(entry => entry.status !== 'completed')
       .map(entry => getEntryKey(entry.symbol, entry.days))
 
     if (pendingSymbols.length === 0) return
+
+    // Apply scan limit if not "ALL"
+    if (scanLimit !== 'ALL' && typeof scanLimit === 'number') {
+      pendingSymbols = pendingSymbols.slice(0, scanLimit)
+    }
 
     setScanQueue(pendingSymbols)
     setScanTotal(pendingSymbols.length)
@@ -1368,10 +1374,15 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
 
     setResults(prev => pruneDisallowedEntries(prev))
 
-    const allSymbols = pruneDisallowedEntries(nonErrorResults)
+    let allSymbols = pruneDisallowedEntries(nonErrorResults)
       .map(entry => getEntryKey(entry.symbol, entry.days))
 
     if (allSymbols.length === 0) return
+
+    // Apply scan limit if not "ALL"
+    if (scanLimit !== 'ALL' && typeof scanLimit === 'number') {
+      allSymbols = allSymbols.slice(0, scanLimit)
+    }
 
     // Clear all results to pending state before rescanning
     setResults(prev => prev.map(entry => clearEntryData(entry)))
@@ -2038,6 +2049,19 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
               {loadingCNSymbols ? <Loader2 className="w-5 h-5 animate-spin" /> : <DownloadCloud className="w-5 h-5" />}
               <span className="text-sm font-medium">CN500</span>
             </button>
+            <select
+              value={scanLimit}
+              onChange={(e) => setScanLimit(e.target.value === 'ALL' ? 'ALL' : parseInt(e.target.value, 10))}
+              className="px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors text-sm"
+              title="Limit number of stocks to scan"
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value="ALL">ALL</option>
+            </select>
             <button
               onClick={scanAllQueued}
               disabled={results.length === 0 || isScanActive}

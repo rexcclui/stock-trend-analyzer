@@ -752,6 +752,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
   const [scanQueue, setScanQueue] = useState([])
   const [isScanning, setIsScanning] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
+  const [scanLimit, setScanLimit] = useState(5) // Default scan limit
   const [scanTotal, setScanTotal] = useState(0)
   const [scanCompleted, setScanCompleted] = useState(0)
   const [showBookmarkedOnly, setShowBookmarkedOnly] = useState(false)
@@ -1455,7 +1456,12 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     if (cleanedEntries.length === 0 || isScanning) return
 
     const refreshedEntries = cleanedEntries.map(entry => clearEntryResults(entry))
-    const loadingEntries = refreshedEntries.map(entry => ({ ...entry, status: 'loading', error: null }))
+    let loadingEntries = refreshedEntries.map(entry => ({ ...entry, status: 'loading', error: null }))
+
+    // Apply scan limit if not "ALL"
+    if (scanLimit !== 'ALL' && typeof scanLimit === 'number') {
+      loadingEntries = loadingEntries.slice(0, scanLimit)
+    }
 
     setEntries(loadingEntries)
     setScanQueue(loadingEntries)
@@ -1976,8 +1982,13 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     const cleanedEntries = dropInvalidScanSymbols(entries)
     if (cleanedEntries.length === 0 || isScanning) return
 
-    const candidates = getVisibleEntries(cleanedEntries)
+    let candidates = getVisibleEntries(cleanedEntries)
     if (candidates.length === 0) return
+
+    // Apply scan limit if not "ALL"
+    if (scanLimit !== 'ALL' && typeof scanLimit === 'number') {
+      candidates = candidates.slice(0, scanLimit)
+    }
 
     const candidateIds = new Set(candidates.map(entry => entry.id))
 
@@ -2282,6 +2293,19 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
               {loadingCNSymbols ? <Loader2 className="w-5 h-5 animate-spin" /> : <DownloadCloud className="w-5 h-5" />}
               CN500
             </button>
+            <select
+              value={scanLimit}
+              onChange={(e) => setScanLimit(e.target.value === 'ALL' ? 'ALL' : parseInt(e.target.value, 10))}
+              className="flex-1 lg:flex-none px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors text-sm"
+              title="Limit number of stocks to scan"
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value="ALL">ALL</option>
+            </select>
             <button
               type="button"
               onClick={scanEntries}
