@@ -1174,11 +1174,21 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
       )))
     } catch (err) {
       console.error(`Error processing ${symbol}:`, err)
-      setResults(prev => prev.map(entry => (
-        entry.symbol === symbol && entry.days === targetDays
-          ? clearEntryData({ ...entry, durationMs: Date.now() - startTime }, 'error', err.message || 'Failed to run backtest')
-          : entry
-      )))
+
+      // If insufficient data error, remove from results and show toast
+      if (err.message && err.message.includes('Insufficient data')) {
+        const periodLabel = formatPeriod(targetDays)
+        showToast(`${symbol}${periodLabel ? ` (${periodLabel})` : ''} removed: ${err.message}`)
+        setResults(prev => prev.filter(entry => !(entry.symbol === symbol && entry.days === targetDays)))
+        setScanQueue(prev => prev.filter(queuedSymbol => queuedSymbol !== symbol))
+      } else {
+        // For other errors, keep the entry but mark as error
+        setResults(prev => prev.map(entry => (
+          entry.symbol === symbol && entry.days === targetDays
+            ? clearEntryData({ ...entry, durationMs: Date.now() - startTime }, 'error', err.message || 'Failed to run backtest')
+            : entry
+        )))
+      }
     }
   }
 
