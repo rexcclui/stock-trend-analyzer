@@ -2395,69 +2395,67 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                           </div>
                         )
                       })}
-                    </div>
-                  )}
 
-                  {/* Breakout Threshold Slider Control (only shown when Vol Prf V2 is active) */}
-                  {!chart.collapsed && chart.volumeProfileV2Enabled && (
-                    <div className="mt-3 px-2">
-                      <div className="flex items-center gap-2 bg-slate-700/50 p-2 rounded">
-                        <span className="text-sm text-slate-300 whitespace-nowrap">Brk Th %</span>
-                        <button
-                          onClick={() => {
-                            const newValue = Math.max(5, chart.volumeProfileV2BreakoutThreshold - 1)
-                            updateBreakoutThreshold(chart.id, newValue)
-                          }}
-                          disabled={chart.volumeProfileV2BreakoutThreshold <= 5 || simulatingBreakoutThreshold[chart.id]}
-                          className="p-1 text-slate-300 hover:text-white hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                          title="Decrease breakout threshold"
-                        >
-                          <Minus className="w-4 h-4" />
-                        </button>
-                        <input
-                          type="range"
-                          min="5"
-                          max="15"
-                          step="1"
-                          value={chart.volumeProfileV2BreakoutThreshold || 6}
-                          onChange={(e) => {
-                            const newValue = parseInt(e.target.value)
-                            updateBreakoutThreshold(chart.id, newValue)
-                          }}
-                          disabled={simulatingBreakoutThreshold[chart.id]}
-                          className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb disabled:opacity-50 disabled:cursor-not-allowed"
-                        />
-                        <button
-                          onClick={() => {
-                            const newValue = Math.min(15, chart.volumeProfileV2BreakoutThreshold + 1)
-                            updateBreakoutThreshold(chart.id, newValue)
-                          }}
-                          disabled={chart.volumeProfileV2BreakoutThreshold >= 15 || simulatingBreakoutThreshold[chart.id]}
-                          className="p-1 text-slate-300 hover:text-white hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                          title="Increase breakout threshold"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                        <span className="text-xs text-slate-400 w-8 text-right">{chart.volumeProfileV2BreakoutThreshold}%</span>
-                        <button
-                          onClick={() => {
-                            setSimulatingBreakoutThreshold(prev => ({ ...prev, [chart.id]: true }))
-                          }}
-                          disabled={simulatingBreakoutThreshold[chart.id]}
-                          className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
-                            simulatingBreakoutThreshold[chart.id]
-                              ? 'bg-yellow-600 text-white cursor-wait'
-                              : 'bg-purple-600 text-white hover:bg-purple-700'
-                          }`}
-                          title="Simulate optimal breakout threshold based on P&L"
-                        >
-                          {simulatingBreakoutThreshold[chart.id] ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            'Sim'
-                          )}
-                        </button>
-                      </div>
+                      {/* Breakout Threshold Slider Control (inline with SMA sliders, only shown when Vol Prf V2 is active) */}
+                      {chart.volumeProfileV2Enabled && (
+                        <div className="flex items-center gap-2 bg-slate-700/50 p-2 rounded w-full md:w-[400px]">
+                          <span className="text-sm text-slate-300 whitespace-nowrap w-16">Brk Th</span>
+                          <button
+                            onClick={() => {
+                              const newValue = Math.max(5, chart.volumeProfileV2BreakoutThreshold - 1)
+                              updateBreakoutThreshold(chart.id, newValue)
+                            }}
+                            disabled={chart.volumeProfileV2BreakoutThreshold <= 5 || simulatingBreakoutThreshold[chart.id]}
+                            className="p-1 text-slate-300 hover:text-white hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="Decrease breakout threshold"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                          <input
+                            type="range"
+                            min="5"
+                            max="15"
+                            step="1"
+                            value={chart.volumeProfileV2BreakoutThreshold || 6}
+                            onChange={(e) => {
+                              const newValue = parseInt(e.target.value)
+                              updateBreakoutThreshold(chart.id, newValue)
+                            }}
+                            disabled={simulatingBreakoutThreshold[chart.id]}
+                            className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb disabled:opacity-50 disabled:cursor-not-allowed"
+                          />
+                          <button
+                            onClick={() => {
+                              const newValue = Math.min(15, chart.volumeProfileV2BreakoutThreshold + 1)
+                              updateBreakoutThreshold(chart.id, newValue)
+                            }}
+                            disabled={chart.volumeProfileV2BreakoutThreshold >= 15 || simulatingBreakoutThreshold[chart.id]}
+                            className="p-1 text-slate-300 hover:text-white hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            title="Increase breakout threshold"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                          <span className="text-xs text-slate-400 w-8 text-right">{chart.volumeProfileV2BreakoutThreshold}%</span>
+                          <button
+                            onClick={() => {
+                              setSimulatingBreakoutThreshold(prev => ({ ...prev, [chart.id]: true }))
+                            }}
+                            disabled={simulatingBreakoutThreshold[chart.id]}
+                            className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
+                              simulatingBreakoutThreshold[chart.id]
+                                ? 'bg-yellow-600 text-white cursor-wait'
+                                : 'bg-purple-600 text-white hover:bg-purple-700'
+                            }`}
+                            title="Simulate optimal breakout threshold based on P&L"
+                          >
+                            {simulatingBreakoutThreshold[chart.id] ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : (
+                              'Sim'
+                            )}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>}
