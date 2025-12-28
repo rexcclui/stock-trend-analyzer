@@ -427,17 +427,21 @@ function buildVolumeSlots(prices) {
 }
 
 function buildLegend(slots, currentIndex) {
-  if (!Array.isArray(slots) || slots.length === 0 || currentIndex < 0) return []
+  if (!Array.isArray(slots) || slots.length === 0) return []
 
-  const startIndex = Math.max(0, currentIndex - 5)
-  const endIndex = Math.min(slots.length - 1, currentIndex + 5)
+  // When currentIndex < 0, show a centered window of slots
+  const hasCurrentIndex = currentIndex >= 0
+  const anchorIndex = hasCurrentIndex ? currentIndex : Math.floor(slots.length / 2)
+
+  const startIndex = Math.max(0, anchorIndex - 5)
+  const endIndex = Math.min(slots.length - 1, anchorIndex + 5)
   const selected = slots.slice(startIndex, endIndex + 1)
   return selected.map((slot, idx) => ({
     ...slot,
     legendIndex: startIndex + idx,
     label: `${slot.weight.toFixed(1)}%`,
     ...getSlotColor(slot.weight),
-    isCurrent: startIndex + idx === currentIndex
+    isCurrent: hasCurrentIndex && (startIndex + idx === currentIndex)
   }))
 }
 
