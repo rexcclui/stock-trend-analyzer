@@ -433,8 +433,9 @@ function buildLegend(slots, currentIndex) {
   const hasCurrentIndex = currentIndex >= 0
   const anchorIndex = hasCurrentIndex ? currentIndex : Math.floor(slots.length / 2)
 
-  const startIndex = Math.max(0, anchorIndex - 5)
-  const endIndex = Math.min(slots.length - 1, anchorIndex + 5)
+  // Match LEGEND_WINDOW size of 17 (current ± 8)
+  const startIndex = Math.max(0, anchorIndex - 8)
+  const endIndex = Math.min(slots.length - 1, anchorIndex + 8)
   const selected = slots.slice(startIndex, endIndex + 1)
   return selected.map((slot, idx) => ({
     ...slot,
