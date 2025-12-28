@@ -432,8 +432,6 @@ function optimizeSMAParams(prices, slots, breakouts) {
 function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, triggerBacktest, onBacktestProcessed }) {
   const [symbols, setSymbols] = useState('')
   const [days, setDays] = useState(DEFAULT_DAYS) // Default to 5Y
-  const [regressionThreshold, setRegressionThreshold] = useState(6) // Default 6% below trend line
-  const [isSimulatingRegression, setIsSimulatingRegression] = useState(false)
   const [loading, setLoading] = useState(false)
   const [loadingTopSymbols, setLoadingTopSymbols] = useState(false)
   const [loadingHKSymbols, setLoadingHKSymbols] = useState(false)
@@ -2033,76 +2031,6 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
               <option value="1095">3 Years</option>
               <option value="1825">5 Years</option>
             </select>
-          </div>
-          <div className="w-full md:w-48">
-            <label className="block text-sm font-medium text-slate-300 mb-2" title="Sell when price falls this % below the trend line from buy point to current point">
-              Regression Sell %
-            </label>
-            <div className="flex items-center gap-2">
-              <input
-                type="range"
-                min="2"
-                max="15"
-                step="0.5"
-                value={regressionThreshold}
-                onChange={(e) => setRegressionThreshold(Number(e.target.value))}
-                className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-purple-600"
-                disabled={isSimulatingRegression}
-              />
-              <span className="text-sm font-medium text-slate-200 w-12 text-right">
-                {regressionThreshold}%
-              </span>
-              <button
-                onClick={async () => {
-                  if (!results || results.length === 0) {
-                    showToast('No stocks to simulate. Add stocks first.')
-                    return
-                  }
-                  setIsSimulatingRegression(true)
-                  try {
-                    // Aggregate optimal thresholds from all completed results
-                    let totalOptimalThreshold = 0
-                    let count = 0
-
-                    for (const result of results) {
-                      if (result.status === 'completed' && result.priceData && result.priceData.length >= 250) {
-                        const optimization = optimizeRegressionThreshold(result.priceData)
-                        totalOptimalThreshold += optimization.optimalThreshold
-                        count++
-                      }
-                    }
-
-                    if (count > 0) {
-                      const avgOptimalThreshold = Math.round((totalOptimalThreshold / count) * 2) / 2 // Round to nearest 0.5
-                      setRegressionThreshold(avgOptimalThreshold)
-                      showToast(`Optimal regression threshold: ${avgOptimalThreshold}% (avg from ${count} stocks)`)
-                    } else {
-                      showToast('No completed stocks to simulate')
-                    }
-                  } catch (error) {
-                    console.error('Simulation error:', error)
-                    showToast('Error during simulation')
-                  } finally {
-                    setIsSimulatingRegression(false)
-                  }
-                }}
-                disabled={isSimulatingRegression || !results || results.length === 0}
-                className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
-                title="Simulate optimal regression threshold from completed stocks"
-              >
-                {isSimulatingRegression ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Sim...
-                  </>
-                ) : (
-                  <>
-                    <RotateCw className="w-4 h-4" />
-                    Sim
-                  </>
-                )}
-              </button>
-            </div>
           </div>
           <div className="flex items-end">
             <label className="flex items-center gap-2 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg cursor-pointer hover:bg-slate-600 transition-colors">
