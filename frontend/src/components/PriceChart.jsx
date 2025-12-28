@@ -110,6 +110,23 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const v3ZoomRangeRef = useRef(zoomRange)
   // Track whether V3 has been initialized to lock in the initial range
   const v3InitializedRef = useRef(false)
+  // Track previous data length to detect period changes
+  const prevDataLengthRef = useRef(prices?.length || 0)
+
+  // Reset V3 initialization when data length changes significantly (period change)
+  useEffect(() => {
+    const currentLength = prices?.length || 0
+    const prevLength = prevDataLengthRef.current
+
+    // If data length changed by more than 10%, it's likely a period change
+    if (prevLength > 0 && Math.abs(currentLength - prevLength) / prevLength > 0.1) {
+      v3InitializedRef.current = false
+      // Reset to full range when period changes
+      v3ZoomRangeRef.current = { start: 0, end: null }
+    }
+
+    prevDataLengthRef.current = currentLength
+  }, [prices?.length])
 
   // Hovered volume zone pill
   const [hoveredVolumeLegend, setHoveredVolumeLegend] = useState(null)
@@ -2617,7 +2634,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // Only capture zoomRange when V3 is FIRST enabled
     // Subsequent zoom changes will NOT trigger recalculation
     if (!v3InitializedRef.current) {
-      v3ZoomRangeRef.current = zoomRange
+      // Always initialize with full data range to ensure all data is included
+      v3ZoomRangeRef.current = { start: 0, end: null }
       v3InitializedRef.current = true
     }
 
