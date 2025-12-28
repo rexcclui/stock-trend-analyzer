@@ -1038,8 +1038,55 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
 
       const { params: optimalParams, breakouts, slots, smaResult: optimalSMAs } = bestResult
 
-      const recentBreakouts = getRecentBreakouts(breakouts, 10)
-      let latestBreakout = getLatestBreakout(breakouts)
+      // Level 3: Fine-tune breakout threshold (5% to 15% in 1% increments)
+      let finalBreakoutThreshold = optimalParams.breakoutThreshold
+      let finalBreakouts = breakouts
+      let finalSlots = slots
+      let finalOptimalSMAs = optimalSMAs
+      let thresholdOptimizationAttempted = false
+
+      try {
+        thresholdOptimizationAttempted = true
+        let bestThresholdPL = optimalSMAs.pl
+
+        for (let thresholdPercent = 5; thresholdPercent <= 15; thresholdPercent += 1) {
+          const testThreshold = thresholdPercent / 100
+
+          // Skip if this is the same as what we already tested
+          if (Math.abs(testThreshold - optimalParams.breakoutThreshold) < 0.001) {
+            continue
+          }
+
+          // Create new params with only breakoutThreshold changed
+          const testParams = {
+            ...optimalParams,
+            breakoutThreshold: testThreshold
+          }
+
+          const { slots: testSlots, breakouts: testBreakouts } = calculateVolPrfV2Breakouts(priceData, testParams)
+
+          if (testBreakouts.length === 0) {
+            continue
+          }
+
+          // Calculate P&L using the SAME optimal SMA period
+          const testSmaResult = optimizeSMAParams(priceData, testSlots, testBreakouts)
+
+          // Only consider if meets minimum criteria
+          if (testSmaResult.totalSignals >= 4 && testSmaResult.pl > bestThresholdPL) {
+            bestThresholdPL = testSmaResult.pl
+            finalBreakoutThreshold = testThreshold
+            finalBreakouts = testBreakouts
+            finalSlots = testSlots
+            finalOptimalSMAs = testSmaResult
+          }
+        }
+      } catch (err) {
+        console.warn(`Threshold optimization failed for ${symbol}, using initial params:`, err)
+      }
+
+      const recentBreakouts = getRecentBreakouts(finalBreakouts, 10)
+      let latestBreakout = getLatestBreakout(finalBreakouts)
       const latestRecentBreakout = getLatestBreakout(recentBreakouts)
 
       if (!latestBreakout) {
@@ -1060,12 +1107,12 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
       }
 
       // Find resistance zones before potentially nullifying latestBreakout
-      const { upResist, downResist } = findResistanceZones(latestBreakout, slots, latestPrice)
+      const { upResist, downResist } = findResistanceZones(latestBreakout, finalSlots, latestPrice)
 
       // Check if the latest breakout has been closed by a sell signal
       // Store original breakout for reference, but hide break price if closed
       const originalBreakout = latestBreakout
-      const breakoutClosed = isBreakoutClosed(latestBreakout.date, priceData, optimalSMAs.period)
+      const breakoutClosed = isBreakoutClosed(latestBreakout.date, priceData, finalOptimalSMAs.period)
       if (breakoutClosed) {
         latestBreakout = null  // This hides the break price column only
       }
@@ -1076,14 +1123,18 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
       const completedEntry = {
         symbol,
         status: 'completed',
-        totalSignals: optimalSMAs.totalSignals,
+        totalSignals: finalOptimalSMAs.totalSignals,
         latestBreakout,
         originalBreakout,  // Always has the breakout data, even if closed
         breakoutClosed,
         latestPrice,
         priceData,
-        optimalParams,
-        optimalSMAs,
+        optimalParams: {
+          ...optimalParams,
+          breakoutThreshold: finalBreakoutThreshold  // Store the optimized threshold
+        },
+        optimalSMAs: finalOptimalSMAs,
+        optimalBreakoutThreshold: finalBreakoutThreshold,  // Add as top-level field for easy access
         marketChange,
         durationMs,
         days: targetDays,
@@ -1708,6 +1759,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
         return entry.optimalSMAs?.pl ?? -Infinity
       case 'marketChange':
         return typeof entry.marketChange === 'number' ? entry.marketChange : -Infinity
+      case 'breakoutThreshold':
+        return entry.optimalBreakoutThreshold ?? entry.optimalParams?.breakoutThreshold ?? -Infinity
       case 'bookmark':
         return entry.bookmarked ? 1 : 0
       default:
@@ -2346,7 +2399,8 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
                       </th>
                       <th onClick={() => handleSort('pl')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Profit/Loss % from the Vol Prf V2 + SMA trading strategy">P/L {renderSortIndicator('pl')}</th>
                       <th onClick={() => handleSort('marketChange')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Buy-and-hold % change over the entire backtest period (oldest to newest price)">Mkt% {renderSortIndicator('marketChange')}</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase" title="Optimized parameters: Th=Breakout Threshold %, LB=Lookback Zones, SMA=SMA Period">Optimal Params</th>
+                      <th onClick={() => handleSort('breakoutThreshold')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Optimized breakout threshold percentage (5-15%)">BrkTh% {renderSortIndicator('breakoutThreshold')}</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase" title="Optimized parameters: LB=Lookback Zones, SMA=SMA Period">Optimal Params</th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase" title="Timestamp of when this backtest was last run (red if >7 days old)">Last Scan</th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase" title="Actions: Load in Volume tab, Rescan, Erase results, Remove from table">Action</th>
                     </tr>
@@ -2518,10 +2572,19 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
                               </span>
                             ) : '—'}
                           </td>
+                          <td className="px-4 py-3 text-sm text-right">
+                            {hasParams ? (
+                              <span className="text-purple-400 font-semibold">
+                                {(result.optimalParams.breakoutThreshold * 100).toFixed(0)}%
+                              </span>
+                            ) : (
+                              <span className="text-slate-500">—</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-xs text-slate-400 text-left">
                             {hasData && hasParams && hasOptimalSMAs ? (
                               <div className="whitespace-nowrap">
-                                Th:{(result.optimalParams.breakoutThreshold * 100).toFixed(0)}% LB:{result.optimalParams.lookbackZones} <span className="text-blue-400 font-medium">SMA:{result.optimalSMAs.period}</span>
+                                LB:{result.optimalParams.lookbackZones} <span className="text-blue-400 font-medium">SMA:{result.optimalSMAs.period}</span>
                               </div>
                             ) : (
                               <span className="text-slate-500">—</span>

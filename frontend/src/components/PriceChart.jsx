@@ -26,18 +26,26 @@ import {
 import VolumeLegendPills from './VolumeLegendPills'
 import { getVolumeColor } from './PriceChart/utils'
 import { calculateVolumeProfileV3WithSells } from './PriceChart/utils/volumeProfileV3Utils'
+import { calculateVolPrfV2Breakouts } from './PriceChart/utils/volumeProfileV2Utils'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RefreshTrigger = 0, volumeProfileV3RegressionThreshold = 6, onVolumeProfileV3RegressionThresholdChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, linearRegressionEnabled = false, linearRegressionSelections = [], onAddLinearRegressionSelection, onClearLinearRegressionSelections, onRemoveLinearRegressionSelection, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, volumeProfileV2BreakoutThreshold = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RefreshTrigger = 0, volumeProfileV3RegressionThreshold = 6, onVolumeProfileV3RegressionThresholdChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, linearRegressionEnabled = false, linearRegressionSelections = [], onAddLinearRegressionSelection, onClearLinearRegressionSelections, onRemoveLinearRegressionSelection, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete, simulatingBreakoutThreshold = false, onBreakoutThresholdSimulateComplete }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
 
   // Vol Profile V2 parameters - use provided params or defaults
-  const volPrfV2Params = volumeProfileV2Params || {
-    breakoutThreshold: 0.06,
-    lookbackZones: 5,
-    resetThreshold: 0.03,
-    timeoutSlots: 5
+  // Use slider-controlled breakout threshold if provided, otherwise use params or default
+  const volPrfV2Params = {
+    ...(volumeProfileV2Params || {
+      breakoutThreshold: 0.06,
+      lookbackZones: 5,
+      resetThreshold: 0.03,
+      timeoutSlots: 5
+    }),
+    // Override with slider value if provided (convert from percentage to decimal)
+    breakoutThreshold: volumeProfileV2BreakoutThreshold
+      ? volumeProfileV2BreakoutThreshold / 100
+      : (volumeProfileV2Params?.breakoutThreshold || 0.06)
   }
 
   // Store ABSOLUTE optimized parameters (not percentages) so they persist across period changes
@@ -2776,6 +2784,123 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     }, 100) // Small delay to let UI update
 
   }, [simulatingSma, chartId, volumeProfileV2Enabled, onSimulateComplete, displayPrices, volumeProfileV2Data, volumeProfileV2Breakouts])
+
+  // Breakout Threshold Simulation Logic - find optimal breakout threshold based on P&L
+  useEffect(() => {
+    if (!simulatingBreakoutThreshold || !volumeProfileV2Enabled || !chartId || !onBreakoutThresholdSimulateComplete) return
+    if (!smaPeriods || smaPeriods.length === 0) {
+      console.warn('No SMA enabled - cannot simulate breakout threshold')
+      if (onBreakoutThresholdSimulateComplete) {
+        onBreakoutThresholdSimulateComplete(null)
+      }
+      return
+    }
+
+    // Run simulation asynchronously
+    setTimeout(() => {
+      let bestPL = -Infinity
+      let bestThreshold = 6  // Default
+
+      const smaPeriod = Math.min(...smaPeriods) // Use smallest SMA period
+
+      // Test thresholds from 5% to 15% in 1% increments
+      for (let thresholdPercent = 5; thresholdPercent <= 15; thresholdPercent += 1) {
+        const testThreshold = thresholdPercent / 100
+
+        // Calculate breakouts with this threshold
+        const testParams = {
+          ...volPrfV2Params,
+          breakoutThreshold: testThreshold
+        }
+
+        const { breakouts: testBreakouts } = calculateVolPrfV2Breakouts(displayPrices, testParams)
+
+        if (testBreakouts.length === 0) continue
+
+        // Calculate P&L for these breakouts
+        const reversedPrices = [...displayPrices].reverse()
+
+        // Calculate SMA from daily prices
+        const dateToSMA = new Map()
+        for (let i = 0; i < reversedPrices.length; i++) {
+          if (i < smaPeriod - 1) {
+            dateToSMA.set(reversedPrices[i].date, null)
+          } else {
+            const sum = reversedPrices.slice(i - smaPeriod + 1, i + 1).reduce((acc, p) => acc + p.close, 0)
+            dateToSMA.set(reversedPrices[i].date, sum / smaPeriod)
+          }
+        }
+
+        const getSMASlope = (currentDate, prevDate) => {
+          const currentSMA = dateToSMA.get(currentDate)
+          const prevSMA = dateToSMA.get(prevDate)
+          if (currentSMA !== undefined && prevSMA !== undefined) {
+            return currentSMA - prevSMA
+          }
+          return null
+        }
+
+        const breakoutDates = new Set(testBreakouts.map(b => b.date))
+        const trades = []
+        let isHolding = false
+        let buyPrice = null
+        let prevSlopeWhileHolding = null
+
+        for (let i = 0; i < reversedPrices.length; i++) {
+          const pricePoint = reversedPrices[i]
+          if (!pricePoint) continue
+
+          const currentDate = pricePoint.date
+          const currentPrice = pricePoint.close
+
+          if (breakoutDates.has(currentDate) && !isHolding) {
+            isHolding = true
+            buyPrice = currentPrice
+            prevSlopeWhileHolding = null
+          } else if (isHolding && i > 0) {
+            const prevPrice = reversedPrices[i - 1]
+            if (prevPrice) {
+              const slope = getSMASlope(currentDate, prevPrice.date)
+              if (slope !== null && prevSlopeWhileHolding !== null && prevSlopeWhileHolding >= 0 && slope < 0) {
+                const plPercent = ((currentPrice - buyPrice) / buyPrice) * 100
+                trades.push({ plPercent })
+                isHolding = false
+                buyPrice = null
+                prevSlopeWhileHolding = null
+              }
+              if (slope !== null) {
+                prevSlopeWhileHolding = slope
+              }
+            }
+          }
+        }
+
+        // If still holding, close at end
+        if (isHolding && reversedPrices.length > 0) {
+          const lastPrice = reversedPrices[reversedPrices.length - 1]
+          const plPercent = ((lastPrice.close - buyPrice) / buyPrice) * 100
+          trades.push({ plPercent, isOpen: true })
+        }
+
+        const totalPL = trades.reduce((sum, trade) => sum + trade.plPercent, 0)
+        const closedTrades = trades.filter(t => !t.isOpen)
+        const openTrades = trades.filter(t => t.isOpen)
+        const totalSignals = closedTrades.length + (openTrades.length * 0.5)
+
+        // Only consider thresholds with >= 4 signals
+        if (totalSignals >= 4 && totalPL > bestPL) {
+          bestPL = totalPL
+          bestThreshold = thresholdPercent
+        }
+      }
+
+      // Call callback with best threshold (as percentage)
+      if (onBreakoutThresholdSimulateComplete) {
+        onBreakoutThresholdSimulateComplete(bestThreshold)
+      }
+    }, 100) // Small delay to let UI update
+
+  }, [simulatingBreakoutThreshold, volumeProfileV2Enabled, chartId, onBreakoutThresholdSimulateComplete, displayPrices, smaPeriods, volPrfV2Params])
 
   // V3 Regression Threshold Optimization - find optimal threshold for best P/L
   const handleSimulateV3RegressionThreshold = () => {

@@ -161,6 +161,9 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
   // Track SMA simulation state (chartId-index pairs that are simulating)
   const [simulatingSma, setSimulatingSma] = useState({})
 
+  // Track breakout threshold simulation state (chartId that is simulating)
+  const [simulatingBreakoutThreshold, setSimulatingBreakoutThreshold] = useState({})
+
   // Load stock history from localStorage on mount
   useEffect(() => {
     const savedHistory = localStorage.getItem(STOCK_HISTORY_KEY)
@@ -278,6 +281,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
             volumeProfileV2EndDate: null,
             volumeProfileV2RefreshTrigger: 0,
             volumeProfileV2Params: params?.volumeProfileV3Enabled ? null : (hasOptimalParams || forceVolumeProfileV2 ? params : null),
+            volumeProfileV2BreakoutThreshold: params?.breakoutThreshold ? params.breakoutThreshold * 100 : 6,  // Store as percentage (6% default)
             volumeProfileV3Enabled: params?.volumeProfileV3Enabled || false,
             volumeProfileV3RefreshTrigger: 0,
             volumeProfileV3RegressionThreshold: params?.regressionThreshold ?? 6,
@@ -431,6 +435,36 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
               ...chart.smaVisibility,
               [period]: !chart.smaVisibility[period]
             }
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const updateBreakoutThreshold = (chartId, newThreshold) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            volumeProfileV2BreakoutThreshold: newThreshold,
+            volumeProfileV2RefreshTrigger: chart.volumeProfileV2RefreshTrigger + 1  // Trigger refresh
+          }
+        }
+        return chart
+      })
+    )
+  }
+
+  const handleSimulateBreakoutThreshold = (chartId, optimalValue) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            volumeProfileV2BreakoutThreshold: optimalValue,
+            volumeProfileV2RefreshTrigger: chart.volumeProfileV2RefreshTrigger + 1  // Trigger refresh
           }
         }
         return chart
@@ -2206,6 +2240,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                     volumeProfileV2EndDate={chart.volumeProfileV2EndDate}
                     volumeProfileV2RefreshTrigger={chart.volumeProfileV2RefreshTrigger}
                     volumeProfileV2Params={chart.volumeProfileV2Params}
+                    volumeProfileV2BreakoutThreshold={chart.volumeProfileV2BreakoutThreshold}
                     onVolumeProfileV2StartChange={(value) => updateVolumeProfileV2Start(chart.id, value)}
                     onVolumeProfileV2EndChange={(value) => updateVolumeProfileV2End(chart.id, value)}
                     volumeProfileV3Enabled={chart.volumeProfileV3Enabled}
@@ -2265,6 +2300,17 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                       })
                       if (optimalValue !== null && optimalValue !== undefined && !isNaN(optimalValue)) {
                         handleSimulateSma(chart.id, smaIndex, optimalValue)
+                      }
+                    }}
+                    simulatingBreakoutThreshold={simulatingBreakoutThreshold[chart.id]}
+                    onBreakoutThresholdSimulateComplete={(optimalValue) => {
+                      setSimulatingBreakoutThreshold(prev => {
+                        const newState = { ...prev }
+                        delete newState[chart.id]
+                        return newState
+                      })
+                      if (optimalValue !== null && optimalValue !== undefined && !isNaN(optimalValue)) {
+                        handleSimulateBreakoutThreshold(chart.id, optimalValue)
                       }
                     }}
                   />
@@ -2349,6 +2395,69 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                           </div>
                         )
                       })}
+                    </div>
+                  )}
+
+                  {/* Breakout Threshold Slider Control (only shown when Vol Prf V2 is active) */}
+                  {!chart.collapsed && chart.volumeProfileV2Enabled && (
+                    <div className="mt-3 px-2">
+                      <div className="flex items-center gap-2 bg-slate-700/50 p-2 rounded">
+                        <span className="text-sm text-slate-300 whitespace-nowrap">Brk Th %</span>
+                        <button
+                          onClick={() => {
+                            const newValue = Math.max(5, chart.volumeProfileV2BreakoutThreshold - 1)
+                            updateBreakoutThreshold(chart.id, newValue)
+                          }}
+                          disabled={chart.volumeProfileV2BreakoutThreshold <= 5 || simulatingBreakoutThreshold[chart.id]}
+                          className="p-1 text-slate-300 hover:text-white hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Decrease breakout threshold"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                        <input
+                          type="range"
+                          min="5"
+                          max="15"
+                          step="1"
+                          value={chart.volumeProfileV2BreakoutThreshold || 6}
+                          onChange={(e) => {
+                            const newValue = parseInt(e.target.value)
+                            updateBreakoutThreshold(chart.id, newValue)
+                          }}
+                          disabled={simulatingBreakoutThreshold[chart.id]}
+                          className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                        <button
+                          onClick={() => {
+                            const newValue = Math.min(15, chart.volumeProfileV2BreakoutThreshold + 1)
+                            updateBreakoutThreshold(chart.id, newValue)
+                          }}
+                          disabled={chart.volumeProfileV2BreakoutThreshold >= 15 || simulatingBreakoutThreshold[chart.id]}
+                          className="p-1 text-slate-300 hover:text-white hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Increase breakout threshold"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                        <span className="text-xs text-slate-400 w-8 text-right">{chart.volumeProfileV2BreakoutThreshold}%</span>
+                        <button
+                          onClick={() => {
+                            setSimulatingBreakoutThreshold(prev => ({ ...prev, [chart.id]: true }))
+                          }}
+                          disabled={simulatingBreakoutThreshold[chart.id]}
+                          className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
+                            simulatingBreakoutThreshold[chart.id]
+                              ? 'bg-yellow-600 text-white cursor-wait'
+                              : 'bg-purple-600 text-white hover:bg-purple-700'
+                          }`}
+                          title="Simulate optimal breakout threshold based on P&L"
+                        >
+                          {simulatingBreakoutThreshold[chart.id] ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            'Sim'
+                          )}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>}
