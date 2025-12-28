@@ -121,8 +121,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // If data length changed by more than 10%, it's likely a period change
     if (prevLength > 0 && Math.abs(currentLength - prevLength) / prevLength > 0.1) {
       v3InitializedRef.current = false
-      // Reset to full range when period changes
-      v3ZoomRangeRef.current = { start: 0, end: null }
+      // Will capture current visible zoomRange on next V3 calculation
     }
 
     prevDataLengthRef.current = currentLength
@@ -2634,8 +2633,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // Only capture zoomRange when V3 is FIRST enabled
     // Subsequent zoom changes will NOT trigger recalculation
     if (!v3InitializedRef.current) {
-      // Always initialize with full data range to ensure all data is included
-      v3ZoomRangeRef.current = { start: 0, end: null }
+      // Capture current visible range when V3 is first enabled
+      v3ZoomRangeRef.current = zoomRange
       v3InitializedRef.current = true
     }
 
