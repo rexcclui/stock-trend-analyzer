@@ -1456,16 +1456,25 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     if (cleanedEntries.length === 0 || isScanning) return
 
     const refreshedEntries = cleanedEntries.map(entry => clearEntryResults(entry))
-    let loadingEntries = refreshedEntries.map(entry => ({ ...entry, status: 'loading', error: null }))
 
-    // Apply scan limit if not "ALL"
-    if (scanLimit !== 'ALL' && typeof scanLimit === 'number') {
-      loadingEntries = loadingEntries.slice(0, scanLimit)
-    }
+    // Determine how many to scan
+    const limitCount = scanLimit === 'ALL' || typeof scanLimit !== 'number'
+      ? refreshedEntries.length
+      : Math.min(scanLimit, refreshedEntries.length)
 
-    setEntries(loadingEntries)
-    setScanQueue(loadingEntries)
-    setScanTotal(loadingEntries.length)
+    // Only mark the first N entries as loading, keep the rest as-is
+    const updatedEntries = refreshedEntries.map((entry, index) =>
+      index < limitCount
+        ? { ...entry, status: 'loading', error: null }
+        : entry
+    )
+
+    // Only queue the first N entries for scanning
+    const queuedEntries = updatedEntries.slice(0, limitCount)
+
+    setEntries(updatedEntries)  // Keep all entries
+    setScanQueue(queuedEntries)  // Only queue the limited amount
+    setScanTotal(queuedEntries.length)
     setScanCompleted(0)
     setIsScanning(true)
     setIsPaused(false)
