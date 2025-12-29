@@ -2796,8 +2796,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
       const smaPeriod = Math.min(...smaPeriods) // Use smallest SMA period
 
-      // Test thresholds from 5% to 15% in 1% increments
-      for (let thresholdPercent = 5; thresholdPercent <= 15; thresholdPercent += 1) {
+      // Generate threshold values: 5-12 (step 1), 14-24 (step 2), 27-33 (step 3)
+      const thresholdValues = []
+      for (let t = 5; t <= 12; t += 1) thresholdValues.push(t)
+      for (let t = 14; t <= 24; t += 2) thresholdValues.push(t)
+      for (let t = 27; t <= 33; t += 3) thresholdValues.push(t)
+
+      for (const thresholdPercent of thresholdValues) {
         const testThreshold = thresholdPercent / 100
 
         // Calculate breakouts with this threshold
