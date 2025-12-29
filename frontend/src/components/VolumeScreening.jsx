@@ -452,7 +452,7 @@ function buildLegend(slots, currentIndex) {
 // - If the prior slot is higher, do the same check on up to five slots above the current range.
 // - If the prior slot is the same or unavailable, no break is reported.
 // - Returns the direction of the break ("up" | "down") or null when no break is detected.
-function detectBreakout(slots, currentIndex, lastPrice, previousPrice) {
+function detectBreakout(slots, currentIndex, lastPrice, previousPrice, volumeWeightThreshold = 5) {
   if (!Array.isArray(slots) || slots.length === 0 || currentIndex < 0 || lastPrice == null) return null
   const currentSlot = slots[currentIndex]
   const prevIndex = findSlotIndex(slots, previousPrice)
@@ -477,7 +477,7 @@ function detectBreakout(slots, currentIndex, lastPrice, previousPrice) {
     }
   }
 
-  const hasBreak = targetSlots.some(slot => Math.abs((slot?.weight ?? 0) - currentWeight) >= 5)
+  const hasBreak = targetSlots.some(slot => Math.abs((slot?.weight ?? 0) - currentWeight) >= volumeWeightThreshold)
   return hasBreak ? direction : null
 }
 
@@ -753,6 +753,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
   const [isScanning, setIsScanning] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [scanLimit, setScanLimit] = useState(5) // Default scan limit
+  const [breakoutVolumeThreshold, setBreakoutVolumeThreshold] = useState(5) // Default breakout volume weight difference threshold
   const [scanTotal, setScanTotal] = useState(0)
   const [scanCompleted, setScanCompleted] = useState(0)
   const [showBookmarkedOnly, setShowBookmarkedOnly] = useState(false)
@@ -1506,7 +1507,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
       const currentRange = slotIndex >= 0 ? slots[slotIndex] : null
       const previousRange = previousSlotIndex >= 0 ? slots[previousSlotIndex] : null
       const legend = buildLegend(slots, slotIndex)
-      const breakout = detectBreakout(slots, slotIndex, lastPrice, previousPrice)
+      const breakout = detectBreakout(slots, slotIndex, lastPrice, previousPrice, breakoutVolumeThreshold)
       const bottomResist = findResistance(slots, slotIndex, 'down')
       const upperResist = findResistance(slots, slotIndex, 'up')
 
@@ -2262,6 +2263,55 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                 </option>
               ))}
             </select>
+          </div>
+          <div className="w-full lg:w-64">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Breakout Volume Threshold: {breakoutVolumeThreshold}%
+            </label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const values = [5, 6, 7, 8, 10, 12, 15, 18, 22, 24, 27, 30, 33]
+                  const currentIndex = values.indexOf(breakoutVolumeThreshold)
+                  if (currentIndex > 0) {
+                    setBreakoutVolumeThreshold(values[currentIndex - 1])
+                  }
+                }}
+                disabled={breakoutVolumeThreshold === 5}
+                className="px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors font-bold"
+                title="Decrease threshold"
+              >
+                −
+              </button>
+              <input
+                type="range"
+                min="0"
+                max="12"
+                value={[5, 6, 7, 8, 10, 12, 15, 18, 22, 24, 27, 30, 33].indexOf(breakoutVolumeThreshold)}
+                onChange={(e) => {
+                  const values = [5, 6, 7, 8, 10, 12, 15, 18, 22, 24, 27, 30, 33]
+                  setBreakoutVolumeThreshold(values[parseInt(e.target.value, 10)])
+                }}
+                className="flex-1 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                title="Adjust breakout volume weight threshold (5-33%)"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const values = [5, 6, 7, 8, 10, 12, 15, 18, 22, 24, 27, 30, 33]
+                  const currentIndex = values.indexOf(breakoutVolumeThreshold)
+                  if (currentIndex < values.length - 1) {
+                    setBreakoutVolumeThreshold(values[currentIndex + 1])
+                  }
+                }}
+                disabled={breakoutVolumeThreshold === 33}
+                className="px-3 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors font-bold"
+                title="Increase threshold"
+              >
+                +
+              </button>
+            </div>
           </div>
           <div className="flex flex-wrap lg:flex-nowrap items-end gap-3">
             <button
