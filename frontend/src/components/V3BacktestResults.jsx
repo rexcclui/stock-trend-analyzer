@@ -970,11 +970,11 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
 
   // Simulate different regression thresholds to optimize P/L
   const optimizeRegressionThreshold = (priceData) => {
-    // Test regression thresholds from 2% to 15% in 0.5% increments
+    // Test regression thresholds from 2% to 33% with variable increments
     const testThresholds = []
-    for (let threshold = 2; threshold <= 15; threshold += 0.5) {
-      testThresholds.push(threshold)
-    }
+    for (let t = 2; t <= 12; t += 1) testThresholds.push(t)
+    for (let t = 14; t <= 24; t += 2) testThresholds.push(t)
+    for (let t = 27; t <= 33; t += 3) testThresholds.push(t)
 
     let bestThreshold = 6 // Default
     let bestPL = -Infinity

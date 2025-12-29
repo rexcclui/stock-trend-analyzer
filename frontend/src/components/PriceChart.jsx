@@ -2909,9 +2909,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     // Run simulation asynchronously to keep UI responsive
     setTimeout(() => {
       const testThresholds = []
-      for (let threshold = 2; threshold <= 15; threshold += 0.5) {
-        testThresholds.push(threshold)
-      }
+      for (let t = 2; t <= 12; t += 1) testThresholds.push(t)
+      for (let t = 14; t <= 24; t += 2) testThresholds.push(t)
+      for (let t = 27; t <= 33; t += 3) testThresholds.push(t)
 
       let bestThreshold = volumeProfileV3RegressionThreshold
       let bestPL = -Infinity

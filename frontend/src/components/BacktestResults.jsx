@@ -1039,7 +1039,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
 
       const { params: optimalParams, breakouts, slots, smaResult: optimalSMAs } = bestResult
 
-      // Level 3: Fine-tune breakout threshold (5% to 15% in 1% increments)
+      // Level 3: Fine-tune breakout threshold (5% to 33% with variable increments)
       let finalBreakoutThreshold = optimalParams.breakoutThreshold
       let finalBreakouts = breakouts
       let finalSlots = slots
@@ -2429,7 +2429,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
                       </th>
                       <th onClick={() => handleSort('pl')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Profit/Loss % from the Vol Prf V2 + SMA trading strategy">P/L {renderSortIndicator('pl')}</th>
                       <th onClick={() => handleSort('marketChange')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Buy-and-hold % change over the entire backtest period (oldest to newest price)">Mkt% {renderSortIndicator('marketChange')}</th>
-                      <th onClick={() => handleSort('breakoutThreshold')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Optimized breakout threshold percentage (5-15%)">BrkTh% {renderSortIndicator('breakoutThreshold')}</th>
+                      <th onClick={() => handleSort('breakoutThreshold')} className="px-4 py-3 text-right text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Optimized breakout threshold percentage (5-33%)">BrkTh% {renderSortIndicator('breakoutThreshold')}</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase" title="Optimized parameters: LB=Lookback Zones, SMA=SMA Period">Optimal Params</th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase" title="Timestamp of when this backtest was last run (red if >7 days old)">Last Scan</th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase" title="Actions: Load in Volume tab, Rescan, Erase results, Remove from table">Action</th>
