@@ -461,19 +461,9 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     setCharts(prevCharts =>
       prevCharts.map(chart => {
         if (chart.id === chartId) {
-          // Add optimal SMA to smaPeriods if not already present
-          const currentSMAs = chart.smaPeriods || []
-          let updatedSMAs = [...currentSMAs]
-
-          if (optimalSMA !== null && optimalSMA !== undefined && !currentSMAs.includes(optimalSMA)) {
-            updatedSMAs.push(optimalSMA)
-            updatedSMAs.sort((a, b) => a - b)
-          }
-
           return {
             ...chart,
             volumeProfileV2BreakoutThreshold: optimalValue,
-            smaPeriods: updatedSMAs,
             volumeProfileV2RefreshTrigger: chart.volumeProfileV2RefreshTrigger + 1  // Trigger refresh
           }
         }
