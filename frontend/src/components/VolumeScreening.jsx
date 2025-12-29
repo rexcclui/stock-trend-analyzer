@@ -451,7 +451,7 @@ function buildLegend(slots, currentIndex) {
 //   A break is flagged when any of those slots differs from the current weight by ≥5 percentage points.
 // - If the prior slot is higher, do the same check on up to five slots above the current range.
 // - If the prior slot is the same or unavailable, no break is reported.
-// - Returns the direction of the break ("up" | "down") or null when no break is detected.
+// - Returns an object with direction ("up" | "down") and maxDiff (max volume weight difference), or null when no break is detected.
 function detectBreakout(slots, currentIndex, lastPrice, previousPrice, volumeWeightThreshold = 5) {
   if (!Array.isArray(slots) || slots.length === 0 || currentIndex < 0 || lastPrice == null) return null
   const currentSlot = slots[currentIndex]
@@ -477,8 +477,17 @@ function detectBreakout(slots, currentIndex, lastPrice, previousPrice, volumeWei
     }
   }
 
-  const hasBreak = targetSlots.some(slot => Math.abs((slot?.weight ?? 0) - currentWeight) >= volumeWeightThreshold)
-  return hasBreak ? direction : null
+  // Find maximum volume weight difference
+  let maxDiff = 0
+  for (const slot of targetSlots) {
+    const diff = Math.abs((slot?.weight ?? 0) - currentWeight)
+    if (diff > maxDiff) {
+      maxDiff = diff
+    }
+  }
+
+  const hasBreak = maxDiff >= volumeWeightThreshold
+  return hasBreak ? { direction, maxDiff } : null
 }
 
 function findResistance(slots, currentIndex, direction = 'down') {
@@ -1543,7 +1552,8 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
         volumeLegend: legend,
         bottomResist: formatResistance(currentRange, bottomResist),
         upperResist: formatResistance(currentRange, upperResist),
-        breakout: breakout ? (breakout === 'up' ? 'Up' : 'Down') : '—',
+        breakout: breakout ? (breakout.direction === 'up' ? 'Up' : 'Down') : '—',
+        breakoutVolumeDiff: breakout ? breakout.maxDiff : null,
         lastDataDate,
         lastScanAt: new Date().toISOString(),
         status: 'ready',
@@ -2705,6 +2715,17 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                       {renderSortIndicator('breakout')}
                     </button>
                   </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('breakoutVolumeDiff')}
+                      className="inline-flex items-center gap-1 hover:text-slate-100"
+                      title="Maximum volume weight difference that triggered the breakout detection"
+                    >
+                      Brk V.Diff%
+                      {renderSortIndicator('breakoutVolumeDiff')}
+                    </button>
+                  </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-slate-300 uppercase tracking-wider">
                     Actions
                   </th>
@@ -2713,7 +2734,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
             <tbody className="divide-y divide-slate-800">
               {displayEntries.length === 0 ? (
                 <tr>
-                  <td colSpan="13" className="px-4 py-6 text-center text-slate-400">
+                  <td colSpan="14" className="px-4 py-6 text-center text-slate-400">
                     {showUpBreakOnly || showDownBreakOnly || showPotentialBreakOnly || showBookmarkedOnly
                       ? 'No symbols matched the current filters. Disable filters to see all entries.'
                       : 'No symbols added yet. Add stocks above to start screening.'}
@@ -2809,6 +2830,9 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                       {entry.upperResist}
                     </td>
                     <td className="px-4 py-3 text-slate-200">{entry.breakout}</td>
+                    <td className="px-4 py-3 text-slate-200">
+                      {entry.breakoutVolumeDiff != null ? `${entry.breakoutVolumeDiff.toFixed(1)}%` : '—'}
+                    </td>
                     <td className="px-4 py-3 text-right">
                       {onBacktestSelect && (
                         <button
