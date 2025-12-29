@@ -2794,7 +2794,17 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       let bestPL = -Infinity
       let bestThreshold = 6  // Default
 
-      const smaPeriod = Math.min(...smaPeriods) // Use smallest SMA period
+      // Generate SMA test values (same as backtest optimization)
+      const smaTestValues = []
+      for (let val = 3; val <= 200;) {
+        smaTestValues.push(val)
+        if (val <= 10) val += 1
+        else if (val <= 20) val += 2
+        else if (val <= 40) val += 3
+        else if (val <= 50) val += 4
+        else if (val <= 100) val += 5
+        else val += 10
+      }
 
       // Generate threshold values: 5-12 (step 1), 14-24 (step 2), 27-33 (step 3)
       const thresholdValues = []
@@ -2815,80 +2825,82 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
         if (testBreakouts.length === 0) continue
 
-        // Calculate P&L for these breakouts
+        // Test all SMA periods for this threshold (same as backtest optimization)
         const reversedPrices = [...displayPrices].reverse()
-
-        // Calculate SMA from daily prices
-        const dateToSMA = new Map()
-        for (let i = 0; i < reversedPrices.length; i++) {
-          if (i < smaPeriod - 1) {
-            dateToSMA.set(reversedPrices[i].date, null)
-          } else {
-            const sum = reversedPrices.slice(i - smaPeriod + 1, i + 1).reduce((acc, p) => acc + p.close, 0)
-            dateToSMA.set(reversedPrices[i].date, sum / smaPeriod)
-          }
-        }
-
-        const getSMASlope = (currentDate, prevDate) => {
-          const currentSMA = dateToSMA.get(currentDate)
-          const prevSMA = dateToSMA.get(prevDate)
-          if (currentSMA !== undefined && prevSMA !== undefined) {
-            return currentSMA - prevSMA
-          }
-          return null
-        }
-
         const breakoutDates = new Set(testBreakouts.map(b => b.date))
-        const trades = []
-        let isHolding = false
-        let buyPrice = null
-        let prevSlopeWhileHolding = null
 
-        for (let i = 0; i < reversedPrices.length; i++) {
-          const pricePoint = reversedPrices[i]
-          if (!pricePoint) continue
+        for (const smaPeriod of smaTestValues) {
+          // Calculate SMA from daily prices
+          const dateToSMA = new Map()
+          for (let i = 0; i < reversedPrices.length; i++) {
+            if (i < smaPeriod - 1) {
+              dateToSMA.set(reversedPrices[i].date, null)
+            } else {
+              const sum = reversedPrices.slice(i - smaPeriod + 1, i + 1).reduce((acc, p) => acc + p.close, 0)
+              dateToSMA.set(reversedPrices[i].date, sum / smaPeriod)
+            }
+          }
 
-          const currentDate = pricePoint.date
-          const currentPrice = pricePoint.close
+          const getSMASlope = (currentDate, prevDate) => {
+            const currentSMA = dateToSMA.get(currentDate)
+            const prevSMA = dateToSMA.get(prevDate)
+            if (currentSMA !== undefined && prevSMA !== undefined) {
+              return currentSMA - prevSMA
+            }
+            return null
+          }
 
-          if (breakoutDates.has(currentDate) && !isHolding) {
-            isHolding = true
-            buyPrice = currentPrice
-            prevSlopeWhileHolding = null
-          } else if (isHolding && i > 0) {
-            const prevPrice = reversedPrices[i - 1]
-            if (prevPrice) {
-              const slope = getSMASlope(currentDate, prevPrice.date)
-              if (slope !== null && prevSlopeWhileHolding !== null && prevSlopeWhileHolding >= 0 && slope < 0) {
-                const plPercent = ((currentPrice - buyPrice) / buyPrice) * 100
-                trades.push({ plPercent })
-                isHolding = false
-                buyPrice = null
-                prevSlopeWhileHolding = null
-              }
-              if (slope !== null) {
-                prevSlopeWhileHolding = slope
+          const trades = []
+          let isHolding = false
+          let buyPrice = null
+          let prevSlopeWhileHolding = null
+
+          for (let i = 0; i < reversedPrices.length; i++) {
+            const pricePoint = reversedPrices[i]
+            if (!pricePoint) continue
+
+            const currentDate = pricePoint.date
+            const currentPrice = pricePoint.close
+
+            if (breakoutDates.has(currentDate) && !isHolding) {
+              isHolding = true
+              buyPrice = currentPrice
+              prevSlopeWhileHolding = null
+            } else if (isHolding && i > 0) {
+              const prevPrice = reversedPrices[i - 1]
+              if (prevPrice) {
+                const slope = getSMASlope(currentDate, prevPrice.date)
+                if (slope !== null && prevSlopeWhileHolding !== null && prevSlopeWhileHolding >= 0 && slope < 0) {
+                  const plPercent = ((currentPrice - buyPrice) / buyPrice) * 100
+                  trades.push({ plPercent })
+                  isHolding = false
+                  buyPrice = null
+                  prevSlopeWhileHolding = null
+                }
+                if (slope !== null) {
+                  prevSlopeWhileHolding = slope
+                }
               }
             }
           }
-        }
 
-        // If still holding, close at end
-        if (isHolding && reversedPrices.length > 0) {
-          const lastPrice = reversedPrices[reversedPrices.length - 1]
-          const plPercent = ((lastPrice.close - buyPrice) / buyPrice) * 100
-          trades.push({ plPercent, isOpen: true })
-        }
+          // If still holding, close at end
+          if (isHolding && reversedPrices.length > 0) {
+            const lastPrice = reversedPrices[reversedPrices.length - 1]
+            const plPercent = ((lastPrice.close - buyPrice) / buyPrice) * 100
+            trades.push({ plPercent, isOpen: true })
+          }
 
-        const totalPL = trades.reduce((sum, trade) => sum + trade.plPercent, 0)
-        const closedTrades = trades.filter(t => !t.isOpen)
-        const openTrades = trades.filter(t => t.isOpen)
-        const totalSignals = closedTrades.length + (openTrades.length * 0.5)
+          const totalPL = trades.reduce((sum, trade) => sum + trade.plPercent, 0)
+          const closedTrades = trades.filter(t => !t.isOpen)
+          const openTrades = trades.filter(t => t.isOpen)
+          const totalSignals = closedTrades.length + (openTrades.length * 0.5)
 
-        // Only consider thresholds with >= 4 signals
-        if (totalSignals >= 4 && totalPL > bestPL) {
-          bestPL = totalPL
-          bestThreshold = thresholdPercent
+          // Only consider thresholds with >= 4 signals
+          if (totalSignals >= 4 && totalPL > bestPL) {
+            bestPL = totalPL
+            bestThreshold = thresholdPercent
+          }
         }
       }
 
