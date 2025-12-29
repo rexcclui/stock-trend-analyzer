@@ -2892,6 +2892,25 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         }
       }
 
+      // Validate: Check if best threshold produces any breakouts in current visible range
+      // This prevents applying a threshold that works historically but not currently
+      if (bestThreshold !== 6) {
+        const finalTestParams = {
+          ...volPrfV2Params,
+          breakoutThreshold: bestThreshold / 100
+        }
+        const { breakouts: finalBreakouts } = calculateVolPrfV2Breakouts(displayPrices, finalTestParams)
+
+        if (finalBreakouts.length === 0) {
+          console.warn(`Optimal threshold ${bestThreshold}% produces no breakouts in current visible range. Keeping current threshold.`)
+          // Call callback with null to clear simulation state but don't change threshold
+          if (onBreakoutThresholdSimulateComplete) {
+            onBreakoutThresholdSimulateComplete(null)
+          }
+          return
+        }
+      }
+
       // Call callback with best threshold (as percentage)
       if (onBreakoutThresholdSimulateComplete) {
         onBreakoutThresholdSimulateComplete(bestThreshold)
