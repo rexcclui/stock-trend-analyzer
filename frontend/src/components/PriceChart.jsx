@@ -2793,6 +2793,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     setTimeout(() => {
       let bestPL = -Infinity
       let bestThreshold = 6  // Default
+      let bestSMA = smaPeriods && smaPeriods.length > 0 ? Math.min(...smaPeriods) : 20  // Track optimal SMA
 
       // Generate SMA test values (same as backtest optimization)
       const smaTestValues = []
@@ -2900,6 +2901,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           if (totalSignals >= 4 && totalPL > bestPL) {
             bestPL = totalPL
             bestThreshold = thresholdPercent
+            bestSMA = smaPeriod  // Track the optimal SMA period
           }
         }
       }
@@ -2923,9 +2925,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         }
       }
 
-      // Call callback with best threshold (as percentage)
+      // Call callback with best threshold (as percentage) and best SMA period
       if (onBreakoutThresholdSimulateComplete) {
-        onBreakoutThresholdSimulateComplete(bestThreshold)
+        onBreakoutThresholdSimulateComplete(bestThreshold, bestSMA)
       }
     }, 100) // Small delay to let UI update
 

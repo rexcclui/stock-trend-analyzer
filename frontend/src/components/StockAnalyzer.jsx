@@ -457,13 +457,23 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     )
   }
 
-  const handleSimulateBreakoutThreshold = (chartId, optimalValue) => {
+  const handleSimulateBreakoutThreshold = (chartId, optimalValue, optimalSMA) => {
     setCharts(prevCharts =>
       prevCharts.map(chart => {
         if (chart.id === chartId) {
+          // Add optimal SMA to smaPeriods if not already present
+          const currentSMAs = chart.smaPeriods || []
+          let updatedSMAs = [...currentSMAs]
+
+          if (optimalSMA !== null && optimalSMA !== undefined && !currentSMAs.includes(optimalSMA)) {
+            updatedSMAs.push(optimalSMA)
+            updatedSMAs.sort((a, b) => a - b)
+          }
+
           return {
             ...chart,
             volumeProfileV2BreakoutThreshold: optimalValue,
+            smaPeriods: updatedSMAs,
             volumeProfileV2RefreshTrigger: chart.volumeProfileV2RefreshTrigger + 1  // Trigger refresh
           }
         }
@@ -2303,14 +2313,14 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                       }
                     }}
                     simulatingBreakoutThreshold={simulatingBreakoutThreshold[chart.id]}
-                    onBreakoutThresholdSimulateComplete={(optimalValue) => {
+                    onBreakoutThresholdSimulateComplete={(optimalValue, optimalSMA) => {
                       setSimulatingBreakoutThreshold(prev => {
                         const newState = { ...prev }
                         delete newState[chart.id]
                         return newState
                       })
                       if (optimalValue !== null && optimalValue !== undefined && !isNaN(optimalValue)) {
-                        handleSimulateBreakoutThreshold(chart.id, optimalValue)
+                        handleSimulateBreakoutThreshold(chart.id, optimalValue, optimalSMA)
                       }
                     }}
                   />
