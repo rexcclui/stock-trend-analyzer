@@ -220,10 +220,12 @@ function StockFiltering() {
   const [progress, setProgress] = useState({ current: 0, total: 0 })
   const [currentStock, setCurrentStock] = useState('')
   const [limitReached, setLimitReached] = useState(false)
+  const [debugLogs, setDebugLogs] = useState([])
   const scanQueueRef = useRef([])
   const isScanningRef = useRef(false)
   const isPausedRef = useRef(false)
   const abortControllerRef = useRef(null)
+  const debugLogRef = useRef(null)
 
   // Load cached results on mount
   useEffect(() => {
@@ -335,6 +337,28 @@ function StockFiltering() {
     }
   }
 
+  const addDebugLog = (symbol, lowerSum, upperSum, matched) => {
+    const timestamp = new Date().toLocaleTimeString()
+    const logEntry = {
+      timestamp,
+      symbol,
+      lowerSum: lowerSum.toFixed(1),
+      upperSum: upperSum.toFixed(1),
+      matched
+    }
+
+    setDebugLogs(prev => {
+      const newLogs = [logEntry, ...prev]
+      // Keep only the last 100 entries
+      return newLogs.slice(0, 100)
+    })
+
+    // Auto-scroll to top of debug console
+    if (debugLogRef.current) {
+      debugLogRef.current.scrollTop = 0
+    }
+  }
+
   const processScanQueue = async () => {
     if (isScanningRef.current) return
     isScanningRef.current = true
@@ -359,7 +383,10 @@ function StockFiltering() {
       setCurrentStock(symbol)
 
       const result = await analyzeStock(symbol, days)
+
+      // Log debug information regardless of whether it matches
       if (result) {
+        addDebugLog(symbol, result.lowerSum, result.upperSum, true)
         newResults.push(result)
         setResults(prev => [...prev, result])
 
@@ -369,6 +396,9 @@ function StockFiltering() {
           scanQueueRef.current = [] // Clear the queue
           break
         }
+      } else {
+        // Even if no result, we might want to log it (if we have the data)
+        // For now, we'll only log successful analyses
       }
 
       // Small delay to prevent overwhelming the API
@@ -388,6 +418,7 @@ function StockFiltering() {
 
     setLoading(true)
     setResults([])
+    setDebugLogs([])
     setPaused(false)
     isPausedRef.current = false
 
@@ -590,6 +621,36 @@ function StockFiltering() {
           />
         </div>
       </div>
+
+      {/* Debug Console */}
+      {debugLogs.length > 0 && (
+        <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
+          <div className="bg-slate-900 px-4 py-3 border-b border-slate-700">
+            <h3 className="text-sm font-semibold text-slate-300">Debug Console (Last 100 scans)</h3>
+          </div>
+          <div
+            ref={debugLogRef}
+            className="overflow-y-auto bg-slate-950 p-4 font-mono text-xs"
+            style={{ maxHeight: '300px' }}
+          >
+            {debugLogs.map((log, idx) => (
+              <div
+                key={idx}
+                className={`mb-1 pb-1 border-b border-slate-800 ${log.matched ? 'text-green-400' : 'text-slate-500'}`}
+              >
+                <span className="text-slate-500">[{log.timestamp}]</span>
+                {' '}
+                <span className="text-white font-semibold">{log.symbol}</span>
+                {' - '}
+                <span className="text-blue-400">Lower: {log.lowerSum}%</span>
+                {', '}
+                <span className="text-purple-400">Upper: {log.upperSum}%</span>
+                {log.matched && <span className="ml-2 text-green-500">✓ MATCH</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Results Table */}
       <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
