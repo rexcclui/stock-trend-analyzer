@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Loader2, Search, Filter } from 'lucide-react'
+import { Loader2, Search, Filter, Pause, Play } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 import VolumeLegendPills from './VolumeLegendPills'
 
@@ -213,6 +213,7 @@ function StockFiltering() {
   const [stockLimit, setStockLimit] = useState(20)
   const [loading, setLoading] = useState(false)
   const [scanning, setScanning] = useState(false)
+  const [paused, setPaused] = useState(false)
   const [results, setResults] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [progress, setProgress] = useState({ current: 0, total: 0 })
@@ -220,6 +221,7 @@ function StockFiltering() {
   const [limitReached, setLimitReached] = useState(false)
   const scanQueueRef = useRef([])
   const isScanningRef = useRef(false)
+  const isPausedRef = useRef(false)
   const abortControllerRef = useRef(null)
 
   // Load cached results on mount
@@ -341,6 +343,14 @@ function StockFiltering() {
     const total = scanQueueRef.current.length
 
     while (scanQueueRef.current.length > 0 && isScanningRef.current) {
+      // Check if paused - wait until resumed
+      while (isPausedRef.current && isScanningRef.current) {
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+
+      // If stopped while paused, exit
+      if (!isScanningRef.current) break
+
       const { symbol, days } = scanQueueRef.current.shift()
       const current = total - scanQueueRef.current.length
 
@@ -366,6 +376,8 @@ function StockFiltering() {
 
     isScanningRef.current = false
     setScanning(false)
+    setPaused(false)
+    isPausedRef.current = false
     setProgress({ current: 0, total: 0 })
     setCurrentStock('')
   }
@@ -375,6 +387,8 @@ function StockFiltering() {
 
     setLoading(true)
     setResults([])
+    setPaused(false)
+    isPausedRef.current = false
 
     try {
       const symbols = await loadTopSymbols()
@@ -401,11 +415,23 @@ function StockFiltering() {
     }
   }
 
+  const handlePause = () => {
+    setPaused(true)
+    isPausedRef.current = true
+  }
+
+  const handleResume = () => {
+    setPaused(false)
+    isPausedRef.current = false
+  }
+
   const handleStop = () => {
     isScanningRef.current = false
+    isPausedRef.current = false
     abortControllerRef.current?.abort()
     scanQueueRef.current = []
     setScanning(false)
+    setPaused(false)
     setProgress({ current: 0, total: 0 })
     setCurrentStock('')
   }
@@ -481,16 +507,35 @@ function StockFiltering() {
             </select>
           </div>
 
-          {/* Load Heavy Vol Button */}
-          <div>
+          {/* Action Buttons */}
+          <div className="flex gap-2">
             {scanning ? (
-              <button
-                onClick={handleStop}
-                className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded font-medium transition-colors flex items-center gap-2"
-              >
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Stop Scanning
-              </button>
+              <>
+                {paused ? (
+                  <button
+                    onClick={handleResume}
+                    className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded font-medium transition-colors flex items-center gap-2"
+                  >
+                    <Play className="w-4 h-4" />
+                    Resume
+                  </button>
+                ) : (
+                  <button
+                    onClick={handlePause}
+                    className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-2 rounded font-medium transition-colors flex items-center gap-2"
+                  >
+                    <Pause className="w-4 h-4" />
+                    Pause
+                  </button>
+                )}
+                <button
+                  onClick={handleStop}
+                  className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded font-medium transition-colors flex items-center gap-2"
+                >
+                  <Loader2 className="w-4 h-4" />
+                  Stop
+                </button>
+              </>
             ) : (
               <button
                 onClick={handleLoadHeavyVol}
@@ -508,18 +553,23 @@ function StockFiltering() {
         {scanning && progress.total > 0 && (
           <div className="mt-4">
             <div className="flex items-center justify-between text-sm text-slate-300 mb-2">
-              <span>Scanning stocks...</span>
+              <span>{paused ? 'Scan paused...' : 'Scanning stocks...'}</span>
               <span>{progress.current} / {progress.total}</span>
             </div>
             <div className="w-full bg-slate-700 rounded-full h-2 mb-2">
               <div
-                className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+                className={`h-2 rounded-full transition-all duration-300 ${paused ? 'bg-yellow-600' : 'bg-purple-600'}`}
                 style={{ width: `${(progress.current / progress.total) * 100}%` }}
               />
             </div>
-            {currentStock && (
+            {currentStock && !paused && (
               <div className="text-sm text-purple-400 font-medium">
                 Currently scanning: <span className="text-white">{currentStock}</span>
+              </div>
+            )}
+            {paused && (
+              <div className="text-sm text-yellow-400 font-medium">
+                Scanning paused - Click Resume to continue
               </div>
             )}
           </div>
