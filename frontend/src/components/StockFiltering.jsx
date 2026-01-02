@@ -346,6 +346,11 @@ function StockFiltering() {
       matched
     }
 
+    // Log to browser console
+    console.log(
+      `[${timestamp}] ${symbol} - Lower: ${lowerSum.toFixed(1)}%, Upper: ${upperSum.toFixed(1)}%${matched ? ' ✓ MATCH' : ''}`
+    )
+
     setDebugLogs(prev => {
       const newLogs = [logEntry, ...prev]
       // Keep only the last 100 entries
