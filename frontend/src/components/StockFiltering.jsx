@@ -299,7 +299,7 @@ function StockFiltering() {
         signal: abortControllerRef.current?.signal
       })
 
-      const priceData = response.data?.data || []
+      const priceData = response.data?.prices || []
       if (priceData.length === 0) {
         console.log(`${symbol}: No price data`)
         return null
