@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { TrendingUp, BarChart3, Activity, Waves, Bug, BarChart2 } from 'lucide-react'
+import { TrendingUp, BarChart3, Activity, Waves, Bug, BarChart2, Filter } from 'lucide-react'
 import StockAnalyzer from './components/StockAnalyzer'
 import BacktestResults from './components/BacktestResults'
 import V3BacktestResults from './components/V3BacktestResults'
 import VolumeScreening from './components/VolumeScreening'
+import StockFiltering from './components/StockFiltering'
 import './App.css'
 
 function App() {
@@ -238,6 +239,17 @@ function App() {
               <Waves className="w-5 h-5" />
               Volume Screening
             </button>
+            <button
+              onClick={() => setActiveTab('filtering')}
+              className={`flex-1 px-6 py-4 font-semibold transition-colors flex items-center justify-center gap-2 ${
+                activeTab === 'filtering'
+                  ? 'text-purple-400 border-b-2 border-purple-400 bg-slate-900'
+                  : 'text-slate-300 hover:text-purple-400 hover:bg-slate-700'
+              }`}
+            >
+              <Filter className="w-5 h-5" />
+              Stock Filtering
+            </button>
           </div>
 
           {/* Tab Content */}
@@ -274,6 +286,9 @@ function App() {
                 bulkImport={volumeImport}
                 onImportProcessed={handleVolumeImportProcessed}
               />
+            </div>
+            <div style={{ display: activeTab === 'filtering' ? 'block' : 'none' }}>
+              <StockFiltering />
             </div>
           </div>
         </div>
