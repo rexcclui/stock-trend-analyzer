@@ -170,34 +170,24 @@ function buildLegend(slots, currentIndex) {
   }))
 }
 
-// Calculate sum of lower slots + current slot
+// Calculate sum of immediate lower slot + current slot
 function calculateLowerSum(slots, currentIndex) {
   if (currentIndex < 0 || !Array.isArray(slots)) return 0
 
-  let sum = 0
-  // Sum all slots below current slot
-  for (let i = 0; i < currentIndex; i++) {
-    sum += slots[i]?.weight || 0
-  }
-  // Add current slot
-  sum += slots[currentIndex]?.weight || 0
+  const currentWeight = slots[currentIndex]?.weight || 0
+  const lowerWeight = currentIndex > 0 ? (slots[currentIndex - 1]?.weight || 0) : 0
 
-  return sum
+  return currentWeight + lowerWeight
 }
 
-// Calculate sum of upper slots + current slot
+// Calculate sum of immediate upper slot + current slot
 function calculateUpperSum(slots, currentIndex) {
   if (currentIndex < 0 || !Array.isArray(slots)) return 0
 
-  let sum = 0
-  // Sum all slots above current slot
-  for (let i = currentIndex + 1; i < slots.length; i++) {
-    sum += slots[i]?.weight || 0
-  }
-  // Add current slot
-  sum += slots[currentIndex]?.weight || 0
+  const currentWeight = slots[currentIndex]?.weight || 0
+  const upperWeight = currentIndex < slots.length - 1 ? (slots[currentIndex + 1]?.weight || 0) : 0
 
-  return sum
+  return currentWeight + upperWeight
 }
 
 function formatPeriod(days) {
