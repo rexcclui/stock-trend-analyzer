@@ -1465,26 +1465,29 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     const cleanedEntries = dropInvalidScanSymbols(entries)
     if (cleanedEntries.length === 0 || isScanning) return
 
-    const refreshedEntries = cleanedEntries.map(entry => clearEntryResults(entry))
+    // Filter out already-scanned entries to preserve existing results
+    const unscannedEntries = cleanedEntries.filter(entry => !hasScanResult(entry))
+    if (unscannedEntries.length === 0) return
 
     // Determine how many to scan
     const limitCount = scanLimit === 'ALL' || typeof scanLimit !== 'number'
-      ? refreshedEntries.length
-      : Math.min(scanLimit, refreshedEntries.length)
+      ? unscannedEntries.length
+      : Math.min(scanLimit, unscannedEntries.length)
 
-    // Only mark the first N entries as loading, keep the rest as-is
-    const updatedEntries = refreshedEntries.map((entry, index) =>
-      index < limitCount
+    // Get the entries to scan (first N unscanned entries)
+    const entriesToScan = unscannedEntries.slice(0, limitCount)
+    const scanIds = new Set(entriesToScan.map(entry => entry.id))
+
+    // Mark only the entries to scan as loading, keep all others (including scanned ones) as-is
+    const updatedEntries = cleanedEntries.map(entry =>
+      scanIds.has(entry.id)
         ? { ...entry, status: 'loading', error: null }
         : entry
     )
 
-    // Only queue the first N entries for scanning
-    const queuedEntries = updatedEntries.slice(0, limitCount)
-
-    setEntries(updatedEntries)  // Keep all entries
-    setScanQueue(queuedEntries)  // Only queue the limited amount
-    setScanTotal(queuedEntries.length)
+    setEntries(updatedEntries)
+    setScanQueue(entriesToScan)
+    setScanTotal(entriesToScan.length)
     setScanCompleted(0)
     setIsScanning(true)
     setIsPaused(false)
