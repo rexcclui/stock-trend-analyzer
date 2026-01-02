@@ -307,6 +307,7 @@ function StockFiltering({ onV3BacktestSelect }) {
       const currentWeight = slots[currentSlotIndex]?.weight || 0
       const lowerSum = calculateLowerSum(slots, currentSlotIndex)
       const upperSum = calculateUpperSum(slots, currentSlotIndex)
+      const sumDiff = upperSum - lowerSum
 
       // Check if it matches the threshold
       const matched = lowerSum >= selectedThreshold || upperSum >= selectedThreshold
@@ -319,6 +320,7 @@ function StockFiltering({ onV3BacktestSelect }) {
         currentWeight,
         lowerSum,
         upperSum,
+        sumDiff,
         volumeLegend,
         lastPrice,
         matched
@@ -698,6 +700,15 @@ function StockFiltering({ onV3BacktestSelect }) {
                   </button>
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
+                  <button
+                    onClick={() => handleSort('sumDiff')}
+                    className="flex items-center gap-1 hover:text-white transition-colors"
+                  >
+                    Diff (U-L)
+                    <ArrowUpDown className="w-3 h-3" />
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
                   Volume Legend
                 </th>
                 <th className="px-4 py-3 text-center text-sm font-semibold text-slate-300">
@@ -708,7 +719,7 @@ function StockFiltering({ onV3BacktestSelect }) {
             <tbody>
               {sortedResults.length === 0 ? (
                 <tr>
-                  <td colSpan="7" className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan="8" className="px-4 py-8 text-center text-slate-400">
                     {scanning ? 'Scanning stocks...' : 'No results. Click "Load Heavy Vol" to start scanning.'}
                   </td>
                 </tr>
@@ -755,6 +766,17 @@ function StockFiltering({ onV3BacktestSelect }) {
                         }}
                       >
                         {result.upperSum.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className="inline-block px-3 py-1 rounded-full text-sm font-medium"
+                        style={{
+                          backgroundColor: result.sumDiff >= 0 ? '#3b82f6' : '#ef4444',
+                          color: '#ffffff'
+                        }}
+                      >
+                        {result.sumDiff >= 0 ? '+' : ''}{result.sumDiff.toFixed(1)}%
                       </span>
                     </td>
                     <td className="px-4 py-3">
