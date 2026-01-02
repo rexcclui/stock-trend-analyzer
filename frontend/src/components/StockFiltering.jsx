@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown } from 'lucide-react'
+import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown, BarChart2 } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 import VolumeLegendPills from './VolumeLegendPills'
 
@@ -198,7 +198,7 @@ function formatPeriod(days) {
   return `${daysNum}D`
 }
 
-function StockFiltering() {
+function StockFiltering({ onV3BacktestSelect }) {
   const [selectedPeriod, setSelectedPeriod] = useState('1825')
   const [selectedThreshold, setSelectedThreshold] = useState(20)
   const [stockLimit, setStockLimit] = useState(20)
@@ -763,13 +763,22 @@ function StockFiltering() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <button
-                        onClick={() => handleRemoveResult(result.symbol)}
-                        className="text-slate-400 hover:text-red-500 transition-colors"
-                        title="Remove this stock"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          onClick={() => onV3BacktestSelect?.(result.symbol, result.period)}
+                          className="text-slate-400 hover:text-purple-500 transition-colors"
+                          title="View in V3 Backtest"
+                        >
+                          <BarChart2 className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleRemoveResult(result.symbol)}
+                          className="text-slate-400 hover:text-red-500 transition-colors"
+                          title="Remove this stock"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
