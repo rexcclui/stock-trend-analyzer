@@ -293,14 +293,12 @@ function StockFiltering({ onV3BacktestSelect }) {
 
       const priceData = response.data?.prices || []
       if (priceData.length === 0) {
-        console.log(`${symbol}: No price data`)
         return null
       }
 
       const { slots, lastPrice, currentSlotIndex } = buildVolumeSlots(priceData)
 
       if (currentSlotIndex < 0) {
-        console.log(`${symbol}: Invalid current slot index`)
         return null
       }
 
@@ -317,6 +315,7 @@ function StockFiltering({ onV3BacktestSelect }) {
       return {
         symbol,
         period: formatPeriod(days),
+        days: days, // Keep the numeric days value for V3 Backtest
         currentWeight,
         lowerSum,
         upperSum,
@@ -329,17 +328,8 @@ function StockFiltering({ onV3BacktestSelect }) {
       if (error.name === 'CanceledError') {
         return null
       }
-      console.error(`Failed to analyze ${symbol}:`, error.message)
       return null
     }
-  }
-
-  const logToConsole = (symbol, lowerSum, upperSum, matched) => {
-    const timestamp = new Date().toLocaleTimeString()
-    // Log to browser console only
-    console.log(
-      `[${timestamp}] ${symbol} - Lower: ${lowerSum.toFixed(1)}%, Upper: ${upperSum.toFixed(1)}%${matched ? ' ✓ MATCH' : ''}`
-    )
   }
 
   const processScanQueue = async () => {
@@ -349,7 +339,6 @@ function StockFiltering({ onV3BacktestSelect }) {
 
     const newResults = []
     const total = scanQueueRef.current.length
-    console.log(`Processing scan queue - total stocks: ${total}`)
 
     while (scanQueueRef.current.length > 0 && isScanningRef.current) {
       // Check if paused - wait until resumed
@@ -366,35 +355,24 @@ function StockFiltering({ onV3BacktestSelect }) {
       setProgress({ current, total })
       setCurrentStock(symbol)
 
-      console.log(`Analyzing stock ${current}/${total}: ${symbol}`)
       const result = await analyzeStock(symbol, days)
 
-      // Log to browser console for all stocks
-      if (result) {
-        logToConsole(symbol, result.lowerSum, result.upperSum, result.matched)
+      if (result && result.matched) {
+        newResults.push(result)
+        setResults(prev => [...prev, result])
 
-        // Only add to results if it matches the threshold
-        if (result.matched) {
-          newResults.push(result)
-          setResults(prev => [...prev, result])
-
-          // Check if we've reached the limit
-          if (stockLimit !== -1 && newResults.length >= stockLimit) {
-            console.log(`Reached stock limit of ${stockLimit}`)
-            setLimitReached(true)
-            scanQueueRef.current = [] // Clear the queue
-            break
-          }
+        // Check if we've reached the limit
+        if (stockLimit !== -1 && newResults.length >= stockLimit) {
+          setLimitReached(true)
+          scanQueueRef.current = [] // Clear the queue
+          break
         }
-      } else {
-        console.log(`No result returned for ${symbol}`)
       }
 
       // Small delay to prevent overwhelming the API
       await new Promise(resolve => setTimeout(resolve, 100))
     }
 
-    console.log(`Scan complete. Found ${newResults.length} matching stocks`)
     isScanningRef.current = false
     setScanning(false)
     setPaused(false)
@@ -406,7 +384,6 @@ function StockFiltering({ onV3BacktestSelect }) {
   const handleLoadHeavyVol = async () => {
     if (loading || scanning) return
 
-    console.log('=== Starting Heavy Vol scan ===')
     setLoading(true)
     setResults([])
     setPaused(false)
@@ -414,7 +391,6 @@ function StockFiltering({ onV3BacktestSelect }) {
 
     try {
       const symbols = await loadTopSymbols()
-      console.log(`Loaded ${symbols.length} symbols`)
 
       if (symbols.length === 0) {
         alert('No symbols loaded')
@@ -426,8 +402,6 @@ function StockFiltering({ onV3BacktestSelect }) {
         symbol,
         days: selectedPeriod
       }))
-
-      console.log(`Created scan queue with ${scanQueueRef.current.length} stocks, period: ${selectedPeriod} days`)
 
       abortControllerRef.current = new AbortController()
       setScanning(true)
@@ -787,7 +761,7 @@ function StockFiltering({ onV3BacktestSelect }) {
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button
-                          onClick={() => onV3BacktestSelect?.(result.symbol, result.period)}
+                          onClick={() => onV3BacktestSelect?.(result.symbol, result.days)}
                           className="text-slate-400 hover:text-purple-500 transition-colors"
                           title="View in V3 Backtest"
                         >
