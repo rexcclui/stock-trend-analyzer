@@ -623,31 +623,39 @@ function StockFiltering() {
       </div>
 
       {/* Debug Console */}
-      {debugLogs.length > 0 && (
+      {scanning && (
         <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
           <div className="bg-slate-900 px-4 py-3 border-b border-slate-700">
-            <h3 className="text-sm font-semibold text-slate-300">Debug Console (Last 100 scans)</h3>
+            <h3 className="text-sm font-semibold text-slate-300">
+              Debug Console (Last 100 scans) - {debugLogs.length} entries
+            </h3>
           </div>
           <div
             ref={debugLogRef}
             className="overflow-y-auto bg-slate-950 p-4 font-mono text-xs"
             style={{ maxHeight: '300px' }}
           >
-            {debugLogs.map((log, idx) => (
-              <div
-                key={idx}
-                className={`mb-1 pb-1 border-b border-slate-800 ${log.matched ? 'text-green-400' : 'text-slate-500'}`}
-              >
-                <span className="text-slate-500">[{log.timestamp}]</span>
-                {' '}
-                <span className="text-white font-semibold">{log.symbol}</span>
-                {' - '}
-                <span className="text-blue-400">Lower: {log.lowerSum}%</span>
-                {', '}
-                <span className="text-purple-400">Upper: {log.upperSum}%</span>
-                {log.matched && <span className="ml-2 text-green-500">✓ MATCH</span>}
+            {debugLogs.length === 0 ? (
+              <div className="text-slate-500 text-center py-4">
+                Waiting for scan data...
               </div>
-            ))}
+            ) : (
+              debugLogs.map((log, idx) => (
+                <div
+                  key={idx}
+                  className={`mb-1 pb-1 border-b border-slate-800 ${log.matched ? 'text-green-400' : 'text-slate-500'}`}
+                >
+                  <span className="text-slate-500">[{log.timestamp}]</span>
+                  {' '}
+                  <span className="text-white font-semibold">{log.symbol}</span>
+                  {' - '}
+                  <span className="text-blue-400">Lower: {log.lowerSum}%</span>
+                  {', '}
+                  <span className="text-purple-400">Upper: {log.upperSum}%</span>
+                  {log.matched && <span className="ml-2 text-green-500">✓ MATCH</span>}
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
