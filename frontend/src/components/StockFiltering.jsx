@@ -300,11 +300,17 @@ function StockFiltering() {
       })
 
       const priceData = response.data?.data || []
-      if (priceData.length === 0) return null
+      if (priceData.length === 0) {
+        console.log(`${symbol}: No price data`)
+        return null
+      }
 
       const { slots, lastPrice, currentSlotIndex } = buildVolumeSlots(priceData)
 
-      if (currentSlotIndex < 0) return null
+      if (currentSlotIndex < 0) {
+        console.log(`${symbol}: Invalid current slot index`)
+        return null
+      }
 
       const currentWeight = slots[currentSlotIndex]?.weight || 0
       const lowerSum = calculateLowerSum(slots, currentSlotIndex)
@@ -329,7 +335,7 @@ function StockFiltering() {
       if (error.name === 'CanceledError') {
         return null
       }
-      console.error(`Failed to analyze ${symbol}`, error)
+      console.error(`Failed to analyze ${symbol}:`, error.message)
       return null
     }
   }
@@ -349,6 +355,7 @@ function StockFiltering() {
 
     const newResults = []
     const total = scanQueueRef.current.length
+    console.log(`Processing scan queue - total stocks: ${total}`)
 
     while (scanQueueRef.current.length > 0 && isScanningRef.current) {
       // Check if paused - wait until resumed
@@ -365,6 +372,7 @@ function StockFiltering() {
       setProgress({ current, total })
       setCurrentStock(symbol)
 
+      console.log(`Analyzing stock ${current}/${total}: ${symbol}`)
       const result = await analyzeStock(symbol, days)
 
       // Log to browser console for all stocks
@@ -378,17 +386,21 @@ function StockFiltering() {
 
           // Check if we've reached the limit
           if (stockLimit !== -1 && newResults.length >= stockLimit) {
+            console.log(`Reached stock limit of ${stockLimit}`)
             setLimitReached(true)
             scanQueueRef.current = [] // Clear the queue
             break
           }
         }
+      } else {
+        console.log(`No result returned for ${symbol}`)
       }
 
       // Small delay to prevent overwhelming the API
       await new Promise(resolve => setTimeout(resolve, 100))
     }
 
+    console.log(`Scan complete. Found ${newResults.length} matching stocks`)
     isScanningRef.current = false
     setScanning(false)
     setPaused(false)
@@ -400,6 +412,7 @@ function StockFiltering() {
   const handleLoadHeavyVol = async () => {
     if (loading || scanning) return
 
+    console.log('=== Starting Heavy Vol scan ===')
     setLoading(true)
     setResults([])
     setPaused(false)
@@ -407,6 +420,7 @@ function StockFiltering() {
 
     try {
       const symbols = await loadTopSymbols()
+      console.log(`Loaded ${symbols.length} symbols`)
 
       if (symbols.length === 0) {
         alert('No symbols loaded')
@@ -418,6 +432,8 @@ function StockFiltering() {
         symbol,
         days: selectedPeriod
       }))
+
+      console.log(`Created scan queue with ${scanQueueRef.current.length} stocks, period: ${selectedPeriod} days`)
 
       abortControllerRef.current = new AbortController()
       setScanning(true)
