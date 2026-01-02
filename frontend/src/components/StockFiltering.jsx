@@ -216,6 +216,7 @@ function StockFiltering() {
   const [results, setResults] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [progress, setProgress] = useState({ current: 0, total: 0 })
+  const [currentStock, setCurrentStock] = useState('')
   const [limitReached, setLimitReached] = useState(false)
   const scanQueueRef = useRef([])
   const isScanningRef = useRef(false)
@@ -344,6 +345,7 @@ function StockFiltering() {
       const current = total - scanQueueRef.current.length
 
       setProgress({ current, total })
+      setCurrentStock(symbol)
 
       const result = await analyzeStock(symbol, days)
       if (result) {
@@ -365,6 +367,7 @@ function StockFiltering() {
     isScanningRef.current = false
     setScanning(false)
     setProgress({ current: 0, total: 0 })
+    setCurrentStock('')
   }
 
   const handleLoadHeavyVol = async () => {
@@ -404,6 +407,7 @@ function StockFiltering() {
     scanQueueRef.current = []
     setScanning(false)
     setProgress({ current: 0, total: 0 })
+    setCurrentStock('')
   }
 
   const filteredResults = results.filter(result => {
@@ -507,12 +511,17 @@ function StockFiltering() {
               <span>Scanning stocks...</span>
               <span>{progress.current} / {progress.total}</span>
             </div>
-            <div className="w-full bg-slate-700 rounded-full h-2">
+            <div className="w-full bg-slate-700 rounded-full h-2 mb-2">
               <div
                 className="bg-purple-600 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${(progress.current / progress.total) * 100}%` }}
               />
             </div>
+            {currentStock && (
+              <div className="text-sm text-purple-400 font-medium">
+                Currently scanning: <span className="text-white">{currentStock}</span>
+              </div>
+            )}
           </div>
         )}
       </div>
