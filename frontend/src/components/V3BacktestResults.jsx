@@ -70,6 +70,31 @@ function computeMarketChange(priceData) {
   return ((newestPrice - oldestPrice) / oldestPrice) * 100
 }
 
+// Helper function to calculate average volume for first 60 days
+function calculateFirst60DaysAvgVolume(priceData) {
+  if (!Array.isArray(priceData) || priceData.length === 0) return 0
+
+  // Determine if data is in chronological or reverse chronological order
+  const firstDate = new Date(priceData[0].date)
+  const lastDate = new Date(priceData[priceData.length - 1].date)
+
+  let first60Days
+  if (firstDate < lastDate) {
+    // Chronological order: first is oldest
+    first60Days = priceData.slice(0, Math.min(60, priceData.length))
+  } else {
+    // Reverse chronological order: last is oldest
+    first60Days = priceData.slice(Math.max(0, priceData.length - 60))
+  }
+
+  const totalVolume = first60Days.reduce((sum, item) => {
+    const volume = Number(item?.volume)
+    return sum + (Number.isFinite(volume) ? volume : 0)
+  }, 0)
+
+  return first60Days.length > 0 ? totalVolume / first60Days.length : 0
+}
+
 function normalizeCachedResults(entries = []) {
   if (!Array.isArray(entries)) return []
 
@@ -1041,6 +1066,16 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
       // Skip stocks with insufficient data for SMA calculation
       if (priceData.length < 250) {
         throw new Error(`Insufficient data: only ${priceData.length} days (need 250+)`)
+      }
+
+      // Check first 60 days average volume
+      const avgVolume = calculateFirst60DaysAvgVolume(priceData)
+      if (avgVolume < 100000) {
+        const periodLabel = formatPeriod(targetDays)
+        showToast(`${symbol}${periodLabel ? ` (${periodLabel})` : ''} removed: first 60 days avg volume (${Math.round(avgVolume).toLocaleString()}) < 100,000`)
+        setResults(prev => prev.filter(entry => !(entry.symbol === symbol && entry.days === targetDays)))
+        setScanQueue(prev => prev.filter(queuedSymbol => queuedSymbol !== symbol))
+        return
       }
 
       // Optimize regression threshold to maximize P/L

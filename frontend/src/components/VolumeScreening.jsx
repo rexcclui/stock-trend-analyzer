@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search, Clock3, BarChart2, BarChart3, ArrowUpToLine, ArrowDownToLine } from 'lucide-react'
+import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search, Clock3, BarChart2, BarChart3, ArrowUpToLine, ArrowDownToLine, AlertCircle } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 import VolumeLegendPills from './VolumeLegendPills'
 
@@ -91,6 +91,31 @@ function parseStockSymbols(input) {
 
 function formatPriceRange(start, end) {
   return `$${Number(start).toFixed(2)} - $${Number(end).toFixed(2)}`
+}
+
+// Helper function to calculate average volume for first 60 days
+function calculateFirst60DaysAvgVolume(priceData) {
+  if (!Array.isArray(priceData) || priceData.length === 0) return 0
+
+  // Determine if data is in chronological or reverse chronological order
+  const firstDate = new Date(priceData[0].date)
+  const lastDate = new Date(priceData[priceData.length - 1].date)
+
+  let first60Days
+  if (firstDate < lastDate) {
+    // Chronological order: first is oldest
+    first60Days = priceData.slice(0, Math.min(60, priceData.length))
+  } else {
+    // Reverse chronological order: last is oldest
+    first60Days = priceData.slice(Math.max(0, priceData.length - 60))
+  }
+
+  const totalVolume = first60Days.reduce((sum, item) => {
+    const volume = Number(item?.volume)
+    return sum + (Number.isFinite(volume) ? volume : 0)
+  }, 0)
+
+  return first60Days.length > 0 ? totalVolume / first60Days.length : 0
 }
 
 function formatTimestamp(dateString) {
@@ -776,9 +801,11 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
   const [stableRowOrder, setStableRowOrder] = useState([])
   const [hasHydratedCache, setHasHydratedCache] = useState(false)
   const [lastAddedId, setLastAddedId] = useState(null)
+  const [toastMessage, setToastMessage] = useState('')
   const activeScanIdRef = useRef(null)
   const importInputRef = useRef(null)
   const tableScrollRef = useRef(null)
+  const toastTimeoutRef = useRef(null)
   const previousSortRef = useRef(sortConfig)
 
   const baseEntryState = {
@@ -1514,6 +1541,18 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
         }
       }
 
+      // Check first 60 days average volume
+      const avgVolume = calculateFirst60DaysAvgVolume(prices)
+      if (avgVolume < 100000) {
+        const periodLabel = formatPeriod(entry.period)
+        showToast(`${entry.symbol}${periodLabel ? ` (${periodLabel})` : ''} removed: first 60 days avg volume (${Math.round(avgVolume).toLocaleString()}) < 100,000`)
+        return {
+          ...entry,
+          removeRow: true,
+          stopAll: false
+        }
+      }
+
       const { slots, lastPrice, previousPrice, currentSlotIndex, previousSlotIndex } = buildVolumeSlots(prices)
       const slotIndex = currentSlotIndex >= 0 ? currentSlotIndex : findSlotIndex(slots, lastPrice)
       const currentRange = slotIndex >= 0 ? slots[slotIndex] : null
@@ -1718,6 +1757,25 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     parts.push(`Slots: ${slotLabel ?? '—'}`)
 
     return parts.length > 0 ? parts.join(' • ') : undefined
+  }
+
+  const showToast = (message) => {
+    setToastMessage(message)
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current)
+    }
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastMessage('')
+      toastTimeoutRef.current = null
+    }, 4500)
+  }
+
+  const dismissToast = () => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current)
+      toastTimeoutRef.current = null
+    }
+    setToastMessage('')
   }
 
   const getVisibleEntries = (sourceEntries = entries) => sourceEntries.filter(entry => {
@@ -2909,6 +2967,22 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
         Selected period: {periods.find(p => p.value === period)?.label || period}
       </div>
     </div>
+    {toastMessage && (
+      <div className="fixed top-4 right-4 z-50">
+        <div className="flex items-start gap-3 bg-slate-900 border border-red-500 text-red-100 px-4 py-3 rounded-lg shadow-xl max-w-sm">
+          <AlertCircle className="w-5 h-5 mt-0.5" />
+          <div className="text-sm leading-relaxed flex-1">{toastMessage}</div>
+          <button
+            type="button"
+            onClick={dismissToast}
+            className="ml-2 text-slate-400 hover:text-slate-200 transition-colors"
+            aria-label="Dismiss notification"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+    )}
     </div >
   )
 }
