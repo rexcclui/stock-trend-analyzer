@@ -197,7 +197,7 @@ function formatPeriod(days) {
 }
 
 function StockFiltering() {
-  const [selectedPeriod, setSelectedPeriod] = useState('365')
+  const [selectedPeriod, setSelectedPeriod] = useState('1825')
   const [selectedThreshold, setSelectedThreshold] = useState(20)
   const [loading, setLoading] = useState(false)
   const [scanning, setScanning] = useState(false)
