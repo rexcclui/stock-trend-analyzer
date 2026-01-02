@@ -81,6 +81,19 @@ function getSlotColor(weight) {
   return { color: `rgb(${blended.join(', ')})`, textColor }
 }
 
+const toNumber = (value) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+const normalizeResult = (result) => ({
+  ...result,
+  currentWeight: toNumber(result?.currentWeight),
+  lowerSum: toNumber(result?.lowerSum),
+  upperSum: toNumber(result?.upperSum),
+  sumDiff: toNumber(result?.sumDiff)
+})
+
 function findSlotIndex(slots, price) {
   if (!Array.isArray(slots) || slots.length === 0 || price == null) return -1
   for (let i = 0; i < slots.length; i++) {
@@ -224,7 +237,7 @@ function StockFiltering({ onV3BacktestSelect }) {
       if (cached) {
         const parsed = JSON.parse(cached)
         if (Array.isArray(parsed)) {
-          setResults(parsed)
+          setResults(parsed.map(normalizeResult))
         }
       }
     } catch (error) {
@@ -455,8 +468,10 @@ function StockFiltering({ onV3BacktestSelect }) {
     return result.symbol.toLowerCase().includes(searchQuery.toLowerCase())
   })
 
+  const normalizedResults = filteredResults.map(normalizeResult)
+
   // Apply sorting
-  const sortedResults = [...filteredResults].sort((a, b) => {
+  const sortedResults = [...normalizedResults].sort((a, b) => {
     if (!sortField) return 0
 
     let aVal = a[sortField]
