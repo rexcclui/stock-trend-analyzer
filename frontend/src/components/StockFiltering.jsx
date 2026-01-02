@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Loader2, Search, Filter, Pause, Play } from 'lucide-react'
+import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 import VolumeLegendPills from './VolumeLegendPills'
 
@@ -210,6 +210,8 @@ function StockFiltering() {
   const [progress, setProgress] = useState({ current: 0, total: 0 })
   const [currentStock, setCurrentStock] = useState('')
   const [limitReached, setLimitReached] = useState(false)
+  const [sortField, setSortField] = useState(null)
+  const [sortDirection, setSortDirection] = useState('asc')
   const scanQueueRef = useRef([])
   const isScanningRef = useRef(false)
   const isPausedRef = useRef(false)
@@ -457,9 +459,48 @@ function StockFiltering() {
     setCurrentStock('')
   }
 
+  const handleRemoveResult = (symbol) => {
+    setResults(prev => prev.filter(result => result.symbol !== symbol))
+  }
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      // Toggle direction if same field
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // New field, default to descending
+      setSortField(field)
+      setSortDirection('desc')
+    }
+  }
+
   const filteredResults = results.filter(result => {
     if (!searchQuery) return true
     return result.symbol.toLowerCase().includes(searchQuery.toLowerCase())
+  })
+
+  // Apply sorting
+  const sortedResults = [...filteredResults].sort((a, b) => {
+    if (!sortField) return 0
+
+    let aVal = a[sortField]
+    let bVal = b[sortField]
+
+    // Handle string comparison for symbol
+    if (sortField === 'symbol') {
+      aVal = aVal.toLowerCase()
+      bVal = bVal.toLowerCase()
+      return sortDirection === 'asc'
+        ? aVal.localeCompare(bVal)
+        : bVal.localeCompare(aVal)
+    }
+
+    // Handle numeric comparison
+    if (sortDirection === 'asc') {
+      return aVal - bVal
+    } else {
+      return bVal - aVal
+    }
   })
 
   return (
@@ -618,34 +659,61 @@ function StockFiltering() {
             <thead>
               <tr className="bg-slate-900 border-b border-slate-700">
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
-                  Stock
+                  <button
+                    onClick={() => handleSort('symbol')}
+                    className="flex items-center gap-1 hover:text-white transition-colors"
+                  >
+                    Stock
+                    <ArrowUpDown className="w-3 h-3" />
+                  </button>
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
                   Period
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
-                  Current Weight
+                  <button
+                    onClick={() => handleSort('currentWeight')}
+                    className="flex items-center gap-1 hover:text-white transition-colors"
+                  >
+                    Current Weight
+                    <ArrowUpDown className="w-3 h-3" />
+                  </button>
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
-                  Lower Sum
+                  <button
+                    onClick={() => handleSort('lowerSum')}
+                    className="flex items-center gap-1 hover:text-white transition-colors"
+                  >
+                    Lower Sum
+                    <ArrowUpDown className="w-3 h-3" />
+                  </button>
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
-                  Upper Sum
+                  <button
+                    onClick={() => handleSort('upperSum')}
+                    className="flex items-center gap-1 hover:text-white transition-colors"
+                  >
+                    Upper Sum
+                    <ArrowUpDown className="w-3 h-3" />
+                  </button>
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
                   Volume Legend
                 </th>
+                <th className="px-4 py-3 text-center text-sm font-semibold text-slate-300">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody>
-              {filteredResults.length === 0 ? (
+              {sortedResults.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan="7" className="px-4 py-8 text-center text-slate-400">
                     {scanning ? 'Scanning stocks...' : 'No results. Click "Load Heavy Vol" to start scanning.'}
                   </td>
                 </tr>
               ) : (
-                filteredResults.map((result, idx) => (
+                sortedResults.map((result, idx) => (
                   <tr
                     key={`${result.symbol}-${idx}`}
                     className="border-b border-slate-700 hover:bg-slate-750"
@@ -693,6 +761,15 @@ function StockFiltering() {
                       {result.volumeLegend && (
                         <VolumeLegendPills legend={result.volumeLegend} />
                       )}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => handleRemoveResult(result.symbol)}
+                        className="text-slate-400 hover:text-red-500 transition-colors"
+                        title="Remove this stock"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
                     </td>
                   </tr>
                 ))
