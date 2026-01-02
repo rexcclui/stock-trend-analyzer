@@ -2005,6 +2005,10 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
     let candidates = getVisibleEntries(cleanedEntries)
     if (candidates.length === 0) return
 
+    // Filter out already-scanned entries to preserve existing results
+    candidates = candidates.filter(entry => !hasScanResult(entry))
+    if (candidates.length === 0) return
+
     // Apply scan limit if not "ALL"
     if (scanLimit !== 'ALL' && typeof scanLimit === 'number') {
       candidates = candidates.slice(0, scanLimit)
@@ -2012,13 +2016,8 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
 
     const candidateIds = new Set(candidates.map(entry => entry.id))
 
-    const resetEntries = cleanedEntries.map(entry => (
-      candidateIds.has(entry.id)
-        ? clearEntryResults(entry)
-        : entry
-    ))
-
-    const loadingEntries = resetEntries.map(entry => (
+    // Don't clear results - just set candidates to loading status
+    const loadingEntries = cleanedEntries.map(entry => (
       candidateIds.has(entry.id)
         ? { ...entry, status: 'loading', error: null }
         : entry
