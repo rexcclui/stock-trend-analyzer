@@ -312,10 +312,8 @@ function StockFiltering() {
       const lowerSum = calculateLowerSum(slots, currentSlotIndex)
       const upperSum = calculateUpperSum(slots, currentSlotIndex)
 
-      // Filter based on threshold
-      if (lowerSum < selectedThreshold && upperSum < selectedThreshold) {
-        return null
-      }
+      // Check if it matches the threshold
+      const matched = lowerSum >= selectedThreshold || upperSum >= selectedThreshold
 
       const volumeLegend = buildLegend(slots, currentSlotIndex)
 
@@ -326,7 +324,8 @@ function StockFiltering() {
         lowerSum,
         upperSum,
         volumeLegend,
-        lastPrice
+        lastPrice,
+        matched
       }
     } catch (error) {
       if (error.name === 'CanceledError') {
@@ -384,21 +383,22 @@ function StockFiltering() {
 
       const result = await analyzeStock(symbol, days)
 
-      // Log debug information regardless of whether it matches
+      // Log debug information for all stocks
       if (result) {
-        addDebugLog(symbol, result.lowerSum, result.upperSum, true)
-        newResults.push(result)
-        setResults(prev => [...prev, result])
+        addDebugLog(symbol, result.lowerSum, result.upperSum, result.matched)
 
-        // Check if we've reached the limit
-        if (stockLimit !== -1 && newResults.length >= stockLimit) {
-          setLimitReached(true)
-          scanQueueRef.current = [] // Clear the queue
-          break
+        // Only add to results if it matches the threshold
+        if (result.matched) {
+          newResults.push(result)
+          setResults(prev => [...prev, result])
+
+          // Check if we've reached the limit
+          if (stockLimit !== -1 && newResults.length >= stockLimit) {
+            setLimitReached(true)
+            scanQueueRef.current = [] // Clear the queue
+            break
+          }
         }
-      } else {
-        // Even if no result, we might want to log it (if we have the data)
-        // For now, we'll only log successful analyses
       }
 
       // Small delay to prevent overwhelming the API
