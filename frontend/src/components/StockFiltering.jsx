@@ -24,6 +24,16 @@ const volumeThresholds = [
   { label: '35%', value: 35 }
 ]
 
+const stockLimits = [
+  { label: '5', value: 5 },
+  { label: '10', value: 10 },
+  { label: '20', value: 20 },
+  { label: '50', value: 50 },
+  { label: '100', value: 100 },
+  { label: '200', value: 200 },
+  { label: 'ALL', value: -1 }
+]
+
 function getSlotColor(weight) {
   const colorStops = [
     { weight: 0, color: [254, 249, 195] },    // Light yellow
@@ -200,11 +210,13 @@ function formatPeriod(days) {
 function StockFiltering() {
   const [selectedPeriod, setSelectedPeriod] = useState('1825')
   const [selectedThreshold, setSelectedThreshold] = useState(20)
+  const [stockLimit, setStockLimit] = useState(20)
   const [loading, setLoading] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [results, setResults] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [progress, setProgress] = useState({ current: 0, total: 0 })
+  const [limitReached, setLimitReached] = useState(false)
   const scanQueueRef = useRef([])
   const isScanningRef = useRef(false)
   const abortControllerRef = useRef(null)
@@ -322,6 +334,7 @@ function StockFiltering() {
   const processScanQueue = async () => {
     if (isScanningRef.current) return
     isScanningRef.current = true
+    setLimitReached(false)
 
     const newResults = []
     const total = scanQueueRef.current.length
@@ -336,6 +349,13 @@ function StockFiltering() {
       if (result) {
         newResults.push(result)
         setResults(prev => [...prev, result])
+
+        // Check if we've reached the limit
+        if (stockLimit !== -1 && newResults.length >= stockLimit) {
+          setLimitReached(true)
+          scanQueueRef.current = [] // Clear the queue
+          break
+        }
       }
 
       // Small delay to prevent overwhelming the API
@@ -433,6 +453,25 @@ function StockFiltering() {
               {volumeThresholds.map(threshold => (
                 <option key={threshold.value} value={threshold.value}>
                   {threshold.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Stock Limit */}
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Stocks to Find
+            </label>
+            <select
+              value={stockLimit}
+              onChange={(e) => setStockLimit(Number(e.target.value))}
+              disabled={scanning}
+              className="w-full bg-slate-700 text-white px-4 py-2 rounded border border-slate-600 focus:border-purple-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {stockLimits.map(limit => (
+                <option key={limit.value} value={limit.value}>
+                  {limit.label}
                 </option>
               ))}
             </select>
@@ -590,6 +629,11 @@ function StockFiltering() {
             Showing {filteredResults.length} stock{filteredResults.length !== 1 ? 's' : ''}
             {searchQuery && ` matching "${searchQuery}"`}
             {' '}with volume weight ≥ {selectedThreshold}%
+            {limitReached && stockLimit !== -1 && (
+              <span className="ml-2 text-green-400 font-semibold">
+                (Limit of {stockLimit} reached - scan stopped)
+              </span>
+            )}
           </div>
         </div>
       )}
