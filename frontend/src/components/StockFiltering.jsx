@@ -556,6 +556,49 @@ function StockFiltering({ onV3BacktestSelect, onVolumeSelect, onAnalyzeWithVolPr
     }
   }
 
+  const handleReloadAll = async () => {
+    if (results.length === 0 || scanning) return
+
+    const stocksToReload = results.map(r => ({ symbol: r.symbol, days: r.days }))
+    const total = stocksToReload.length
+
+    setScanning(true)
+    setProgress({ current: 0, total })
+
+    const newResults = []
+    let removed = 0
+
+    for (let i = 0; i < stocksToReload.length; i++) {
+      const { symbol, days } = stocksToReload[i]
+
+      setProgress({ current: i + 1, total })
+      setCurrentStock(symbol)
+
+      const result = await analyzeStock(symbol, days)
+
+      // Add back if it meets criteria
+      if (result && result.dataPoints >= 250 && result.avgVolume >= 100000 && result.matched) {
+        newResults.push(result)
+      } else {
+        removed++
+      }
+
+      // Small delay to prevent overwhelming the API
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+
+    setResults(newResults)
+    setScanning(false)
+    setProgress({ current: 0, total: 0 })
+    setCurrentStock('')
+
+    if (removed > 0) {
+      showToast(`Reload complete: ${removed} stock${removed !== 1 ? 's' : ''} removed (failed criteria)`)
+    } else {
+      showToast(`All ${total} stocks reloaded successfully`)
+    }
+  }
+
   const handleSort = (field) => {
     if (sortField === field) {
       // Toggle direction if same field
@@ -735,15 +778,26 @@ function StockFiltering({ onV3BacktestSelect, onVolumeSelect, onAnalyzeWithVolPr
 
       {/* Search */}
       <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search stocks..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-700 text-white pl-10 pr-4 py-2 rounded border border-slate-600 focus:border-purple-500 focus:outline-none"
-          />
+        <div className="flex gap-3 items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search stocks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-slate-700 text-white pl-10 pr-4 py-2 rounded border border-slate-600 focus:border-purple-500 focus:outline-none"
+            />
+          </div>
+          <button
+            onClick={handleReloadAll}
+            disabled={results.length === 0 || scanning}
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded font-medium transition-colors flex items-center gap-2"
+            title="Reload all stocks in table"
+          >
+            <RefreshCw className="w-5 h-5" />
+            Reload All
+          </button>
         </div>
       </div>
 
