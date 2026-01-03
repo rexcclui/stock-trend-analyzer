@@ -221,7 +221,7 @@ function isValidSymbol(symbol) {
   return allowedSuffixes.some(suffix => symbol.endsWith(suffix))
 }
 
-function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf }) {
+function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2BacktestSelect, onVolumeBulkAdd }) {
   const [selectedPeriod, setSelectedPeriod] = useState('1825')
   const [selectedThreshold, setSelectedThreshold] = useState(20)
   const [stockLimit, setStockLimit] = useState(20)
@@ -236,6 +236,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf }) {
   const [sortField, setSortField] = useState(null)
   const [sortDirection, setSortDirection] = useState('asc')
   const [toastMessage, setToastMessage] = useState('')
+  const [selectedRows, setSelectedRows] = useState(new Set())
   const scanQueueRef = useRef([])
   const isScanningRef = useRef(false)
   const isPausedRef = useRef(false)
@@ -540,7 +541,75 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf }) {
     if (results.length === 0) return
     const count = results.length
     setResults([])
+    setSelectedRows(new Set())
     showToast(`Removed all ${count} stock${count !== 1 ? 's' : ''} from table`)
+  }
+
+  const handleToggleRow = (symbol) => {
+    setSelectedRows(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(symbol)) {
+        newSet.delete(symbol)
+      } else {
+        newSet.add(symbol)
+      }
+      return newSet
+    })
+  }
+
+  const handleToggleAll = () => {
+    if (selectedRows.size === sortedResults.length) {
+      setSelectedRows(new Set())
+    } else {
+      setSelectedRows(new Set(sortedResults.map(r => r.symbol)))
+    }
+  }
+
+  const handleBulkAddToV3Backtest = () => {
+    if (selectedRows.size === 0) {
+      showToast('No stocks selected')
+      return
+    }
+
+    const selectedStocks = results.filter(r => selectedRows.has(r.symbol))
+    selectedStocks.forEach(stock => {
+      onV3BacktestSelect?.(stock.symbol, stock.days)
+    })
+
+    showToast(`Added ${selectedRows.size} stock${selectedRows.size !== 1 ? 's' : ''} to V3 Backtest`)
+    setSelectedRows(new Set())
+  }
+
+  const handleBulkAddToV2Backtest = () => {
+    if (selectedRows.size === 0) {
+      showToast('No stocks selected')
+      return
+    }
+
+    const selectedStocks = results.filter(r => selectedRows.has(r.symbol))
+    selectedStocks.forEach(stock => {
+      onV2BacktestSelect?.(stock.symbol, stock.days)
+    })
+
+    showToast(`Added ${selectedRows.size} stock${selectedRows.size !== 1 ? 's' : ''} to V2 Backtest`)
+    setSelectedRows(new Set())
+  }
+
+  const handleBulkAddToVolumeScreen = () => {
+    if (selectedRows.size === 0) {
+      showToast('No stocks selected')
+      return
+    }
+
+    const selectedStocks = results.filter(r => selectedRows.has(r.symbol))
+    const entries = selectedStocks.map(stock => ({
+      symbol: stock.symbol,
+      days: stock.days
+    }))
+
+    onVolumeBulkAdd?.(entries)
+    showToast(`Added ${selectedRows.size} stock${selectedRows.size !== 1 ? 's' : ''} to Volume Screen`)
+    setSelectedRows(new Set())
   }
 
   const handleReloadStock = async (symbol, days) => {
@@ -783,8 +852,8 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf }) {
         )}
       </div>
 
-      {/* Search */}
-      <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+      {/* Search and Bulk Actions */}
+      <div className="bg-slate-800 rounded-lg p-4 border border-slate-700 space-y-3">
         <div className="flex gap-3 items-center">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
@@ -815,6 +884,33 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf }) {
             Remove All
           </button>
         </div>
+
+        {/* Bulk Actions */}
+        {selectedRows.size > 0 && (
+          <div className="flex gap-2 items-center pt-2 border-t border-slate-700">
+            <span className="text-sm text-slate-400">
+              {selectedRows.size} selected:
+            </span>
+            <button
+              onClick={handleBulkAddToV3Backtest}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded text-sm font-medium transition-colors"
+            >
+              + V3 Backtest
+            </button>
+            <button
+              onClick={handleBulkAddToV2Backtest}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded text-sm font-medium transition-colors"
+            >
+              + V2 Backtest
+            </button>
+            <button
+              onClick={handleBulkAddToVolumeScreen}
+              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm font-medium transition-colors"
+            >
+              + Volume Screen
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Results Table */}
@@ -823,6 +919,15 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf }) {
           <table className="w-full">
             <thead>
               <tr className="bg-slate-900 border-b border-slate-700">
+                <th className="px-4 py-3 text-center text-sm font-semibold text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={sortedResults.length > 0 && selectedRows.size === sortedResults.length}
+                    onChange={handleToggleAll}
+                    className="w-4 h-4 cursor-pointer"
+                    title="Select all"
+                  />
+                </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
                   <button
                     onClick={() => handleSort('symbol')}
@@ -891,7 +996,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf }) {
             <tbody>
               {sortedResults.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan="10" className="px-4 py-8 text-center text-slate-400">
                     {scanning ? 'Scanning stocks...' : 'No results. Click "Load Heavy Vol" to start scanning.'}
                   </td>
                 </tr>
@@ -901,6 +1006,14 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf }) {
                     key={`${result.symbol}-${idx}`}
                     className="border-b border-slate-700 hover:bg-slate-750"
                   >
+                    <td className="px-4 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedRows.has(result.symbol)}
+                        onChange={() => handleToggleRow(result.symbol)}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                    </td>
                     <td className="px-4 py-3 text-white font-medium">
                       {result.symbol}
                     </td>

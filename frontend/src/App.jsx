@@ -222,7 +222,7 @@ function App() {
               }`}
             >
               <BarChart3 className="w-5 h-5" />
-              Backtesting
+              V2 Backtest
             </button>
             <button
               onClick={() => setActiveTab('v3backtest')}
@@ -298,6 +298,8 @@ function App() {
               <StockFiltering
                 onV3BacktestSelect={handleV3BacktestSelect}
                 onAnalyzeWithVolProf={handleAnalyzeWithVolProf}
+                onV2BacktestSelect={handleBacktestSelect}
+                onVolumeBulkAdd={handleVolumeBulkAdd}
               />
             </div>
           </div>
