@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown, BarChart2, AlertCircle, RefreshCw, Activity, TrendingUp } from 'lucide-react'
+import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown, BarChart2, AlertCircle, RefreshCw, TrendingUp } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 import VolumeLegendPills from './VolumeLegendPills'
 
@@ -221,7 +221,7 @@ function isValidSymbol(symbol) {
   return allowedSuffixes.some(suffix => symbol.endsWith(suffix))
 }
 
-function StockFiltering({ onV3BacktestSelect, onVolumeSelect, onAnalyzeWithVolProf }) {
+function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf }) {
   const [selectedPeriod, setSelectedPeriod] = useState('1825')
   const [selectedThreshold, setSelectedThreshold] = useState(20)
   const [stockLimit, setStockLimit] = useState(20)
@@ -951,13 +951,6 @@ function StockFiltering({ onV3BacktestSelect, onVolumeSelect, onAnalyzeWithVolPr
                           title="View in Technical Analysis with Vol Prof V2"
                         >
                           <TrendingUp className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => onVolumeSelect?.(result.symbol, result.days)}
-                          className="text-slate-400 hover:text-green-500 transition-colors"
-                          title="View V2 Volume Profile"
-                        >
-                          <Activity className="w-5 h-5" />
                         </button>
                         <button
                           onClick={() => onV3BacktestSelect?.(result.symbol, result.days)}
