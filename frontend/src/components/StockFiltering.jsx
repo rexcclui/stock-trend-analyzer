@@ -90,6 +90,7 @@ const normalizeResult = (result) => ({
   ...result,
   dataPoints: toNumber(result?.dataPoints),
   change7d: toNumber(result?.change7d),
+  avgTxn: toNumber(result?.avgTxn),
   currentWeight: toNumber(result?.currentWeight),
   lowerSum: toNumber(result?.lowerSum),
   upperSum: toNumber(result?.upperSum),
@@ -375,6 +376,14 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
         }
       }
 
+      // Calculate average transaction value (avg volume × avg price in last 30 days)
+      const last30Days = priceData.slice(-30)
+      const totalVolume30d = last30Days.reduce((sum, price) => sum + (price.volume || 0), 0)
+      const avgVolume30d = last30Days.length > 0 ? totalVolume30d / last30Days.length : 0
+      const totalPrice30d = last30Days.reduce((sum, price) => sum + (price.close || 0), 0)
+      const avgPrice30d = last30Days.length > 0 ? totalPrice30d / last30Days.length : 0
+      const avgTxn = avgVolume30d * avgPrice30d
+
       const { slots, lastPrice, currentSlotIndex } = buildVolumeSlots(priceData)
 
       if (currentSlotIndex < 0) {
@@ -397,6 +406,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
         days: days, // Keep the numeric days value for V3 Backtest
         dataPoints: priceData.length,
         change7d,
+        avgTxn,
         avgVolume,
         currentWeight,
         lowerSum,
@@ -1013,6 +1023,15 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
                   <button
+                    onClick={() => handleSort('avgTxn')}
+                    className="flex items-center gap-1 hover:text-white transition-colors"
+                  >
+                    Avg Txn
+                    <ArrowUpDown className="w-3 h-3" />
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
+                  <button
                     onClick={() => handleSort('currentWeight')}
                     className="flex items-center gap-1 hover:text-white transition-colors"
                   >
@@ -1061,7 +1080,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
             <tbody>
               {sortedResults.length === 0 ? (
                 <tr>
-                  <td colSpan="12" className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan="13" className="px-4 py-8 text-center text-slate-400">
                     {scanning ? 'Scanning stocks...' : 'No results. Click "Load Heavy Vol" to start scanning.'}
                   </td>
                 </tr>
@@ -1105,6 +1124,16 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                           {result.change7d > 0 ? '+' : ''}{result.change7d.toFixed(2)}%
                         </span>
                       </div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-300 text-sm">
+                      {result.avgTxn >= 1000000000
+                        ? `$${(result.avgTxn / 1000000000).toFixed(2)}B`
+                        : result.avgTxn >= 1000000
+                        ? `$${(result.avgTxn / 1000000).toFixed(2)}M`
+                        : result.avgTxn >= 1000
+                        ? `$${(result.avgTxn / 1000).toFixed(2)}K`
+                        : `$${result.avgTxn.toFixed(0)}`
+                      }
                     </td>
                     <td className="px-4 py-3">
                       <span
