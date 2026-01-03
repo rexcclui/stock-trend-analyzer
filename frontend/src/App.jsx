@@ -142,6 +142,13 @@ function App() {
     setActiveTab('volume')
   }
 
+  // Handle clicking on chart icon to view in technical analysis with volume profile v2
+  const handleAnalyzeWithVolProf = (symbol) => {
+    setSelectedSymbol(symbol)
+    setSelectedParams({ forceVolumeProfileV2: true })
+    setActiveTab('analyze')
+  }
+
   const handleVolumeBulkAdd = (entries) => {
     if (!Array.isArray(entries) || entries.length === 0) return
 
@@ -291,6 +298,7 @@ function App() {
               <StockFiltering
                 onV3BacktestSelect={handleV3BacktestSelect}
                 onVolumeSelect={handleVolumeSelect}
+                onAnalyzeWithVolProf={handleAnalyzeWithVolProf}
               />
             </div>
           </div>
