@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown, BarChart2 } from 'lucide-react'
+import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown, BarChart2, AlertCircle, RefreshCw, Activity } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 import VolumeLegendPills from './VolumeLegendPills'
 
@@ -88,6 +88,7 @@ const toNumber = (value) => {
 
 const normalizeResult = (result) => ({
   ...result,
+  dataPoints: toNumber(result?.dataPoints),
   currentWeight: toNumber(result?.currentWeight),
   lowerSum: toNumber(result?.lowerSum),
   upperSum: toNumber(result?.upperSum),
@@ -211,7 +212,16 @@ function formatPeriod(days) {
   return `${daysNum}D`
 }
 
-function StockFiltering({ onV3BacktestSelect }) {
+function isValidSymbol(symbol) {
+  // Allow symbols with ≤5 characters
+  if (symbol.length <= 5) return true
+
+  // Allow symbols ending with .HK, .L, .SS, or .SZ regardless of length
+  const allowedSuffixes = ['.HK', '.L', '.SS', '.SZ']
+  return allowedSuffixes.some(suffix => symbol.endsWith(suffix))
+}
+
+function StockFiltering({ onV3BacktestSelect, onVolumeSelect }) {
   const [selectedPeriod, setSelectedPeriod] = useState('1825')
   const [selectedThreshold, setSelectedThreshold] = useState(20)
   const [stockLimit, setStockLimit] = useState(20)
@@ -225,10 +235,12 @@ function StockFiltering({ onV3BacktestSelect }) {
   const [limitReached, setLimitReached] = useState(false)
   const [sortField, setSortField] = useState(null)
   const [sortDirection, setSortDirection] = useState('asc')
+  const [toastMessage, setToastMessage] = useState('')
   const scanQueueRef = useRef([])
   const isScanningRef = useRef(false)
   const isPausedRef = useRef(false)
   const abortControllerRef = useRef(null)
+  const toastTimeoutRef = useRef(null)
 
   // Load cached results on mount
   useEffect(() => {
@@ -255,6 +267,25 @@ function StockFiltering({ onV3BacktestSelect }) {
       }
     }
   }, [results])
+
+  const showToast = (message) => {
+    setToastMessage(message)
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current)
+    }
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastMessage('')
+      toastTimeoutRef.current = null
+    }, 4500)
+  }
+
+  const dismissToast = () => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current)
+      toastTimeoutRef.current = null
+    }
+    setToastMessage('')
+  }
 
   const loadTopSymbols = async () => {
     try {
@@ -329,6 +360,7 @@ function StockFiltering({ onV3BacktestSelect }) {
         symbol,
         period: formatPeriod(days),
         days: days, // Keep the numeric days value for V3 Backtest
+        dataPoints: priceData.length,
         currentWeight,
         lowerSum,
         upperSum,
@@ -352,6 +384,8 @@ function StockFiltering({ onV3BacktestSelect }) {
 
     const newResults = []
     const total = scanQueueRef.current.length
+    let filteredBySymbolLength = 0
+    let filteredByDataPoints = 0
 
     while (scanQueueRef.current.length > 0 && isScanningRef.current) {
       // Check if paused - wait until resumed
@@ -368,7 +402,19 @@ function StockFiltering({ onV3BacktestSelect }) {
       setProgress({ current, total })
       setCurrentStock(symbol)
 
+      // Filter by symbol length
+      if (!isValidSymbol(symbol)) {
+        filteredBySymbolLength++
+        continue
+      }
+
       const result = await analyzeStock(symbol, days)
+
+      // Filter by data points (minimum 250)
+      if (result && result.dataPoints < 250) {
+        filteredByDataPoints++
+        continue
+      }
 
       if (result && result.matched) {
         newResults.push(result)
@@ -386,6 +432,18 @@ function StockFiltering({ onV3BacktestSelect }) {
       await new Promise(resolve => setTimeout(resolve, 100))
     }
 
+    // Show toast notification for filtered stocks
+    if (filteredBySymbolLength > 0 || filteredByDataPoints > 0) {
+      const messages = []
+      if (filteredBySymbolLength > 0) {
+        messages.push(`${filteredBySymbolLength} stocks filtered by symbol length`)
+      }
+      if (filteredByDataPoints > 0) {
+        messages.push(`${filteredByDataPoints} stocks filtered (< 250 data points)`)
+      }
+      showToast(`Filtered: ${messages.join(', ')}`)
+    }
+
     isScanningRef.current = false
     setScanning(false)
     setPaused(false)
@@ -398,7 +456,6 @@ function StockFiltering({ onV3BacktestSelect }) {
     if (loading || scanning) return
 
     setLoading(true)
-    setResults([])
     setPaused(false)
     isPausedRef.current = false
 
@@ -410,11 +467,22 @@ function StockFiltering({ onV3BacktestSelect }) {
         return
       }
 
-      // Create scan queue
-      scanQueueRef.current = symbols.map(symbol => ({
-        symbol,
-        days: selectedPeriod
-      }))
+      // Get existing symbols to skip them
+      const existingSymbols = new Set(results.map(r => r.symbol))
+
+      // Create scan queue, excluding already scanned symbols
+      scanQueueRef.current = symbols
+        .filter(symbol => !existingSymbols.has(symbol))
+        .map(symbol => ({
+          symbol,
+          days: selectedPeriod
+        }))
+
+      if (scanQueueRef.current.length === 0) {
+        showToast('All symbols already scanned')
+        setLoading(false)
+        return
+      }
 
       abortControllerRef.current = new AbortController()
       setScanning(true)
@@ -450,6 +518,24 @@ function StockFiltering({ onV3BacktestSelect }) {
 
   const handleRemoveResult = (symbol) => {
     setResults(prev => prev.filter(result => result.symbol !== symbol))
+  }
+
+  const handleReloadStock = async (symbol, days) => {
+    // Remove the old result
+    setResults(prev => prev.filter(result => result.symbol !== symbol))
+
+    // Re-analyze the stock
+    const result = await analyzeStock(symbol, days)
+
+    // Add back if it meets criteria
+    if (result && result.dataPoints >= 250) {
+      setResults(prev => [...prev, result])
+      showToast(`${symbol} reloaded successfully`)
+    } else if (result && result.dataPoints < 250) {
+      showToast(`${symbol} removed: insufficient data points (${result.dataPoints})`)
+    } else {
+      showToast(`${symbol} removed: failed to load data`)
+    }
   }
 
   const handleSort = (field) => {
@@ -663,6 +749,15 @@ function StockFiltering({ onV3BacktestSelect }) {
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
                   <button
+                    onClick={() => handleSort('dataPoints')}
+                    className="flex items-center gap-1 hover:text-white transition-colors"
+                  >
+                    Data Points
+                    <ArrowUpDown className="w-3 h-3" />
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
+                  <button
                     onClick={() => handleSort('currentWeight')}
                     className="flex items-center gap-1 hover:text-white transition-colors"
                   >
@@ -708,7 +803,7 @@ function StockFiltering({ onV3BacktestSelect }) {
             <tbody>
               {sortedResults.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan="9" className="px-4 py-8 text-center text-slate-400">
                     {scanning ? 'Scanning stocks...' : 'No results. Click "Load Heavy Vol" to start scanning.'}
                   </td>
                 </tr>
@@ -723,6 +818,9 @@ function StockFiltering({ onV3BacktestSelect }) {
                     </td>
                     <td className="px-4 py-3 text-slate-300">
                       {result.period}
+                    </td>
+                    <td className="px-4 py-3 text-slate-300">
+                      {result.dataPoints}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -776,11 +874,25 @@ function StockFiltering({ onV3BacktestSelect }) {
                     <td className="px-4 py-3 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button
+                          onClick={() => onVolumeSelect?.(result.symbol, result.days)}
+                          className="text-slate-400 hover:text-green-500 transition-colors"
+                          title="View V2 Volume Profile"
+                        >
+                          <Activity className="w-5 h-5" />
+                        </button>
+                        <button
                           onClick={() => onV3BacktestSelect?.(result.symbol, result.days)}
                           className="text-slate-400 hover:text-purple-500 transition-colors"
                           title="View in V3 Backtest"
                         >
                           <BarChart2 className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleReloadStock(result.symbol, result.days)}
+                          className="text-slate-400 hover:text-blue-500 transition-colors"
+                          title="Reload this stock"
+                        >
+                          <RefreshCw className="w-5 h-5" />
                         </button>
                         <button
                           onClick={() => handleRemoveResult(result.symbol)}
@@ -811,6 +923,23 @@ function StockFiltering({ onV3BacktestSelect }) {
                 (Limit of {stockLimit} reached - scan stopped)
               </span>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-4 right-4 z-50">
+          <div className="flex items-start gap-3 bg-slate-900 border border-blue-500 text-blue-100 px-4 py-3 rounded-lg shadow-xl max-w-sm">
+            <AlertCircle className="w-5 h-5 mt-0.5" />
+            <div className="text-sm leading-relaxed flex-1">{toastMessage}</div>
+            <button
+              type="button"
+              onClick={dismissToast}
+              className="ml-2 text-slate-400 hover:text-slate-200 transition-colors"
+            >
+              ×
+            </button>
           </div>
         </div>
       )}

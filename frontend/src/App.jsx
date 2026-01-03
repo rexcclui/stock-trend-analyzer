@@ -288,7 +288,10 @@ function App() {
               />
             </div>
             <div style={{ display: activeTab === 'filtering' ? 'block' : 'none' }}>
-              <StockFiltering onV3BacktestSelect={handleV3BacktestSelect} />
+              <StockFiltering
+                onV3BacktestSelect={handleV3BacktestSelect}
+                onVolumeSelect={handleVolumeSelect}
+              />
             </div>
           </div>
         </div>
