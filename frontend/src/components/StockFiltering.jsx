@@ -213,6 +213,24 @@ function formatPeriod(days) {
   return `${daysNum}D`
 }
 
+function formatLastRunTime(isoString) {
+  if (!isoString) return 'N/A'
+
+  const now = new Date()
+  const runTime = new Date(isoString)
+  const diffMs = now - runTime
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins} min${diffMins !== 1 ? 's' : ''} ago`
+  if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`
+  if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`
+
+  return runTime.toLocaleDateString() + ' ' + runTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
 function isValidSymbol(symbol) {
   // Allow symbols with ≤5 characters
   if (symbol.length <= 5) return true
@@ -386,7 +404,8 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
         sumDiff,
         volumeLegend,
         lastPrice,
-        matched
+        matched,
+        lastRunTime: new Date().toISOString()
       }
     } catch (error) {
       if (error.name === 'CanceledError') {
@@ -1034,12 +1053,15 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                 <th className="px-4 py-3 text-center text-sm font-semibold text-slate-300">
                   Actions
                 </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
+                  Last Run
+                </th>
               </tr>
             </thead>
             <tbody>
               {sortedResults.length === 0 ? (
                 <tr>
-                  <td colSpan="11" className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan="12" className="px-4 py-8 text-center text-slate-400">
                     {scanning ? 'Scanning stocks...' : 'No results. Click "Load Heavy Vol" to start scanning.'}
                   </td>
                 </tr>
@@ -1164,6 +1186,9 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                           <X className="w-5 h-5" />
                         </button>
                       </div>
+                    </td>
+                    <td className="px-4 py-3 text-slate-400 text-sm">
+                      {formatLastRunTime(result.lastRunTime)}
                     </td>
                   </tr>
                 ))
