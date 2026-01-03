@@ -435,6 +435,8 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
     let filteredBySymbolLength = 0
     let filteredByDataPoints = 0
     let filteredByVolume = 0
+    let filteredByAvgTxn = 0
+    let filteredBySameDirection = 0
 
     while (scanQueueRef.current.length > 0 && isScanningRef.current) {
       // Check if paused - wait until resumed
@@ -471,6 +473,19 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
         continue
       }
 
+      // Filter by average transaction value (minimum $10 million)
+      if (result && result.avgTxn < 10000000) {
+        filteredByAvgTxn++
+        continue
+      }
+
+      // Filter out stocks where 7-day change and diff have the same direction
+      // Only keep stocks with opposite directions (divergence)
+      if (result && (result.change7d * result.sumDiff) >= 0) {
+        filteredBySameDirection++
+        continue
+      }
+
       if (result && result.matched) {
         newResults.push(result)
         setResults(prev => [...prev, result])
@@ -488,7 +503,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
     }
 
     // Show toast notification for filtered stocks
-    if (filteredBySymbolLength > 0 || filteredByDataPoints > 0 || filteredByVolume > 0) {
+    if (filteredBySymbolLength > 0 || filteredByDataPoints > 0 || filteredByVolume > 0 || filteredByAvgTxn > 0 || filteredBySameDirection > 0) {
       const messages = []
       if (filteredBySymbolLength > 0) {
         messages.push(`${filteredBySymbolLength} by symbol length`)
@@ -498,6 +513,12 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
       }
       if (filteredByVolume > 0) {
         messages.push(`${filteredByVolume} by low volume`)
+      }
+      if (filteredByAvgTxn > 0) {
+        messages.push(`${filteredByAvgTxn} by low avg txn`)
+      }
+      if (filteredBySameDirection > 0) {
+        messages.push(`${filteredBySameDirection} by same direction`)
       }
       showToast(`Filtered stocks: ${messages.join(', ')}`)
     }
@@ -674,13 +695,17 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
     const result = await analyzeStock(symbol, days)
 
     // Add back if it meets criteria
-    if (result && result.dataPoints >= 250 && result.avgVolume >= 100000) {
+    if (result && result.dataPoints >= 250 && result.avgVolume >= 100000 && result.avgTxn >= 10000000 && (result.change7d * result.sumDiff) < 0) {
       setResults(prev => [...prev, result])
       showToast(`${symbol} reloaded successfully`)
     } else if (result && result.dataPoints < 250) {
       showToast(`${symbol} removed: insufficient data points (${result.dataPoints})`)
     } else if (result && result.avgVolume < 100000) {
       showToast(`${symbol} removed: low average volume (${Math.round(result.avgVolume).toLocaleString()})`)
+    } else if (result && result.avgTxn < 10000000) {
+      showToast(`${symbol} removed: low avg transaction value ($${(result.avgTxn / 1000000).toFixed(2)}M)`)
+    } else if (result && (result.change7d * result.sumDiff) >= 0) {
+      showToast(`${symbol} removed: 7D change and diff have same direction`)
     } else {
       showToast(`${symbol} removed: failed to load data`)
     }
@@ -707,7 +732,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
       const result = await analyzeStock(symbol, days)
 
       // Add back if it meets criteria
-      if (result && result.dataPoints >= 250 && result.avgVolume >= 100000 && result.matched) {
+      if (result && result.dataPoints >= 250 && result.avgVolume >= 100000 && result.avgTxn >= 10000000 && (result.change7d * result.sumDiff) < 0 && result.matched) {
         newResults.push(result)
       } else {
         removed++
