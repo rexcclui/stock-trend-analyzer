@@ -1177,15 +1177,24 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span
-                        className="inline-block px-3 py-1 rounded-full text-sm font-medium"
-                        style={{
-                          backgroundColor: result.sumDiff >= 0 ? '#3b82f6' : '#ef4444',
-                          color: '#ffffff'
-                        }}
-                      >
-                        {result.sumDiff >= 0 ? '+' : ''}{result.sumDiff.toFixed(1)}%
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="inline-block px-3 py-1 rounded-full text-sm font-medium"
+                          style={{
+                            backgroundColor: result.sumDiff >= 0 ? '#3b82f6' : '#ef4444',
+                            color: '#ffffff'
+                          }}
+                        >
+                          {result.sumDiff >= 0 ? '+' : ''}{result.sumDiff.toFixed(1)}%
+                        </span>
+                        {result.sumDiff > 0 ? (
+                          <ArrowUp className="w-4 h-4 text-blue-500" />
+                        ) : result.sumDiff < 0 ? (
+                          <ArrowDown className="w-4 h-4 text-red-500" />
+                        ) : (
+                          <Minus className="w-4 h-4 text-slate-500" />
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       {result.volumeLegend && (
