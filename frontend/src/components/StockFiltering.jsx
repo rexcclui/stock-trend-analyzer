@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown, BarChart2, AlertCircle, RefreshCw, TrendingUp, Database } from 'lucide-react'
+import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown, BarChart2, AlertCircle, RefreshCw, TrendingUp, Database, TrendingDown, Minus } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 import VolumeLegendPills from './VolumeLegendPills'
 
@@ -89,6 +89,7 @@ const toNumber = (value) => {
 const normalizeResult = (result) => ({
   ...result,
   dataPoints: toNumber(result?.dataPoints),
+  change7d: toNumber(result?.change7d),
   currentWeight: toNumber(result?.currentWeight),
   lowerSum: toNumber(result?.lowerSum),
   upperSum: toNumber(result?.upperSum),
@@ -346,6 +347,16 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
       const totalVolume = last250Days.reduce((sum, price) => sum + (price.volume || 0), 0)
       const avgVolume = last250Days.length > 0 ? totalVolume / last250Days.length : 0
 
+      // Calculate 7-day percentage change
+      let change7d = 0
+      if (priceData.length >= 7) {
+        const currentPrice = priceData[priceData.length - 1]?.close
+        const price7dAgo = priceData[priceData.length - 7]?.close
+        if (currentPrice && price7dAgo && price7dAgo !== 0) {
+          change7d = ((currentPrice - price7dAgo) / price7dAgo) * 100
+        }
+      }
+
       const { slots, lastPrice, currentSlotIndex } = buildVolumeSlots(priceData)
 
       if (currentSlotIndex < 0) {
@@ -367,6 +378,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
         period: formatPeriod(days),
         days: days, // Keep the numeric days value for V3 Backtest
         dataPoints: priceData.length,
+        change7d,
         avgVolume,
         currentWeight,
         lowerSum,
@@ -973,6 +985,15 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
                   <button
+                    onClick={() => handleSort('change7d')}
+                    className="flex items-center gap-1 hover:text-white transition-colors"
+                  >
+                    7D Change
+                    <ArrowUpDown className="w-3 h-3" />
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
+                  <button
                     onClick={() => handleSort('currentWeight')}
                     className="flex items-center gap-1 hover:text-white transition-colors"
                   >
@@ -1018,7 +1039,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
             <tbody>
               {sortedResults.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan="11" className="px-4 py-8 text-center text-slate-400">
                     {scanning ? 'Scanning stocks...' : 'No results. Click "Load Heavy Vol" to start scanning.'}
                   </td>
                 </tr>
@@ -1044,6 +1065,24 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                     </td>
                     <td className="px-4 py-3 text-slate-300">
                       {result.dataPoints}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        {result.change7d > 0 ? (
+                          <TrendingUp className="w-4 h-4 text-green-500" />
+                        ) : result.change7d < 0 ? (
+                          <TrendingDown className="w-4 h-4 text-red-500" />
+                        ) : (
+                          <Minus className="w-4 h-4 text-slate-500" />
+                        )}
+                        <span className={`text-sm font-medium ${
+                          result.change7d > 0 ? 'text-green-500' :
+                          result.change7d < 0 ? 'text-red-500' :
+                          'text-slate-500'
+                        }`}>
+                          {result.change7d > 0 ? '+' : ''}{result.change7d.toFixed(2)}%
+                        </span>
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <span
