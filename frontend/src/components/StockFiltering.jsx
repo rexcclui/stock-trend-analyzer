@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown, BarChart2, AlertCircle, RefreshCw, TrendingUp } from 'lucide-react'
+import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown, BarChart2, AlertCircle, RefreshCw, TrendingUp, Database } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 import VolumeLegendPills from './VolumeLegendPills'
 
@@ -545,6 +545,19 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
     showToast(`Removed all ${count} stock${count !== 1 ? 's' : ''} from table`)
   }
 
+  const handleClearCache = () => {
+    try {
+      localStorage.removeItem(RESULT_CACHE_KEY)
+      const count = results.length
+      setResults([])
+      setSelectedRows(new Set())
+      showToast(`Cleared cache and removed ${count} stock${count !== 1 ? 's' : ''} from table`)
+    } catch (error) {
+      console.error('Failed to clear cache', error)
+      showToast('Failed to clear cache')
+    }
+  }
+
   const handleToggleRow = (symbol) => {
     setSelectedRows(prev => {
       const newSet = new Set(prev)
@@ -882,6 +895,15 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
           >
             <X className="w-5 h-5" />
             Remove All
+          </button>
+          <button
+            onClick={handleClearCache}
+            disabled={scanning}
+            className="bg-orange-600 hover:bg-orange-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded font-medium transition-colors flex items-center gap-2"
+            title="Clear cached stocks from localStorage"
+          >
+            <Database className="w-5 h-5" />
+            Clear Cache
           </button>
         </div>
 
