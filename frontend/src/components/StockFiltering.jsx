@@ -1016,7 +1016,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                   <button
                     onClick={() => handleSort('change7d')}
                     className="flex items-center gap-1 hover:text-white transition-colors"
-                    title="7D Change"
+                    title="7-Day Percentage Change: Price change over last 7 trading days"
                   >
                     <TrendingUp className="w-4 h-4" />
                     <ArrowUpDown className="w-3 h-3" />
@@ -1026,7 +1026,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                   <button
                     onClick={() => handleSort('avgTxn')}
                     className="flex items-center gap-1 hover:text-white transition-colors"
-                    title="Avg Txn"
+                    title="Average Transaction Value: Avg volume × avg price (last 30 days)"
                   >
                     <DollarSign className="w-4 h-4" />
                     <ArrowUpDown className="w-3 h-3" />
@@ -1036,7 +1036,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                   <button
                     onClick={() => handleSort('currentWeight')}
                     className="flex items-center gap-1 hover:text-white transition-colors"
-                    title="Current Weight"
+                    title="Current Weight: Volume concentration at current price level (%)"
                   >
                     <Scale className="w-4 h-4" />
                     <ArrowUpDown className="w-3 h-3" />
@@ -1046,7 +1046,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                   <button
                     onClick={() => handleSort('lowerSum')}
                     className="flex items-center gap-1 hover:text-white transition-colors"
-                    title="Lower Sum"
+                    title="Lower Sum: Current slot + immediate lower slot volume weight (%)"
                   >
                     <ArrowDown className="w-4 h-4" />
                     <ArrowUpDown className="w-3 h-3" />
@@ -1056,7 +1056,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                   <button
                     onClick={() => handleSort('upperSum')}
                     className="flex items-center gap-1 hover:text-white transition-colors"
-                    title="Upper Sum"
+                    title="Upper Sum: Current slot + immediate upper slot volume weight (%)"
                   >
                     <ArrowUp className="w-4 h-4" />
                     <ArrowUpDown className="w-3 h-3" />
@@ -1066,21 +1066,21 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                   <button
                     onClick={() => handleSort('sumDiff')}
                     className="flex items-center gap-1 hover:text-white transition-colors"
-                    title="Diff (U-L)"
+                    title="Difference (Upper - Lower): Indicates volume distribution bias direction"
                   >
                     <ArrowLeftRight className="w-4 h-4" />
                     <ArrowUpDown className="w-3 h-3" />
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300" title="Volume Legend">
+                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300" title="Volume Legend: Visual distribution of volume across price levels">
                   <Waves className="w-4 h-4" />
                 </th>
-                <th className="px-4 py-3 text-center text-sm font-semibold text-slate-300" title="Actions">
+                <th className="px-4 py-3 text-center text-sm font-semibold text-slate-300" title="Actions: View chart, add to backtest, reload, or remove stock">
                   <div className="flex justify-center">
                     <Settings className="w-4 h-4" />
                   </div>
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300" title="Last Run">
+                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300" title="Last Run: When this stock was last analyzed">
                   <Clock className="w-4 h-4" />
                 </th>
               </tr>
