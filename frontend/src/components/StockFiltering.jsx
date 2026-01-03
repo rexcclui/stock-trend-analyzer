@@ -721,7 +721,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
     setProgress({ current: 0, total })
 
     const newResults = []
-    let removed = 0
+    let failedToLoad = 0
 
     for (let i = 0; i < stocksToReload.length; i++) {
       const { symbol, days } = stocksToReload[i]
@@ -731,11 +731,11 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
 
       const result = await analyzeStock(symbol, days)
 
-      // Add back if it meets criteria
-      if (result && result.dataPoints >= 250 && result.avgVolume >= 100000 && result.avgTxn >= 10000000 && (result.change7d * result.sumDiff) < 0 && result.matched) {
+      // Always keep the stock, just refresh the data
+      if (result) {
         newResults.push(result)
       } else {
-        removed++
+        failedToLoad++
       }
 
       // Small delay to prevent overwhelming the API
@@ -747,8 +747,8 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
     setProgress({ current: 0, total: 0 })
     setCurrentStock('')
 
-    if (removed > 0) {
-      showToast(`Reload complete: ${removed} stock${removed !== 1 ? 's' : ''} removed (failed criteria)`)
+    if (failedToLoad > 0) {
+      showToast(`Reload complete: ${failedToLoad} stock${failedToLoad !== 1 ? 's' : ''} failed to load data`)
     } else {
       showToast(`All ${total} stocks reloaded successfully`)
     }
