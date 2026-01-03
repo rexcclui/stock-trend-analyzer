@@ -1014,16 +1014,6 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
                   <button
-                    onClick={() => handleSort('change7d')}
-                    className="flex items-center gap-1 hover:text-white transition-colors"
-                    title="7-Day Percentage Change: Price change over last 7 trading days"
-                  >
-                    <TrendingUp className="w-4 h-4" />
-                    <ArrowUpDown className="w-3 h-3" />
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
-                  <button
                     onClick={() => handleSort('avgTxn')}
                     className="flex items-center gap-1 hover:text-white transition-colors"
                     title="Average Transaction Value: Avg volume × avg price (last 30 days)"
@@ -1072,6 +1062,16 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                     <ArrowUpDown className="w-3 h-3" />
                   </button>
                 </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
+                  <button
+                    onClick={() => handleSort('change7d')}
+                    className="flex items-center gap-1 hover:text-white transition-colors"
+                    title="7-Day Percentage Change: Price change over last 7 trading days"
+                  >
+                    <TrendingUp className="w-4 h-4" />
+                    <ArrowUpDown className="w-3 h-3" />
+                  </button>
+                </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300" title="Volume Legend: Visual distribution of volume across price levels">
                   <Waves className="w-4 h-4" />
                 </th>
@@ -1114,24 +1114,6 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                     </td>
                     <td className="px-4 py-3 text-slate-300">
                       {result.dataPoints}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        {result.change7d > 0 ? (
-                          <TrendingUp className="w-4 h-4 text-green-500" />
-                        ) : result.change7d < 0 ? (
-                          <TrendingDown className="w-4 h-4 text-red-500" />
-                        ) : (
-                          <Minus className="w-4 h-4 text-slate-500" />
-                        )}
-                        <span className={`text-sm font-medium ${
-                          result.change7d > 0 ? 'text-green-500' :
-                          result.change7d < 0 ? 'text-red-500' :
-                          'text-slate-500'
-                        }`}>
-                          {result.change7d > 0 ? '+' : ''}{result.change7d.toFixed(2)}%
-                        </span>
-                      </div>
                     </td>
                     <td className="px-4 py-3 text-slate-300 text-sm">
                       {result.avgTxn >= 1000000000
@@ -1194,6 +1176,24 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                         ) : (
                           <Minus className="w-4 h-4 text-slate-500" />
                         )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1">
+                        {result.change7d > 0 ? (
+                          <TrendingUp className="w-4 h-4 text-green-500" />
+                        ) : result.change7d < 0 ? (
+                          <TrendingDown className="w-4 h-4 text-red-500" />
+                        ) : (
+                          <Minus className="w-4 h-4 text-slate-500" />
+                        )}
+                        <span className={`text-sm font-medium ${
+                          result.change7d > 0 ? 'text-green-500' :
+                          result.change7d < 0 ? 'text-red-500' :
+                          'text-slate-500'
+                        }`}>
+                          {result.change7d > 0 ? '+' : ''}{result.change7d.toFixed(2)}%
+                        </span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
