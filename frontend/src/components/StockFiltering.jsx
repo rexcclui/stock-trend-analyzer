@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown, BarChart2, AlertCircle, RefreshCw, TrendingUp, Database, TrendingDown, Minus } from 'lucide-react'
+import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown, BarChart2, AlertCircle, RefreshCw, TrendingUp, Database, TrendingDown, Minus, DollarSign, Scale, ArrowDown, ArrowUp, ArrowLeftRight, Settings, Clock, Waves } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 import VolumeLegendPills from './VolumeLegendPills'
 
@@ -1016,8 +1016,9 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                   <button
                     onClick={() => handleSort('change7d')}
                     className="flex items-center gap-1 hover:text-white transition-colors"
+                    title="7D Change"
                   >
-                    7D Change
+                    <TrendingUp className="w-4 h-4" />
                     <ArrowUpDown className="w-3 h-3" />
                   </button>
                 </th>
@@ -1025,8 +1026,9 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                   <button
                     onClick={() => handleSort('avgTxn')}
                     className="flex items-center gap-1 hover:text-white transition-colors"
+                    title="Avg Txn"
                   >
-                    Avg Txn
+                    <DollarSign className="w-4 h-4" />
                     <ArrowUpDown className="w-3 h-3" />
                   </button>
                 </th>
@@ -1034,8 +1036,9 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                   <button
                     onClick={() => handleSort('currentWeight')}
                     className="flex items-center gap-1 hover:text-white transition-colors"
+                    title="Current Weight"
                   >
-                    Current Weight
+                    <Scale className="w-4 h-4" />
                     <ArrowUpDown className="w-3 h-3" />
                   </button>
                 </th>
@@ -1043,8 +1046,9 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                   <button
                     onClick={() => handleSort('lowerSum')}
                     className="flex items-center gap-1 hover:text-white transition-colors"
+                    title="Lower Sum"
                   >
-                    Lower Sum
+                    <ArrowDown className="w-4 h-4" />
                     <ArrowUpDown className="w-3 h-3" />
                   </button>
                 </th>
@@ -1052,8 +1056,9 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                   <button
                     onClick={() => handleSort('upperSum')}
                     className="flex items-center gap-1 hover:text-white transition-colors"
+                    title="Upper Sum"
                   >
-                    Upper Sum
+                    <ArrowUp className="w-4 h-4" />
                     <ArrowUpDown className="w-3 h-3" />
                   </button>
                 </th>
@@ -1061,19 +1066,22 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                   <button
                     onClick={() => handleSort('sumDiff')}
                     className="flex items-center gap-1 hover:text-white transition-colors"
+                    title="Diff (U-L)"
                   >
-                    Diff (U-L)
+                    <ArrowLeftRight className="w-4 h-4" />
                     <ArrowUpDown className="w-3 h-3" />
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
-                  Volume Legend
+                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300" title="Volume Legend">
+                  <Waves className="w-4 h-4" />
                 </th>
-                <th className="px-4 py-3 text-center text-sm font-semibold text-slate-300">
-                  Actions
+                <th className="px-4 py-3 text-center text-sm font-semibold text-slate-300" title="Actions">
+                  <div className="flex justify-center">
+                    <Settings className="w-4 h-4" />
+                  </div>
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
-                  Last Run
+                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300" title="Last Run">
+                  <Clock className="w-4 h-4" />
                 </th>
               </tr>
             </thead>
