@@ -340,6 +340,11 @@ function StockFiltering({ onV3BacktestSelect, onVolumeSelect }) {
         return null
       }
 
+      // Calculate average volume from last 250 days
+      const last250Days = priceData.slice(-250)
+      const totalVolume = last250Days.reduce((sum, price) => sum + (price.volume || 0), 0)
+      const avgVolume = last250Days.length > 0 ? totalVolume / last250Days.length : 0
+
       const { slots, lastPrice, currentSlotIndex } = buildVolumeSlots(priceData)
 
       if (currentSlotIndex < 0) {
@@ -361,6 +366,7 @@ function StockFiltering({ onV3BacktestSelect, onVolumeSelect }) {
         period: formatPeriod(days),
         days: days, // Keep the numeric days value for V3 Backtest
         dataPoints: priceData.length,
+        avgVolume,
         currentWeight,
         lowerSum,
         upperSum,
@@ -386,6 +392,7 @@ function StockFiltering({ onV3BacktestSelect, onVolumeSelect }) {
     const total = scanQueueRef.current.length
     let filteredBySymbolLength = 0
     let filteredByDataPoints = 0
+    let filteredByVolume = 0
 
     while (scanQueueRef.current.length > 0 && isScanningRef.current) {
       // Check if paused - wait until resumed
@@ -416,6 +423,12 @@ function StockFiltering({ onV3BacktestSelect, onVolumeSelect }) {
         continue
       }
 
+      // Filter by average volume (minimum 100,000)
+      if (result && result.avgVolume < 100000) {
+        filteredByVolume++
+        continue
+      }
+
       if (result && result.matched) {
         newResults.push(result)
         setResults(prev => [...prev, result])
@@ -433,15 +446,18 @@ function StockFiltering({ onV3BacktestSelect, onVolumeSelect }) {
     }
 
     // Show toast notification for filtered stocks
-    if (filteredBySymbolLength > 0 || filteredByDataPoints > 0) {
+    if (filteredBySymbolLength > 0 || filteredByDataPoints > 0 || filteredByVolume > 0) {
       const messages = []
       if (filteredBySymbolLength > 0) {
-        messages.push(`${filteredBySymbolLength} stocks filtered by symbol length`)
+        messages.push(`${filteredBySymbolLength} by symbol length`)
       }
       if (filteredByDataPoints > 0) {
-        messages.push(`${filteredByDataPoints} stocks filtered (< 250 data points)`)
+        messages.push(`${filteredByDataPoints} by data points`)
       }
-      showToast(`Filtered: ${messages.join(', ')}`)
+      if (filteredByVolume > 0) {
+        messages.push(`${filteredByVolume} by low volume`)
+      }
+      showToast(`Filtered stocks: ${messages.join(', ')}`)
     }
 
     isScanningRef.current = false
@@ -528,11 +544,13 @@ function StockFiltering({ onV3BacktestSelect, onVolumeSelect }) {
     const result = await analyzeStock(symbol, days)
 
     // Add back if it meets criteria
-    if (result && result.dataPoints >= 250) {
+    if (result && result.dataPoints >= 250 && result.avgVolume >= 100000) {
       setResults(prev => [...prev, result])
       showToast(`${symbol} reloaded successfully`)
     } else if (result && result.dataPoints < 250) {
       showToast(`${symbol} removed: insufficient data points (${result.dataPoints})`)
+    } else if (result && result.avgVolume < 100000) {
+      showToast(`${symbol} removed: low average volume (${Math.round(result.avgVolume).toLocaleString()})`)
     } else {
       showToast(`${symbol} removed: failed to load data`)
     }
