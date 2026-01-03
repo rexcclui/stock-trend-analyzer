@@ -356,8 +356,8 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf }) {
       const upperSum = calculateUpperSum(slots, currentSlotIndex)
       const sumDiff = upperSum - lowerSum
 
-      // Check if it matches the threshold
-      const matched = lowerSum >= selectedThreshold || upperSum >= selectedThreshold
+      // Check if absolute value of difference meets the threshold
+      const matched = Math.abs(sumDiff) >= selectedThreshold
 
       const volumeLegend = buildLegend(slots, currentSlotIndex)
 
@@ -534,6 +534,13 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf }) {
 
   const handleRemoveResult = (symbol) => {
     setResults(prev => prev.filter(result => result.symbol !== symbol))
+  }
+
+  const handleRemoveAll = () => {
+    if (results.length === 0) return
+    const count = results.length
+    setResults([])
+    showToast(`Removed all ${count} stock${count !== 1 ? 's' : ''} from table`)
   }
 
   const handleReloadStock = async (symbol, days) => {
@@ -798,6 +805,15 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf }) {
             <RefreshCw className="w-5 h-5" />
             Reload All
           </button>
+          <button
+            onClick={handleRemoveAll}
+            disabled={results.length === 0 || scanning}
+            className="bg-red-600 hover:bg-red-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded font-medium transition-colors flex items-center gap-2"
+            title="Remove all stocks from table"
+          >
+            <X className="w-5 h-5" />
+            Remove All
+          </button>
         </div>
       </div>
 
@@ -989,7 +1005,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf }) {
           <div className="text-sm text-slate-300">
             Showing {filteredResults.length} stock{filteredResults.length !== 1 ? 's' : ''}
             {searchQuery && ` matching "${searchQuery}"`}
-            {' '}with volume weight ≥ {selectedThreshold}%
+            {' '}with |Diff (U-L)| ≥ {selectedThreshold}%
             {limitReached && stockLimit !== -1 && (
               <span className="ml-2 text-green-400 font-semibold">
                 (Limit of {stockLimit} reached - scan stopped)
