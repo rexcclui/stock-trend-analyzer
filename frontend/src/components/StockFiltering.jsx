@@ -233,12 +233,12 @@ function formatLastRunTime(isoString) {
 }
 
 function isValidSymbol(symbol) {
-  // Allow symbols with ≤5 characters
-  if (symbol.length <= 5) return true
-
-  // Allow symbols ending with .HK, .L, .SS, or .SZ regardless of length
-  const allowedSuffixes = ['.HK', '.L', '.SS', '.SZ']
-  return allowedSuffixes.some(suffix => symbol.endsWith(suffix))
+  // Filter out symbols with ≥5 characters that don't contain a '.'
+  // This excludes long ticker symbols without exchange suffixes (e.g., .HK, .L, .SS, .SZ)
+  if (symbol.length >= 5 && !symbol.includes('.')) {
+    return false
+  }
+  return true
 }
 
 function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2BacktestSelect, onVolumeBulkAdd }) {
