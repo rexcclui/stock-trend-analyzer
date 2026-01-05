@@ -1267,6 +1267,9 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     setDays(newDays)
     setError(null)
 
+    // Reset zoom to show all data when period changes
+    setGlobalZoomRange({ start: 0, end: null })
+
     // Show loading spinner during data fetch
     setLoading(true)
 
