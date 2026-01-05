@@ -103,23 +103,11 @@ function parseStockSymbols(input) {
 function getFetchPeriod(displayDays) {
   const days = parseInt(displayDays)
 
-  // 7D → fetch 3M (90 days)
-  if (days <= 7) return '90'
+  // Always fetch 3x the requested period (capped at 10Y)
+  // This ensures we get full historical data
+  const fetchDays = Math.min(days * 3, 3650)
 
-  // 1M (30) → fetch 6M (180 days)
-  if (days <= 30) return '180'
-
-  // 6M (180) → fetch 3Y (1095 days)
-  if (days <= 180) return '1095'
-
-  // 1Y (365) → fetch 3Y (1095 days)
-  if (days <= 365) return '1095'
-
-  // 3Y (1095) → fetch 5Y (1825 days)
-  if (days <= 1095) return '1825'
-
-  // 5Y (1825) and above → fetch MAX (3650 days for 10Y)
-  return '3650'
+  return String(fetchDays)
 }
 
 function StockAnalyzer({ selectedSymbol, selectedParams }) {
