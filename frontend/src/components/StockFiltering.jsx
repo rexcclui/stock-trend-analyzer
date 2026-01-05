@@ -270,35 +270,31 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
   const abortControllerRef = useRef(null)
   const toastTimeoutRef = useRef(null)
 
-  // Load cached results on mount and when market changes
+  // Load cached results on mount (all markets together)
   useEffect(() => {
     try {
-      const cacheKey = `${RESULT_CACHE_KEY_PREFIX}_${selectedMarket}`
-      const cached = localStorage.getItem(cacheKey)
+      const cached = localStorage.getItem(RESULT_CACHE_KEY_PREFIX)
       if (cached) {
         const parsed = JSON.parse(cached)
         if (Array.isArray(parsed)) {
           setResults(parsed.map(normalizeResult))
         }
-      } else {
-        setResults([])
       }
     } catch (error) {
       console.error('Failed to load cached results', error)
     }
-  }, [selectedMarket])
+  }, [])
 
-  // Save results to cache when they change
+  // Save results to cache when they change (all markets together)
   useEffect(() => {
     if (results.length > 0) {
       try {
-        const cacheKey = `${RESULT_CACHE_KEY_PREFIX}_${selectedMarket}`
-        localStorage.setItem(cacheKey, JSON.stringify(results))
+        localStorage.setItem(RESULT_CACHE_KEY_PREFIX, JSON.stringify(results))
       } catch (error) {
         console.error('Failed to cache results', error)
       }
     }
-  }, [results, selectedMarket])
+  }, [results])
 
   const showToast = (message) => {
     setToastMessage(message)
@@ -421,6 +417,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
 
       return {
         symbol,
+        market: selectedMarket,
         period: formatPeriod(days),
         days: days, // Keep the numeric days value for V3 Backtest
         dataPoints: priceData.length,
@@ -628,12 +625,11 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
 
   const handleClearCache = () => {
     try {
-      const cacheKey = `${RESULT_CACHE_KEY_PREFIX}_${selectedMarket}`
-      localStorage.removeItem(cacheKey)
+      localStorage.removeItem(RESULT_CACHE_KEY_PREFIX)
       const count = results.length
       setResults([])
       setSelectedRows(new Set())
-      showToast(`Cleared ${selectedMarket} cache and removed ${count} stock${count !== 1 ? 's' : ''} from table`)
+      showToast(`Cleared cache and removed ${count} stock${count !== 1 ? 's' : ''} from table`)
     } catch (error) {
       console.error('Failed to clear cache', error)
       showToast('Failed to clear cache')
@@ -799,10 +795,10 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
     let aVal = a[sortField]
     let bVal = b[sortField]
 
-    // Handle string comparison for symbol
-    if (sortField === 'symbol') {
-      aVal = aVal.toLowerCase()
-      bVal = bVal.toLowerCase()
+    // Handle string comparison for symbol and market
+    if (sortField === 'symbol' || sortField === 'market') {
+      aVal = (aVal || '').toLowerCase()
+      bVal = (bVal || '').toLowerCase()
       return sortDirection === 'asc'
         ? aVal.localeCompare(bVal)
         : bVal.localeCompare(aVal)
@@ -1069,6 +1065,15 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                   </button>
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
+                  <button
+                    onClick={() => handleSort('market')}
+                    className="flex items-center gap-1 hover:text-white transition-colors"
+                  >
+                    Market
+                    <ArrowUpDown className="w-3 h-3" />
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
                   Period
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
@@ -1156,7 +1161,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
             <tbody>
               {sortedResults.length === 0 ? (
                 <tr>
-                  <td colSpan="13" className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan="14" className="px-4 py-8 text-center text-slate-400">
                     {scanning ? 'Scanning stocks...' : 'No results. Click "Load Heavy Vol" to start scanning.'}
                   </td>
                 </tr>
@@ -1176,6 +1181,16 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                     </td>
                     <td className="px-4 py-3 text-white font-medium">
                       {result.symbol}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
+                        result.market === 'US' ? 'bg-blue-600 text-white' :
+                        result.market === 'HK' ? 'bg-purple-600 text-white' :
+                        result.market === 'CN' ? 'bg-red-600 text-white' :
+                        'bg-slate-600 text-white'
+                      }`}>
+                        {result.market}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-slate-300">
                       {result.period}
