@@ -4,8 +4,8 @@ import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown, BarChart2, AlertC
 import { joinUrl } from '../utils/urlHelper'
 import VolumeLegendPills from './VolumeLegendPills'
 
-const TOP_SYMBOL_CACHE_KEY = 'stockFilteringTopSymbols'
-const RESULT_CACHE_KEY = 'stockFilteringResults'
+const TOP_SYMBOL_CACHE_KEY_PREFIX = 'stockFilteringTopSymbols'
+const RESULT_CACHE_KEY_PREFIX = 'stockFilteringResults'
 const TOP_SYMBOL_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 1 month cache
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -33,6 +33,12 @@ const stockLimits = [
   { label: '100', value: 100 },
   { label: '200', value: 200 },
   { label: 'ALL', value: -1 }
+]
+
+const markets = [
+  { label: 'US', value: 'US', limit: 2000, exchange: null },
+  { label: 'HK', value: 'HK', limit: 500, exchange: 'HKG' },
+  { label: 'CN', value: 'CN', limit: 500, exchange: 'CN' }
 ]
 
 function getSlotColor(weight) {
@@ -245,6 +251,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
   const [selectedPeriod, setSelectedPeriod] = useState('1825')
   const [selectedThreshold, setSelectedThreshold] = useState(20)
   const [stockLimit, setStockLimit] = useState(20)
+  const [selectedMarket, setSelectedMarket] = useState('US')
   const [loading, setLoading] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [paused, setPaused] = useState(false)
@@ -263,31 +270,35 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
   const abortControllerRef = useRef(null)
   const toastTimeoutRef = useRef(null)
 
-  // Load cached results on mount
+  // Load cached results on mount and when market changes
   useEffect(() => {
     try {
-      const cached = localStorage.getItem(RESULT_CACHE_KEY)
+      const cacheKey = `${RESULT_CACHE_KEY_PREFIX}_${selectedMarket}`
+      const cached = localStorage.getItem(cacheKey)
       if (cached) {
         const parsed = JSON.parse(cached)
         if (Array.isArray(parsed)) {
           setResults(parsed.map(normalizeResult))
         }
+      } else {
+        setResults([])
       }
     } catch (error) {
       console.error('Failed to load cached results', error)
     }
-  }, [])
+  }, [selectedMarket])
 
   // Save results to cache when they change
   useEffect(() => {
     if (results.length > 0) {
       try {
-        localStorage.setItem(RESULT_CACHE_KEY, JSON.stringify(results))
+        const cacheKey = `${RESULT_CACHE_KEY_PREFIX}_${selectedMarket}`
+        localStorage.setItem(cacheKey, JSON.stringify(results))
       } catch (error) {
         console.error('Failed to cache results', error)
       }
     }
-  }, [results])
+  }, [results, selectedMarket])
 
   const showToast = (message) => {
     setToastMessage(message)
@@ -310,8 +321,13 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
 
   const loadTopSymbols = async () => {
     try {
+      const market = markets.find(m => m.value === selectedMarket)
+      if (!market) return []
+
+      const cacheKey = `${TOP_SYMBOL_CACHE_KEY_PREFIX}_${selectedMarket}`
+
       // Check cache first
-      const cached = localStorage.getItem(TOP_SYMBOL_CACHE_KEY)
+      const cached = localStorage.getItem(cacheKey)
       if (cached) {
         const { symbols, timestamp } = JSON.parse(cached)
         if (Date.now() - timestamp < TOP_SYMBOL_TTL_MS) {
@@ -319,10 +335,13 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
         }
       }
 
-      // Fetch from API
-      const response = await axios.get(joinUrl(API_URL, '/top-market-cap'), {
-        params: { limit: 2000 }
-      })
+      // Fetch from API with market-specific parameters
+      const params = { limit: market.limit }
+      if (market.exchange) {
+        params.exchange = market.exchange
+      }
+
+      const response = await axios.get(joinUrl(API_URL, '/top-market-cap'), { params })
 
       const payload = response.data
       const symbols = Array.isArray(payload)
@@ -336,8 +355,8 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
         .filter(Boolean)
         .map(symbol => symbol.toUpperCase())
 
-      // Save to cache
-      localStorage.setItem(TOP_SYMBOL_CACHE_KEY, JSON.stringify({
+      // Save to cache with market-specific key
+      localStorage.setItem(cacheKey, JSON.stringify({
         symbols: normalized,
         timestamp: Date.now()
       }))
@@ -609,11 +628,12 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
 
   const handleClearCache = () => {
     try {
-      localStorage.removeItem(RESULT_CACHE_KEY)
+      const cacheKey = `${RESULT_CACHE_KEY_PREFIX}_${selectedMarket}`
+      localStorage.removeItem(cacheKey)
       const count = results.length
       setResults([])
       setSelectedRows(new Set())
-      showToast(`Cleared cache and removed ${count} stock${count !== 1 ? 's' : ''} from table`)
+      showToast(`Cleared ${selectedMarket} cache and removed ${count} stock${count !== 1 ? 's' : ''} from table`)
     } catch (error) {
       console.error('Failed to clear cache', error)
       showToast('Failed to clear cache')
@@ -801,6 +821,29 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
       {/* Control Panel */}
       <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
         <div className="flex flex-wrap items-end gap-4">
+          {/* Market Selection */}
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Market
+            </label>
+            <div className="flex gap-2">
+              {markets.map(market => (
+                <button
+                  key={market.value}
+                  onClick={() => setSelectedMarket(market.value)}
+                  disabled={scanning}
+                  className={`px-4 py-2 rounded font-medium transition-colors ${
+                    selectedMarket === market.value
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                  } ${scanning ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {market.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Period Selection */}
           <div className="flex-1 min-w-[200px]">
             <label className="block text-sm font-medium text-slate-300 mb-2">
