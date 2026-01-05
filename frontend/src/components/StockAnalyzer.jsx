@@ -99,15 +99,9 @@ function parseStockSymbols(input) {
 }
 
 // Helper function to get the fetch period based on display period
-// Always fetch more data than displayed to enable smooth panning
+// Fetch exactly what's requested - no over-fetching
 function getFetchPeriod(displayDays) {
-  const days = parseInt(displayDays)
-
-  // Always fetch 3x the requested period (capped at 10Y)
-  // This ensures we get full historical data
-  const fetchDays = Math.min(days * 3, 3650)
-
-  return String(fetchDays)
+  return String(displayDays)
 }
 
 function StockAnalyzer({ selectedSymbol, selectedParams }) {
