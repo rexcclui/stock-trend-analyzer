@@ -313,6 +313,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
       // Add all successfully fetched charts
       if (newCharts.length > 0) {
         setCharts(prevCharts => [...newCharts, ...prevCharts])
+      }
 
       // Show errors if any
       if (errors.length > 0) {
