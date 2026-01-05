@@ -731,18 +731,10 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
     // Re-analyze the stock
     const result = await analyzeStock(symbol, days)
 
-    // Add back if it meets criteria
-    if (result && result.dataPoints >= 250 && result.avgVolume >= 100000 && result.avgTxn >= 10000000 && (result.change7d * result.sumDiff) < 0) {
+    // Always keep the stock, just refresh the data (same behavior as Reload All)
+    if (result) {
       setResults(prev => [...prev, result])
       showToast(`${symbol} reloaded successfully`)
-    } else if (result && result.dataPoints < 250) {
-      showToast(`${symbol} removed: insufficient data points (${result.dataPoints})`)
-    } else if (result && result.avgVolume < 100000) {
-      showToast(`${symbol} removed: low average volume (${Math.round(result.avgVolume).toLocaleString()})`)
-    } else if (result && result.avgTxn < 10000000) {
-      showToast(`${symbol} removed: low avg transaction value ($${(result.avgTxn / 1000000).toFixed(2)}M)`)
-    } else if (result && (result.change7d * result.sumDiff) >= 0) {
-      showToast(`${symbol} removed: 7D change and diff have same direction`)
     } else {
       showToast(`${symbol} removed: failed to load data`)
     }
