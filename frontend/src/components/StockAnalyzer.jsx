@@ -314,28 +314,6 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
       if (newCharts.length > 0) {
         setCharts(prevCharts => [...newCharts, ...prevCharts])
 
-        // Set initial zoom to show only the display period (not all fetched data)
-        setTimeout(() => {
-          const displayDaysNum = parseInt(displayDays)
-          const fetchDaysNum = parseInt(fetchDays)
-
-          if (displayDaysNum < fetchDaysNum && newCharts.length > 0) {
-            // We fetched more data than we want to display
-            // Use the first chart's data length to calculate the ratio
-            const actualDataLength = newCharts[0].data.prices.length
-            const displayRatio = displayDaysNum / fetchDaysNum
-
-            // Show only the most recent portion based on the ratio
-            // For example: 1Y/3Y = 0.333, so show the most recent 33.3% of data
-            const startIndex = Math.floor(actualDataLength * (1 - displayRatio))
-            setGlobalZoomRange({ start: startIndex, end: null })
-          } else {
-            // Show all fetched data
-            setGlobalZoomRange({ start: 0, end: null })
-          }
-        }, 100)
-      }
-
       // Show errors if any
       if (errors.length > 0) {
         setError(`Failed to fetch some symbols: ${errors.join(', ')}`)
@@ -1355,29 +1333,6 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
         })
       )
 
-      // After data is loaded, set initial zoom to show only the display period (not all fetched data)
-      // Use the freshly fetched results instead of stale charts state
-      const displayDaysNum = parseInt(displayDays)
-      const fetchDaysNum = parseInt(fetchDays)
-
-      if (displayDaysNum < fetchDaysNum && results.length > 0) {
-        // We fetched more data than we want to display
-        // Use the first result's actual data length to calculate the ratio
-        const firstResult = results[0]
-        if (firstResult && firstResult.data && firstResult.data.prices) {
-          const actualDataLength = firstResult.data.prices.length
-          const displayRatio = displayDaysNum / fetchDaysNum
-
-          // Show only the most recent portion based on the ratio
-          const startIndex = Math.floor(actualDataLength * (1 - displayRatio))
-          setGlobalZoomRange({ start: startIndex, end: null })
-        } else {
-          setGlobalZoomRange({ start: 0, end: null })
-        }
-      } else {
-        // Show all fetched data
-        setGlobalZoomRange({ start: 0, end: null })
-      }
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to update charts.')
     } finally {
