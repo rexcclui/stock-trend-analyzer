@@ -220,6 +220,21 @@ function formatPeriod(days) {
   return `${daysNum}D`
 }
 
+function formatDateRange(startDate, endDate) {
+  if (!startDate || !endDate) return ''
+
+  const formatDate = (dateStr) => {
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  }
+
+  return `${formatDate(startDate)} → ${formatDate(endDate)}`
+}
+
 function formatLastRunTime(isoString) {
   if (!isoString) return 'N/A'
 
@@ -415,12 +430,18 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
 
       const volumeLegend = buildLegend(slots, currentSlotIndex)
 
+      // Get start and end dates from price data
+      const startDate = priceData.length > 0 ? priceData[0]?.date : null
+      const endDate = priceData.length > 0 ? priceData[priceData.length - 1]?.date : null
+
       return {
         symbol,
         market: selectedMarket,
         period: formatPeriod(days),
         days: days, // Keep the numeric days value for V3 Backtest
         dataPoints: priceData.length,
+        startDate,
+        endDate,
         change7d,
         avgTxn,
         avgVolume,
@@ -1192,7 +1213,10 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                         {result.market}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-300">
+                    <td
+                      className="px-4 py-3 text-slate-300 cursor-help"
+                      title={formatDateRange(result.startDate, result.endDate)}
+                    >
                       {result.period}
                     </td>
                     <td className="px-4 py-3 text-slate-300">
