@@ -262,7 +262,7 @@ function isValidSymbol(symbol) {
   return true
 }
 
-function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2BacktestSelect, onVolumeBulkAdd }) {
+function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2BacktestSelect, onVolumeBulkAdd, bulkImport }) {
   const [selectedPeriod, setSelectedPeriod] = useState('1825')
   const [selectedThreshold, setSelectedThreshold] = useState(20)
   const [stockLimit, setStockLimit] = useState(20)
@@ -310,6 +310,41 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
       }
     }
   }, [results])
+
+  // Handle bulk import from other tabs
+  useEffect(() => {
+    if (!bulkImport?.entries || !Array.isArray(bulkImport.entries)) return
+
+    const entries = bulkImport.entries
+    if (entries.length === 0) return
+
+    // Get existing symbols to skip them
+    const existingSymbols = new Set(results.map(r => r.symbol))
+
+    // Add to scan queue
+    const newEntries = entries
+      .filter(entry => !existingSymbols.has(entry.symbol))
+      .map(entry => ({
+        symbol: entry.symbol,
+        days: entry.days || selectedPeriod
+      }))
+
+    if (newEntries.length === 0) {
+      showToast('All imported stocks already in table')
+      return
+    }
+
+    scanQueueRef.current = [...scanQueueRef.current, ...newEntries]
+
+    // Start scanning if not already scanning
+    if (!isScanningRef.current && !scanning) {
+      abortControllerRef.current = new AbortController()
+      setScanning(true)
+      processScanQueue()
+    }
+
+    showToast(`Added ${newEntries.length} stock${newEntries.length !== 1 ? 's' : ''} to scan queue`)
+  }, [bulkImport])
 
   const showToast = (message) => {
     setToastMessage(message)

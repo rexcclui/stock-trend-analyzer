@@ -15,6 +15,7 @@ function App() {
   const [backtestSymbol, setBacktestSymbol] = useState(null)
   const [v3BacktestSymbol, setV3BacktestSymbol] = useState(null)
   const [volumeImport, setVolumeImport] = useState(null)
+  const [filterImport, setFilterImport] = useState(null)
   const [storageUsage, setStorageUsage] = useState(null)
   const [storageQuota, setStorageQuota] = useState(null)
 
@@ -156,6 +157,13 @@ function App() {
     setActiveTab('volume')
   }
 
+  const handleFilterBulkAdd = (entries) => {
+    if (!Array.isArray(entries) || entries.length === 0) return
+
+    setFilterImport({ entries, timestamp: Date.now() })
+    setActiveTab('filtering')
+  }
+
   const handleBacktestSelect = (symbol, days) => {
     setBacktestSymbol({ symbol, days })
     setActiveTab('backtest')
@@ -279,6 +287,7 @@ function App() {
                 onStockSelect={handleStockSelect}
                 onVolumeSelect={handleVolumeSelect}
                 onVolumeBulkAdd={handleVolumeBulkAdd}
+                onFilterBulkAdd={handleFilterBulkAdd}
                 triggerBacktest={v3BacktestSymbol}
                 onBacktestProcessed={() => setV3BacktestSymbol(null)}
               />
@@ -300,6 +309,7 @@ function App() {
                 onAnalyzeWithVolProf={handleAnalyzeWithVolProf}
                 onV2BacktestSelect={handleBacktestSelect}
                 onVolumeBulkAdd={handleVolumeBulkAdd}
+                bulkImport={filterImport}
               />
             </div>
           </div>

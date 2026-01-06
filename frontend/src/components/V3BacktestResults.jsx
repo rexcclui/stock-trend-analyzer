@@ -454,7 +454,7 @@ function optimizeSMAParams(prices, slots, breakouts) {
   return { period: bestSMA, pl: bestPL, totalSignals, winRate }
 }
 
-function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, triggerBacktest, onBacktestProcessed }) {
+function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, onFilterBulkAdd, triggerBacktest, onBacktestProcessed }) {
   const [symbols, setSymbols] = useState('')
   const [days, setDays] = useState(DEFAULT_DAYS) // Default to 5Y
   const [loading, setLoading] = useState(false)
@@ -1828,6 +1828,20 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
     setSelectedRows(new Set())
   }
 
+  const addSelectedToStockFilter = () => {
+    if (!onFilterBulkAdd || selectedRows.size === 0) return
+
+    const selectedEntries = sortedResults
+      .filter(r => selectedRows.has(getEntryKey(r.symbol, r.days)))
+      .map(r => ({ symbol: r.symbol, days: r.days }))
+
+    if (selectedEntries.length === 0) return
+
+    onFilterBulkAdd(selectedEntries)
+    showToast(`Added ${selectedEntries.length} selected stock${selectedEntries.length !== 1 ? 's' : ''} to Stock Filter`)
+    setSelectedRows(new Set())
+  }
+
   const scrollTableToTop = () => {
     if (!tableScrollRef.current) return
     tableScrollRef.current.scrollTo({ top: 0, behavior: 'auto' })
@@ -2374,6 +2388,16 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                           <Download className="w-3.5 h-3.5" />
                         </button>
                       </>
+                    )}
+                    {onFilterBulkAdd && (
+                      <button
+                        onClick={addSelectedToStockFilter}
+                        disabled={selectedRows.size === 0}
+                        className="p-1.5 bg-purple-700 text-white rounded-lg hover:bg-purple-600 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                        title={`Add ${selectedRows.size} selected stock${selectedRows.size !== 1 ? 's' : ''} to Stock Filter`}
+                      >
+                        <Filter className="w-3.5 h-3.5" />
+                      </button>
                     )}
                   </div>
                 )}
