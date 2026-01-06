@@ -534,6 +534,7 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
   const [searchFilter, setSearchFilter] = useState('')
   const [hasHydratedCache, setHasHydratedCache] = useState(() => initialHydratedResultsRef.current !== null)
   const [toastMessage, setToastMessage] = useState('')
+  const [selectedRows, setSelectedRows] = useState(new Set())
   const toastTimeoutRef = useRef(null)
   const activeScanSymbolRef = useRef(null)
   const importInputRef = useRef(null)
@@ -1793,6 +1794,40 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
     onVolumeBulkAdd(uniqueEntries)
   }
 
+  const handleToggleRow = (entryKey) => {
+    setSelectedRows(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(entryKey)) {
+        newSet.delete(entryKey)
+      } else {
+        newSet.add(entryKey)
+      }
+      return newSet
+    })
+  }
+
+  const handleToggleAll = () => {
+    if (selectedRows.size === sortedResults.length) {
+      setSelectedRows(new Set())
+    } else {
+      setSelectedRows(new Set(sortedResults.map(r => getEntryKey(r.symbol, r.days))))
+    }
+  }
+
+  const addSelectedToVolumeScreen = () => {
+    if (!onVolumeBulkAdd || selectedRows.size === 0) return
+
+    const selectedEntries = sortedResults
+      .filter(r => selectedRows.has(getEntryKey(r.symbol, r.days)))
+      .map(r => ({ symbol: r.symbol, days: r.days }))
+
+    if (selectedEntries.length === 0) return
+
+    onVolumeBulkAdd(selectedEntries)
+    showToast(`Added ${selectedEntries.length} selected stock${selectedEntries.length !== 1 ? 's' : ''} to Volume Screen`)
+    setSelectedRows(new Set())
+  }
+
   const scrollTableToTop = () => {
     if (!tableScrollRef.current) return
     tableScrollRef.current.scrollTo({ top: 0, behavior: 'auto' })
@@ -2321,14 +2356,24 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                       <X className="w-3.5 h-3.5" />
                     </button>
                     {onVolumeBulkAdd && (
-                      <button
-                        onClick={addVisibleToVolumeScreen}
-                        disabled={sortedResults.length === 0}
-                        className="p-1.5 bg-cyan-700 text-white rounded-lg hover:bg-cyan-600 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
-                        title="Add all visible rows to Volume Screening without scanning"
-                      >
-                        <Waves className="w-3.5 h-3.5" />
-                      </button>
+                      <>
+                        <button
+                          onClick={addVisibleToVolumeScreen}
+                          disabled={sortedResults.length === 0}
+                          className="p-1.5 bg-cyan-700 text-white rounded-lg hover:bg-cyan-600 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                          title="Add all visible rows to Volume Screening without scanning"
+                        >
+                          <Waves className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={addSelectedToVolumeScreen}
+                          disabled={selectedRows.size === 0}
+                          className="p-1.5 bg-green-700 text-white rounded-lg hover:bg-green-600 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"
+                          title={`Add ${selectedRows.size} selected stock${selectedRows.size !== 1 ? 's' : ''} to Volume Screening`}
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                      </>
                     )}
                   </div>
                 )}
@@ -2479,6 +2524,15 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                 <table className="min-w-full divide-y divide-slate-700">
                   <thead className="bg-slate-900 sticky top-0 z-10">
                     <tr>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-slate-400 uppercase">
+                        <input
+                          type="checkbox"
+                          checked={sortedResults.length > 0 && selectedRows.size === sortedResults.length}
+                          onChange={handleToggleAll}
+                          className="w-4 h-4 cursor-pointer"
+                          title="Select all"
+                        />
+                      </th>
                       <th onClick={() => handleSort('bookmark')} className="px-4 py-3 text-left text-xs font-medium text-slate-400 uppercase cursor-pointer select-none" title="Click to bookmark stocks for quick filtering">
                         <span className="flex items-center gap-1">
                           <Bookmark className="w-4 h-4" />
@@ -2576,6 +2630,14 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, tri
                           className={`transition-colors ${hasData ? 'hover:bg-slate-700 cursor-pointer' : 'opacity-75'} ${isWithinLast10Days ? 'bg-blue-900/20 hover:bg-blue-800/30' : ''}`}
                           title={hasData ? (result.breakoutClosed ? 'Click to view with Vol Prf V3 (breakout closed by sell signal)' : 'Click to view in Technical Analysis with Vol Prf V3 and optimized parameters') : 'Pending scan'}
                         >
+                          <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={selectedRows.has(getEntryKey(result.symbol, result.days))}
+                              onChange={() => handleToggleRow(getEntryKey(result.symbol, result.days))}
+                              className="w-4 h-4 cursor-pointer"
+                            />
+                          </td>
                           <td className="px-4 py-3 text-sm">
                             <button
                               onClick={(e) => {
