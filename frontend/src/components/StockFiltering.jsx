@@ -100,7 +100,10 @@ const normalizeResult = (result) => ({
   currentWeight: toNumber(result?.currentWeight),
   lowerSum: toNumber(result?.lowerSum),
   upperSum: toNumber(result?.upperSum),
-  sumDiff: toNumber(result?.sumDiff)
+  sumDiff: toNumber(result?.sumDiff),
+  lower2Sum: toNumber(result?.lower2Sum),
+  upper2Sum: toNumber(result?.upper2Sum),
+  diff2: toNumber(result?.diff2)
 })
 
 function findSlotIndex(slots, price) {
@@ -210,6 +213,26 @@ function calculateUpperSum(slots, currentIndex) {
   const upperWeight = currentIndex < slots.length - 1 ? (slots[currentIndex + 1]?.weight || 0) : 0
 
   return currentWeight + upperWeight
+}
+
+// Calculate sum of current slot + lower lower slot (2 slots below)
+function calculateLower2Sum(slots, currentIndex) {
+  if (currentIndex < 0 || !Array.isArray(slots)) return 0
+
+  const currentWeight = slots[currentIndex]?.weight || 0
+  const lower2Weight = currentIndex > 1 ? (slots[currentIndex - 2]?.weight || 0) : 0
+
+  return currentWeight + lower2Weight
+}
+
+// Calculate sum of current slot + upper upper slot (2 slots above)
+function calculateUpper2Sum(slots, currentIndex) {
+  if (currentIndex < 0 || !Array.isArray(slots)) return 0
+
+  const currentWeight = slots[currentIndex]?.weight || 0
+  const upper2Weight = currentIndex < slots.length - 2 ? (slots[currentIndex + 2]?.weight || 0) : 0
+
+  return currentWeight + upper2Weight
 }
 
 function formatPeriod(days) {
@@ -459,6 +482,9 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
       const lowerSum = calculateLowerSum(slots, currentSlotIndex)
       const upperSum = calculateUpperSum(slots, currentSlotIndex)
       const sumDiff = upperSum - lowerSum
+      const lower2Sum = calculateLower2Sum(slots, currentSlotIndex)
+      const upper2Sum = calculateUpper2Sum(slots, currentSlotIndex)
+      const diff2 = upper2Sum - lower2Sum
 
       // Check if absolute value of difference meets the threshold
       const matched = Math.abs(sumDiff) >= selectedThreshold
@@ -484,6 +510,9 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
         lowerSum,
         upperSum,
         sumDiff,
+        lower2Sum,
+        upper2Sum,
+        diff2,
         volumeLegend,
         lastPrice,
         matched,
@@ -551,9 +580,9 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
         continue
       }
 
-      // Filter out stocks where 7-day change and diff have the same direction
-      // Only keep stocks with opposite directions (divergence)
-      if (result && (result.change7d * result.sumDiff) >= 0) {
+      // Filter out stocks where 7-day change and BOTH diff and diff2 have the same direction
+      // Keep stocks if at least one diff shows divergence (opposite direction)
+      if (result && (result.change7d * result.sumDiff) >= 0 && (result.change7d * result.diff2) >= 0) {
         filteredBySameDirection++
         continue
       }
@@ -1185,6 +1214,36 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
                   <button
+                    onClick={() => handleSort('lower2Sum')}
+                    className="flex items-center gap-1 hover:text-white transition-colors"
+                    title="Lower 2 Sum: Current slot + lower lower slot volume weight (%)"
+                  >
+                    <ArrowDown className="w-4 h-4" />
+                    <ArrowDown className="w-3 h-3" />
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
+                  <button
+                    onClick={() => handleSort('upper2Sum')}
+                    className="flex items-center gap-1 hover:text-white transition-colors"
+                    title="Upper 2 Sum: Current slot + upper upper slot volume weight (%)"
+                  >
+                    <ArrowUp className="w-4 h-4" />
+                    <ArrowUp className="w-3 h-3" />
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
+                  <button
+                    onClick={() => handleSort('diff2')}
+                    className="flex items-center gap-1 hover:text-white transition-colors"
+                    title="Difference 2 (Upper 2 - Lower 2): Extended volume distribution bias"
+                  >
+                    <ArrowLeftRight className="w-4 h-4" />
+                    <ArrowLeftRight className="w-3 h-3" />
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
+                  <button
                     onClick={() => handleSort('change7d')}
                     className="flex items-center gap-1 hover:text-white transition-colors"
                     title="7-Day Percentage Change: Price change over last 7 trading days"
@@ -1306,6 +1365,36 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                         {result.sumDiff > 0 ? (
                           <ArrowUp className="w-4 h-4 text-blue-500" />
                         ) : result.sumDiff < 0 ? (
+                          <ArrowDown className="w-4 h-4 text-red-500" />
+                        ) : (
+                          <Minus className="w-4 h-4 text-slate-500" />
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="inline-block px-3 py-1 rounded-full text-sm font-medium bg-slate-700 text-white">
+                        {result.lower2Sum.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="inline-block px-3 py-1 rounded-full text-sm font-medium bg-slate-700 text-white">
+                        {result.upper2Sum.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="inline-block px-3 py-1 rounded-full text-sm font-medium"
+                          style={{
+                            backgroundColor: result.diff2 >= 0 ? '#3b82f6' : '#ef4444',
+                            color: '#ffffff'
+                          }}
+                        >
+                          {result.diff2 >= 0 ? '+' : ''}{result.diff2.toFixed(1)}%
+                        </span>
+                        {result.diff2 > 0 ? (
+                          <ArrowUp className="w-4 h-4 text-blue-500" />
+                        ) : result.diff2 < 0 ? (
                           <ArrowDown className="w-4 h-4 text-red-500" />
                         ) : (
                           <Minus className="w-4 h-4 text-slate-500" />
