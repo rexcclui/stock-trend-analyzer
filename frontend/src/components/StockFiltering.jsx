@@ -1372,12 +1372,24 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="inline-block px-3 py-1 rounded-full text-sm font-medium bg-slate-700 text-white">
+                      <span
+                        className="inline-block px-3 py-1 rounded-full text-sm font-medium"
+                        style={{
+                          backgroundColor: result.lower2Sum >= selectedThreshold ? '#22c55e' : '#64748b',
+                          color: '#ffffff'
+                        }}
+                      >
                         {result.lower2Sum.toFixed(1)}%
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="inline-block px-3 py-1 rounded-full text-sm font-medium bg-slate-700 text-white">
+                      <span
+                        className="inline-block px-3 py-1 rounded-full text-sm font-medium"
+                        style={{
+                          backgroundColor: result.upper2Sum >= selectedThreshold ? '#22c55e' : '#64748b',
+                          color: '#ffffff'
+                        }}
+                      >
                         {result.upper2Sum.toFixed(1)}%
                       </span>
                     </td>
