@@ -1289,6 +1289,16 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
                   <button
+                    onClick={() => handleSort('lower2Sum')}
+                    className="flex items-center gap-1 hover:text-white transition-colors"
+                    title="Lower 2 Sum: Current slot + lower lower slot volume weight (%)"
+                  >
+                    <ArrowDown className="w-4 h-4" />
+                    <ArrowDown className="w-3 h-3" />
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
+                  <button
                     onClick={() => handleSort('lowerSum')}
                     className="flex items-center gap-1 hover:text-white transition-colors"
                     title="Lower Sum: Current slot + immediate lower slot volume weight (%)"
@@ -1309,32 +1319,22 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
                   <button
-                    onClick={() => handleSort('sumDiff')}
-                    className="flex items-center gap-1 hover:text-white transition-colors"
-                    title="Difference (Upper - Lower): Indicates volume distribution bias direction"
-                  >
-                    <ArrowLeftRight className="w-4 h-4" />
-                    <ArrowUpDown className="w-3 h-3" />
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
-                  <button
-                    onClick={() => handleSort('lower2Sum')}
-                    className="flex items-center gap-1 hover:text-white transition-colors"
-                    title="Lower 2 Sum: Current slot + lower lower slot volume weight (%)"
-                  >
-                    <ArrowDown className="w-4 h-4" />
-                    <ArrowDown className="w-3 h-3" />
-                  </button>
-                </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
-                  <button
                     onClick={() => handleSort('upper2Sum')}
                     className="flex items-center gap-1 hover:text-white transition-colors"
                     title="Upper 2 Sum: Current slot + upper upper slot volume weight (%)"
                   >
                     <ArrowUp className="w-4 h-4" />
                     <ArrowUp className="w-3 h-3" />
+                  </button>
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
+                  <button
+                    onClick={() => handleSort('sumDiff')}
+                    className="flex items-center gap-1 hover:text-white transition-colors"
+                    title="Difference (Upper - Lower): Indicates volume distribution bias direction"
+                  >
+                    <ArrowLeftRight className="w-4 h-4" />
+                    <ArrowUpDown className="w-3 h-3" />
                   </button>
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
@@ -1438,6 +1438,17 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                       <span
                         className="inline-block px-3 py-1 rounded-full text-sm font-medium"
                         style={{
+                          backgroundColor: result.lower2Sum >= selectedThreshold ? '#22c55e' : '#64748b',
+                          color: '#ffffff'
+                        }}
+                      >
+                        {result.lower2Sum.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className="inline-block px-3 py-1 rounded-full text-sm font-medium"
+                        style={{
                           backgroundColor: result.lowerSum >= selectedThreshold ? '#22c55e' : '#64748b',
                           color: '#ffffff'
                         }}
@@ -1454,6 +1465,17 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                         }}
                       >
                         {result.upperSum.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className="inline-block px-3 py-1 rounded-full text-sm font-medium"
+                        style={{
+                          backgroundColor: result.upper2Sum >= selectedThreshold ? '#22c55e' : '#64748b',
+                          color: '#ffffff'
+                        }}
+                      >
+                        {result.upper2Sum.toFixed(1)}%
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -1475,28 +1497,6 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                           <Minus className="w-4 h-4 text-slate-500" />
                         )}
                       </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className="inline-block px-3 py-1 rounded-full text-sm font-medium"
-                        style={{
-                          backgroundColor: result.lower2Sum >= selectedThreshold ? '#22c55e' : '#64748b',
-                          color: '#ffffff'
-                        }}
-                      >
-                        {result.lower2Sum.toFixed(1)}%
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className="inline-block px-3 py-1 rounded-full text-sm font-medium"
-                        style={{
-                          backgroundColor: result.upper2Sum >= selectedThreshold ? '#22c55e' : '#64748b',
-                          color: '#ffffff'
-                        }}
-                      >
-                        {result.upper2Sum.toFixed(1)}%
-                      </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
