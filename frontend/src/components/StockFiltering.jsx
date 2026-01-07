@@ -290,6 +290,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
   const [selectedThreshold, setSelectedThreshold] = useState(20)
   const [stockLimit, setStockLimit] = useState(20)
   const [selectedMarket, setSelectedMarket] = useState('US')
+  const [specificStockInput, setSpecificStockInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [paused, setPaused] = useState(false)
@@ -696,6 +697,70 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
     setCurrentStock('')
   }
 
+  const handleScanSpecificStocks = async () => {
+    if (!specificStockInput.trim()) {
+      showToast('Please enter stock symbols')
+      return
+    }
+
+    // Parse input (comma or space separated)
+    const symbols = specificStockInput
+      .toUpperCase()
+      .split(/[,\s]+/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0)
+
+    if (symbols.length === 0) {
+      showToast('No valid symbols entered')
+      return
+    }
+
+    setLoading(true)
+    let successCount = 0
+    let failCount = 0
+
+    for (const symbol of symbols) {
+      setCurrentStock(symbol)
+
+      try {
+        const result = await analyzeStock(symbol, selectedPeriod)
+
+        if (result) {
+          // Add to results without filter criteria
+          setResults(prev => {
+            // Check if symbol already exists
+            const existingIndex = prev.findIndex(r => r.symbol === symbol)
+            if (existingIndex >= 0) {
+              // Update existing
+              const updated = [...prev]
+              updated[existingIndex] = result
+              return updated
+            } else {
+              // Add new
+              return [...prev, result]
+            }
+          })
+          successCount++
+        } else {
+          failCount++
+        }
+      } catch (error) {
+        console.error(`Error scanning ${symbol}:`, error)
+        failCount++
+      }
+    }
+
+    setLoading(false)
+    setCurrentStock('')
+    setSpecificStockInput('')
+
+    if (successCount > 0) {
+      showToast(`Added ${successCount} stock${successCount !== 1 ? 's' : ''}${failCount > 0 ? ` (${failCount} failed)` : ''}`)
+    } else {
+      showToast(`Failed to scan stocks`)
+    }
+  }
+
   const handleRemoveResult = (symbol) => {
     setResults(prev => prev.filter(result => result.symbol !== symbol))
   }
@@ -1019,6 +1084,46 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
             )}
           </div>
         </div>
+
+        {/* Specific Stock Input */}
+        <div className="mt-4 flex items-end gap-4">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Scan Specific Stocks (comma or space separated)
+            </label>
+            <input
+              type="text"
+              value={specificStockInput}
+              onChange={(e) => setSpecificStockInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !loading && !scanning) {
+                  handleScanSpecificStocks()
+                }
+              }}
+              disabled={loading || scanning}
+              placeholder="e.g., AAPL, MSFT, GOOGL"
+              className="w-full bg-slate-700 text-white px-4 py-2 rounded border border-slate-600 focus:border-green-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+          </div>
+          <button
+            onClick={handleScanSpecificStocks}
+            disabled={loading || scanning || !specificStockInput.trim()}
+            className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            <Search className="w-4 h-4" />
+            Scan
+          </button>
+        </div>
+
+        {/* Current Stock Indicator for Specific Stock Scan */}
+        {loading && currentStock && (
+          <div className="mt-4">
+            <div className="text-sm text-green-400 font-medium">
+              Currently scanning: <span className="text-white">{currentStock}</span>
+            </div>
+          </div>
+        )}
 
         {/* Progress */}
         {scanning && progress.total > 0 && (
