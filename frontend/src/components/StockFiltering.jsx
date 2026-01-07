@@ -103,7 +103,8 @@ const normalizeResult = (result) => ({
   sumDiff: toNumber(result?.sumDiff),
   lower2Sum: toNumber(result?.lower2Sum),
   upper2Sum: toNumber(result?.upper2Sum),
-  diff2: toNumber(result?.diff2)
+  diff2: toNumber(result?.diff2),
+  useSumDiff: result?.useSumDiff ?? true
 })
 
 function findSlotIndex(slots, price) {
@@ -487,8 +488,13 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
       const upper2Sum = calculateUpper2Sum(slots, currentSlotIndex)
       const diff2 = upper2Sum - lower2Sum
 
-      // Check if absolute value of difference meets the threshold
-      const matched = Math.abs(sumDiff) >= selectedThreshold
+      // Check if absolute value of either difference meets the threshold
+      const sumDiffMeetsThreshold = Math.abs(sumDiff) >= selectedThreshold
+      const diff2MeetsThreshold = Math.abs(diff2) >= selectedThreshold
+      const matched = sumDiffMeetsThreshold || diff2MeetsThreshold
+
+      // Track which diff to use for divergence check (prioritize sumDiff if it passes)
+      const useSumDiff = sumDiffMeetsThreshold
 
       const volumeLegend = buildLegend(slots, currentSlotIndex)
 
@@ -517,6 +523,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
         volumeLegend,
         lastPrice,
         matched,
+        useSumDiff,
         lastRunTime: new Date().toISOString()
       }
     } catch (error) {
@@ -581,11 +588,22 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
         continue
       }
 
-      // Filter out stocks where 7-day change and BOTH diff and diff2 have the same direction
-      // Keep stocks if at least one diff shows divergence (opposite direction)
-      if (result && (result.change7d * result.sumDiff) >= 0 && (result.change7d * result.diff2) >= 0) {
-        filteredBySameDirection++
-        continue
+      // Filter based on divergence: which diff to check depends on which threshold passed
+      // If sumDiff met threshold, check divergence with sumDiff; otherwise check with diff2
+      if (result) {
+        if (result.useSumDiff) {
+          // Filter out if change7d and sumDiff have same direction (no divergence)
+          if ((result.change7d * result.sumDiff) >= 0) {
+            filteredBySameDirection++
+            continue
+          }
+        } else {
+          // Filter out if change7d and diff2 have same direction (no divergence)
+          if ((result.change7d * result.diff2) >= 0) {
+            filteredBySameDirection++
+            continue
+          }
+        }
       }
 
       if (result && result.matched) {
