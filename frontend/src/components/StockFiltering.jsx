@@ -958,7 +958,8 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
     <div className="space-y-6">
       {/* Control Panel */}
       <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
-        <div className="flex flex-wrap items-end gap-4">
+        {/* First Row - Market Selection */}
+        <div className="flex flex-wrap items-end gap-4 mb-4">
           {/* Market Selection */}
           <div className="flex-1 min-w-[200px]">
             <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -980,6 +981,40 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* Second Row - Stock Input and Other Controls */}
+        <div className="flex flex-wrap items-end gap-4">
+          {/* Specific Stock Input */}
+          <div className="flex items-end gap-2">
+            <div className="min-w-[250px]">
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Scan Specific Stocks
+              </label>
+              <input
+                type="text"
+                value={specificStockInput}
+                onChange={(e) => setSpecificStockInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !loading && !scanning) {
+                    handleScanSpecificStocks()
+                  }
+                }}
+                disabled={loading || scanning}
+                placeholder="e.g., AAPL, MSFT, GOOGL"
+                className="w-full bg-slate-700 text-white px-4 py-2 rounded border border-slate-600 focus:border-green-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+              />
+            </div>
+            <button
+              onClick={handleScanSpecificStocks}
+              disabled={loading || scanning || !specificStockInput.trim()}
+              className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+              <Search className="w-4 h-4" />
+              Scan
+            </button>
           </div>
 
           {/* Period Selection */}
@@ -1083,37 +1118,6 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
               </button>
             )}
           </div>
-        </div>
-
-        {/* Specific Stock Input */}
-        <div className="mt-4 flex items-end gap-4">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Scan Specific Stocks (comma or space separated)
-            </label>
-            <input
-              type="text"
-              value={specificStockInput}
-              onChange={(e) => setSpecificStockInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !loading && !scanning) {
-                  handleScanSpecificStocks()
-                }
-              }}
-              disabled={loading || scanning}
-              placeholder="e.g., AAPL, MSFT, GOOGL"
-              className="w-full bg-slate-700 text-white px-4 py-2 rounded border border-slate-600 focus:border-green-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-          </div>
-          <button
-            onClick={handleScanSpecificStocks}
-            disabled={loading || scanning || !specificStockInput.trim()}
-            className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            <Search className="w-4 h-4" />
-            Scan
-          </button>
         </div>
 
         {/* Current Stock Indicator for Specific Stock Scan */}
