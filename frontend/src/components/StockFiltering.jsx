@@ -958,10 +958,9 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
     <div className="space-y-6">
       {/* Control Panel */}
       <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
-        {/* First Row - Market Selection */}
-        <div className="flex flex-wrap items-end gap-4 mb-4">
+        <div className="flex flex-wrap items-end gap-4">
           {/* Market Selection */}
-          <div className="flex-1 min-w-[200px]">
+          <div className="min-w-[200px]">
             <label className="block text-sm font-medium text-slate-300 mb-2">
               Market
             </label>
@@ -982,10 +981,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
               ))}
             </div>
           </div>
-        </div>
 
-        {/* Second Row - Stock Input and Other Controls */}
-        <div className="flex flex-wrap items-end gap-4">
           {/* Specific Stock Input */}
           <div className="flex items-end gap-2">
             <div className="min-w-[250px]">
