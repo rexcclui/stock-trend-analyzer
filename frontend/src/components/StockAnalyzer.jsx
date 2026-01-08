@@ -2382,139 +2382,141 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                         const upperPercent = chart.smaChannelUpperPercent?.[period] ?? 5
                         const lowerPercent = chart.smaChannelLowerPercent?.[period] ?? 5
                         return (
-                          <div key={index} className="flex flex-col gap-2 w-full">
-                            <div className="flex items-center gap-2 bg-slate-700/50 p-2 rounded w-full md:w-[400px]">
-                              <span className="text-sm text-slate-300 w-16">SMA {period}</span>
-                              <button
-                                onMouseDown={() => startSmaButtonHold(chart.id, index, 'decrement')}
-                                onMouseUp={stopSmaButtonHold}
-                                onMouseLeave={stopSmaButtonHold}
-                                onTouchStart={() => startSmaButtonHold(chart.id, index, 'decrement')}
-                                onTouchEnd={stopSmaButtonHold}
-                                disabled={period <= 3 || isSimulating}
-                                className="p-1 text-slate-300 hover:text-white hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                title="Decrease SMA period (hold to repeat)"
-                              >
-                                <Minus className="w-4 h-4" />
-                              </button>
-                              <input
-                                type="range"
-                                min="3"
-                                max="200"
-                                value={period || 10}
-                                onChange={(e) => {
-                                  const rawValue = parseInt(e.target.value)
-                                  const snappedValue = snapToValidSmaValue(rawValue)
-                                  const newPeriods = [...chart.smaPeriods]
-                                  newPeriods[index] = snappedValue
-                                  updateSmaPeriods(chart.id, newPeriods)
-                                }}
-                                disabled={isSimulating}
-                                className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb disabled:opacity-50 disabled:cursor-not-allowed"
-                              />
-                              <button
-                                onMouseDown={() => startSmaButtonHold(chart.id, index, 'increment')}
-                                onMouseUp={stopSmaButtonHold}
-                                onMouseLeave={stopSmaButtonHold}
-                                onTouchStart={() => startSmaButtonHold(chart.id, index, 'increment')}
-                                onTouchEnd={stopSmaButtonHold}
-                                disabled={period >= 200 || isSimulating}
-                                className="p-1 text-slate-300 hover:text-white hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                title="Increase SMA period (hold to repeat)"
-                              >
-                                <Plus className="w-4 h-4" />
-                              </button>
-                              <span className="text-xs text-slate-400 w-8 text-right">{period}</span>
-                              {chart.volumeProfileV2Enabled && (
-                                <button
-                                  onClick={() => {
-                                    setSimulatingSma(prev => ({ ...prev, [smaKey]: index }))
-                                  }}
-                                  disabled={isSimulating}
-                                  className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
-                                    isSimulating
-                                      ? 'bg-yellow-600 text-white cursor-wait'
-                                      : 'bg-blue-600 text-white hover:bg-blue-700'
-                                  }`}
-                                  title="Simulate optimal SMA value based on P&L"
-                                >
-                                  {isSimulating ? (
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                  ) : (
-                                    'Sim'
-                                  )}
-                                </button>
-                              )}
-                              <button
-                                onClick={() => deleteSma(chart.id, period)}
-                                disabled={isSimulating}
-                                className="p-1 text-slate-400 hover:text-red-400 hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                title="Remove SMA"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                            {/* Channel percentage controls */}
-                            <div className="flex gap-2 pl-4">
-                              <div className="flex items-center gap-2 bg-slate-800/50 p-2 rounded flex-1">
-                                <span className="text-xs text-slate-400 w-16">Upper %</span>
-                                <input
-                                  type="range"
-                                  min="0"
-                                  max="50"
-                                  step="0.5"
-                                  value={upperPercent}
-                                  onChange={(e) => {
-                                    updateSmaChannelPercent(chart.id, period, 'upper', parseFloat(e.target.value))
-                                  }}
-                                  className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb"
-                                />
-                                <span className="text-xs text-slate-400 w-10 text-right">{upperPercent.toFixed(1)}%</span>
-                              </div>
-                              <div className="flex items-center gap-2 bg-slate-800/50 p-2 rounded flex-1">
-                                <span className="text-xs text-slate-400 w-16">Lower %</span>
-                                <input
-                                  type="range"
-                                  min="0"
-                                  max="50"
-                                  step="0.5"
-                                  value={lowerPercent}
-                                  onChange={(e) => {
-                                    updateSmaChannelPercent(chart.id, period, 'lower', parseFloat(e.target.value))
-                                  }}
-                                  className="flex-1 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb"
-                                />
-                                <span className="text-xs text-slate-400 w-10 text-right">{lowerPercent.toFixed(1)}%</span>
-                              </div>
+                          <div key={index} className="flex items-center gap-2 bg-slate-700/50 p-2 rounded w-full">
+                            {/* SMA Period Control */}
+                            <span className="text-sm text-slate-300 w-12">SMA</span>
+                            <button
+                              onMouseDown={() => startSmaButtonHold(chart.id, index, 'decrement')}
+                              onMouseUp={stopSmaButtonHold}
+                              onMouseLeave={stopSmaButtonHold}
+                              onTouchStart={() => startSmaButtonHold(chart.id, index, 'decrement')}
+                              onTouchEnd={stopSmaButtonHold}
+                              disabled={period <= 3 || isSimulating}
+                              className="p-1 text-slate-300 hover:text-white hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                              title="Decrease SMA period"
+                            >
+                              <Minus className="w-4 h-4" />
+                            </button>
+                            <input
+                              type="range"
+                              min="3"
+                              max="200"
+                              value={period || 10}
+                              onChange={(e) => {
+                                const rawValue = parseInt(e.target.value)
+                                const snappedValue = snapToValidSmaValue(rawValue)
+                                const newPeriods = [...chart.smaPeriods]
+                                newPeriods[index] = snappedValue
+                                updateSmaPeriods(chart.id, newPeriods)
+                              }}
+                              disabled={isSimulating}
+                              className="w-20 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb disabled:opacity-50 disabled:cursor-not-allowed"
+                            />
+                            <button
+                              onMouseDown={() => startSmaButtonHold(chart.id, index, 'increment')}
+                              onMouseUp={stopSmaButtonHold}
+                              onMouseLeave={stopSmaButtonHold}
+                              onTouchStart={() => startSmaButtonHold(chart.id, index, 'increment')}
+                              onTouchEnd={stopSmaButtonHold}
+                              disabled={period >= 200 || isSimulating}
+                              className="p-1 text-slate-300 hover:text-white hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                              title="Increase SMA period"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                            <span className="text-xs text-slate-400 w-7 text-right">{period}</span>
+
+                            {/* Upper % Control */}
+                            <span className="text-xs text-slate-400 w-10 ml-2">Up%</span>
+                            <input
+                              type="range"
+                              min="0"
+                              max="50"
+                              step="0.5"
+                              value={upperPercent}
+                              onChange={(e) => {
+                                updateSmaChannelPercent(chart.id, period, 'upper', parseFloat(e.target.value))
+                              }}
+                              className="w-20 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb"
+                            />
+                            <span className="text-xs text-slate-400 w-9 text-right">{upperPercent.toFixed(1)}%</span>
+
+                            {/* Lower % Control */}
+                            <span className="text-xs text-slate-400 w-10">Lw%</span>
+                            <input
+                              type="range"
+                              min="0"
+                              max="50"
+                              step="0.5"
+                              value={lowerPercent}
+                              onChange={(e) => {
+                                updateSmaChannelPercent(chart.id, period, 'lower', parseFloat(e.target.value))
+                              }}
+                              className="w-20 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb"
+                            />
+                            <span className="text-xs text-slate-400 w-9 text-right">{lowerPercent.toFixed(1)}%</span>
+
+                            {/* Sim Button */}
+                            <button
+                              onClick={() => {
+                                const chartData = charts.find(c => c.id === chart.id)
+                                if (chartData && chartData.data && chartData.data.prices) {
+                                  // Calculate SMA data
+                                  const prices = chartData.data.prices
+                                  const smaData = []
+                                  for (let i = 0; i < prices.length; i++) {
+                                    if (i < period - 1) {
+                                      smaData.push(null)
+                                    } else {
+                                      let sum = 0
+                                      for (let j = 0; j < period; j++) {
+                                        sum += prices[i - j].close
+                                      }
+                                      smaData.push(sum / period)
+                                    }
+                                  }
+                                  const result = simulateSmaChannelPercent(chart.id, period, prices, smaData)
+                                  updateSmaChannelPercent(chart.id, period, 'upper', result.upper)
+                                  updateSmaChannelPercent(chart.id, period, 'lower', result.lower)
+                                }
+                              }}
+                              className="px-2 py-1 text-xs rounded font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"
+                              title="Simulate optimal channel % to contain 98% of prices"
+                            >
+                              Sim
+                            </button>
+
+                            {/* SMA Value Sim Button (only for Vol Prf V2) */}
+                            {chart.volumeProfileV2Enabled && (
                               <button
                                 onClick={() => {
-                                  const chartData = charts.find(c => c.id === chart.id)
-                                  if (chartData && chartData.data && chartData.data.prices) {
-                                    // Calculate SMA data
-                                    const prices = chartData.data.prices
-                                    const smaData = []
-                                    for (let i = 0; i < prices.length; i++) {
-                                      if (i < period - 1) {
-                                        smaData.push(null)
-                                      } else {
-                                        let sum = 0
-                                        for (let j = 0; j < period; j++) {
-                                          sum += prices[i - j].close
-                                        }
-                                        smaData.push(sum / period)
-                                      }
-                                    }
-                                    const result = simulateSmaChannelPercent(chart.id, period, prices, smaData)
-                                    updateSmaChannelPercent(chart.id, period, 'upper', result.upper)
-                                    updateSmaChannelPercent(chart.id, period, 'lower', result.lower)
-                                  }
+                                  setSimulatingSma(prev => ({ ...prev, [smaKey]: index }))
                                 }}
-                                className="px-3 py-1 text-xs rounded font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"
-                                title="Simulate optimal channel % to contain 98% of prices"
+                                disabled={isSimulating}
+                                className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
+                                  isSimulating
+                                    ? 'bg-yellow-600 text-white cursor-wait'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                                }`}
+                                title="Simulate optimal SMA value based on P&L"
                               >
-                                Sim
+                                {isSimulating ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  'SimV'
+                                )}
                               </button>
-                            </div>
+                            )}
+
+                            {/* Delete Button */}
+                            <button
+                              onClick={() => deleteSma(chart.id, period)}
+                              disabled={isSimulating}
+                              className="p-1 text-slate-400 hover:text-red-400 hover:bg-slate-600 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed ml-1"
+                              title="Remove SMA"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
                           </div>
                         )
                       })}
