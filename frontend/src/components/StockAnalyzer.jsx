@@ -543,22 +543,40 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     }
 
     const tolerance = getTolerance(period)
+    const windowSize = 5 // N days before and after
 
     // Identify turning points (local maxima and minima)
     const turningPoints = []
-    for (let i = 1; i < prices.length - 1; i++) {
+    for (let i = windowSize; i < prices.length - windowSize; i++) {
       if (!smaData[i] || smaData[i] <= 0) continue
 
-      const prev = prices[i - 1].close // Newer data (index i-1)
-      const curr = prices[i].close     // Current data (index i)
-      const next = prices[i + 1].close // Older data (index i+1)
+      const curr = prices[i].close
 
-      // Local maximum (Higher than newer data AND higher than older data)
-      if (curr > prev && curr > next) {
+      // Check if this is a local maximum within the window
+      let isMaximum = true
+      let isMinimum = true
+
+      for (let j = i - windowSize; j <= i + windowSize; j++) {
+        if (j === i) continue // Skip the current point itself
+
+        const comparePrice = prices[j].close
+        if (comparePrice >= curr) {
+          isMaximum = false
+        }
+        if (comparePrice <= curr) {
+          isMinimum = false
+        }
+
+        // Early exit if neither
+        if (!isMaximum && !isMinimum) break
+      }
+
+      // Local maximum (Higher than all points in the N-day window)
+      if (isMaximum) {
         turningPoints.push({ index: i, type: 'max', price: curr, sma: smaData[i] })
       }
-      // Local minimum (Lower than newer data AND lower than older data)
-      else if (curr < prev && curr < next) {
+      // Local minimum (Lower than all points in the N-day window)
+      else if (isMinimum) {
         turningPoints.push({ index: i, type: 'min', price: curr, sma: smaData[i] })
       }
     }
@@ -660,17 +678,34 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
 
       // Count total touches for this configuration
       const tolerance = getTolerance(period)
+      const windowSize = 5 // N days before and after
       const turningPoints = []
-      for (let i = 1; i < prices.length - 1; i++) {
+      for (let i = windowSize; i < prices.length - windowSize; i++) {
         if (!smaData[i] || smaData[i] <= 0) continue
 
-        const prev = prices[i - 1].close
         const curr = prices[i].close
-        const next = prices[i + 1].close
 
-        if (curr > prev && curr > next) {
+        // Check if this is a local maximum/minimum within the window
+        let isMaximum = true
+        let isMinimum = true
+
+        for (let j = i - windowSize; j <= i + windowSize; j++) {
+          if (j === i) continue
+
+          const comparePrice = prices[j].close
+          if (comparePrice >= curr) {
+            isMaximum = false
+          }
+          if (comparePrice <= curr) {
+            isMinimum = false
+          }
+
+          if (!isMaximum && !isMinimum) break
+        }
+
+        if (isMaximum) {
           turningPoints.push({ type: 'max', price: curr, sma: smaData[i] })
-        } else if (curr < prev && curr < next) {
+        } else if (isMinimum) {
           turningPoints.push({ type: 'min', price: curr, sma: smaData[i] })
         }
       }

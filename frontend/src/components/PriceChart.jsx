@@ -2213,19 +2213,36 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       }
 
       const tolerance = getTolerance(period)
+      const windowSize = 5 // N days before and after
       let upperTouches = 0
       let lowerTouches = 0
 
       // Identify turning points and count touches
-      for (let i = 1; i < displayPrices.length - 1; i++) {
+      for (let i = windowSize; i < displayPrices.length - windowSize; i++) {
         if (!smaData[i] || smaData[i] <= 0) continue
 
-        const prev = displayPrices[i - 1].close // Newer (index i-1)
-        const curr = displayPrices[i].close     // Current (index i)
-        const next = displayPrices[i + 1].close // Older (index i+1)
+        const curr = displayPrices[i].close
+
+        // Check if this is a local maximum/minimum within the window
+        let isMaximum = true
+        let isMinimum = true
+
+        for (let j = i - windowSize; j <= i + windowSize; j++) {
+          if (j === i) continue
+
+          const comparePrice = displayPrices[j].close
+          if (comparePrice >= curr) {
+            isMaximum = false
+          }
+          if (comparePrice <= curr) {
+            isMinimum = false
+          }
+
+          if (!isMaximum && !isMinimum) break
+        }
 
         // Local maximum - check upper bound
-        if (curr > prev && curr > next && upperPercent > 0) {
+        if (isMaximum && upperPercent > 0) {
           const upperBound = smaData[i] * (1 + upperPercent / 100)
           const variance = Math.abs(upperBound - curr) / curr * 100
           if (variance <= tolerance) {
@@ -2233,7 +2250,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           }
         }
         // Local minimum - check lower bound
-        else if (curr < prev && curr < next && lowerPercent > 0) {
+        else if (isMinimum && lowerPercent > 0) {
           const lowerBound = smaData[i] * (1 - lowerPercent / 100)
           const variance = Math.abs(lowerBound - curr) / curr * 100
           if (variance <= tolerance) {
@@ -3475,16 +3492,33 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       }
 
       const tolerance = getTolerance(period)
+      const windowSize = 5 // N days before and after
 
-      for (let i = 1; i < visibleChartData.length - 1; i++) {
+      for (let i = windowSize; i < visibleChartData.length - windowSize; i++) {
         const smaValue = visibleChartData[i]?.[smaKey]
         if (!smaValue || smaValue <= 0) continue
 
-        const prev = visibleChartData[i - 1].close
         const curr = visibleChartData[i].close
-        const next = visibleChartData[i + 1].close
 
-        if (curr > prev && curr > next && upperPercent > 0) {
+        // Check if this is a local maximum/minimum within the window
+        let isMaximum = true
+        let isMinimum = true
+
+        for (let j = i - windowSize; j <= i + windowSize; j++) {
+          if (j === i) continue
+
+          const comparePrice = visibleChartData[j].close
+          if (comparePrice >= curr) {
+            isMaximum = false
+          }
+          if (comparePrice <= curr) {
+            isMinimum = false
+          }
+
+          if (!isMaximum && !isMinimum) break
+        }
+
+        if (isMaximum && upperPercent > 0) {
           const upperBound = smaValue * (1 + upperPercent / 100)
           const variance = Math.abs(upperBound - curr) / curr * 100
           if (variance <= tolerance) {
@@ -3495,7 +3529,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               period
             })
           }
-        } else if (curr < prev && curr < next && lowerPercent > 0) {
+        } else if (isMinimum && lowerPercent > 0) {
           const lowerBound = smaValue * (1 - lowerPercent / 100)
           const variance = Math.abs(lowerBound - curr) / curr * 100
           if (variance <= tolerance) {
