@@ -2498,7 +2498,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                 <div className="bg-slate-800 p-2 md:p-6 rounded-lg border-0 md:border md:border-slate-700">
                   <h3 className="text-lg font-semibold mb-4 text-slate-100">Statistics</h3>
                   <StatisticsCharts
-                    stockData={chart.data.history}
+                    stockData={chart.data.prices}
                     zoomRange={globalZoomRange}
                   />
                 </div>

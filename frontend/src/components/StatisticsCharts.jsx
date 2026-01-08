@@ -13,6 +13,15 @@ function StatisticsCharts({ stockData, zoomRange }) {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
 
+  // Safety check: return early if no data
+  if (!stockData || !Array.isArray(stockData) || stockData.length === 0) {
+    return (
+      <div className="text-center text-slate-400 py-8">
+        No data available for statistics
+      </div>
+    )
+  }
+
   // Prepare data: reverse to chronological order and apply zoom range
   const chartData = stockData.slice().reverse()
   const endIndex = zoomRange.end === null ? chartData.length : zoomRange.end
