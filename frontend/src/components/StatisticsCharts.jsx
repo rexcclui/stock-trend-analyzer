@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 
 function StatisticsCharts({ stockData, zoomRange }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const [activeTab, setActiveTab] = useState('weekday')
 
   // Track window resize for mobile detection
   useEffect(() => {
@@ -137,14 +138,24 @@ function StatisticsCharts({ stockData, zoomRange }) {
   const yearStats = groupByYear()
   const monthWeekStats = groupByMonthWeek()
 
-  // Chart configurations
-  const chartGroups = [
-    { title: 'By Weekday', data: weekdayStats },
-    { title: 'By Quarter', data: quarterStats },
-    { title: 'By Month', data: monthStats },
-    { title: 'By Year', data: yearStats },
-    { title: "By Month's Week", data: monthWeekStats }
+  // Chart configurations with tabs
+  const chartGroups = {
+    weekday: { id: 'weekday', title: 'Weekday', data: weekdayStats },
+    quarter: { id: 'quarter', title: 'Quarter', data: quarterStats },
+    month: { id: 'month', title: 'Month', data: monthStats },
+    year: { id: 'year', title: 'Year', data: yearStats },
+    monthWeek: { id: 'monthWeek', title: "Month's Week", data: monthWeekStats }
+  }
+
+  const tabs = [
+    { id: 'weekday', label: 'Weekday' },
+    { id: 'quarter', label: 'Quarter' },
+    { id: 'month', label: 'Month' },
+    { id: 'year', label: 'Year' },
+    { id: 'monthWeek', label: "Month's Week" }
   ]
+
+  const activeGroup = chartGroups[activeTab]
 
   // Custom tooltip
   const CustomTooltip = ({ active, payload, label }) => {
@@ -204,20 +215,34 @@ function StatisticsCharts({ stockData, zoomRange }) {
   const minColors = ['#ef4444', '#f87171', '#fca5a5', '#fecaca', '#fee2e2', '#fb7185', '#fda4af']
 
   return (
-    <div className="space-y-8">
-      {chartGroups.map((group, groupIndex) => (
-        <div key={groupIndex}>
-          <h4 className="text-lg font-semibold mb-4 text-slate-100">{group.title}</h4>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            {renderChart(`Count`, group.data, 'count', 'Count', countColors)}
-            {renderChart(`Avg % Change`, group.data, 'avgChange', '%', avgColors)}
-            {renderChart(`Max % Change`, group.data, 'maxChange', '%', maxColors)}
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
-            {renderChart(`Min % Change`, group.data, 'minChange', '%', minColors)}
-          </div>
+    <div className="space-y-6">
+      {/* Tab Navigation */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              activeTab === tab.id
+                ? 'bg-purple-600 text-white'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Charts - 4 per row */}
+      <div>
+        <h4 className="text-lg font-semibold mb-4 text-slate-100">Group by {activeGroup.title}</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {renderChart(`Count`, activeGroup.data, 'count', 'Count', countColors)}
+          {renderChart(`Avg % Change`, activeGroup.data, 'avgChange', '%', avgColors)}
+          {renderChart(`Max % Change`, activeGroup.data, 'maxChange', '%', maxColors)}
+          {renderChart(`Min % Change`, activeGroup.data, 'minChange', '%', minColors)}
         </div>
-      ))}
+      </div>
     </div>
   )
 }
