@@ -2185,6 +2185,66 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return cache
   }, [displayPrices, smaPeriods])
 
+  // Helper function to get tolerance based on SMA period
+  const getTolerance = (smaPeriod) => {
+    if (smaPeriod < 10) return 1
+    if (smaPeriod < 15) return 2
+    if (smaPeriod < 20) return 3
+    if (smaPeriod < 30) return 4
+    if (smaPeriod < 40) return 5
+    return 5
+  }
+
+  // Calculate SMA touch points for display
+  const smaTouchPoints = useMemo(() => {
+    const touchData = {}
+
+    smaPeriods.forEach(period => {
+      const smaData = smaCache[period]
+      const upperPercent = smaChannelUpperPercent?.[period] ?? 0
+      const lowerPercent = smaChannelLowerPercent?.[period] ?? 0
+
+      if (!smaData || upperPercent === 0 && lowerPercent === 0) {
+        touchData[period] = { upper: 0, lower: 0 }
+        return
+      }
+
+      const tolerance = getTolerance(period)
+      let upperTouches = 0
+      let lowerTouches = 0
+
+      // Identify turning points and count touches
+      for (let i = 1; i < displayPrices.length - 1; i++) {
+        if (!smaData[i] || smaData[i] <= 0) continue
+
+        const prev = displayPrices[i - 1].close
+        const curr = displayPrices[i].close
+        const next = displayPrices[i + 1].close
+
+        // Local maximum - check upper bound
+        if (curr > prev && curr > next && upperPercent > 0) {
+          const upperBound = smaData[i] * (1 + upperPercent / 100)
+          const variance = Math.abs(upperBound - curr) / curr * 100
+          if (variance <= tolerance) {
+            upperTouches++
+          }
+        }
+        // Local minimum - check lower bound
+        else if (curr < prev && curr < next && lowerPercent > 0) {
+          const lowerBound = smaData[i] * (1 - lowerPercent / 100)
+          const variance = Math.abs(lowerBound - curr) / curr * 100
+          if (variance <= tolerance) {
+            lowerTouches++
+          }
+        }
+      }
+
+      touchData[period] = { upper: upperTouches, lower: lowerTouches }
+    })
+
+    return touchData
+  }, [displayPrices, smaCache, smaPeriods, smaChannelUpperPercent, smaChannelLowerPercent])
+
   // Build a map of SPY volumes by date for quick lookup
   const spyVolumeByDate = (() => {
     if (!volumeColorEnabled || volumeColorMode !== 'relative-spy' || !spyData) return {}
@@ -5373,6 +5433,78 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
             {/* Volume Profile Horizontal Bars */}
             <Customized component={CustomVolumeProfile} />
+
+            {/* SMA Touch Point Statistics - Top Left Display */}
+            {smaPeriods.length > 0 && (
+              <Customized component={(props) => {
+                const { offset } = props
+                if (!offset) return null
+
+                return (
+                  <g>
+                    {smaPeriods.map((period, idx) => {
+                      const touchData = smaTouchPoints[period]
+                      const upperPercent = smaChannelUpperPercent?.[period] ?? 0
+                      const lowerPercent = smaChannelLowerPercent?.[period] ?? 0
+                      const isVisible = smaVisibility[period]
+
+                      if (!isVisible || (upperPercent === 0 && lowerPercent === 0)) return null
+
+                      const yPos = offset.top + 10 + (idx * 40)
+                      const xPos = offset.left + 10
+
+                      return (
+                        <g key={period}>
+                          {/* Background */}
+                          <rect
+                            x={xPos}
+                            y={yPos}
+                            width={180}
+                            height={35}
+                            fill="rgba(30, 41, 59, 0.85)"
+                            stroke="rgba(148, 163, 184, 0.3)"
+                            strokeWidth={1}
+                            rx={4}
+                          />
+                          {/* SMA Period */}
+                          <text
+                            x={xPos + 8}
+                            y={yPos + 15}
+                            fill="#94a3b8"
+                            fontSize="12"
+                            fontWeight="600"
+                          >
+                            SMA {period}
+                          </text>
+                          {/* Upper Touches */}
+                          {upperPercent > 0 && (
+                            <text
+                              x={xPos + 8}
+                              y={yPos + 28}
+                              fill="#22c55e"
+                              fontSize="10"
+                            >
+                              ↑ {touchData.upper} ({upperPercent.toFixed(1)}%)
+                            </text>
+                          )}
+                          {/* Lower Touches */}
+                          {lowerPercent > 0 && (
+                            <text
+                              x={xPos + 90}
+                              y={yPos + 28}
+                              fill="#ef4444"
+                              fontSize="10"
+                            >
+                              ↓ {touchData.lower} ({lowerPercent.toFixed(1)}%)
+                            </text>
+                          )}
+                        </g>
+                      )
+                    })}
+                  </g>
+                )
+              }} />
+            )}
 
             {/* Manual Channel Selection Rectangle */}
             {manualChannelEnabled && manualChannelDragMode && isSelecting && selectionStart && selectionEnd && (
