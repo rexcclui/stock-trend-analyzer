@@ -2217,9 +2217,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       for (let i = 1; i < displayPrices.length - 1; i++) {
         if (!smaData[i] || smaData[i] <= 0) continue
 
-        const prev = displayPrices[i - 1].close
-        const curr = displayPrices[i].close
-        const next = displayPrices[i + 1].close
+        const prev = displayPrices[i - 1].close // Newer (index i-1)
+        const curr = displayPrices[i].close     // Current (index i)
+        const next = displayPrices[i + 1].close // Older (index i+1)
 
         // Local maximum - check upper bound
         if (curr > prev && curr > next && upperPercent > 0) {
@@ -3398,58 +3398,58 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
           // Inject comparison data into each visible point
           data = data.map((point, index) => {
-          const compCurrentPrice = compPriceByDate[point.date]
+            const compCurrentPrice = compPriceByDate[point.date]
 
-          if (!compCurrentPrice || !point.close) {
-            return point
-          }
-
-          // Historical % change from baseline (first visible point)
-          const selectedHistPctChg = (point.close - selectedFirstPrice) / selectedFirstPrice
-          const compHistPctChg = (compCurrentPrice - compFirstPrice) / compFirstPrice
-
-          // Performance difference
-          const perfDiffPct = compHistPctChg - selectedHistPctChg
-
-          // Comparison line value
-          const lineValue = (perfDiffPct + 1) * point.close
-
-          // Add comparison data to this point
-          const compPriceKey = `compPrice_${compStock.symbol}`
-          const compPerfKey = `compPerf_${compStock.symbol}`
-          const compPositiveKey = `compPos_${compStock.symbol}` // Blue: above
-          const compNegativeKey = `compNeg_${compStock.symbol}` // Red: below
-
-          // Determine if line is above or below
-          const isAbove = lineValue > point.close
-
-          // Check if this is a crossover point by looking at previous point
-          let isCrossover = false
-          if (index > 0) {
-            const prevPoint = data[index - 1]
-            const prevCompPrice = compPriceByDate[prevPoint.date]
-
-            if (prevCompPrice && prevPoint.close) {
-              const prevSelectedHistPctChg = (prevPoint.close - selectedFirstPrice) / selectedFirstPrice
-              const prevCompHistPctChg = (prevCompPrice - compFirstPrice) / compFirstPrice
-              const prevPerfDiffPct = prevCompHistPctChg - prevSelectedHistPctChg
-              const prevLineValue = (prevPerfDiffPct + 1) * prevPoint.close
-              const prevIsAbove = prevLineValue > prevPoint.close
-
-              // Crossover detected if direction changed
-              isCrossover = isAbove !== prevIsAbove
+            if (!compCurrentPrice || !point.close) {
+              return point
             }
-          }
 
-          // At crossover points, set BOTH values to ensure continuity
-          // Otherwise, set only one value
-          return {
-            ...point,
-            [compPriceKey]: compCurrentPrice,
-            [compPerfKey]: perfDiffPct * 100,
-            [compPositiveKey]: (isAbove || isCrossover) ? lineValue : null,
-            [compNegativeKey]: (!isAbove || isCrossover) ? lineValue : null
-          }
+            // Historical % change from baseline (first visible point)
+            const selectedHistPctChg = (point.close - selectedFirstPrice) / selectedFirstPrice
+            const compHistPctChg = (compCurrentPrice - compFirstPrice) / compFirstPrice
+
+            // Performance difference
+            const perfDiffPct = compHistPctChg - selectedHistPctChg
+
+            // Comparison line value
+            const lineValue = (perfDiffPct + 1) * point.close
+
+            // Add comparison data to this point
+            const compPriceKey = `compPrice_${compStock.symbol}`
+            const compPerfKey = `compPerf_${compStock.symbol}`
+            const compPositiveKey = `compPos_${compStock.symbol}` // Blue: above
+            const compNegativeKey = `compNeg_${compStock.symbol}` // Red: below
+
+            // Determine if line is above or below
+            const isAbove = lineValue > point.close
+
+            // Check if this is a crossover point by looking at previous point
+            let isCrossover = false
+            if (index > 0) {
+              const prevPoint = data[index - 1]
+              const prevCompPrice = compPriceByDate[prevPoint.date]
+
+              if (prevCompPrice && prevPoint.close) {
+                const prevSelectedHistPctChg = (prevPoint.close - selectedFirstPrice) / selectedFirstPrice
+                const prevCompHistPctChg = (prevCompPrice - compFirstPrice) / compFirstPrice
+                const prevPerfDiffPct = prevCompHistPctChg - prevSelectedHistPctChg
+                const prevLineValue = (prevPerfDiffPct + 1) * prevPoint.close
+                const prevIsAbove = prevLineValue > prevPoint.close
+
+                // Crossover detected if direction changed
+                isCrossover = isAbove !== prevIsAbove
+              }
+            }
+
+            // At crossover points, set BOTH values to ensure continuity
+            // Otherwise, set only one value
+            return {
+              ...point,
+              [compPriceKey]: compCurrentPrice,
+              [compPerfKey]: perfDiffPct * 100,
+              [compPositiveKey]: (isAbove || isCrossover) ? lineValue : null,
+              [compNegativeKey]: (!isAbove || isCrossover) ? lineValue : null
+            }
           })
         })
       }
@@ -4887,388 +4887,388 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         </div>
       ) : (
         <>
-      {/* Last Channel Controls Panel */}
-      {slopeChannelEnabled && slopeChannelInfo && onSlopeChannelParamsChange && controlsVisible && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '60px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'rgba(30, 41, 59, 0.95)',
-            border: '1px solid rgb(71, 85, 105)',
-            borderRadius: '8px',
-            padding: '12px',
-            zIndex: 10,
-            minWidth: '280px',
-            backdropFilter: 'blur(4px)'
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '600', color: 'rgb(226, 232, 240)' }}>
-              Channel Controls
-            </div>
-            <button
-              onClick={() => setControlsVisible(false)}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                color: 'rgb(148, 163, 184)',
-                padding: '2px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: '4px',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(71, 85, 105, 0.5)'
-                e.currentTarget.style.color = 'rgb(226, 232, 240)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent'
-                e.currentTarget.style.color = 'rgb(148, 163, 184)'
-              }}
-              title="Hide controls"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Manual Parameter Controls */}
-          <div style={{ marginBottom: '12px' }}>
-            {/* Lookback Slider */}
-            <div style={{ marginBottom: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <label style={{ fontSize: '11px', color: 'rgb(203, 213, 225)', fontWeight: '500' }}>
-                  Lookback Period
-                </label>
-                <span style={{ fontSize: '11px', color: 'rgb(139, 92, 246)', fontFamily: 'monospace', fontWeight: '600' }}>
-                  {slopeChannelInfo.recentDataCount} pts
-                </span>
-              </div>
-              <input
-                type="range"
-                min="100"
-                max={dataLength}
-                step="1"
-                value={slopeChannelInfo.recentDataCount}
-                onChange={(e) => {
-                  const newCount = parseInt(e.target.value)
-                  setOptimizedLookbackCount(newCount)
-                }}
-                style={{
-                  width: '100%',
-                  height: '4px',
-                  borderRadius: '2px',
-                  outline: 'none',
-                  background: `linear-gradient(to right, rgb(139, 92, 246) 0%, rgb(139, 92, 246) ${((slopeChannelInfo.recentDataCount - 100) / (dataLength - 100)) * 100}%, rgb(71, 85, 105) ${((slopeChannelInfo.recentDataCount - 100) / (dataLength - 100)) * 100}%, rgb(71, 85, 105) 100%)`,
-                  cursor: 'pointer'
-                }}
-              />
-            </div>
-
-            {/* StdDev Width Slider */}
-            <div style={{ marginBottom: '12px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                <label style={{ fontSize: '11px', color: 'rgb(203, 213, 225)', fontWeight: '500' }}>
-                  Channel Width
-                </label>
-                <span style={{ fontSize: '11px', color: 'rgb(139, 92, 246)', fontFamily: 'monospace', fontWeight: '600' }}>
-                  {slopeChannelInfo.optimalStdevMult.toFixed(2)}σ
-                </span>
-              </div>
-              <input
-                type="range"
-                min="1.0"
-                max="4.0"
-                step="0.1"
-                value={slopeChannelInfo.optimalStdevMult}
-                onChange={(e) => {
-                  const newMult = parseFloat(e.target.value)
-                  setOptimizedStdevMult(newMult)
-                }}
-                style={{
-                  width: '100%',
-                  height: '4px',
-                  borderRadius: '2px',
-                  outline: 'none',
-                  background: `linear-gradient(to right, rgb(139, 92, 246) 0%, rgb(139, 92, 246) ${((slopeChannelInfo.optimalStdevMult - 1) / 3) * 100}%, rgb(71, 85, 105) ${((slopeChannelInfo.optimalStdevMult - 1) / 3) * 100}%, rgb(71, 85, 105) 100%)`,
-                  cursor: 'pointer'
-                }}
-              />
-            </div>
-
-            {/* Find Best Fit Button */}
-            <button
-              onClick={() => {
-                // Trigger re-optimization by clearing stored params
-                setOptimizedLookbackCount(null)
-                setOptimizedStdevMult(null)
-              }}
-              style={{
-                width: '100%',
-                padding: '8px',
-                background: 'rgb(139, 92, 246)',
-                border: 'none',
-                borderRadius: '6px',
-                color: 'rgb(226, 232, 240)',
-                fontSize: '11px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgb(124, 58, 237)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgb(139, 92, 246)'
-              }}
-            >
-              Find Best Fit
-            </button>
-          </div>
-
-          {/* Channel Statistics */}
-          <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgb(71, 85, 105)' }}>
-            <div style={{ fontSize: '10px', color: 'rgb(148, 163, 184)', lineHeight: '1.4' }}>
-              <div>Touches: {slopeChannelInfo.touchCount} ({((slopeChannelInfo.touchCount / slopeChannelInfo.recentDataCount) * 100).toFixed(1)}%)</div>
-              <div>Outside: {slopeChannelInfo.percentOutside}% (target: ≤5%)</div>
-              <div>R²: {(slopeChannelInfo.rSquared * 100).toFixed(1)}%</div>
-              {slopeChannelVolumeWeighted && (
-                <div style={{ color: 'rgb(139, 92, 246)', fontWeight: '600' }}>Volume Weighted (bottom 20% ignored)</div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {revAllChannelEnabled && revAllVisibleLength > 1 && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '4px',
-            left: 0,
-            right: 0,
-            padding: '0 16px',
-            zIndex: 7,
-            pointerEvents: 'none'
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              width: '100%',
-              background: 'rgba(30, 41, 59, 0.75)',
-              border: '1px solid rgba(148, 163, 184, 0.3)',
-              borderRadius: '8px',
-              padding: '6px 10px',
-              backdropFilter: 'blur(4px)',
-              boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
-              pointerEvents: 'auto'
-            }}
-          >
-            <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>Rev End</span>
-            <input
-              type="range"
-              min={0}
-              max={maxRevAllChannelEndIndex}
-              value={effectiveRevAllChannelEndIndex}
-              onChange={(e) => onRevAllChannelEndChange && onRevAllChannelEndChange(parseInt(e.target.value, 10))}
-              style={{
-                flex: 1,
-                height: '6px',
-                accentColor: '#6366f1',
-                cursor: 'pointer'
-              }}
-            />
-            <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600, minWidth: '80px', textAlign: 'right' }}>
-              {revAllChannelEndDate || '...'}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Volume Profile V2 Dual-Handle Range Slider */}
-      {volumeProfileV2Enabled && (() => {
-        const reversedDisplayPrices = [...displayPrices].reverse()
-        const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
-        const maxIndex = visibleData.length
-
-        // Convert stored dates to current visible indices
-        let effectiveStartIndex = 0
-        let effectiveEndIndex = maxIndex
-
-        if (volumeProfileV2StartDate !== null) {
-          const startIdx = visibleData.findIndex(d => d.date === volumeProfileV2StartDate)
-          if (startIdx !== -1) {
-            effectiveStartIndex = startIdx
-          }
-          // If not found, use default (0)
-        }
-
-        if (volumeProfileV2EndDate !== null) {
-          const endIdx = visibleData.findIndex(d => d.date === volumeProfileV2EndDate)
-          if (endIdx !== -1) {
-            effectiveEndIndex = endIdx + 1
-          }
-          // If not found, use default (maxIndex)
-        }
-
-        const startDate = visibleData[effectiveStartIndex]?.date || '...'
-        const endDate = visibleData[effectiveEndIndex - 1]?.date || '...'
-
-        if (maxIndex <= 1) return null
-
-        const topOffset = revAllChannelEnabled && revAllVisibleLength > 1 ? '46px' : '4px'
-
-        return (
-          <div
-            style={{
-              position: 'absolute',
-              top: topOffset,
-              left: '60px', // Align with chart left edge (Y-axis width)
-              right: '20px', // Align with chart right edge
-              zIndex: 7,
-              pointerEvents: 'none'
-            }}
-          >
+          {/* Last Channel Controls Panel */}
+          {slopeChannelEnabled && slopeChannelInfo && onSlopeChannelParamsChange && controlsVisible && (
             <div
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                width: '100%',
-                background: 'rgba(30, 41, 59, 0.75)',
-                border: '1px solid rgba(148, 163, 184, 0.3)',
+                position: 'absolute',
+                bottom: '60px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: 'rgba(30, 41, 59, 0.95)',
+                border: '1px solid rgb(71, 85, 105)',
                 borderRadius: '8px',
-                padding: '6px 10px',
-                backdropFilter: 'blur(4px)',
-                boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
-                pointerEvents: 'auto'
+                padding: '12px',
+                zIndex: 10,
+                minWidth: '280px',
+                backdropFilter: 'blur(4px)'
               }}
             >
-              <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>Vol V2 Range</span>
-
-              {/* Date range popup - shown while dragging */}
-              {volV2SliderDragging && (
-                <div style={{
-                  position: 'absolute',
-                  top: '-35px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  background: 'rgba(15, 23, 42, 0.95)',
-                  border: '1px solid rgba(148, 163, 184, 0.5)',
-                  borderRadius: '6px',
-                  padding: '4px 12px',
-                  fontSize: '11px',
-                  color: '#e2e8f0',
-                  fontWeight: 600,
-                  whiteSpace: 'nowrap',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-                  zIndex: 10
-                }}>
-                  {startDate} → {endDate}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '600', color: 'rgb(226, 232, 240)' }}>
+                  Channel Controls
                 </div>
-              )}
+                <button
+                  onClick={() => setControlsVisible(false)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'rgb(148, 163, 184)',
+                    padding: '2px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '4px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(71, 85, 105, 0.5)'
+                    e.currentTarget.style.color = 'rgb(226, 232, 240)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'transparent'
+                    e.currentTarget.style.color = 'rgb(148, 163, 184)'
+                  }}
+                  title="Hide controls"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
 
-              {/* Dual-handle range slider container */}
-              <div style={{ flex: 1, position: 'relative', height: '24px', display: 'flex', alignItems: 'center' }}>
-                {/* Background track */}
-                <div style={{
-                  position: 'absolute',
+              {/* Manual Parameter Controls */}
+              <div style={{ marginBottom: '12px' }}>
+                {/* Lookback Slider */}
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <label style={{ fontSize: '11px', color: 'rgb(203, 213, 225)', fontWeight: '500' }}>
+                      Lookback Period
+                    </label>
+                    <span style={{ fontSize: '11px', color: 'rgb(139, 92, 246)', fontFamily: 'monospace', fontWeight: '600' }}>
+                      {slopeChannelInfo.recentDataCount} pts
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="100"
+                    max={dataLength}
+                    step="1"
+                    value={slopeChannelInfo.recentDataCount}
+                    onChange={(e) => {
+                      const newCount = parseInt(e.target.value)
+                      setOptimizedLookbackCount(newCount)
+                    }}
+                    style={{
+                      width: '100%',
+                      height: '4px',
+                      borderRadius: '2px',
+                      outline: 'none',
+                      background: `linear-gradient(to right, rgb(139, 92, 246) 0%, rgb(139, 92, 246) ${((slopeChannelInfo.recentDataCount - 100) / (dataLength - 100)) * 100}%, rgb(71, 85, 105) ${((slopeChannelInfo.recentDataCount - 100) / (dataLength - 100)) * 100}%, rgb(71, 85, 105) 100%)`,
+                      cursor: 'pointer'
+                    }}
+                  />
+                </div>
+
+                {/* StdDev Width Slider */}
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <label style={{ fontSize: '11px', color: 'rgb(203, 213, 225)', fontWeight: '500' }}>
+                      Channel Width
+                    </label>
+                    <span style={{ fontSize: '11px', color: 'rgb(139, 92, 246)', fontFamily: 'monospace', fontWeight: '600' }}>
+                      {slopeChannelInfo.optimalStdevMult.toFixed(2)}σ
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1.0"
+                    max="4.0"
+                    step="0.1"
+                    value={slopeChannelInfo.optimalStdevMult}
+                    onChange={(e) => {
+                      const newMult = parseFloat(e.target.value)
+                      setOptimizedStdevMult(newMult)
+                    }}
+                    style={{
+                      width: '100%',
+                      height: '4px',
+                      borderRadius: '2px',
+                      outline: 'none',
+                      background: `linear-gradient(to right, rgb(139, 92, 246) 0%, rgb(139, 92, 246) ${((slopeChannelInfo.optimalStdevMult - 1) / 3) * 100}%, rgb(71, 85, 105) ${((slopeChannelInfo.optimalStdevMult - 1) / 3) * 100}%, rgb(71, 85, 105) 100%)`,
+                      cursor: 'pointer'
+                    }}
+                  />
+                </div>
+
+                {/* Find Best Fit Button */}
+                <button
+                  onClick={() => {
+                    // Trigger re-optimization by clearing stored params
+                    setOptimizedLookbackCount(null)
+                    setOptimizedStdevMult(null)
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '8px',
+                    background: 'rgb(139, 92, 246)',
+                    border: 'none',
+                    borderRadius: '6px',
+                    color: 'rgb(226, 232, 240)',
+                    fontSize: '11px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgb(124, 58, 237)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgb(139, 92, 246)'
+                  }}
+                >
+                  Find Best Fit
+                </button>
+              </div>
+
+              {/* Channel Statistics */}
+              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgb(71, 85, 105)' }}>
+                <div style={{ fontSize: '10px', color: 'rgb(148, 163, 184)', lineHeight: '1.4' }}>
+                  <div>Touches: {slopeChannelInfo.touchCount} ({((slopeChannelInfo.touchCount / slopeChannelInfo.recentDataCount) * 100).toFixed(1)}%)</div>
+                  <div>Outside: {slopeChannelInfo.percentOutside}% (target: ≤5%)</div>
+                  <div>R²: {(slopeChannelInfo.rSquared * 100).toFixed(1)}%</div>
+                  {slopeChannelVolumeWeighted && (
+                    <div style={{ color: 'rgb(139, 92, 246)', fontWeight: '600' }}>Volume Weighted (bottom 20% ignored)</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {revAllChannelEnabled && revAllVisibleLength > 1 && (
+            <div
+              style={{
+                position: 'absolute',
+                top: '4px',
+                left: 0,
+                right: 0,
+                padding: '0 16px',
+                zIndex: 7,
+                pointerEvents: 'none'
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
                   width: '100%',
-                  height: '6px',
-                  background: '#475569',
-                  borderRadius: '3px',
-                  zIndex: 1
-                }} />
+                  background: 'rgba(30, 41, 59, 0.75)',
+                  border: '1px solid rgba(148, 163, 184, 0.3)',
+                  borderRadius: '8px',
+                  padding: '6px 10px',
+                  backdropFilter: 'blur(4px)',
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
+                  pointerEvents: 'auto'
+                }}
+              >
+                <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>Rev End</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={maxRevAllChannelEndIndex}
+                  value={effectiveRevAllChannelEndIndex}
+                  onChange={(e) => onRevAllChannelEndChange && onRevAllChannelEndChange(parseInt(e.target.value, 10))}
+                  style={{
+                    flex: 1,
+                    height: '6px',
+                    accentColor: '#6366f1',
+                    cursor: 'pointer'
+                  }}
+                />
+                <span style={{ fontSize: '11px', color: '#e2e8f0', fontWeight: 600, minWidth: '80px', textAlign: 'right' }}>
+                  {revAllChannelEndDate || '...'}
+                </span>
+              </div>
+            </div>
+          )}
 
-                {/* Active range highlight */}
-                <div style={{
+          {/* Volume Profile V2 Dual-Handle Range Slider */}
+          {volumeProfileV2Enabled && (() => {
+            const reversedDisplayPrices = [...displayPrices].reverse()
+            const visibleData = reversedDisplayPrices.slice(zoomRange.start, zoomRange.end === null ? reversedDisplayPrices.length : zoomRange.end)
+            const maxIndex = visibleData.length
+
+            // Convert stored dates to current visible indices
+            let effectiveStartIndex = 0
+            let effectiveEndIndex = maxIndex
+
+            if (volumeProfileV2StartDate !== null) {
+              const startIdx = visibleData.findIndex(d => d.date === volumeProfileV2StartDate)
+              if (startIdx !== -1) {
+                effectiveStartIndex = startIdx
+              }
+              // If not found, use default (0)
+            }
+
+            if (volumeProfileV2EndDate !== null) {
+              const endIdx = visibleData.findIndex(d => d.date === volumeProfileV2EndDate)
+              if (endIdx !== -1) {
+                effectiveEndIndex = endIdx + 1
+              }
+              // If not found, use default (maxIndex)
+            }
+
+            const startDate = visibleData[effectiveStartIndex]?.date || '...'
+            const endDate = visibleData[effectiveEndIndex - 1]?.date || '...'
+
+            if (maxIndex <= 1) return null
+
+            const topOffset = revAllChannelEnabled && revAllVisibleLength > 1 ? '46px' : '4px'
+
+            return (
+              <div
+                style={{
                   position: 'absolute',
-                  left: `${(effectiveStartIndex / maxIndex) * 100}%`,
-                  width: `${((effectiveEndIndex - effectiveStartIndex) / maxIndex) * 100}%`,
-                  height: '6px',
-                  background: '#06b6d4',
-                  borderRadius: '3px',
-                  zIndex: 2
-                }} />
-
-                {/* Start handle slider */}
-                <input
-                  type="range"
-                  min={0}
-                  max={maxIndex}
-                  value={effectiveStartIndex}
-                  title={`Start: ${startDate}`}
-                  onChange={(e) => {
-                    const newStartIdx = parseInt(e.target.value, 10)
-                    if (newStartIdx < effectiveEndIndex && visibleData[newStartIdx]) {
-                      // Convert index to date and store the date
-                      const newStartDate = visibleData[newStartIdx].date
-                      onVolumeProfileV2StartChange && onVolumeProfileV2StartChange(newStartDate)
-                    }
-                  }}
+                  top: topOffset,
+                  left: '60px', // Align with chart left edge (Y-axis width)
+                  right: '20px', // Align with chart right edge
+                  zIndex: 7,
+                  pointerEvents: 'none'
+                }}
+              >
+                <div
                   style={{
-                    position: 'absolute',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
                     width: '100%',
-                    height: '6px',
-                    margin: 0,
-                    padding: 0,
-                    background: 'transparent',
-                    pointerEvents: 'all',
-                    cursor: 'pointer',
-                    zIndex: 4,
-                    WebkitAppearance: 'none',
-                    appearance: 'none'
+                    background: 'rgba(30, 41, 59, 0.75)',
+                    border: '1px solid rgba(148, 163, 184, 0.3)',
+                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    backdropFilter: 'blur(4px)',
+                    boxShadow: '0 4px 10px rgba(0,0,0,0.35)',
+                    pointerEvents: 'auto'
                   }}
-                  onMouseDown={() => setVolV2SliderDragging(true)}
-                  onMouseUp={() => setVolV2SliderDragging(false)}
-                  onTouchStart={() => setVolV2SliderDragging(true)}
-                  onTouchEnd={() => setVolV2SliderDragging(false)}
-                />
+                >
+                  <span style={{ fontSize: '11px', color: '#cbd5e1', fontWeight: 700 }}>Vol V2 Range</span>
 
-                {/* End handle slider */}
-                <input
-                  type="range"
-                  min={0}
-                  max={maxIndex}
-                  value={effectiveEndIndex}
-                  title={`End: ${endDate}`}
-                  onChange={(e) => {
-                    const newEndIdx = parseInt(e.target.value, 10)
-                    if (newEndIdx > effectiveStartIndex && visibleData[newEndIdx - 1]) {
-                      // Convert index to date and store the date
-                      const newEndDate = visibleData[newEndIdx - 1].date
-                      onVolumeProfileV2EndChange && onVolumeProfileV2EndChange(newEndDate)
-                    }
-                  }}
-                  style={{
-                    position: 'absolute',
-                    width: '100%',
-                    height: '6px',
-                    margin: 0,
-                    padding: 0,
-                    background: 'transparent',
-                    pointerEvents: 'all',
-                    cursor: 'pointer',
-                    zIndex: 3,
-                    WebkitAppearance: 'none',
-                    appearance: 'none'
-                  }}
-                  onMouseDown={(e) => { e.currentTarget.style.zIndex = '5'; setVolV2SliderDragging(true); }}
-                  onMouseUp={(e) => { e.currentTarget.style.zIndex = '3'; setVolV2SliderDragging(false); }}
-                  onTouchStart={() => setVolV2SliderDragging(true)}
-                  onTouchEnd={() => setVolV2SliderDragging(false)}
-                />
+                  {/* Date range popup - shown while dragging */}
+                  {volV2SliderDragging && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '-35px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      background: 'rgba(15, 23, 42, 0.95)',
+                      border: '1px solid rgba(148, 163, 184, 0.5)',
+                      borderRadius: '6px',
+                      padding: '4px 12px',
+                      fontSize: '11px',
+                      color: '#e2e8f0',
+                      fontWeight: 600,
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+                      zIndex: 10
+                    }}>
+                      {startDate} → {endDate}
+                    </div>
+                  )}
 
-                <style>{`
+                  {/* Dual-handle range slider container */}
+                  <div style={{ flex: 1, position: 'relative', height: '24px', display: 'flex', alignItems: 'center' }}>
+                    {/* Background track */}
+                    <div style={{
+                      position: 'absolute',
+                      width: '100%',
+                      height: '6px',
+                      background: '#475569',
+                      borderRadius: '3px',
+                      zIndex: 1
+                    }} />
+
+                    {/* Active range highlight */}
+                    <div style={{
+                      position: 'absolute',
+                      left: `${(effectiveStartIndex / maxIndex) * 100}%`,
+                      width: `${((effectiveEndIndex - effectiveStartIndex) / maxIndex) * 100}%`,
+                      height: '6px',
+                      background: '#06b6d4',
+                      borderRadius: '3px',
+                      zIndex: 2
+                    }} />
+
+                    {/* Start handle slider */}
+                    <input
+                      type="range"
+                      min={0}
+                      max={maxIndex}
+                      value={effectiveStartIndex}
+                      title={`Start: ${startDate}`}
+                      onChange={(e) => {
+                        const newStartIdx = parseInt(e.target.value, 10)
+                        if (newStartIdx < effectiveEndIndex && visibleData[newStartIdx]) {
+                          // Convert index to date and store the date
+                          const newStartDate = visibleData[newStartIdx].date
+                          onVolumeProfileV2StartChange && onVolumeProfileV2StartChange(newStartDate)
+                        }
+                      }}
+                      style={{
+                        position: 'absolute',
+                        width: '100%',
+                        height: '6px',
+                        margin: 0,
+                        padding: 0,
+                        background: 'transparent',
+                        pointerEvents: 'all',
+                        cursor: 'pointer',
+                        zIndex: 4,
+                        WebkitAppearance: 'none',
+                        appearance: 'none'
+                      }}
+                      onMouseDown={() => setVolV2SliderDragging(true)}
+                      onMouseUp={() => setVolV2SliderDragging(false)}
+                      onTouchStart={() => setVolV2SliderDragging(true)}
+                      onTouchEnd={() => setVolV2SliderDragging(false)}
+                    />
+
+                    {/* End handle slider */}
+                    <input
+                      type="range"
+                      min={0}
+                      max={maxIndex}
+                      value={effectiveEndIndex}
+                      title={`End: ${endDate}`}
+                      onChange={(e) => {
+                        const newEndIdx = parseInt(e.target.value, 10)
+                        if (newEndIdx > effectiveStartIndex && visibleData[newEndIdx - 1]) {
+                          // Convert index to date and store the date
+                          const newEndDate = visibleData[newEndIdx - 1].date
+                          onVolumeProfileV2EndChange && onVolumeProfileV2EndChange(newEndDate)
+                        }
+                      }}
+                      style={{
+                        position: 'absolute',
+                        width: '100%',
+                        height: '6px',
+                        margin: 0,
+                        padding: 0,
+                        background: 'transparent',
+                        pointerEvents: 'all',
+                        cursor: 'pointer',
+                        zIndex: 3,
+                        WebkitAppearance: 'none',
+                        appearance: 'none'
+                      }}
+                      onMouseDown={(e) => { e.currentTarget.style.zIndex = '5'; setVolV2SliderDragging(true); }}
+                      onMouseUp={(e) => { e.currentTarget.style.zIndex = '3'; setVolV2SliderDragging(false); }}
+                      onTouchStart={() => setVolV2SliderDragging(true)}
+                      onTouchEnd={() => setVolV2SliderDragging(false)}
+                    />
+
+                    <style>{`
                   input[type="range"]::-webkit-slider-thumb {
                     -webkit-appearance: none;
                     appearance: none;
@@ -5301,836 +5301,836 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                     height: 6px;
                   }
                 `}</style>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        )
-      })()}
+            )
+          })()}
 
-      <div style={{
-        width: '100%',
-        height: '100%',
-        paddingTop: (() => {
-          const hasRevSlider = revAllChannelEnabled && revAllVisibleLength > 1
-          const hasVolV2Slider = volumeProfileV2Enabled && displayPrices.length > 0
-          if (hasRevSlider && hasVolV2Slider) return '84px' // Rev slider + Vol V2 slider
-          if (hasRevSlider || hasVolV2Slider) return '42px' // One slider
-          return '0' // No sliders
-        })()
-      }}>
-        <ResponsiveContainer>
-          <ComposedChart
-            data={chartDataWithZones}
-            margin={{ top: 5, right: 0, left: 0, bottom: 32 }}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-            onMouseDown={handleMouseDown}
-            onMouseUp={handleMouseUp}
-          >
-            <defs>
-              {slopeChannelEnabled && zoneColors.map((zone, index) => (
-                <linearGradient key={`gradient-${index}`} id={`zoneGradient-${index}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={zone.color} stopOpacity={0.4} />
-                  <stop offset="100%" stopColor={zone.color} stopOpacity={0.2} />
-                </linearGradient>
-              ))}
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
-            <XAxis
-              dataKey="date"
-              tick={<CustomXAxisTick />}
-              interval={Math.floor(chartDataWithZones.length / 10)}
-              stroke="#475569"
-            />
-            <YAxis domain={['auto', 'auto']} tick={{ fill: '#94a3b8', fontSize: isMobile ? 10 : 12 }} stroke="#475569" width={isMobile ? 40 : 60} />
-            <Tooltip content={<CustomTooltip />} />
-            <Legend
-              align="center"
-              verticalAlign="bottom"
-              wrapperStyle={{
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-                width: '100%',
-                marginTop: 0,
-                paddingTop: 0
-              }}
-              content={<ImportedCustomLegend
-              smaVisibility={smaVisibility}
-              onToggleSma={onToggleSma}
-              onDeleteSma={onDeleteSma}
-              allChannelsVisibility={allChannelsVisibility}
-              setAllChannelsVisibility={setAllChannelsVisibility}
-              allChannels={allChannels}
-              setAllChannels={setAllChannels}
-              revAllChannelsVisibility={revAllChannelsVisibility}
-              setRevAllChannelsVisibility={setRevAllChannelsVisibility}
-              revAllChannels={revAllChannels}
-              setRevAllChannels={setRevAllChannels}
-              adjustChannelRangeWithoutRecalc={adjustChannelRangeWithoutRecalc}
-              bestStdevChannelsVisibility={bestStdevChannelsVisibility}
-              setBestStdevChannelsVisibility={setBestStdevChannelsVisibility}
-              trendChannelVisible={trendChannelVisible}
-              setTrendChannelVisible={setTrendChannelVisible}
-              slopeChannelEnabled={slopeChannelEnabled}
-              onSlopeChannelParamsChange={onSlopeChannelParamsChange}
-              controlsVisible={controlsVisible}
-              setControlsVisible={setControlsVisible}
-              manualChannels={manualChannels}
-              setManualChannels={setManualChannels}
-              extendManualChannel={extendManualChannel}
-              volumeProfileV2Enabled={volumeProfileV2Enabled}
-              volumeProfileV3Enabled={volumeProfileV3Enabled}
-              volumeProfileV3RegressionThreshold={volumeProfileV3RegressionThreshold}
-              onVolumeProfileV3RegressionThresholdChange={onVolumeProfileV3RegressionThresholdChange}
-              onSimulateV3RegressionThreshold={handleSimulateV3RegressionThreshold}
-              simulatingV3Regression={simulatingV3Regression}
-              isMobile={isMobile}
-              displayPrices={displayPrices}
-              zoomRange={zoomRange}
-              hoveredVolumeLegend={hoveredVolumeLegend}
-              hoveredVolumeTitleFormatter={(slot) => `$${slot.start?.toFixed(2)} - $${slot.end?.toFixed(2)}`}
-            />}
-            />
-            {syncedMouseDate && (
-              <ReferenceLine
-                x={syncedMouseDate}
-                stroke="#94a3b8"
-                strokeWidth={1}
-                strokeDasharray="3 3"
-              />
-            )}
-
-            {/* Volume Profile V2 - Progressive Horizontal Bars (RENDER FIRST - UNDER EVERYTHING) */}
-            <Customized component={(props) => <ImportedCustomVolumeProfileV2 {...props} volumeProfileV2Enabled={volumeProfileV2Enabled} volumeProfileV2Data={volumeProfileV2Data} displayPrices={displayPrices} zoomRange={zoomRange} volV2HoveredBar={volV2HoveredBar} setVolV2HoveredBar={setVolV2HoveredBar} volumeProfileV2Breakouts={volumeProfileV2Breakouts} breakoutPL={breakoutPL} />} />
-
-            {/* Volume Profile V3 - Windowed Analysis with Break Detection */}
-            <Customized component={(props) => <ImportedCustomVolumeProfileV3 {...props} volumeProfileV3Enabled={volumeProfileV3Enabled} volumeProfileV3Data={volumeProfileV3Data} displayPrices={displayPrices} zoomRange={zoomRange} volV3HoveredBar={volV3HoveredBar} setVolV3HoveredBar={setVolV3HoveredBar} volumeProfileV3Breaks={volumeProfileV3Breaks} v3PL={v3PL} />} />
-
-            {/* Last Channel Zones as Parallel Lines */}
-            <Customized component={CustomZoneLines} />
-
-            {/* Last Channel Stdev Label */}
-            <Customized component={CustomSlopeChannelLabel} />
-
-            {/* All Channels Zones as Parallel Lines */}
-            <Customized component={(props) => <ImportedCustomRevAllChannelZoneLines {...props} revAllChannelEnabled={revAllChannelEnabled} revAllChannels={revAllChannels} revAllChannelsVisibility={revAllChannelsVisibility} revAllChannelZones={revAllChannelZones} chartDataWithZones={chartDataWithZones} />} />
-
-            {/* All Channels Stdev Labels at Lower Bound Midpoint */}
-            <Customized component={(props) => <ImportedCustomRevAllChannelStdevLabels {...props} revAllChannelEnabled={revAllChannelEnabled} revAllChannels={revAllChannels} revAllChannelsVisibility={revAllChannelsVisibility} chartDataWithZones={chartDataWithZones} />} />
-
-            {/* Manual Channel Zones as Parallel Lines */}
-            <Customized component={(props) => <ImportedCustomManualChannelZoneLines {...props} manualChannelEnabled={manualChannelEnabled} manualChannels={manualChannels} allManualChannelZones={allManualChannelZones} chartDataWithZones={chartDataWithZones} />} />
-
-            {/* Manual Channel Stdev Labels */}
-            <Customized component={(props) => <ImportedCustomManualChannelLabels {...props} manualChannelEnabled={manualChannelEnabled} manualChannels={manualChannels} displayPrices={displayPrices} chartDataWithZones={chartDataWithZones} zoomRange={zoomRange} />} />
-
-            {/* Best Channel Zones as Parallel Lines */}
-            <Customized component={(props) => <ImportedCustomBestChannelZoneLines {...props} bestChannelEnabled={bestChannelEnabled} bestChannels={bestChannels} bestChannelsVisibility={bestChannelsVisibility} bestChannelZones={bestChannelZones} chartDataWithZones={chartDataWithZones} />} />
-
-            {/* Best Channel Stdev Labels */}
-            <Customized component={(props) => <ImportedCustomBestChannelStdevLabels {...props} bestChannelEnabled={bestChannelEnabled} bestChannels={bestChannels} bestChannelsVisibility={bestChannelsVisibility} chartDataWithZones={chartDataWithZones} />} />
-
-            {/* Volume Profile Horizontal Bars */}
-            <Customized component={CustomVolumeProfile} />
-
-            {/* SMA Touch Point Statistics - Top Left Display */}
-            {smaPeriods.length > 0 && (
-              <Customized component={(props) => {
-                const { offset } = props
-                if (!offset) return null
-
-                return (
-                  <g>
-                    {smaPeriods.map((period, idx) => {
-                      const touchData = smaTouchPoints[period]
-                      const upperPercent = smaChannelUpperPercent?.[period] ?? 0
-                      const lowerPercent = smaChannelLowerPercent?.[period] ?? 0
-                      const isVisible = smaVisibility[period]
-
-                      if (!isVisible || (upperPercent === 0 && lowerPercent === 0)) return null
-
-                      const yPos = offset.top + 10 + (idx * 40)
-                      const xPos = offset.left + 10
-
-                      return (
-                        <g key={period}>
-                          {/* Background */}
-                          <rect
-                            x={xPos}
-                            y={yPos}
-                            width={180}
-                            height={35}
-                            fill="rgba(30, 41, 59, 0.85)"
-                            stroke="rgba(148, 163, 184, 0.3)"
-                            strokeWidth={1}
-                            rx={4}
-                          />
-                          {/* SMA Period */}
-                          <text
-                            x={xPos + 8}
-                            y={yPos + 15}
-                            fill="#94a3b8"
-                            fontSize="12"
-                            fontWeight="600"
-                          >
-                            SMA {period}
-                          </text>
-                          {/* Upper Touches */}
-                          {upperPercent > 0 && (
-                            <text
-                              x={xPos + 8}
-                              y={yPos + 28}
-                              fill="#22c55e"
-                              fontSize="10"
-                            >
-                              ↑ {touchData.upper} ({upperPercent.toFixed(1)}%)
-                            </text>
-                          )}
-                          {/* Lower Touches */}
-                          {lowerPercent > 0 && (
-                            <text
-                              x={xPos + 90}
-                              y={yPos + 28}
-                              fill="#ef4444"
-                              fontSize="10"
-                            >
-                              ↓ {touchData.lower} ({lowerPercent.toFixed(1)}%)
-                            </text>
-                          )}
-                        </g>
-                      )
-                    })}
-                  </g>
-                )
-              }} />
-            )}
-
-            {/* Manual Channel Selection Rectangle */}
-            {manualChannelEnabled && manualChannelDragMode && isSelecting && selectionStart && selectionEnd && (
-              <Customized component={(props) => {
-                const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
-                if (!xAxisMap || !yAxisMap) return null
-
-                const xAxis = xAxisMap[0]
-                const yAxis = yAxisMap[0]
-
-                if (!xAxis || !yAxis) return null
-
-                const startX = xAxis.scale(selectionStart)
-                const endX = xAxis.scale(selectionEnd)
-
-                if (startX === undefined || endX === undefined) return null
-
-                const x = Math.min(startX, endX)
-                const width = Math.abs(endX - startX)
-                const y = offset.top
-                const height = offset.height
-
-                return (
-                  <rect
-                    x={x}
-                    y={y}
-                    width={width}
-                    height={height}
-                    fill="rgba(34, 197, 94, 0.2)"
-                    stroke="#22c55e"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                  />
-                )
-              }} />
-            )}
-
-            {/* Volume Profile Manual Selection Rectangle */}
-            {volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && volumeProfileSelectionStart && volumeProfileSelectionEnd && (
-              <Customized component={(props) => {
-                const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
-                if (!xAxisMap || !yAxisMap) return null
-
-                const xAxis = xAxisMap[0]
-                const yAxis = yAxisMap[0]
-
-                if (!xAxis || !yAxis) return null
-
-                const startX = xAxis.scale(volumeProfileSelectionStart)
-                const endX = xAxis.scale(volumeProfileSelectionEnd)
-
-                if (startX === undefined || endX === undefined) return null
-
-                const x = Math.min(startX, endX)
-                const width = Math.abs(endX - startX)
-                const y = offset.top
-                const height = offset.height
-
-                return (
-                  <rect
-                    x={x}
-                    y={y}
-                    width={width}
-                    height={height}
-                    fill="rgba(147, 51, 234, 0.2)"
-                    stroke="#9333ea"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                  />
-                )
-              }} />
-            )}
-
-            {/* Zoom Selection Rectangle */}
-            {zoomMode && isSelectingZoom && zoomSelectionStart && zoomSelectionEnd && (
-              <Customized component={(props) => {
-                const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
-                if (!xAxisMap || !yAxisMap) return null
-
-                const xAxis = xAxisMap[0]
-                const yAxis = yAxisMap[0]
-
-                if (!xAxis || !yAxis) return null
-
-                const startX = xAxis.scale(zoomSelectionStart)
-                const endX = xAxis.scale(zoomSelectionEnd)
-
-                if (startX === undefined || endX === undefined) return null
-
-                const x = Math.min(startX, endX)
-                const width = Math.abs(endX - startX)
-                const y = offset.top
-                const height = offset.height
-
-                return (
-                  <rect
-                    x={x}
-                    y={y}
-                    width={width}
-                    height={height}
-                    fill="rgba(59, 130, 246, 0.2)"
-                    stroke="#3b82f6"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                  />
-                )
-              }} />
-            )}
-
-            {/* Linear Regression Selection and Line */}
-            <Customized component={(props) => {
-              const { xAxisMap, yAxisMap, chartWidth, chartHeight } = props
-              if (!xAxisMap || !yAxisMap) return null
-
-              const xAxis = xAxisMap[0]
-              const yAxis = yAxisMap[0]
-
-              if (!xAxis || !yAxis) return null
-
-              return (
-                <ImportedCustomLinearRegression
-                  xScale={xAxis.scale}
-                  yScale={yAxis.scale}
-                  chartWidth={chartWidth}
-                  chartHeight={chartHeight}
-                  isSelecting={isSelectingRegression}
-                  selectionStart={regressionSelectionStart}
-                  selectionEnd={regressionSelectionEnd}
-                  regressionData={linearRegressionSelections}
-                  displayPrices={displayPrices}
-                  onRemoveRegression={onRemoveLinearRegressionSelection}
+          <div style={{
+            width: '100%',
+            height: '100%',
+            paddingTop: (() => {
+              const hasRevSlider = revAllChannelEnabled && revAllVisibleLength > 1
+              const hasVolV2Slider = volumeProfileV2Enabled && displayPrices.length > 0
+              if (hasRevSlider && hasVolV2Slider) return '84px' // Rev slider + Vol V2 slider
+              if (hasRevSlider || hasVolV2Slider) return '42px' // One slider
+              return '0' // No sliders
+            })()
+          }}>
+            <ResponsiveContainer>
+              <ComposedChart
+                data={chartDataWithZones}
+                margin={{ top: 5, right: 0, left: 0, bottom: 32 }}
+                onMouseMove={handleMouseMove}
+                onMouseLeave={handleMouseLeave}
+                onMouseDown={handleMouseDown}
+                onMouseUp={handleMouseUp}
+              >
+                <defs>
+                  {slopeChannelEnabled && zoneColors.map((zone, index) => (
+                    <linearGradient key={`gradient-${index}`} id={`zoneGradient-${index}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={zone.color} stopOpacity={0.4} />
+                      <stop offset="100%" stopColor={zone.color} stopOpacity={0.2} />
+                    </linearGradient>
+                  ))}
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
+                <XAxis
+                  dataKey="date"
+                  tick={<CustomXAxisTick />}
+                  interval={Math.floor(chartDataWithZones.length / 10)}
+                  stroke="#475569"
                 />
-              )
-            }} />
-
-            {/* Last Channel Lines */}
-            {slopeChannelEnabled && slopeChannelInfo && (
-              <>
-                <Line
-                  type="monotone"
-                  dataKey="channelUpper"
-                  stroke="#10b981"
-                  strokeWidth={1.5}
-                  dot={false}
-                  name={`Upper (+${slopeChannelInfo.optimalStdevMult.toFixed(2)}σ)`}
-                  strokeDasharray="3 3"
-                  legendType="none"
-                  hide={!trendChannelVisible}
+                <YAxis domain={['auto', 'auto']} tick={{ fill: '#94a3b8', fontSize: isMobile ? 10 : 12 }} stroke="#475569" width={isMobile ? 40 : 60} />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend
+                  align="center"
+                  verticalAlign="bottom"
+                  wrapperStyle={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    width: '100%',
+                    marginTop: 0,
+                    paddingTop: 0
+                  }}
+                  content={<ImportedCustomLegend
+                    smaVisibility={smaVisibility}
+                    onToggleSma={onToggleSma}
+                    onDeleteSma={onDeleteSma}
+                    allChannelsVisibility={allChannelsVisibility}
+                    setAllChannelsVisibility={setAllChannelsVisibility}
+                    allChannels={allChannels}
+                    setAllChannels={setAllChannels}
+                    revAllChannelsVisibility={revAllChannelsVisibility}
+                    setRevAllChannelsVisibility={setRevAllChannelsVisibility}
+                    revAllChannels={revAllChannels}
+                    setRevAllChannels={setRevAllChannels}
+                    adjustChannelRangeWithoutRecalc={adjustChannelRangeWithoutRecalc}
+                    bestStdevChannelsVisibility={bestStdevChannelsVisibility}
+                    setBestStdevChannelsVisibility={setBestStdevChannelsVisibility}
+                    trendChannelVisible={trendChannelVisible}
+                    setTrendChannelVisible={setTrendChannelVisible}
+                    slopeChannelEnabled={slopeChannelEnabled}
+                    onSlopeChannelParamsChange={onSlopeChannelParamsChange}
+                    controlsVisible={controlsVisible}
+                    setControlsVisible={setControlsVisible}
+                    manualChannels={manualChannels}
+                    setManualChannels={setManualChannels}
+                    extendManualChannel={extendManualChannel}
+                    volumeProfileV2Enabled={volumeProfileV2Enabled}
+                    volumeProfileV3Enabled={volumeProfileV3Enabled}
+                    volumeProfileV3RegressionThreshold={volumeProfileV3RegressionThreshold}
+                    onVolumeProfileV3RegressionThresholdChange={onVolumeProfileV3RegressionThresholdChange}
+                    onSimulateV3RegressionThreshold={handleSimulateV3RegressionThreshold}
+                    simulatingV3Regression={simulatingV3Regression}
+                    isMobile={isMobile}
+                    displayPrices={displayPrices}
+                    zoomRange={zoomRange}
+                    hoveredVolumeLegend={hoveredVolumeLegend}
+                    hoveredVolumeTitleFormatter={(slot) => `$${slot.start?.toFixed(2)} - $${slot.end?.toFixed(2)}`}
+                  />}
                 />
-                <Line
-                  type="monotone"
-                  dataKey="channelMid"
-                  stroke="#3b82f6"
-                  strokeWidth={1.5}
-                  dot={false}
-                  name={`Trend${slopeChannelVolumeWeighted ? ' (Vol-Weighted)' : ''} (${slopeChannelInfo.recentDataCount}pts, ${slopeChannelInfo.touchCount} touches, R²=${(slopeChannelInfo.rSquared * 100).toFixed(1)}%)`}
-                  strokeDasharray="3 3"
-                  hide={!trendChannelVisible}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="channelLower"
-                  stroke="#ef4444"
-                  strokeWidth={1.5}
-                  dot={false}
-                  name={`Lower (-${slopeChannelInfo.optimalStdevMult.toFixed(2)}σ)`}
-                  strokeDasharray="3 3"
-                  legendType="none"
-                  hide={!trendChannelVisible}
-                />
-              </>
-            )}
-
-            {/* All Channels Lines */}
-            {revAllChannelEnabled && revAllChannels.length > 0 && revAllChannels.map((channel, index) => {
-              // Define distinct colors for each channel - using single color per channel for consistency
-              const channelColors = [
-                '#3b82f6',  // Blue
-                '#8b5cf6',  // Purple
-                '#f59e0b',  // Amber
-                '#10b981',  // Green
-                '#06b6d4',  // Cyan
-                '#f97316',  // Orange
-                '#ec4899',  // Pink
-                '#84cc16',  // Lime
-              ]
-              const channelColor = channelColors[index % channelColors.length]
-              const isVisible = revAllChannelsVisibility[index] !== false
-
-              return (
-                <React.Fragment key={`rev-channel-${index}`}>
-                  <Line
-                    type="monotone"
-                    dataKey={`revAllChannel${index}Upper`}
-                    stroke={channelColor}
-                    strokeWidth={1.5}
-                    dot={false}
-                    legendType="none"
-                    strokeDasharray="5 5"
-                    opacity={0.6}
-                    hide={!isVisible}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey={`revAllChannel${index}Mid`}
-                    stroke={channelColor}
-                    strokeWidth={2}
-                    dot={false}
-                    name={`Rev${index + 1}`}
-                    strokeDasharray="5 5"
-                    opacity={1.0}
-                    hide={!isVisible}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey={`revAllChannel${index}Lower`}
-                    stroke={channelColor}
-                    strokeWidth={1.5}
-                    dot={false}
-                    legendType="none"
-                    strokeDasharray="5 5"
-                    opacity={0.6}
-                    hide={!isVisible}
-                  />
-                </React.Fragment>
-              )
-            })}
-
-            {/* Manual Channel Lines */}
-            {manualChannelEnabled && manualChannels.length > 0 && manualChannels.map((channel, index) => {
-              // Color palette for manual channels (various green shades)
-              const channelColors = [
-                '#22c55e',  // Green
-                '#10b981',  // Emerald
-                '#14b8a6',  // Teal
-                '#84cc16',  // Lime
-                '#059669',  // Deep green
-              ]
-              const channelColor = channelColors[index % channelColors.length]
-
-              return (
-                <React.Fragment key={`manual-channel-${index}`}>
-                  <Line
-                    type="monotone"
-                    dataKey={`manualChannel${index}Upper`}
-                    stroke={channelColor}
-                    strokeWidth={2}
-                    dot={false}
-                    name={`Manual ${index + 1} Upper (+${channel.optimalStdevMult.toFixed(2)}σ)`}
-                    strokeDasharray="5 5"
-                    opacity={0.7}
-                    legendType="none"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey={`manualChannel${index}Mid`}
-                    stroke={channelColor}
-                    strokeWidth={2.5}
-                    dot={false}
-                    name={`Manual Channel ${index + 1} (${channel.endIndex - channel.startIndex + 1}pts, ${channel.touchCount} touches, R²=${(channel.rSquared * 100).toFixed(1)}%)`}
-                    strokeDasharray="5 5"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey={`manualChannel${index}Lower`}
-                    stroke={channelColor}
-                    strokeWidth={2}
-                    dot={false}
-                    name={`Manual ${index + 1} Lower (-${channel.optimalStdevMult.toFixed(2)}σ)`}
-                    strokeDasharray="5 5"
-                    opacity={0.7}
-                    legendType="none"
-                  />
-                </React.Fragment>
-              )
-            })}
-
-            {/* Best Channel Lines */}
-            {bestChannelEnabled && bestChannels.length > 0 && bestChannels.map((channel, index) => {
-              // Color palette for best channels (warm colors - orange/yellow tones)
-              const channelColors = [
-                '#f59e0b',  // Amber
-                '#f97316',  // Orange
-                '#eab308',  // Yellow
-                '#fb923c',  // Light Orange
-                '#fbbf24',  // Light Amber
-              ]
-              const channelColor = channelColors[index % channelColors.length]
-              const isVisible = bestChannelsVisibility[index] !== false
-
-              return (
-                <React.Fragment key={`best-channel-${index}`}>
-                  <Line
-                    type="monotone"
-                    dataKey={`bestChannel${index}Upper`}
-                    stroke={channelColor}
-                    strokeWidth={2}
-                    dot={false}
-                    legendType="none"
+                {syncedMouseDate && (
+                  <ReferenceLine
+                    x={syncedMouseDate}
+                    stroke="#94a3b8"
+                    strokeWidth={1}
                     strokeDasharray="3 3"
-                    opacity={0.7}
-                    hide={!isVisible}
                   />
-                  <Line
-                    type="monotone"
-                    dataKey={`bestChannel${index}Mid`}
-                    stroke={channelColor}
-                    strokeWidth={2.5}
-                    dot={false}
-                    name={`Best${index + 1} (${channel.endIndex - channel.startIndex + 1}pts, ${channel.touchCount} touches)`}
-                    strokeDasharray="3 3"
-                    hide={!isVisible}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey={`bestChannel${index}Lower`}
-                    stroke={channelColor}
-                    strokeWidth={2}
-                    dot={false}
-                    legendType="none"
-                    strokeDasharray="3 3"
-                    opacity={0.7}
-                    hide={!isVisible}
-                  />
-                </React.Fragment>
-              )
-            })}
+                )}
 
-            {/* Best Stdev Channel Lines */}
-            {bestStdevEnabled && bestStdevChannels.length > 0 && bestStdevChannels.map((channel, index) => {
-              // Color palette for best stdev channels (purple/magenta tones)
-              const channelColors = [
-                '#a855f7',  // Purple
-                '#d946ef',  // Fuchsia
-                '#c026d3',  // Magenta
-                '#e879f9',  // Light Purple
-                '#f0abfc',  // Pale Purple
-              ]
-              const channelColor = channelColors[index % channelColors.length]
-              const isVisible = bestStdevChannelsVisibility[index] !== false
+                {/* Volume Profile V2 - Progressive Horizontal Bars (RENDER FIRST - UNDER EVERYTHING) */}
+                <Customized component={(props) => <ImportedCustomVolumeProfileV2 {...props} volumeProfileV2Enabled={volumeProfileV2Enabled} volumeProfileV2Data={volumeProfileV2Data} displayPrices={displayPrices} zoomRange={zoomRange} volV2HoveredBar={volV2HoveredBar} setVolV2HoveredBar={setVolV2HoveredBar} volumeProfileV2Breakouts={volumeProfileV2Breakouts} breakoutPL={breakoutPL} />} />
 
-              return (
-                <React.Fragment key={`best-stdev-channel-${index}`}>
-                  <Line
-                    type="monotone"
-                    dataKey={`bestStdevChannel${index}Upper`}
-                    stroke={channelColor}
-                    strokeWidth={2}
-                    dot={false}
-                    legendType="none"
-                    strokeDasharray="4 4"
-                    opacity={0.7}
-                    hide={!isVisible}
-                  />
-                  <Customized
-                    key={`best-stdev-channel-${index}-zones`}
-                    component={<CustomBestStdevZoneLines
-                      bestStdevChannels={bestStdevChannels}
-                      bestStdevChannelsVisibility={bestStdevChannelsVisibility}
-                      bestStdevChannelZones={bestStdevChannelZones}
-                    />}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey={`bestStdevChannel${index}Mid`}
-                    stroke={channelColor}
-                    strokeWidth={2.5}
-                    dot={false}
-                    name={`BStd${index + 1} (${channel.lookbackCount}pts, ${channel.touchCount} touches, ${bestStdevValue?.toFixed(2)}σ)`}
-                    strokeDasharray="4 4"
-                    hide={!isVisible}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey={`bestStdevChannel${index}Lower`}
-                    stroke={channelColor}
-                    strokeWidth={2}
-                    dot={false}
-                    legendType="none"
-                    strokeDasharray="4 4"
-                    opacity={0.7}
-                    hide={!isVisible}
-                  />
-                </React.Fragment>
-              )
-            })}
+                {/* Volume Profile V3 - Windowed Analysis with Break Detection */}
+                <Customized component={(props) => <ImportedCustomVolumeProfileV3 {...props} volumeProfileV3Enabled={volumeProfileV3Enabled} volumeProfileV3Data={volumeProfileV3Data} displayPrices={displayPrices} zoomRange={zoomRange} volV3HoveredBar={volV3HoveredBar} setVolV3HoveredBar={setVolV3HoveredBar} volumeProfileV3Breaks={volumeProfileV3Breaks} v3PL={v3PL} />} />
 
-            <Line
-              type="monotone"
-              dataKey="close"
-              stroke="#8b5cf6"
-              strokeWidth={2}
-              dot={false}
-              name="Close Price"
-            />
-            {volumeColorEnabled && (
-              <>
-                <Line
-                  type="monotone"
-                  dataKey="highVolumeClose"
-                  stroke="#ea580c"
-                  strokeWidth={3}
-                  dot={false}
-                  name={volumeColorMode === 'relative-spy' ? "High Volume vs SPY (Top 20%)" : "High Volume (Top 20%)"}
-                  connectNulls={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="lowVolumeClose"
-                  stroke="#06b6d4"
-                  strokeWidth={3}
-                  dot={false}
-                  name={volumeColorMode === 'relative-spy' ? "Low Volume vs SPY (Bottom 20%)" : "Low Volume (Bottom 20%)"}
-                  connectNulls={false}
-                />
-              </>
-            )}
-            {performanceComparisonEnabled && comparisonMode === 'color' && (
-              <>
-                <Line
-                  type="monotone"
-                  dataKey="topPerformanceClose"
-                  stroke="#22c55e"
-                  strokeWidth={3}
-                  dot={false}
-                  name={`Top Performance vs ${performanceComparisonBenchmark} (Top 20%)`}
-                  connectNulls={false}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="bottomPerformanceClose"
-                  stroke="#ef4444"
-                  strokeWidth={3}
-                  dot={false}
-                  name={`Bottom Performance vs ${performanceComparisonBenchmark} (Bottom 20%)`}
-                  connectNulls={false}
-                />
-              </>
-            )}
-            {comparisonMode === 'line' && comparisonStocks && comparisonStocks.map((compStock, index) => {
-              const compPositiveKey = `compPos_${compStock.symbol}`
-              const compNegativeKey = `compNeg_${compStock.symbol}`
+                {/* Last Channel Zones as Parallel Lines */}
+                <Customized component={CustomZoneLines} />
 
-              // Base colors for each comparison stock
-              const baseColors = [
-                { light: '#93c5fd', dark: '#1e40af' }, // Blue
-                { light: '#86efac', dark: '#15803d' }, // Green
-                { light: '#fde047', dark: '#a16207' }, // Yellow
-                { light: '#c4b5fd', dark: '#6d28d9' }, // Purple
-                { light: '#f9a8d4', dark: '#be185d' }, // Pink
-                { light: '#5eead4', dark: '#0f766e' }, // Teal
-              ]
+                {/* Last Channel Stdev Label */}
+                <Customized component={CustomSlopeChannelLabel} />
 
-              const colorPair = baseColors[index % baseColors.length]
+                {/* All Channels Zones as Parallel Lines */}
+                <Customized component={(props) => <ImportedCustomRevAllChannelZoneLines {...props} revAllChannelEnabled={revAllChannelEnabled} revAllChannels={revAllChannels} revAllChannelsVisibility={revAllChannelsVisibility} revAllChannelZones={revAllChannelZones} chartDataWithZones={chartDataWithZones} />} />
 
-              return (
-                <React.Fragment key={compStock.symbol}>
-                  {/* Deeper/darker color when ABOVE selected stock (outperforming) */}
-                  <Line
-                    type="monotone"
-                    dataKey={compPositiveKey}
-                    stroke={colorPair.dark}
-                    strokeWidth={2.5}
-                    dot={false}
-                    name={`${compStock.symbol} (Above)`}
-                    connectNulls={false}
-                  />
-                  {/* Lighter color when BELOW selected stock (underperforming) */}
-                  <Line
-                    type="monotone"
-                    dataKey={compNegativeKey}
-                    stroke={colorPair.light}
-                    strokeWidth={2.5}
-                    dot={false}
-                    name={`${compStock.symbol} (Below)`}
-                    connectNulls={false}
-                  />
-                </React.Fragment>
-              )
-            })}
-            {smaPeriods.map((period, index) => {
-              const smaKey = `sma${period}`
-              const isVisible = smaVisibility[period]
-              const upperPercent = smaChannelUpperPercent?.[period] ?? 0
-              const lowerPercent = smaChannelLowerPercent?.[period] ?? 0
-              const hasChannels = upperPercent > 0 || lowerPercent > 0
+                {/* All Channels Stdev Labels at Lower Bound Midpoint */}
+                <Customized component={(props) => <ImportedCustomRevAllChannelStdevLabels {...props} revAllChannelEnabled={revAllChannelEnabled} revAllChannels={revAllChannels} revAllChannelsVisibility={revAllChannelsVisibility} chartDataWithZones={chartDataWithZones} />} />
 
-              return (
-                <React.Fragment key={`sma-${period}`}>
-                  <Line
-                    key={smaKey}
-                    type="monotone"
-                    dataKey={smaKey}
-                    stroke={getSmaColor(period)}
-                    strokeWidth={1.5}
-                    dot={false}
-                    name={`SMA ${period}`}
-                    strokeDasharray="5 5"
-                    hide={!isVisible}
-                    connectNulls={true}
-                  />
-                  {/* Upper channel line */}
-                  {hasChannels && upperPercent > 0 && (
-                    <Line
-                      key={`${smaKey}ChannelUpper`}
-                      type="monotone"
-                      dataKey={`${smaKey}ChannelUpper`}
-                      stroke={getSmaColor(period)}
-                      strokeWidth={1}
-                      dot={false}
-                      name={`SMA ${period} Upper (+${upperPercent.toFixed(1)}%)`}
-                      strokeDasharray="2 2"
-                      opacity={0.5}
-                      hide={!isVisible}
-                      legendType="none"
-                      connectNulls={true}
-                    />
-                  )}
-                  {/* Lower channel line */}
-                  {hasChannels && lowerPercent > 0 && (
-                    <Line
-                      key={`${smaKey}ChannelLower`}
-                      type="monotone"
-                      dataKey={`${smaKey}ChannelLower`}
-                      stroke={getSmaColor(period)}
-                      strokeWidth={1}
-                      dot={false}
-                      name={`SMA ${period} Lower (-${lowerPercent.toFixed(1)}%)`}
-                      strokeDasharray="2 2"
-                      opacity={0.5}
-                      hide={!isVisible}
-                      legendType="none"
-                      connectNulls={true}
-                    />
-                  )}
-                </React.Fragment>
-              )
-            })}
+                {/* Manual Channel Zones as Parallel Lines */}
+                <Customized component={(props) => <ImportedCustomManualChannelZoneLines {...props} manualChannelEnabled={manualChannelEnabled} manualChannels={manualChannels} allManualChannelZones={allManualChannelZones} chartDataWithZones={chartDataWithZones} />} />
 
-            {/* Market Gap Open Indicators */}
-            {mktGapOpenEnabled && mktGapOpenData.map((gap, index) => {
-              // Find the corresponding data point in the main chart to position the arrow
-              const pricePoint = prices.find(p => p.date === gap.date)
-              if (!pricePoint) return null
+                {/* Manual Channel Stdev Labels */}
+                <Customized component={(props) => <ImportedCustomManualChannelLabels {...props} manualChannelEnabled={manualChannelEnabled} manualChannels={manualChannels} displayPrices={displayPrices} chartDataWithZones={chartDataWithZones} zoomRange={zoomRange} />} />
 
-              // Gap Up (SPY > 0) -> Down Arrow
-              // Gap Down (SPY < 0) -> Up Arrow
-              // Anchor to CLOSE price so it touches the line
-              const isGapUp = gap.isGapUp
-              const yPos = pricePoint.close
-              const color = isGapUp ? "#ef4444" : "#22c55e" // Red for Gap Up (Down Arrow), Green for Gap Down (Up Arrow)
+                {/* Best Channel Zones as Parallel Lines */}
+                <Customized component={(props) => <ImportedCustomBestChannelZoneLines {...props} bestChannelEnabled={bestChannelEnabled} bestChannels={bestChannels} bestChannelsVisibility={bestChannelsVisibility} bestChannelZones={bestChannelZones} chartDataWithZones={chartDataWithZones} />} />
 
-              return (
-                <ReferenceDot
-                  key={`gap-${gap.date}-${index}`}
-                  x={gap.date}
-                  y={yPos}
-                  r={0} // Invisible dot, just for positioning
-                  label={({ viewBox }) => {
-                    const { x, y } = viewBox
-                    // y is the screen coordinate of the price point (High or Low)
+                {/* Best Channel Stdev Labels */}
+                <Customized component={(props) => <ImportedCustomBestChannelStdevLabels {...props} bestChannelEnabled={bestChannelEnabled} bestChannels={bestChannels} bestChannelsVisibility={bestChannelsVisibility} chartDataWithZones={chartDataWithZones} />} />
+
+                {/* Volume Profile Horizontal Bars */}
+                <Customized component={CustomVolumeProfile} />
+
+                {/* SMA Touch Point Statistics - Top Left Display */}
+                {smaPeriods.length > 0 && (
+                  <Customized component={(props) => {
+                    const { offset } = props
+                    if (!offset) return null
 
                     return (
-                      <g transform={`translate(${x}, ${y})`}>
-                        {isGapUp ? (
-                          // Gap Up: Down Arrow pointing at High (y)
-                          // Text above arrow
-                          <>
-                            <text
-                              x={0}
-                              y={-20}
-                              textAnchor="middle"
-                              fill={color}
-                              fontSize={11}
-                              fontWeight="bold"
-                            >
-                              {gap.symbol} {gap.changePercent}%
-                            </text>
-                            <path
-                              d="M0,-15 L0,0 M-5,-5 L0,0 L5,-5"
-                              stroke={color}
-                              strokeWidth={2}
-                              fill="none"
-                            />
-                          </>
-                        ) : (
-                          // Gap Down: Up Arrow pointing at Low (y)
-                          // Text below arrow
-                          <>
-                            <path
-                              d="M0,15 L0,0 M-5,5 L0,0 L5,5"
-                              stroke={color}
-                              strokeWidth={2}
-                              fill="none"
-                            />
-                            <text
-                              x={0}
-                              y={27}
-                              textAnchor="middle"
-                              fill={color}
-                              fontSize={11}
-                              fontWeight="bold"
-                            >
-                              {gap.symbol} {gap.changePercent}%
-                            </text>
-                          </>
-                        )}
+                      <g>
+                        {smaPeriods.map((period, idx) => {
+                          const touchData = smaTouchPoints[period]
+                          const upperPercent = smaChannelUpperPercent?.[period] ?? 0
+                          const lowerPercent = smaChannelLowerPercent?.[period] ?? 0
+                          const isVisible = smaVisibility[period]
+
+                          if (!isVisible || (upperPercent === 0 && lowerPercent === 0)) return null
+
+                          const yPos = offset.top + 10 + (idx * 40)
+                          const xPos = offset.left + 10
+
+                          return (
+                            <g key={period}>
+                              {/* Background */}
+                              <rect
+                                x={xPos}
+                                y={yPos}
+                                width={180}
+                                height={35}
+                                fill="rgba(30, 41, 59, 0.85)"
+                                stroke="rgba(148, 163, 184, 0.3)"
+                                strokeWidth={1}
+                                rx={4}
+                              />
+                              {/* SMA Period */}
+                              <text
+                                x={xPos + 8}
+                                y={yPos + 15}
+                                fill="#94a3b8"
+                                fontSize="12"
+                                fontWeight="600"
+                              >
+                                SMA {period}
+                              </text>
+                              {/* Upper Touches */}
+                              {upperPercent > 0 && (
+                                <text
+                                  x={xPos + 8}
+                                  y={yPos + 28}
+                                  fill="#22c55e"
+                                  fontSize="10"
+                                >
+                                  ↑ {touchData.upper} ({upperPercent.toFixed(1)}%)
+                                </text>
+                              )}
+                              {/* Lower Touches */}
+                              {lowerPercent > 0 && (
+                                <text
+                                  x={xPos + 90}
+                                  y={yPos + 28}
+                                  fill="#ef4444"
+                                  fontSize="10"
+                                >
+                                  ↓ {touchData.lower} ({lowerPercent.toFixed(1)}%)
+                                </text>
+                              )}
+                            </g>
+                          )
+                        })}
                       </g>
                     )
-                  }}
+                  }} />
+                )}
+
+                {/* Manual Channel Selection Rectangle */}
+                {manualChannelEnabled && manualChannelDragMode && isSelecting && selectionStart && selectionEnd && (
+                  <Customized component={(props) => {
+                    const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
+                    if (!xAxisMap || !yAxisMap) return null
+
+                    const xAxis = xAxisMap[0]
+                    const yAxis = yAxisMap[0]
+
+                    if (!xAxis || !yAxis) return null
+
+                    const startX = xAxis.scale(selectionStart)
+                    const endX = xAxis.scale(selectionEnd)
+
+                    if (startX === undefined || endX === undefined) return null
+
+                    const x = Math.min(startX, endX)
+                    const width = Math.abs(endX - startX)
+                    const y = offset.top
+                    const height = offset.height
+
+                    return (
+                      <rect
+                        x={x}
+                        y={y}
+                        width={width}
+                        height={height}
+                        fill="rgba(34, 197, 94, 0.2)"
+                        stroke="#22c55e"
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                      />
+                    )
+                  }} />
+                )}
+
+                {/* Volume Profile Manual Selection Rectangle */}
+                {volumeProfileEnabled && volumeProfileMode === 'manual' && isSelectingVolumeProfile && volumeProfileSelectionStart && volumeProfileSelectionEnd && (
+                  <Customized component={(props) => {
+                    const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
+                    if (!xAxisMap || !yAxisMap) return null
+
+                    const xAxis = xAxisMap[0]
+                    const yAxis = yAxisMap[0]
+
+                    if (!xAxis || !yAxis) return null
+
+                    const startX = xAxis.scale(volumeProfileSelectionStart)
+                    const endX = xAxis.scale(volumeProfileSelectionEnd)
+
+                    if (startX === undefined || endX === undefined) return null
+
+                    const x = Math.min(startX, endX)
+                    const width = Math.abs(endX - startX)
+                    const y = offset.top
+                    const height = offset.height
+
+                    return (
+                      <rect
+                        x={x}
+                        y={y}
+                        width={width}
+                        height={height}
+                        fill="rgba(147, 51, 234, 0.2)"
+                        stroke="#9333ea"
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                      />
+                    )
+                  }} />
+                )}
+
+                {/* Zoom Selection Rectangle */}
+                {zoomMode && isSelectingZoom && zoomSelectionStart && zoomSelectionEnd && (
+                  <Customized component={(props) => {
+                    const { xAxisMap, yAxisMap, chartWidth, chartHeight, offset } = props
+                    if (!xAxisMap || !yAxisMap) return null
+
+                    const xAxis = xAxisMap[0]
+                    const yAxis = yAxisMap[0]
+
+                    if (!xAxis || !yAxis) return null
+
+                    const startX = xAxis.scale(zoomSelectionStart)
+                    const endX = xAxis.scale(zoomSelectionEnd)
+
+                    if (startX === undefined || endX === undefined) return null
+
+                    const x = Math.min(startX, endX)
+                    const width = Math.abs(endX - startX)
+                    const y = offset.top
+                    const height = offset.height
+
+                    return (
+                      <rect
+                        x={x}
+                        y={y}
+                        width={width}
+                        height={height}
+                        fill="rgba(59, 130, 246, 0.2)"
+                        stroke="#3b82f6"
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                      />
+                    )
+                  }} />
+                )}
+
+                {/* Linear Regression Selection and Line */}
+                <Customized component={(props) => {
+                  const { xAxisMap, yAxisMap, chartWidth, chartHeight } = props
+                  if (!xAxisMap || !yAxisMap) return null
+
+                  const xAxis = xAxisMap[0]
+                  const yAxis = yAxisMap[0]
+
+                  if (!xAxis || !yAxis) return null
+
+                  return (
+                    <ImportedCustomLinearRegression
+                      xScale={xAxis.scale}
+                      yScale={yAxis.scale}
+                      chartWidth={chartWidth}
+                      chartHeight={chartHeight}
+                      isSelecting={isSelectingRegression}
+                      selectionStart={regressionSelectionStart}
+                      selectionEnd={regressionSelectionEnd}
+                      regressionData={linearRegressionSelections}
+                      displayPrices={displayPrices}
+                      onRemoveRegression={onRemoveLinearRegressionSelection}
+                    />
+                  )
+                }} />
+
+                {/* Last Channel Lines */}
+                {slopeChannelEnabled && slopeChannelInfo && (
+                  <>
+                    <Line
+                      type="monotone"
+                      dataKey="channelUpper"
+                      stroke="#10b981"
+                      strokeWidth={1.5}
+                      dot={false}
+                      name={`Upper (+${slopeChannelInfo.optimalStdevMult.toFixed(2)}σ)`}
+                      strokeDasharray="3 3"
+                      legendType="none"
+                      hide={!trendChannelVisible}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="channelMid"
+                      stroke="#3b82f6"
+                      strokeWidth={1.5}
+                      dot={false}
+                      name={`Trend${slopeChannelVolumeWeighted ? ' (Vol-Weighted)' : ''} (${slopeChannelInfo.recentDataCount}pts, ${slopeChannelInfo.touchCount} touches, R²=${(slopeChannelInfo.rSquared * 100).toFixed(1)}%)`}
+                      strokeDasharray="3 3"
+                      hide={!trendChannelVisible}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="channelLower"
+                      stroke="#ef4444"
+                      strokeWidth={1.5}
+                      dot={false}
+                      name={`Lower (-${slopeChannelInfo.optimalStdevMult.toFixed(2)}σ)`}
+                      strokeDasharray="3 3"
+                      legendType="none"
+                      hide={!trendChannelVisible}
+                    />
+                  </>
+                )}
+
+                {/* All Channels Lines */}
+                {revAllChannelEnabled && revAllChannels.length > 0 && revAllChannels.map((channel, index) => {
+                  // Define distinct colors for each channel - using single color per channel for consistency
+                  const channelColors = [
+                    '#3b82f6',  // Blue
+                    '#8b5cf6',  // Purple
+                    '#f59e0b',  // Amber
+                    '#10b981',  // Green
+                    '#06b6d4',  // Cyan
+                    '#f97316',  // Orange
+                    '#ec4899',  // Pink
+                    '#84cc16',  // Lime
+                  ]
+                  const channelColor = channelColors[index % channelColors.length]
+                  const isVisible = revAllChannelsVisibility[index] !== false
+
+                  return (
+                    <React.Fragment key={`rev-channel-${index}`}>
+                      <Line
+                        type="monotone"
+                        dataKey={`revAllChannel${index}Upper`}
+                        stroke={channelColor}
+                        strokeWidth={1.5}
+                        dot={false}
+                        legendType="none"
+                        strokeDasharray="5 5"
+                        opacity={0.6}
+                        hide={!isVisible}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey={`revAllChannel${index}Mid`}
+                        stroke={channelColor}
+                        strokeWidth={2}
+                        dot={false}
+                        name={`Rev${index + 1}`}
+                        strokeDasharray="5 5"
+                        opacity={1.0}
+                        hide={!isVisible}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey={`revAllChannel${index}Lower`}
+                        stroke={channelColor}
+                        strokeWidth={1.5}
+                        dot={false}
+                        legendType="none"
+                        strokeDasharray="5 5"
+                        opacity={0.6}
+                        hide={!isVisible}
+                      />
+                    </React.Fragment>
+                  )
+                })}
+
+                {/* Manual Channel Lines */}
+                {manualChannelEnabled && manualChannels.length > 0 && manualChannels.map((channel, index) => {
+                  // Color palette for manual channels (various green shades)
+                  const channelColors = [
+                    '#22c55e',  // Green
+                    '#10b981',  // Emerald
+                    '#14b8a6',  // Teal
+                    '#84cc16',  // Lime
+                    '#059669',  // Deep green
+                  ]
+                  const channelColor = channelColors[index % channelColors.length]
+
+                  return (
+                    <React.Fragment key={`manual-channel-${index}`}>
+                      <Line
+                        type="monotone"
+                        dataKey={`manualChannel${index}Upper`}
+                        stroke={channelColor}
+                        strokeWidth={2}
+                        dot={false}
+                        name={`Manual ${index + 1} Upper (+${channel.optimalStdevMult.toFixed(2)}σ)`}
+                        strokeDasharray="5 5"
+                        opacity={0.7}
+                        legendType="none"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey={`manualChannel${index}Mid`}
+                        stroke={channelColor}
+                        strokeWidth={2.5}
+                        dot={false}
+                        name={`Manual Channel ${index + 1} (${channel.endIndex - channel.startIndex + 1}pts, ${channel.touchCount} touches, R²=${(channel.rSquared * 100).toFixed(1)}%)`}
+                        strokeDasharray="5 5"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey={`manualChannel${index}Lower`}
+                        stroke={channelColor}
+                        strokeWidth={2}
+                        dot={false}
+                        name={`Manual ${index + 1} Lower (-${channel.optimalStdevMult.toFixed(2)}σ)`}
+                        strokeDasharray="5 5"
+                        opacity={0.7}
+                        legendType="none"
+                      />
+                    </React.Fragment>
+                  )
+                })}
+
+                {/* Best Channel Lines */}
+                {bestChannelEnabled && bestChannels.length > 0 && bestChannels.map((channel, index) => {
+                  // Color palette for best channels (warm colors - orange/yellow tones)
+                  const channelColors = [
+                    '#f59e0b',  // Amber
+                    '#f97316',  // Orange
+                    '#eab308',  // Yellow
+                    '#fb923c',  // Light Orange
+                    '#fbbf24',  // Light Amber
+                  ]
+                  const channelColor = channelColors[index % channelColors.length]
+                  const isVisible = bestChannelsVisibility[index] !== false
+
+                  return (
+                    <React.Fragment key={`best-channel-${index}`}>
+                      <Line
+                        type="monotone"
+                        dataKey={`bestChannel${index}Upper`}
+                        stroke={channelColor}
+                        strokeWidth={2}
+                        dot={false}
+                        legendType="none"
+                        strokeDasharray="3 3"
+                        opacity={0.7}
+                        hide={!isVisible}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey={`bestChannel${index}Mid`}
+                        stroke={channelColor}
+                        strokeWidth={2.5}
+                        dot={false}
+                        name={`Best${index + 1} (${channel.endIndex - channel.startIndex + 1}pts, ${channel.touchCount} touches)`}
+                        strokeDasharray="3 3"
+                        hide={!isVisible}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey={`bestChannel${index}Lower`}
+                        stroke={channelColor}
+                        strokeWidth={2}
+                        dot={false}
+                        legendType="none"
+                        strokeDasharray="3 3"
+                        opacity={0.7}
+                        hide={!isVisible}
+                      />
+                    </React.Fragment>
+                  )
+                })}
+
+                {/* Best Stdev Channel Lines */}
+                {bestStdevEnabled && bestStdevChannels.length > 0 && bestStdevChannels.map((channel, index) => {
+                  // Color palette for best stdev channels (purple/magenta tones)
+                  const channelColors = [
+                    '#a855f7',  // Purple
+                    '#d946ef',  // Fuchsia
+                    '#c026d3',  // Magenta
+                    '#e879f9',  // Light Purple
+                    '#f0abfc',  // Pale Purple
+                  ]
+                  const channelColor = channelColors[index % channelColors.length]
+                  const isVisible = bestStdevChannelsVisibility[index] !== false
+
+                  return (
+                    <React.Fragment key={`best-stdev-channel-${index}`}>
+                      <Line
+                        type="monotone"
+                        dataKey={`bestStdevChannel${index}Upper`}
+                        stroke={channelColor}
+                        strokeWidth={2}
+                        dot={false}
+                        legendType="none"
+                        strokeDasharray="4 4"
+                        opacity={0.7}
+                        hide={!isVisible}
+                      />
+                      <Customized
+                        key={`best-stdev-channel-${index}-zones`}
+                        component={<CustomBestStdevZoneLines
+                          bestStdevChannels={bestStdevChannels}
+                          bestStdevChannelsVisibility={bestStdevChannelsVisibility}
+                          bestStdevChannelZones={bestStdevChannelZones}
+                        />}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey={`bestStdevChannel${index}Mid`}
+                        stroke={channelColor}
+                        strokeWidth={2.5}
+                        dot={false}
+                        name={`BStd${index + 1} (${channel.lookbackCount}pts, ${channel.touchCount} touches, ${bestStdevValue?.toFixed(2)}σ)`}
+                        strokeDasharray="4 4"
+                        hide={!isVisible}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey={`bestStdevChannel${index}Lower`}
+                        stroke={channelColor}
+                        strokeWidth={2}
+                        dot={false}
+                        legendType="none"
+                        strokeDasharray="4 4"
+                        opacity={0.7}
+                        hide={!isVisible}
+                      />
+                    </React.Fragment>
+                  )
+                })}
+
+                <Line
+                  type="monotone"
+                  dataKey="close"
+                  stroke="#8b5cf6"
+                  strokeWidth={2}
+                  dot={false}
+                  name="Close Price"
                 />
-              )
-            })}
+                {volumeColorEnabled && (
+                  <>
+                    <Line
+                      type="monotone"
+                      dataKey="highVolumeClose"
+                      stroke="#ea580c"
+                      strokeWidth={3}
+                      dot={false}
+                      name={volumeColorMode === 'relative-spy' ? "High Volume vs SPY (Top 20%)" : "High Volume (Top 20%)"}
+                      connectNulls={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="lowVolumeClose"
+                      stroke="#06b6d4"
+                      strokeWidth={3}
+                      dot={false}
+                      name={volumeColorMode === 'relative-spy' ? "Low Volume vs SPY (Bottom 20%)" : "Low Volume (Bottom 20%)"}
+                      connectNulls={false}
+                    />
+                  </>
+                )}
+                {performanceComparisonEnabled && comparisonMode === 'color' && (
+                  <>
+                    <Line
+                      type="monotone"
+                      dataKey="topPerformanceClose"
+                      stroke="#22c55e"
+                      strokeWidth={3}
+                      dot={false}
+                      name={`Top Performance vs ${performanceComparisonBenchmark} (Top 20%)`}
+                      connectNulls={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="bottomPerformanceClose"
+                      stroke="#ef4444"
+                      strokeWidth={3}
+                      dot={false}
+                      name={`Bottom Performance vs ${performanceComparisonBenchmark} (Bottom 20%)`}
+                      connectNulls={false}
+                    />
+                  </>
+                )}
+                {comparisonMode === 'line' && comparisonStocks && comparisonStocks.map((compStock, index) => {
+                  const compPositiveKey = `compPos_${compStock.symbol}`
+                  const compNegativeKey = `compNeg_${compStock.symbol}`
 
-            {/* Resistance Line - Color-coded by volume percentage */}
-            <Customized component={(props) => <ImportedCustomResistanceLine {...props} chartDataWithZones={chartDataWithZones} resLnEnabled={resLnEnabled} />} />
+                  // Base colors for each comparison stock
+                  const baseColors = [
+                    { light: '#93c5fd', dark: '#1e40af' }, // Blue
+                    { light: '#86efac', dark: '#15803d' }, // Green
+                    { light: '#fde047', dark: '#a16207' }, // Yellow
+                    { light: '#c4b5fd', dark: '#6d28d9' }, // Purple
+                    { light: '#f9a8d4', dark: '#be185d' }, // Pink
+                    { light: '#5eead4', dark: '#0f766e' }, // Teal
+                  ]
 
-            {/* Second Volume Zone Line - Support/Resistance in same direction */}
-            <Customized component={(props) => <ImportedCustomSecondVolZoneLine {...props} chartDataWithZones={chartDataWithZones} resLnEnabled={resLnEnabled} />} />
+                  const colorPair = baseColors[index % baseColors.length]
 
-            {/* Third Volume Zone Line - Support/Resistance in opposite direction */}
-            <Customized component={(props) => <ImportedCustomThirdVolZoneLine {...props} chartDataWithZones={chartDataWithZones} resLnEnabled={resLnEnabled} />} />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-      </>
+                  return (
+                    <React.Fragment key={compStock.symbol}>
+                      {/* Deeper/darker color when ABOVE selected stock (outperforming) */}
+                      <Line
+                        type="monotone"
+                        dataKey={compPositiveKey}
+                        stroke={colorPair.dark}
+                        strokeWidth={2.5}
+                        dot={false}
+                        name={`${compStock.symbol} (Above)`}
+                        connectNulls={false}
+                      />
+                      {/* Lighter color when BELOW selected stock (underperforming) */}
+                      <Line
+                        type="monotone"
+                        dataKey={compNegativeKey}
+                        stroke={colorPair.light}
+                        strokeWidth={2.5}
+                        dot={false}
+                        name={`${compStock.symbol} (Below)`}
+                        connectNulls={false}
+                      />
+                    </React.Fragment>
+                  )
+                })}
+                {smaPeriods.map((period, index) => {
+                  const smaKey = `sma${period}`
+                  const isVisible = smaVisibility[period]
+                  const upperPercent = smaChannelUpperPercent?.[period] ?? 0
+                  const lowerPercent = smaChannelLowerPercent?.[period] ?? 0
+                  const hasChannels = upperPercent > 0 || lowerPercent > 0
+
+                  return (
+                    <React.Fragment key={`sma-${period}`}>
+                      <Line
+                        key={smaKey}
+                        type="monotone"
+                        dataKey={smaKey}
+                        stroke={getSmaColor(period)}
+                        strokeWidth={1.5}
+                        dot={false}
+                        name={`SMA ${period}`}
+                        strokeDasharray="5 5"
+                        hide={!isVisible}
+                        connectNulls={true}
+                      />
+                      {/* Upper channel line */}
+                      {hasChannels && upperPercent > 0 && (
+                        <Line
+                          key={`${smaKey}ChannelUpper`}
+                          type="monotone"
+                          dataKey={`${smaKey}ChannelUpper`}
+                          stroke={getSmaColor(period)}
+                          strokeWidth={1}
+                          dot={false}
+                          name={`SMA ${period} Upper (+${upperPercent.toFixed(1)}%)`}
+                          strokeDasharray="2 2"
+                          opacity={0.5}
+                          hide={!isVisible}
+                          legendType="none"
+                          connectNulls={true}
+                        />
+                      )}
+                      {/* Lower channel line */}
+                      {hasChannels && lowerPercent > 0 && (
+                        <Line
+                          key={`${smaKey}ChannelLower`}
+                          type="monotone"
+                          dataKey={`${smaKey}ChannelLower`}
+                          stroke={getSmaColor(period)}
+                          strokeWidth={1}
+                          dot={false}
+                          name={`SMA ${period} Lower (-${lowerPercent.toFixed(1)}%)`}
+                          strokeDasharray="2 2"
+                          opacity={0.5}
+                          hide={!isVisible}
+                          legendType="none"
+                          connectNulls={true}
+                        />
+                      )}
+                    </React.Fragment>
+                  )
+                })}
+
+                {/* Market Gap Open Indicators */}
+                {mktGapOpenEnabled && mktGapOpenData.map((gap, index) => {
+                  // Find the corresponding data point in the main chart to position the arrow
+                  const pricePoint = prices.find(p => p.date === gap.date)
+                  if (!pricePoint) return null
+
+                  // Gap Up (SPY > 0) -> Down Arrow
+                  // Gap Down (SPY < 0) -> Up Arrow
+                  // Anchor to CLOSE price so it touches the line
+                  const isGapUp = gap.isGapUp
+                  const yPos = pricePoint.close
+                  const color = isGapUp ? "#ef4444" : "#22c55e" // Red for Gap Up (Down Arrow), Green for Gap Down (Up Arrow)
+
+                  return (
+                    <ReferenceDot
+                      key={`gap-${gap.date}-${index}`}
+                      x={gap.date}
+                      y={yPos}
+                      r={0} // Invisible dot, just for positioning
+                      label={({ viewBox }) => {
+                        const { x, y } = viewBox
+                        // y is the screen coordinate of the price point (High or Low)
+
+                        return (
+                          <g transform={`translate(${x}, ${y})`}>
+                            {isGapUp ? (
+                              // Gap Up: Down Arrow pointing at High (y)
+                              // Text above arrow
+                              <>
+                                <text
+                                  x={0}
+                                  y={-20}
+                                  textAnchor="middle"
+                                  fill={color}
+                                  fontSize={11}
+                                  fontWeight="bold"
+                                >
+                                  {gap.symbol} {gap.changePercent}%
+                                </text>
+                                <path
+                                  d="M0,-15 L0,0 M-5,-5 L0,0 L5,-5"
+                                  stroke={color}
+                                  strokeWidth={2}
+                                  fill="none"
+                                />
+                              </>
+                            ) : (
+                              // Gap Down: Up Arrow pointing at Low (y)
+                              // Text below arrow
+                              <>
+                                <path
+                                  d="M0,15 L0,0 M-5,5 L0,0 L5,5"
+                                  stroke={color}
+                                  strokeWidth={2}
+                                  fill="none"
+                                />
+                                <text
+                                  x={0}
+                                  y={27}
+                                  textAnchor="middle"
+                                  fill={color}
+                                  fontSize={11}
+                                  fontWeight="bold"
+                                >
+                                  {gap.symbol} {gap.changePercent}%
+                                </text>
+                              </>
+                            )}
+                          </g>
+                        )
+                      }}
+                    />
+                  )
+                })}
+
+                {/* Resistance Line - Color-coded by volume percentage */}
+                <Customized component={(props) => <ImportedCustomResistanceLine {...props} chartDataWithZones={chartDataWithZones} resLnEnabled={resLnEnabled} />} />
+
+                {/* Second Volume Zone Line - Support/Resistance in same direction */}
+                <Customized component={(props) => <ImportedCustomSecondVolZoneLine {...props} chartDataWithZones={chartDataWithZones} resLnEnabled={resLnEnabled} />} />
+
+                {/* Third Volume Zone Line - Support/Resistance in opposite direction */}
+                <Customized component={(props) => <ImportedCustomThirdVolZoneLine {...props} chartDataWithZones={chartDataWithZones} resLnEnabled={resLnEnabled} />} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </>
       )}
     </div>
   )

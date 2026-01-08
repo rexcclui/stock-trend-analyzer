@@ -537,15 +537,15 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     for (let i = 1; i < prices.length - 1; i++) {
       if (!smaData[i] || smaData[i] <= 0) continue
 
-      const prev = prices[i - 1].close
-      const curr = prices[i].close
-      const next = prices[i + 1].close
+      const prev = prices[i - 1].close // Newer data (index i-1)
+      const curr = prices[i].close     // Current data (index i)
+      const next = prices[i + 1].close // Older data (index i+1)
 
-      // Local maximum
+      // Local maximum (Higher than newer data AND higher than older data)
       if (curr > prev && curr > next) {
         turningPoints.push({ index: i, type: 'max', price: curr, sma: smaData[i] })
       }
-      // Local minimum
+      // Local minimum (Lower than newer data AND lower than older data)
       else if (curr < prev && curr < next) {
         turningPoints.push({ index: i, type: 'min', price: curr, sma: smaData[i] })
       }
@@ -572,36 +572,40 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     let bestLowerTouches = 0
 
     // Find optimal upper bound (for maxima)
-    testPercentages.forEach(pct => {
-      let touches = 0
-      maxima.forEach(tp => {
-        const upperBound = tp.sma * (1 + pct / 100)
-        const variance = Math.abs(upperBound - tp.price) / tp.price * 100
-        if (variance <= tolerance) {
-          touches++
+    if (maxima.length > 0) {
+      testPercentages.forEach(pct => {
+        let touches = 0
+        maxima.forEach(tp => {
+          const upperBound = tp.sma * (1 + pct / 100)
+          const variance = Math.abs(upperBound - tp.price) / tp.price * 100
+          if (variance <= tolerance) {
+            touches++
+          }
+        })
+        if (touches > bestUpperTouches) {
+          bestUpperTouches = touches
+          bestUpper = pct
         }
       })
-      if (touches > bestUpperTouches) {
-        bestUpperTouches = touches
-        bestUpper = pct
-      }
-    })
+    }
 
     // Find optimal lower bound (for minima)
-    testPercentages.forEach(pct => {
-      let touches = 0
-      minima.forEach(tp => {
-        const lowerBound = tp.sma * (1 - pct / 100)
-        const variance = Math.abs(lowerBound - tp.price) / tp.price * 100
-        if (variance <= tolerance) {
-          touches++
+    if (minima.length > 0) {
+      testPercentages.forEach(pct => {
+        let touches = 0
+        minima.forEach(tp => {
+          const lowerBound = tp.sma * (1 - pct / 100)
+          const variance = Math.abs(lowerBound - tp.price) / tp.price * 100
+          if (variance <= tolerance) {
+            touches++
+          }
+        })
+        if (touches > bestLowerTouches) {
+          bestLowerTouches = touches
+          bestLower = pct
         }
       })
-      if (touches > bestLowerTouches) {
-        bestLowerTouches = touches
-        bestLower = pct
-      }
-    })
+    }
 
     // Round to 1 decimal place
     return {
@@ -621,15 +625,16 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
 
     // For each SMA period, find optimal bounds
     for (const period of testPeriods) {
-      // Calculate SMA for this period
+      // Calculate SMA for this period (Newest -> Oldest direction)
       const smaData = []
       for (let i = 0; i < prices.length; i++) {
-        if (i < period - 1) {
-          smaData.push(null)
+        // We need 'period' number of points from i to i + period - 1
+        if (i + period - 1 >= prices.length) {
+          smaData.push(null) // Not enough older data to calculate SMA
         } else {
           let sum = 0
           for (let j = 0; j < period; j++) {
-            sum += prices[i - j].close
+            sum += prices[i + j].close
           }
           smaData.push(sum / period)
         }
@@ -2660,12 +2665,12 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                                   const prices = chartData.data.prices
                                   const smaData = []
                                   for (let i = 0; i < prices.length; i++) {
-                                    if (i < period - 1) {
+                                    if (i + period - 1 >= prices.length) {
                                       smaData.push(null)
                                     } else {
                                       let sum = 0
                                       for (let j = 0; j < period; j++) {
-                                        sum += prices[i - j].close
+                                        sum += prices[i + j].close
                                       }
                                       smaData.push(sum / period)
                                     }
@@ -2689,11 +2694,10 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                                 <button
                                   onClick={() => handleComprehensiveSimulation(chart.id, index)}
                                   disabled={isSimulatingComp}
-                                  className={`px-2 py-1 text-xs rounded font-medium transition-colors whitespace-nowrap ${
-                                    isSimulatingComp
-                                      ? 'bg-purple-600 text-white cursor-wait'
-                                      : 'bg-purple-600 text-white hover:bg-purple-700'
-                                  }`}
+                                  className={`px-2 py-1 text-xs rounded font-medium transition-colors whitespace-nowrap ${isSimulatingComp
+                                    ? 'bg-purple-600 text-white cursor-wait'
+                                    : 'bg-purple-600 text-white hover:bg-purple-700'
+                                    }`}
                                   title="Simulate optimal SMA period + channel bounds to touch most turning points"
                                 >
                                   {isSimulatingComp ? (
@@ -2712,11 +2716,10 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                                   setSimulatingSma(prev => ({ ...prev, [smaKey]: index }))
                                 }}
                                 disabled={isSimulating}
-                                className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
-                                  isSimulating
-                                    ? 'bg-yellow-600 text-white cursor-wait'
-                                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                                }`}
+                                className={`px-2 py-1 text-xs rounded font-medium transition-colors ${isSimulating
+                                  ? 'bg-yellow-600 text-white cursor-wait'
+                                  : 'bg-blue-600 text-white hover:bg-blue-700'
+                                  }`}
                                 title="Simulate optimal SMA value based on P&L"
                               >
                                 {isSimulating ? (
@@ -2797,11 +2800,10 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                                 setSimulatingBreakoutThreshold(prev => ({ ...prev, [chart.id]: true }))
                               }}
                               disabled={simulatingBreakoutThreshold[chart.id]}
-                              className={`px-2 py-1 text-xs rounded font-medium transition-colors ${
-                                simulatingBreakoutThreshold[chart.id]
-                                  ? 'bg-yellow-600 text-white cursor-wait'
-                                  : 'bg-purple-600 text-white hover:bg-purple-700'
-                              }`}
+                              className={`px-2 py-1 text-xs rounded font-medium transition-colors ${simulatingBreakoutThreshold[chart.id]
+                                ? 'bg-yellow-600 text-white cursor-wait'
+                                : 'bg-purple-600 text-white hover:bg-purple-700'
+                                }`}
                               title="Simulate optimal breakout threshold based on P&L"
                             >
                               {simulatingBreakoutThreshold[chart.id] ? (

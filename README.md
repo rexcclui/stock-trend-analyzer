@@ -639,3 +639,6 @@ For issues and questions:
 **Built with**: Java 17, AWS Lambda, React 18, Vite, Recharts, Tailwind CSS
 
 **Data Source**: Financial Modeling Prep API
+
+https://8i8590b7nf.execute-api.eu-west-1.amazonaws.com/prod/analyze?symbol=ZM&days=1825
+https://financialmodelingprep.com/api/v3/historical-price-full/AAPL?from=2021-01-05&to=2026-01-05&apikey=zGcTWbE1JPSBQB43vW4NGgTow69y5ksM
