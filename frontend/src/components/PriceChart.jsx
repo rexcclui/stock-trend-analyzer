@@ -684,12 +684,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return smaData
   }
 
-  // Pre-calculate all SMAs using displayPrices to ensure alignment
-  const smaCache = {}
-  smaPeriods.forEach(period => {
-    smaCache[period] = calculateSMA(displayPrices, period)
-  })
-
   // Calculate Last Channel using linear regression
   // If useStoredParams is true and we have stored params, use them; otherwise optimize
   const calculateSlopeChannel = (data, useStoredParams = true, volumeWeighted = false) => {
@@ -2177,6 +2171,15 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // This prevents mismatch when period changes and indicators haven't updated yet
   const displayPrices = useMemo(() => prices.slice(0, dataLength), [prices, dataLength])
   const displayIndicators = useMemo(() => (indicators || []).slice(0, dataLength), [indicators, dataLength])
+
+  // Pre-calculate all SMAs using displayPrices to ensure alignment
+  const smaCache = useMemo(() => {
+    const cache = {}
+    smaPeriods.forEach(period => {
+      cache[period] = calculateSMA(displayPrices, period)
+    })
+    return cache
+  }, [displayPrices, smaPeriods])
 
   // Build a map of SPY volumes by date for quick lookup
   const spyVolumeByDate = (() => {
