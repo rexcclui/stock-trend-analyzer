@@ -2173,10 +2173,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   const displayIndicators = useMemo(() => (indicators || []).slice(0, dataLength), [indicators, dataLength])
 
   // Pre-calculate all SMAs using displayPrices to ensure alignment
+  // IMPORTANT: Reverse the SMA arrays to match the reversed chartData order
   const smaCache = useMemo(() => {
     const cache = {}
     smaPeriods.forEach(period => {
-      cache[period] = calculateSMA(displayPrices, period)
+      const smaData = calculateSMA(displayPrices, period)
+      cache[period] = [...smaData].reverse() // Reverse to match chartData
     })
     return cache
   }, [displayPrices, smaPeriods])
