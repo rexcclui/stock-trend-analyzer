@@ -684,10 +684,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return smaData
   }
 
-  // Pre-calculate all SMAs
+  // Pre-calculate all SMAs using displayPrices to ensure alignment
   const smaCache = {}
   smaPeriods.forEach(period => {
-    smaCache[period] = calculateSMA(prices, period)
+    smaCache[period] = calculateSMA(displayPrices, period)
   })
 
   // Calculate Last Channel using linear regression
@@ -5865,6 +5865,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                     name={`SMA ${period}`}
                     strokeDasharray="5 5"
                     hide={!isVisible}
+                    connectNulls={true}
                   />
                   {/* Upper channel line */}
                   {hasChannels && upperPercent > 0 && (
@@ -5880,6 +5881,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                       opacity={0.5}
                       hide={!isVisible}
                       legendType="none"
+                      connectNulls={true}
                     />
                   )}
                   {/* Lower channel line */}
@@ -5896,6 +5898,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                       opacity={0.5}
                       hide={!isVisible}
                       legendType="none"
+                      connectNulls={true}
                     />
                   )}
                 </React.Fragment>
