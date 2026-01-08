@@ -50,7 +50,7 @@ function StatisticsCharts({ stockData, zoomRange }) {
 
   // Helper function to aggregate statistics
   const aggregateStats = (groupedData) => {
-    const stats = Object.entries(groupedData).map(([key, items]) => {
+    return Object.entries(groupedData).map(([key, items]) => {
       const validChanges = items.filter(item => item.percentChange !== 0)
       const count = validChanges.length
       const avgChange = count > 0 ? validChanges.reduce((sum, item) => sum + item.percentChange, 0) / count : 0
@@ -65,17 +65,6 @@ function StatisticsCharts({ stockData, zoomRange }) {
         minChange: parseFloat(minChange.toFixed(2))
       }
     })
-
-    // Find the single category with absolute max and min
-    const maxEntry = stats.reduce((max, curr) => curr.maxChange > max.maxChange ? curr : max, stats[0] || { maxChange: 0 })
-    const minEntry = stats.reduce((min, curr) => curr.minChange < min.minChange ? curr : min, stats[0] || { minChange: 0 })
-
-    // Return stats with markers for which category has the absolute max/min
-    return stats.map(stat => ({
-      ...stat,
-      isAbsoluteMax: stat.name === maxEntry.name,
-      isAbsoluteMin: stat.name === minEntry.name
-    }))
   }
 
   // Group by weekdays (Mon-Fri only, weekends filtered out)
@@ -201,19 +190,11 @@ function StatisticsCharts({ stockData, zoomRange }) {
 
   // Render a single chart
   const renderChart = (title, data, metricKey, yAxisLabel, colors) => {
-    // Filter data based on metric type
-    let filteredData = data
-    if (metricKey === 'maxChange') {
-      filteredData = data.filter(item => item.isAbsoluteMax)
-    } else if (metricKey === 'minChange') {
-      filteredData = data.filter(item => item.isAbsoluteMin)
-    }
-
     return (
       <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
         <h5 className="text-sm font-semibold mb-3 text-slate-200 text-center">{title}</h5>
         <ResponsiveContainer width="100%" height={250}>
-          <BarChart data={filteredData} margin={{ top: 5, right: 10, left: isMobile ? -10 : 10, bottom: 5 }}>
+          <BarChart data={data} margin={{ top: 5, right: 10, left: isMobile ? -10 : 10, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
             <XAxis
               dataKey="name"
@@ -231,7 +212,7 @@ function StatisticsCharts({ stockData, zoomRange }) {
             />
             <Tooltip content={<CustomTooltip />} />
             <Bar dataKey={metricKey} radius={[4, 4, 0, 0]}>
-              {filteredData.map((entry, index) => (
+              {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
               ))}
               <LabelList
