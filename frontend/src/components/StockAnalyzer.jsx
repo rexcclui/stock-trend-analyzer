@@ -144,6 +144,9 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
   // Track SMA simulation state (chartId-index pairs that are simulating)
   const [simulatingSma, setSimulatingSma] = useState({})
 
+  // Track comprehensive SMA+bounds simulation state (chartId-index pairs)
+  const [simulatingComprehensive, setSimulatingComprehensive] = useState({})
+
   // Track breakout threshold simulation state (chartId that is simulating)
   const [simulatingBreakoutThreshold, setSimulatingBreakoutThreshold] = useState({})
 
@@ -510,39 +513,217 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
   }
 
   const simulateSmaChannelPercent = (chartId, period, prices, smaData) => {
-    // Calculate optimal upper and lower percentages to contain 98% of price data
+    // Find optimal upper and lower percentages that touch the most turning points
+    // "Touch" means the bound is within 5% absolute variance of the price
     if (!prices || !smaData || prices.length === 0 || smaData.length === 0) {
       return { upper: 5, lower: 5 }
     }
 
-    // Calculate percentage deviations for all valid data points
-    const deviations = []
-    for (let i = 0; i < prices.length && i < smaData.length; i++) {
-      if (smaData[i] && smaData[i] > 0) {
-        const deviation = ((prices[i].close - smaData[i]) / smaData[i]) * 100
-        deviations.push(deviation)
+    // Identify turning points (local maxima and minima)
+    const turningPoints = []
+    for (let i = 1; i < prices.length - 1; i++) {
+      if (!smaData[i] || smaData[i] <= 0) continue
+
+      const prev = prices[i - 1].close
+      const curr = prices[i].close
+      const next = prices[i + 1].close
+
+      // Local maximum
+      if (curr > prev && curr > next) {
+        turningPoints.push({ index: i, type: 'max', price: curr, sma: smaData[i] })
+      }
+      // Local minimum
+      else if (curr < prev && curr < next) {
+        turningPoints.push({ index: i, type: 'min', price: curr, sma: smaData[i] })
       }
     }
 
-    if (deviations.length === 0) {
+    if (turningPoints.length === 0) {
       return { upper: 5, lower: 5 }
     }
 
-    // Sort deviations
-    deviations.sort((a, b) => a - b)
+    // Separate maxima and minima
+    const maxima = turningPoints.filter(tp => tp.type === 'max')
+    const minima = turningPoints.filter(tp => tp.type === 'min')
 
-    // Find the 1st and 99th percentile (to contain 98% of data)
-    const lowerIndex = Math.floor(deviations.length * 0.01)
-    const upperIndex = Math.ceil(deviations.length * 0.99) - 1
+    // Test different percentage values and count touches
+    // Test from 1% to 30% in 0.5% increments
+    const testPercentages = []
+    for (let p = 1; p <= 30; p += 0.5) {
+      testPercentages.push(p)
+    }
 
-    const lowerDeviation = Math.abs(deviations[lowerIndex])
-    const upperDeviation = Math.abs(deviations[upperIndex])
+    let bestUpper = 5
+    let bestUpperTouches = 0
+    let bestLower = 5
+    let bestLowerTouches = 0
+
+    // Find optimal upper bound (for maxima)
+    testPercentages.forEach(pct => {
+      let touches = 0
+      maxima.forEach(tp => {
+        const upperBound = tp.sma * (1 + pct / 100)
+        const variance = Math.abs(upperBound - tp.price) / tp.price * 100
+        if (variance <= 5) { // Within 5% tolerance
+          touches++
+        }
+      })
+      if (touches > bestUpperTouches) {
+        bestUpperTouches = touches
+        bestUpper = pct
+      }
+    })
+
+    // Find optimal lower bound (for minima)
+    testPercentages.forEach(pct => {
+      let touches = 0
+      minima.forEach(tp => {
+        const lowerBound = tp.sma * (1 - pct / 100)
+        const variance = Math.abs(lowerBound - tp.price) / tp.price * 100
+        if (variance <= 5) { // Within 5% tolerance
+          touches++
+        }
+      })
+      if (touches > bestLowerTouches) {
+        bestLowerTouches = touches
+        bestLower = pct
+      }
+    })
 
     // Round to 1 decimal place
     return {
-      upper: Math.round(upperDeviation * 10) / 10,
-      lower: Math.round(lowerDeviation * 10) / 10
+      upper: Math.round(bestUpper * 10) / 10,
+      lower: Math.round(bestLower * 10) / 10
     }
+  }
+
+  const simulateComprehensive = async (chartId, smaIndex, prices) => {
+    // Find optimal SMA period AND upper/lower bounds that touch the most turning points
+    if (!prices || prices.length === 0) return null
+
+    // Test SMA periods: use common values
+    const testPeriods = [5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100, 120, 150, 200]
+
+    let bestResult = { period: 10, upper: 5, lower: 5, totalTouches: 0 }
+
+    // For each SMA period, find optimal bounds
+    for (const period of testPeriods) {
+      // Calculate SMA for this period
+      const smaData = []
+      for (let i = 0; i < prices.length; i++) {
+        if (i < period - 1) {
+          smaData.push(null)
+        } else {
+          let sum = 0
+          for (let j = 0; j < period; j++) {
+            sum += prices[i - j].close
+          }
+          smaData.push(sum / period)
+        }
+      }
+
+      // Find optimal bounds for this period
+      const result = simulateSmaChannelPercent(chartId, period, prices, smaData)
+
+      // Count total touches for this configuration
+      const turningPoints = []
+      for (let i = 1; i < prices.length - 1; i++) {
+        if (!smaData[i] || smaData[i] <= 0) continue
+
+        const prev = prices[i - 1].close
+        const curr = prices[i].close
+        const next = prices[i + 1].close
+
+        if (curr > prev && curr > next) {
+          turningPoints.push({ type: 'max', price: curr, sma: smaData[i] })
+        } else if (curr < prev && curr < next) {
+          turningPoints.push({ type: 'min', price: curr, sma: smaData[i] })
+        }
+      }
+
+      let totalTouches = 0
+      turningPoints.forEach(tp => {
+        if (tp.type === 'max') {
+          const upperBound = tp.sma * (1 + result.upper / 100)
+          const variance = Math.abs(upperBound - tp.price) / tp.price * 100
+          if (variance <= 5) totalTouches++
+        } else {
+          const lowerBound = tp.sma * (1 - result.lower / 100)
+          const variance = Math.abs(lowerBound - tp.price) / tp.price * 100
+          if (variance <= 5) totalTouches++
+        }
+      })
+
+      if (totalTouches > bestResult.totalTouches) {
+        bestResult = {
+          period,
+          upper: result.upper,
+          lower: result.lower,
+          totalTouches
+        }
+      }
+    }
+
+    return bestResult
+  }
+
+  const handleComprehensiveSimulation = async (chartId, smaIndex) => {
+    const chart = charts.find(c => c.id === chartId)
+    if (!chart || !chart.data || !chart.data.prices) return
+
+    const smaKey = `${chartId}-${smaIndex}`
+    setSimulatingComprehensive(prev => ({ ...prev, [smaKey]: true }))
+
+    // Run simulation asynchronously
+    setTimeout(async () => {
+      try {
+        const result = await simulateComprehensive(chartId, smaIndex, chart.data.prices)
+
+        if (result) {
+          // Update the SMA period and bounds
+          setCharts(prevCharts =>
+            prevCharts.map(c => {
+              if (c.id === chartId) {
+                const newPeriods = [...c.smaPeriods]
+                const oldPeriod = newPeriods[smaIndex]
+                newPeriods[smaIndex] = result.period
+
+                const newUpperPercent = { ...c.smaChannelUpperPercent }
+                const newLowerPercent = { ...c.smaChannelLowerPercent }
+
+                // Remove old period entries
+                delete newUpperPercent[oldPeriod]
+                delete newLowerPercent[oldPeriod]
+
+                // Add new period entries
+                newUpperPercent[result.period] = result.upper
+                newLowerPercent[result.period] = result.lower
+
+                const newVisibility = {}
+                newPeriods.forEach(period => {
+                  newVisibility[period] = c.smaVisibility?.[period] ?? true
+                })
+
+                return {
+                  ...c,
+                  smaPeriods: newPeriods,
+                  smaVisibility: newVisibility,
+                  smaChannelUpperPercent: newUpperPercent,
+                  smaChannelLowerPercent: newLowerPercent
+                }
+              }
+              return c
+            })
+          )
+        }
+      } finally {
+        setSimulatingComprehensive(prev => {
+          const newState = { ...prev }
+          delete newState[smaKey]
+          return newState
+        })
+      }
+    }, 100)
   }
 
   // Helper function to stop SMA button press-and-hold
@@ -2456,7 +2637,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                             />
                             <span className="text-xs text-slate-400 w-9 text-right">{lowerPercent.toFixed(1)}%</span>
 
-                            {/* Sim Button */}
+                            {/* Sim Bound Button - optimizes bounds only */}
                             <button
                               onClick={() => {
                                 const chartData = charts.find(c => c.id === chart.id)
@@ -2480,11 +2661,35 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                                   updateSmaChannelPercent(chart.id, period, 'lower', result.lower)
                                 }
                               }}
-                              className="px-2 py-1 text-xs rounded font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"
-                              title="Simulate optimal channel % to contain 98% of prices"
+                              className="px-2 py-1 text-xs rounded font-medium bg-green-600 text-white hover:bg-green-700 transition-colors whitespace-nowrap"
+                              title="Simulate optimal channel % to touch most turning points (5% tolerance)"
                             >
-                              Sim
+                              Sim Bound
                             </button>
+
+                            {/* Comprehensive Sim Button - optimizes SMA period AND bounds */}
+                            {(() => {
+                              const compKey = `${chart.id}-${index}`
+                              const isSimulatingComp = simulatingComprehensive[compKey]
+                              return (
+                                <button
+                                  onClick={() => handleComprehensiveSimulation(chart.id, index)}
+                                  disabled={isSimulatingComp}
+                                  className={`px-2 py-1 text-xs rounded font-medium transition-colors whitespace-nowrap ${
+                                    isSimulatingComp
+                                      ? 'bg-purple-600 text-white cursor-wait'
+                                      : 'bg-purple-600 text-white hover:bg-purple-700'
+                                  }`}
+                                  title="Simulate optimal SMA period + channel bounds to touch most turning points"
+                                >
+                                  {isSimulatingComp ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    'Sim All'
+                                  )}
+                                </button>
+                              )
+                            })()}
 
                             {/* SMA Value Sim Button (only for Vol Prf V2) */}
                             {chart.volumeProfileV2Enabled && (
