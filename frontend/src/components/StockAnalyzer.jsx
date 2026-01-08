@@ -3,6 +3,7 @@ import axios from 'axios'
 import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp, RefreshCw, Filter, Menu, ZoomIn, LineChart } from 'lucide-react'
 import PriceChart from './PriceChart'
 import IndicatorsChart from './IndicatorsChart'
+import StatisticsCharts from './StatisticsCharts'
 import SignalsList from './SignalsList'
 import { apiCache } from '../utils/apiCache'
 import { joinUrl } from '../utils/urlHelper'
@@ -251,6 +252,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
             data: data,
             showRSI: false,
             showMACD: false,
+            showStatistics: false,
             smaPeriods: defaultSMAs,
             smaVisibility: defaultSMAVisibility,
             volumeColorEnabled: false,
@@ -2144,6 +2146,16 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                       >
                         MACD
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => updateChartIndicator(chart.id, 'showStatistics', !chart.showStatistics)}
+                        className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.showStatistics
+                          ? 'bg-purple-600 text-white'
+                          : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                      >
+                        Statistic
+                      </button>
                     </div>
                   </div>}
                 </div>
@@ -2477,6 +2489,17 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                     zoomRange={globalZoomRange}
                     onZoomChange={updateGlobalZoom}
                     onExtendPeriod={extendTimePeriod}
+                  />
+                </div>
+              )}
+
+              {/* Statistics */}
+              {!chart.collapsed && chart.showStatistics && (
+                <div className="bg-slate-800 p-2 md:p-6 rounded-lg border-0 md:border md:border-slate-700">
+                  <h3 className="text-lg font-semibold mb-4 text-slate-100">Statistics</h3>
+                  <StatisticsCharts
+                    stockData={chart.data.history}
+                    zoomRange={globalZoomRange}
                   />
                 </div>
               )}
