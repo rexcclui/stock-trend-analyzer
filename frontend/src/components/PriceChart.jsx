@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
-import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, ReferenceDot, Customized, Scatter } from 'recharts'
+import { ComposedChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, ReferenceDot, Customized } from 'recharts'
 import { X, ArrowLeftRight, Hand } from 'lucide-react'
 import { findBestChannels, filterOverlappingChannels } from './PriceChart/utils/bestChannelFinder'
 import { calculateLinearRegression, getRegressionLinePoints } from './PriceChart/utils/regressionUtils'
@@ -6103,27 +6103,39 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                 })}
 
                 {smaTouchPointMarkers.length > 0 && (
-                  <Scatter
-                    data={smaTouchPointMarkers}
-                    dataKey="value"
-                    name="SMA Touch Points"
-                    shape={(props) => {
-                      const fill = props.payload.type === 'upper' ? '#22c55e' : '#ef4444'
+                  <Customized component={(props) => {
+                    const { xAxisMap, yAxisMap } = props
+                    if (!xAxisMap || !yAxisMap) return null
 
-                      return (
-                        <circle
-                          cx={props.cx}
-                          cy={props.cy}
-                          r={3}
-                          fill={fill}
-                          stroke="rgba(15, 23, 42, 0.8)"
-                          strokeWidth={1}
-                        />
-                      )
-                    }}
-                    isAnimationActive={false}
-                    legendType="none"
-                  />
+                    const xAxis = xAxisMap[0]
+                    const yAxis = yAxisMap[0]
+
+                    if (!xAxis || !yAxis) return null
+
+                    return (
+                      <g>
+                        {smaTouchPointMarkers.map((point, idx) => {
+                          const x = xAxis.scale(point.date)
+                          const y = yAxis.scale(point.value)
+                          if (x === undefined || y === undefined) return null
+
+                          const fill = point.type === 'upper' ? '#22c55e' : '#ef4444'
+
+                          return (
+                            <circle
+                              key={`${point.period}-${point.type}-${point.date}-${idx}`}
+                              cx={x}
+                              cy={y}
+                              r={3}
+                              fill={fill}
+                              stroke="rgba(15, 23, 42, 0.8)"
+                              strokeWidth={1}
+                            />
+                          )
+                        })}
+                      </g>
+                    )
+                  }} />
                 )}
 
                 {/* Market Gap Open Indicators */}
