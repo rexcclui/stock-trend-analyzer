@@ -42,6 +42,12 @@ function StatisticsCharts({ stockData, zoomRange }) {
     }
   })
 
+  // Filter out weekends (Saturday = 6, Sunday = 0)
+  const weekdayData = dataWithChanges.filter(item => {
+    const dayOfWeek = item.date.getDay()
+    return dayOfWeek !== 0 && dayOfWeek !== 6
+  })
+
   // Helper function to aggregate statistics
   const aggregateStats = (groupedData) => {
     return Object.entries(groupedData).map(([key, items]) => {
@@ -61,15 +67,19 @@ function StatisticsCharts({ stockData, zoomRange }) {
     })
   }
 
-  // Group by weekdays (Mon-Sun)
+  // Group by weekdays (Mon-Fri only, weekends filtered out)
   const groupByWeekday = () => {
-    const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
     const grouped = {}
     weekdays.forEach(day => grouped[day] = [])
 
-    dataWithChanges.forEach(item => {
-      const dayName = weekdays[item.date.getDay()]
-      grouped[dayName].push(item)
+    weekdayData.forEach(item => {
+      const dayOfWeek = item.date.getDay()
+      // Map day number to weekday name (1=Monday, 2=Tuesday, etc.)
+      if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+        const dayName = weekdays[dayOfWeek - 1]
+        grouped[dayName].push(item)
+      }
     })
 
     return aggregateStats(grouped)
@@ -79,7 +89,7 @@ function StatisticsCharts({ stockData, zoomRange }) {
   const groupByQuarter = () => {
     const grouped = { 'Q1': [], 'Q2': [], 'Q3': [], 'Q4': [] }
 
-    dataWithChanges.forEach(item => {
+    weekdayData.forEach(item => {
       const month = item.date.getMonth()
       const quarter = `Q${Math.floor(month / 3) + 1}`
       grouped[quarter].push(item)
@@ -94,7 +104,7 @@ function StatisticsCharts({ stockData, zoomRange }) {
     const grouped = {}
     months.forEach(month => grouped[month] = [])
 
-    dataWithChanges.forEach(item => {
+    weekdayData.forEach(item => {
       const monthName = months[item.date.getMonth()]
       grouped[monthName].push(item)
     })
@@ -106,7 +116,7 @@ function StatisticsCharts({ stockData, zoomRange }) {
   const groupByYear = () => {
     const grouped = {}
 
-    dataWithChanges.forEach(item => {
+    weekdayData.forEach(item => {
       const year = item.date.getFullYear().toString()
       if (!grouped[year]) grouped[year] = []
       grouped[year].push(item)
@@ -119,7 +129,7 @@ function StatisticsCharts({ stockData, zoomRange }) {
   const groupByMonthWeek = () => {
     const grouped = { 'Week 1': [], 'Week 2': [], 'Week 3': [], 'Week 4': [], 'Week 5': [] }
 
-    dataWithChanges.forEach(item => {
+    weekdayData.forEach(item => {
       const dayOfMonth = item.date.getDate()
       const weekNum = Math.ceil(dayOfMonth / 7)
       const weekKey = `Week ${weekNum}`
