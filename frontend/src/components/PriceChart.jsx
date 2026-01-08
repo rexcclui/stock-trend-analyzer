@@ -28,7 +28,7 @@ import { getVolumeColor } from './PriceChart/utils'
 import { calculateVolumeProfileV3WithSells } from './PriceChart/utils/volumeProfileV3Utils'
 import { calculateVolPrfV2Breakouts } from './PriceChart/utils/volumeProfileV2Utils'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, volumeProfileV2BreakoutThreshold = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RefreshTrigger = 0, volumeProfileV3RegressionThreshold = 6, onVolumeProfileV3RegressionThresholdChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, linearRegressionEnabled = false, linearRegressionSelections = [], onAddLinearRegressionSelection, onClearLinearRegressionSelections, onRemoveLinearRegressionSelection, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete, simulatingBreakoutThreshold = false, onBreakoutThresholdSimulateComplete }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, smaChannelUpperPercent = {}, smaChannelLowerPercent = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, volumeProfileV2BreakoutThreshold = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RefreshTrigger = 0, volumeProfileV3RegressionThreshold = 6, onVolumeProfileV3RegressionThresholdChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, linearRegressionEnabled = false, linearRegressionSelections = [], onAddLinearRegressionSelection, onClearLinearRegressionSelections, onRemoveLinearRegressionSelection, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete, simulatingBreakoutThreshold = false, onBreakoutThresholdSimulateComplete }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -3115,7 +3115,20 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     smaPeriods.forEach(period => {
       const smaKey = `sma${period}`
       // Try backend data first, fall back to frontend calculation
-      dataPoint[smaKey] = indicator[smaKey] || smaCache[period][index]
+      const smaValue = indicator[smaKey] || smaCache[period][index]
+      dataPoint[smaKey] = smaValue
+
+      // Add SMA channel upper and lower bounds if percentages are set
+      if (smaValue && smaValue > 0) {
+        const upperPercent = smaChannelUpperPercent?.[period] ?? 0
+        const lowerPercent = smaChannelLowerPercent?.[period] ?? 0
+        if (upperPercent > 0) {
+          dataPoint[`${smaKey}ChannelUpper`] = smaValue * (1 + upperPercent / 100)
+        }
+        if (lowerPercent > 0) {
+          dataPoint[`${smaKey}ChannelLower`] = smaValue * (1 - lowerPercent / 100)
+        }
+      }
     })
 
     // Add last channel data if enabled
@@ -5836,19 +5849,56 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             {smaPeriods.map((period, index) => {
               const smaKey = `sma${period}`
               const isVisible = smaVisibility[period]
+              const upperPercent = smaChannelUpperPercent?.[period] ?? 0
+              const lowerPercent = smaChannelLowerPercent?.[period] ?? 0
+              const hasChannels = upperPercent > 0 || lowerPercent > 0
 
               return (
-                <Line
-                  key={smaKey}
-                  type="monotone"
-                  dataKey={smaKey}
-                  stroke={getSmaColor(period)}
-                  strokeWidth={1.5}
-                  dot={false}
-                  name={`SMA ${period}`}
-                  strokeDasharray="5 5"
-                  hide={!isVisible}
-                />
+                <React.Fragment key={`sma-${period}`}>
+                  <Line
+                    key={smaKey}
+                    type="monotone"
+                    dataKey={smaKey}
+                    stroke={getSmaColor(period)}
+                    strokeWidth={1.5}
+                    dot={false}
+                    name={`SMA ${period}`}
+                    strokeDasharray="5 5"
+                    hide={!isVisible}
+                  />
+                  {/* Upper channel line */}
+                  {hasChannels && upperPercent > 0 && (
+                    <Line
+                      key={`${smaKey}ChannelUpper`}
+                      type="monotone"
+                      dataKey={`${smaKey}ChannelUpper`}
+                      stroke={getSmaColor(period)}
+                      strokeWidth={1}
+                      dot={false}
+                      name={`SMA ${period} Upper (+${upperPercent.toFixed(1)}%)`}
+                      strokeDasharray="2 2"
+                      opacity={0.5}
+                      hide={!isVisible}
+                      legendType="none"
+                    />
+                  )}
+                  {/* Lower channel line */}
+                  {hasChannels && lowerPercent > 0 && (
+                    <Line
+                      key={`${smaKey}ChannelLower`}
+                      type="monotone"
+                      dataKey={`${smaKey}ChannelLower`}
+                      stroke={getSmaColor(period)}
+                      strokeWidth={1}
+                      dot={false}
+                      name={`SMA ${period} Lower (-${lowerPercent.toFixed(1)}%)`}
+                      strokeDasharray="2 2"
+                      opacity={0.5}
+                      hide={!isVisible}
+                      legendType="none"
+                    />
+                  )}
+                </React.Fragment>
               )
             })}
 
