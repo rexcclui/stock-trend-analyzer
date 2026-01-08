@@ -2245,6 +2245,64 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return touchData
   }, [displayPrices, smaCache, smaPeriods, smaChannelUpperPercent, smaChannelLowerPercent])
 
+  const smaTouchPointMarkers = useMemo(() => {
+    const markers = []
+
+    smaPeriods.forEach(period => {
+      const smaData = smaCache[period]
+      const upperPercent = smaChannelUpperPercent?.[period] ?? 0
+      const lowerPercent = smaChannelLowerPercent?.[period] ?? 0
+      const isVisible = smaVisibility[period]
+
+      if (!smaData || (!upperPercent && !lowerPercent) || !isVisible) {
+        return
+      }
+
+      const tolerance = getTolerance(period)
+
+      for (let i = 1; i < displayPrices.length - 1; i++) {
+        if (!smaData[i] || smaData[i] <= 0) continue
+
+        const prev = displayPrices[i - 1].close
+        const curr = displayPrices[i].close
+        const next = displayPrices[i + 1].close
+
+        if (curr > prev && curr > next && upperPercent > 0) {
+          const upperBound = smaData[i] * (1 + upperPercent / 100)
+          const variance = Math.abs(upperBound - curr) / curr * 100
+          if (variance <= tolerance) {
+            markers.push({
+              date: displayPrices[i].date,
+              value: curr,
+              type: 'upper',
+              period
+            })
+          }
+        } else if (curr < prev && curr < next && lowerPercent > 0) {
+          const lowerBound = smaData[i] * (1 - lowerPercent / 100)
+          const variance = Math.abs(lowerBound - curr) / curr * 100
+          if (variance <= tolerance) {
+            markers.push({
+              date: displayPrices[i].date,
+              value: curr,
+              type: 'lower',
+              period
+            })
+          }
+        }
+      }
+    })
+
+    return markers
+  }, [
+    displayPrices,
+    smaCache,
+    smaPeriods,
+    smaChannelUpperPercent,
+    smaChannelLowerPercent,
+    smaVisibility
+  ])
+
   // Build a map of SPY volumes by date for quick lookup
   const spyVolumeByDate = (() => {
     if (!volumeColorEnabled || volumeColorMode !== 'relative-spy' || !spyData) return {}
@@ -6043,6 +6101,42 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                     </React.Fragment>
                   )
                 })}
+
+                {smaTouchPointMarkers.length > 0 && (
+                  <Customized component={(props) => {
+                    const { xAxisMap, yAxisMap } = props
+                    if (!xAxisMap || !yAxisMap) return null
+
+                    const xAxis = xAxisMap[0]
+                    const yAxis = yAxisMap[0]
+
+                    if (!xAxis || !yAxis) return null
+
+                    return (
+                      <g>
+                        {smaTouchPointMarkers.map((point, idx) => {
+                          const x = xAxis.scale(point.date)
+                          const y = yAxis.scale(point.value)
+                          if (x === undefined || y === undefined) return null
+
+                          const fill = point.type === 'upper' ? '#22c55e' : '#ef4444'
+
+                          return (
+                            <circle
+                              key={`${point.period}-${point.type}-${point.date}-${idx}`}
+                              cx={x}
+                              cy={y}
+                              r={3}
+                              fill={fill}
+                              stroke="rgba(15, 23, 42, 0.8)"
+                              strokeWidth={1}
+                            />
+                          )
+                        })}
+                      </g>
+                    )
+                  }} />
+                )}
 
                 {/* Market Gap Open Indicators */}
                 {mktGapOpenEnabled && mktGapOpenData.map((gap, index) => {
