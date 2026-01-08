@@ -2245,64 +2245,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return touchData
   }, [displayPrices, smaCache, smaPeriods, smaChannelUpperPercent, smaChannelLowerPercent])
 
-  const smaTouchPointMarkers = useMemo(() => {
-    const markers = []
-
-    smaPeriods.forEach(period => {
-      const smaData = smaCache[period]
-      const upperPercent = smaChannelUpperPercent?.[period] ?? 0
-      const lowerPercent = smaChannelLowerPercent?.[period] ?? 0
-      const isVisible = smaVisibility[period]
-
-      if (!smaData || (!upperPercent && !lowerPercent) || !isVisible) {
-        return
-      }
-
-      const tolerance = getTolerance(period)
-
-      for (let i = 1; i < displayPrices.length - 1; i++) {
-        if (!smaData[i] || smaData[i] <= 0) continue
-
-        const prev = displayPrices[i - 1].close
-        const curr = displayPrices[i].close
-        const next = displayPrices[i + 1].close
-
-        if (curr > prev && curr > next && upperPercent > 0) {
-          const upperBound = smaData[i] * (1 + upperPercent / 100)
-          const variance = Math.abs(upperBound - curr) / curr * 100
-          if (variance <= tolerance) {
-            markers.push({
-              date: displayPrices[i].date,
-              value: curr,
-              type: 'upper',
-              period
-            })
-          }
-        } else if (curr < prev && curr < next && lowerPercent > 0) {
-          const lowerBound = smaData[i] * (1 - lowerPercent / 100)
-          const variance = Math.abs(lowerBound - curr) / curr * 100
-          if (variance <= tolerance) {
-            markers.push({
-              date: displayPrices[i].date,
-              value: curr,
-              type: 'lower',
-              period
-            })
-          }
-        }
-      }
-    })
-
-    return markers
-  }, [
-    displayPrices,
-    smaCache,
-    smaPeriods,
-    smaChannelUpperPercent,
-    smaChannelLowerPercent,
-    smaVisibility
-  ])
-
   // Build a map of SPY volumes by date for quick lookup
   const spyVolumeByDate = (() => {
     if (!volumeColorEnabled || volumeColorMode !== 'relative-spy' || !spyData) return {}
@@ -3515,6 +3457,64 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     return data
   }, [chartData, zoomRange.start, zoomRange.end, comparisonMode, comparisonStocks])
+
+  const smaTouchPointMarkers = useMemo(() => {
+    const markers = []
+
+    smaPeriods.forEach(period => {
+      const upperPercent = smaChannelUpperPercent?.[period] ?? 0
+      const lowerPercent = smaChannelLowerPercent?.[period] ?? 0
+      const isVisible = smaVisibility[period]
+      const smaKey = `sma${period}`
+
+      if ((!upperPercent && !lowerPercent) || !isVisible) {
+        return
+      }
+
+      const tolerance = getTolerance(period)
+
+      for (let i = 1; i < visibleChartData.length - 1; i++) {
+        const smaValue = visibleChartData[i]?.[smaKey]
+        if (!smaValue || smaValue <= 0) continue
+
+        const prev = visibleChartData[i - 1].close
+        const curr = visibleChartData[i].close
+        const next = visibleChartData[i + 1].close
+
+        if (curr > prev && curr > next && upperPercent > 0) {
+          const upperBound = smaValue * (1 + upperPercent / 100)
+          const variance = Math.abs(upperBound - curr) / curr * 100
+          if (variance <= tolerance) {
+            markers.push({
+              date: visibleChartData[i].date,
+              value: curr,
+              type: 'upper',
+              period
+            })
+          }
+        } else if (curr < prev && curr < next && lowerPercent > 0) {
+          const lowerBound = smaValue * (1 - lowerPercent / 100)
+          const variance = Math.abs(lowerBound - curr) / curr * 100
+          if (variance <= tolerance) {
+            markers.push({
+              date: visibleChartData[i].date,
+              value: curr,
+              type: 'lower',
+              period
+            })
+          }
+        }
+      }
+    })
+
+    return markers
+  }, [
+    visibleChartData,
+    smaPeriods,
+    smaChannelUpperPercent,
+    smaChannelLowerPercent,
+    smaVisibility
+  ])
 
   const revAllVisibleLength = visibleChartData.length
   const maxRevAllChannelEndIndex = revAllVisibleLength > 0 ? revAllVisibleLength - 1 : 0
