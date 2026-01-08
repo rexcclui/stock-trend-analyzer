@@ -2273,7 +2273,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           if (variance <= tolerance) {
             markers.push({
               date: displayPrices[i].date,
-              value: upperBound,
+              value: curr,
               type: 'upper',
               period
             })
@@ -2284,7 +2284,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           if (variance <= tolerance) {
             markers.push({
               date: displayPrices[i].date,
-              value: lowerBound,
+              value: curr,
               type: 'lower',
               period
             })
