@@ -600,42 +600,69 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     let bestUpperTouches = 0
     let bestLower = 5
     let bestLowerTouches = 0
+    let bestTotalTouches = 0
 
-    // Find optimal upper bound (for maxima)
-    if (maxima.length > 0) {
-      testPercentages.forEach(pct => {
-        let touches = 0
+    // Test combinations of upper and lower bounds
+    // Find the combination that maximizes touches while keeping 75%+ prices within channel
+    testPercentages.forEach(upperPct => {
+      testPercentages.forEach(lowerPct => {
+        // Check if at least 75% of prices are within the channel
+        let pricesWithinChannel = 0
+        let totalValidPrices = 0
+
+        for (let i = 0; i < prices.length; i++) {
+          if (!smaData[i] || smaData[i] <= 0) continue
+
+          totalValidPrices++
+          const price = prices[i].close
+          const upperBound = smaData[i] * (1 + upperPct / 100)
+          const lowerBound = smaData[i] * (1 - lowerPct / 100)
+
+          // Price is within channel if it's between lower and upper bounds
+          if (price >= lowerBound && price <= upperBound) {
+            pricesWithinChannel++
+          }
+        }
+
+        const containmentRate = totalValidPrices > 0 ? pricesWithinChannel / totalValidPrices : 0
+
+        // Only consider this combination if at least 75% of prices are within the channel
+        if (containmentRate < 0.75) {
+          return // Skip this combination
+        }
+
+        // Count touches for this combination
+        let upperTouches = 0
+        let lowerTouches = 0
+
         maxima.forEach(tp => {
-          const upperBound = tp.sma * (1 + pct / 100)
+          const upperBound = tp.sma * (1 + upperPct / 100)
           const variance = Math.abs(upperBound - tp.price) / tp.price * 100
           if (variance <= tolerance) {
-            touches++
+            upperTouches++
           }
         })
-        if (touches > bestUpperTouches) {
-          bestUpperTouches = touches
-          bestUpper = pct
-        }
-      })
-    }
 
-    // Find optimal lower bound (for minima)
-    if (minima.length > 0) {
-      testPercentages.forEach(pct => {
-        let touches = 0
         minima.forEach(tp => {
-          const lowerBound = tp.sma * (1 - pct / 100)
+          const lowerBound = tp.sma * (1 - lowerPct / 100)
           const variance = Math.abs(lowerBound - tp.price) / tp.price * 100
           if (variance <= tolerance) {
-            touches++
+            lowerTouches++
           }
         })
-        if (touches > bestLowerTouches) {
-          bestLowerTouches = touches
-          bestLower = pct
+
+        const totalTouches = upperTouches + lowerTouches
+
+        // Keep the combination with the most total touches
+        if (totalTouches > bestTotalTouches) {
+          bestTotalTouches = totalTouches
+          bestUpperTouches = upperTouches
+          bestLowerTouches = lowerTouches
+          bestUpper = upperPct
+          bestLower = lowerPct
         }
       })
-    }
+    })
 
     // Round to 1 decimal place
     return {
