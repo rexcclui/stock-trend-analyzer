@@ -512,12 +512,25 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     )
   }
 
+  const getTolerance = (smaPeriod) => {
+    // Dynamic tolerance based on SMA period
+    if (smaPeriod < 10) return 1
+    if (smaPeriod < 15) return 2
+    if (smaPeriod < 20) return 3
+    if (smaPeriod < 30) return 4
+    if (smaPeriod < 40) return 5
+    return 5 // 40 and above
+  }
+
   const simulateSmaChannelPercent = (chartId, period, prices, smaData) => {
     // Find optimal upper and lower percentages that touch the most turning points
-    // "Touch" means the bound is within 5% absolute variance of the price
+    // "Touch" means the bound is within tolerance% absolute variance of the price
+    // Tolerance is dynamic based on SMA period
     if (!prices || !smaData || prices.length === 0 || smaData.length === 0) {
       return { upper: 5, lower: 5 }
     }
+
+    const tolerance = getTolerance(period)
 
     // Identify turning points (local maxima and minima)
     const turningPoints = []
@@ -564,7 +577,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
       maxima.forEach(tp => {
         const upperBound = tp.sma * (1 + pct / 100)
         const variance = Math.abs(upperBound - tp.price) / tp.price * 100
-        if (variance <= 5) { // Within 5% tolerance
+        if (variance <= tolerance) {
           touches++
         }
       })
@@ -580,7 +593,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
       minima.forEach(tp => {
         const lowerBound = tp.sma * (1 - pct / 100)
         const variance = Math.abs(lowerBound - tp.price) / tp.price * 100
-        if (variance <= 5) { // Within 5% tolerance
+        if (variance <= tolerance) {
           touches++
         }
       })
@@ -626,6 +639,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
       const result = simulateSmaChannelPercent(chartId, period, prices, smaData)
 
       // Count total touches for this configuration
+      const tolerance = getTolerance(period)
       const turningPoints = []
       for (let i = 1; i < prices.length - 1; i++) {
         if (!smaData[i] || smaData[i] <= 0) continue
@@ -646,11 +660,11 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
         if (tp.type === 'max') {
           const upperBound = tp.sma * (1 + result.upper / 100)
           const variance = Math.abs(upperBound - tp.price) / tp.price * 100
-          if (variance <= 5) totalTouches++
+          if (variance <= tolerance) totalTouches++
         } else {
           const lowerBound = tp.sma * (1 - result.lower / 100)
           const variance = Math.abs(lowerBound - tp.price) / tp.price * 100
-          if (variance <= 5) totalTouches++
+          if (variance <= tolerance) totalTouches++
         }
       })
 
@@ -2662,7 +2676,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                                 }
                               }}
                               className="px-2 py-1 text-xs rounded font-medium bg-green-600 text-white hover:bg-green-700 transition-colors whitespace-nowrap"
-                              title="Simulate optimal channel % to touch most turning points (5% tolerance)"
+                              title={`Simulate optimal channel % to touch most turning points (${getTolerance(period)}% tolerance for SMA${period})`}
                             >
                               Sim Bound
                             </button>
