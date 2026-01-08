@@ -2187,12 +2187,15 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Helper function to get tolerance based on SMA period
   const getTolerance = (smaPeriod) => {
-    if (smaPeriod < 10) return 1
-    if (smaPeriod < 15) return 2
-    if (smaPeriod < 20) return 3
-    if (smaPeriod < 30) return 4
-    if (smaPeriod < 40) return 5
-    return 5
+    if (smaPeriod < 5) return 0.1
+    if (smaPeriod < 10) return 0.25
+    if (smaPeriod < 20) return 0.75
+    if (smaPeriod < 30) return 1
+    if (smaPeriod < 40) return 1.5
+    if (smaPeriod < 50) return 2
+    if (smaPeriod < 60) return 2.25
+    if (smaPeriod < 100) return 3
+    return 3
   }
 
   // Calculate SMA touch points for display
