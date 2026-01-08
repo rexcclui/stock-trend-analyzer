@@ -1,4 +1,4 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, LabelList } from 'recharts'
 import { useState, useEffect } from 'react'
 
 function StatisticsCharts({ stockData, zoomRange }) {
@@ -160,12 +160,16 @@ function StatisticsCharts({ stockData, zoomRange }) {
   // Custom tooltip
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
+      const dataPoint = payload[0].payload
       return (
         <div className="bg-slate-900 border border-slate-600 p-3 rounded shadow-lg">
           <p className="text-slate-200 font-semibold mb-1">{label}</p>
+          <p className="text-sm text-slate-300">
+            Count: {dataPoint.count}
+          </p>
           {payload.map((entry, index) => (
             <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.name}: {entry.value}{entry.name === 'Count' ? '' : '%'}
+              {entry.name}: {entry.value}%
             </p>
           ))}
         </div>
@@ -201,6 +205,11 @@ function StatisticsCharts({ stockData, zoomRange }) {
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
               ))}
+              <LabelList
+                dataKey="count"
+                position="top"
+                style={{ fill: '#94a3b8', fontSize: isMobile ? 10 : 12, fontWeight: 'bold' }}
+              />
             </Bar>
           </BarChart>
         </ResponsiveContainer>
@@ -209,7 +218,6 @@ function StatisticsCharts({ stockData, zoomRange }) {
   }
 
   // Color schemes for different metrics
-  const countColors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#6366f1']
   const avgColors = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#d1fae5', '#6366f1', '#8b5cf6']
   const maxColors = ['#f59e0b', '#fbbf24', '#fcd34d', '#fde68a', '#fef3c7', '#fb923c', '#fdba74']
   const minColors = ['#ef4444', '#f87171', '#fca5a5', '#fecaca', '#fee2e2', '#fb7185', '#fda4af']
@@ -233,11 +241,10 @@ function StatisticsCharts({ stockData, zoomRange }) {
         ))}
       </div>
 
-      {/* Charts - 4 per row */}
+      {/* Charts - 3 per row with count labels */}
       <div>
         <h4 className="text-lg font-semibold mb-4 text-slate-100">Group by {activeGroup.title}</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {renderChart(`Count`, activeGroup.data, 'count', 'Count', countColors)}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {renderChart(`Avg % Change`, activeGroup.data, 'avgChange', '%', avgColors)}
           {renderChart(`Max % Change`, activeGroup.data, 'maxChange', '%', maxColors)}
           {renderChart(`Min % Change`, activeGroup.data, 'minChange', '%', minColors)}
