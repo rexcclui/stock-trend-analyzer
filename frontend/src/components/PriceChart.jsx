@@ -28,7 +28,7 @@ import { getVolumeColor } from './PriceChart/utils'
 import { calculateVolumeProfileV3WithSells } from './PriceChart/utils/volumeProfileV3Utils'
 import { calculateVolPrfV2Breakouts } from './PriceChart/utils/volumeProfileV2Utils'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, smaChannelUpperPercent = {}, smaChannelLowerPercent = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, volumeProfileV2BreakoutThreshold = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RefreshTrigger = 0, volumeProfileV3RegressionThreshold = 6, onVolumeProfileV3RegressionThresholdChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, linearRegressionEnabled = false, linearRegressionSelections = [], onAddLinearRegressionSelection, onClearLinearRegressionSelections, onRemoveLinearRegressionSelection, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete, simulatingBreakoutThreshold = false, onBreakoutThresholdSimulateComplete }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, smaChannelUpperPercent = {}, smaChannelLowerPercent = {}, smaOptimalTouches = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, volumeProfileV2BreakoutThreshold = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RefreshTrigger = 0, volumeProfileV3RegressionThreshold = 6, onVolumeProfileV3RegressionThresholdChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, linearRegressionEnabled = false, linearRegressionSelections = [], onAddLinearRegressionSelection, onClearLinearRegressionSelections, onRemoveLinearRegressionSelection, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete, simulatingBreakoutThreshold = false, onBreakoutThresholdSimulateComplete }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -5502,6 +5502,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                       <g>
                         {smaPeriods.map((period, idx) => {
                           const touchData = smaTouchPoints[period]
+                          const optimalData = smaOptimalTouches?.[period]
                           const upperPercent = smaChannelUpperPercent?.[period] ?? 0
                           const lowerPercent = smaChannelLowerPercent?.[period] ?? 0
                           const isVisible = smaVisibility[period]
@@ -5517,7 +5518,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                               <rect
                                 x={xPos}
                                 y={yPos}
-                                width={180}
+                                width={210}
                                 height={35}
                                 fill="rgba(30, 41, 59, 0.85)"
                                 stroke="rgba(148, 163, 184, 0.3)"
@@ -5542,18 +5543,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                                   fill="#22c55e"
                                   fontSize="10"
                                 >
-                                  ↑ {touchData.upper} ({upperPercent.toFixed(1)}%)
+                                  ↑ {touchData.upper}{optimalData ? `/${optimalData.upper}` : ''} ({upperPercent.toFixed(1)}%)
                                 </text>
                               )}
                               {/* Lower Touches */}
                               {lowerPercent > 0 && (
                                 <text
-                                  x={xPos + 90}
+                                  x={xPos + 105}
                                   y={yPos + 28}
                                   fill="#ef4444"
                                   fontSize="10"
                                 >
-                                  ↓ {touchData.lower} ({lowerPercent.toFixed(1)}%)
+                                  ↓ {touchData.lower}{optimalData ? `/${optimalData.lower}` : ''} ({lowerPercent.toFixed(1)}%)
                                 </text>
                               )}
                             </g>

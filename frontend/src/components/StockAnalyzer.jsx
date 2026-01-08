@@ -260,6 +260,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
             smaVisibility: defaultSMAVisibility,
             smaChannelUpperPercent: defaultSMAs.reduce((acc, period) => ({ ...acc, [period]: 5 }), {}),
             smaChannelLowerPercent: defaultSMAs.reduce((acc, period) => ({ ...acc, [period]: 5 }), {}),
+            smaOptimalTouches: {}, // Stores optimal touch counts from simulation: { period: { upper: N, lower: M, total: N+M } }
             volumeColorEnabled: false,
             volumeColorMode: 'absolute',
             volumeProfileEnabled: false,
@@ -368,17 +369,22 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
           const newVisibility = {}
           const newUpperPercent = {}
           const newLowerPercent = {}
+          const newOptimalTouches = {}
           newPeriods.forEach(period => {
             newVisibility[period] = chart.smaVisibility?.[period] ?? true
             newUpperPercent[period] = chart.smaChannelUpperPercent?.[period] ?? 5
             newLowerPercent[period] = chart.smaChannelLowerPercent?.[period] ?? 5
+            if (chart.smaOptimalTouches?.[period]) {
+              newOptimalTouches[period] = chart.smaOptimalTouches[period]
+            }
           })
           return {
             ...chart,
             smaPeriods: newPeriods,
             smaVisibility: newVisibility,
             smaChannelUpperPercent: newUpperPercent,
-            smaChannelLowerPercent: newLowerPercent
+            smaChannelLowerPercent: newLowerPercent,
+            smaOptimalTouches: newOptimalTouches
           }
         }
         return chart
@@ -469,15 +475,18 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
           const newVisibility = { ...chart.smaVisibility }
           const newUpperPercent = { ...chart.smaChannelUpperPercent }
           const newLowerPercent = { ...chart.smaChannelLowerPercent }
+          const newOptimalTouches = { ...chart.smaOptimalTouches }
           delete newVisibility[period]
           delete newUpperPercent[period]
           delete newLowerPercent[period]
+          delete newOptimalTouches[period]
           return {
             ...chart,
             smaPeriods: newPeriods,
             smaVisibility: newVisibility,
             smaChannelUpperPercent: newUpperPercent,
-            smaChannelLowerPercent: newLowerPercent
+            smaChannelLowerPercent: newLowerPercent,
+            smaOptimalTouches: newOptimalTouches
           }
         }
         return chart
@@ -610,7 +619,10 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     // Round to 1 decimal place
     return {
       upper: Math.round(bestUpper * 10) / 10,
-      lower: Math.round(bestLower * 10) / 10
+      lower: Math.round(bestLower * 10) / 10,
+      upperTouches: bestUpperTouches,
+      lowerTouches: bestLowerTouches,
+      totalTouches: bestUpperTouches + bestLowerTouches
     }
   }
 
@@ -678,6 +690,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
           period,
           upper: result.upper,
           lower: result.lower,
+          upperTouches: result.upperTouches,
+          lowerTouches: result.lowerTouches,
           totalTouches
         }
       }
@@ -723,12 +737,23 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                   newVisibility[period] = c.smaVisibility?.[period] ?? true
                 })
 
+                const newOptimalTouches = { ...c.smaOptimalTouches }
+                // Remove old period entry
+                delete newOptimalTouches[oldPeriod]
+                // Add new period entry
+                newOptimalTouches[result.period] = {
+                  upper: result.upperTouches,
+                  lower: result.lowerTouches,
+                  total: result.totalTouches
+                }
+
                 return {
                   ...c,
                   smaPeriods: newPeriods,
                   smaVisibility: newVisibility,
                   smaChannelUpperPercent: newUpperPercent,
-                  smaChannelLowerPercent: newLowerPercent
+                  smaChannelLowerPercent: newLowerPercent,
+                  smaOptimalTouches: newOptimalTouches
                 }
               }
               return c
@@ -2484,6 +2509,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                     smaVisibility={chart.smaVisibility}
                     smaChannelUpperPercent={chart.smaChannelUpperPercent}
                     smaChannelLowerPercent={chart.smaChannelLowerPercent}
+                    smaOptimalTouches={chart.smaOptimalTouches}
                     onToggleSma={(period) => toggleSmaVisibility(chart.id, period)}
                     onDeleteSma={(period) => deleteSma(chart.id, period)}
                     volumeColorEnabled={chart.volumeColorEnabled}
@@ -2678,6 +2704,25 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                                   const result = simulateSmaChannelPercent(chart.id, period, prices, smaData)
                                   updateSmaChannelPercent(chart.id, period, 'upper', result.upper)
                                   updateSmaChannelPercent(chart.id, period, 'lower', result.lower)
+                                  // Save optimal touch counts
+                                  setCharts(prevCharts =>
+                                    prevCharts.map(c => {
+                                      if (c.id === chart.id) {
+                                        return {
+                                          ...c,
+                                          smaOptimalTouches: {
+                                            ...c.smaOptimalTouches,
+                                            [period]: {
+                                              upper: result.upperTouches,
+                                              lower: result.lowerTouches,
+                                              total: result.totalTouches
+                                            }
+                                          }
+                                        }
+                                      }
+                                      return c
+                                    })
+                                  )
                                 }
                               }}
                               className="px-2 py-1 text-xs rounded font-medium bg-green-600 text-white hover:bg-green-700 transition-colors whitespace-nowrap"
