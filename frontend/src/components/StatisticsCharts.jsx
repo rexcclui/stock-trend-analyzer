@@ -207,8 +207,8 @@ function StatisticsCharts({ stockData, zoomRange }) {
               ))}
               <LabelList
                 dataKey="count"
-                position="top"
-                style={{ fill: '#94a3b8', fontSize: isMobile ? 10 : 12, fontWeight: 'bold' }}
+                position="inside"
+                style={{ fill: '#ffffff', fontSize: isMobile ? 10 : 12, fontWeight: 'bold' }}
               />
             </Bar>
           </BarChart>
