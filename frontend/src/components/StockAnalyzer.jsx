@@ -2763,8 +2763,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                             </button>
                             <span className="text-xs text-slate-400 w-7 text-right">{period}</span>
 
-                            {/* Add UpperBound Button - only show if neither bound is enabled */}
-                            {!chart.smaChannelUpperEnabled?.[period] && !chart.smaChannelLowerEnabled?.[period] && (
+                            {/* Add UpperBound Button - only show if upper bound is not enabled */}
+                            {!chart.smaChannelUpperEnabled?.[period] && (
                               <button
                                 onClick={() => toggleSmaChannelBound(chart.id, period, 'upper')}
                                 className="px-2 py-1 text-xs rounded font-medium bg-green-600/70 text-white hover:bg-green-600 transition-colors whitespace-nowrap"
@@ -2800,8 +2800,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                               </>
                             )}
 
-                            {/* Add LowerBound Button - only show if neither bound is enabled */}
-                            {!chart.smaChannelUpperEnabled?.[period] && !chart.smaChannelLowerEnabled?.[period] && (
+                            {/* Add LowerBound Button - only show if lower bound is not enabled */}
+                            {!chart.smaChannelLowerEnabled?.[period] && (
                               <button
                                 onClick={() => toggleSmaChannelBound(chart.id, period, 'lower')}
                                 className="px-2 py-1 text-xs rounded font-medium bg-red-600/70 text-white hover:bg-red-600 transition-colors whitespace-nowrap"
