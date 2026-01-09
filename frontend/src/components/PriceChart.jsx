@@ -6094,6 +6094,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   const isVisible = smaVisibility[period]
                   const upperPercent = smaChannelUpperPercent?.[period] ?? 0
                   const lowerPercent = smaChannelLowerPercent?.[period] ?? 0
+                  const upperEnabled = smaChannelUpperEnabled?.[period] ?? false
+                  const lowerEnabled = smaChannelLowerEnabled?.[period] ?? false
                   const hasChannels = upperPercent > 0 || lowerPercent > 0
 
                   return (
@@ -6111,7 +6113,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                         connectNulls={true}
                       />
                       {/* Upper channel line */}
-                      {hasChannels && upperPercent > 0 && (
+                      {hasChannels && upperPercent > 0 && upperEnabled && (
                         <Line
                           key={`${smaKey}ChannelUpper`}
                           type="monotone"
@@ -6128,7 +6130,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                         />
                       )}
                       {/* Lower channel line */}
-                      {hasChannels && lowerPercent > 0 && (
+                      {hasChannels && lowerPercent > 0 && lowerEnabled && (
                         <Line
                           key={`${smaKey}ChannelLower`}
                           type="monotone"
