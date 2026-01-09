@@ -201,6 +201,7 @@ function StatisticsCharts({ stockData, zoomRange }) {
               width={isMobile ? 35 : 50}
               label={{ value: yAxisLabel, angle: -90, position: 'insideLeft', fill: '#94a3b8', fontSize: isMobile ? 9 : 11 }}
               domain={domain}
+              tickFormatter={(value) => value.toFixed(1)}
             />
             <Tooltip content={<CustomTooltip />} />
             <Bar dataKey={metricKey} radius={[4, 4, 0, 0]}>
