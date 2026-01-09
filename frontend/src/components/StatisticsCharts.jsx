@@ -179,8 +179,30 @@ function StatisticsCharts({ stockData, zoomRange }) {
     return null
   }
 
+  // Function to get color based on value (deeper color for higher values)
+  const getColorForValue = (value, minValue, maxValue) => {
+    // Handle edge cases
+    if (maxValue === minValue) return '#10b981' // Default green
+
+    // Normalize value to 0-1 range
+    const normalized = (value - minValue) / (maxValue - minValue)
+
+    // Green color scale: lighter green for lower values, deeper green for higher values
+    // HSL format: hue=160 (green), saturation increases with value, lightness decreases with value
+    const hue = 160
+    const saturation = 50 + (normalized * 30) // 50% to 80%
+    const lightness = 70 - (normalized * 40)  // 70% to 30%
+
+    return `hsl(${hue}, ${saturation}%, ${lightness}%)`
+  }
+
   // Render a single chart
   const renderChart = (title, data, metricKey, yAxisLabel, colors, domain) => {
+    // Get min and max values from data for color scaling
+    const values = data.map(item => item[metricKey])
+    const minValue = Math.min(...values)
+    const maxValue = Math.max(...values)
+
     return (
       <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
         <h5 className="text-sm font-semibold mb-3 text-slate-200 text-center">{title}</h5>
@@ -206,7 +228,10 @@ function StatisticsCharts({ stockData, zoomRange }) {
             <Tooltip content={<CustomTooltip />} />
             <Bar dataKey={metricKey} radius={[4, 4, 0, 0]}>
               {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={getColorForValue(entry[metricKey], minValue, maxValue)}
+                />
               ))}
               <LabelList
                 dataKey="count"
@@ -219,9 +244,6 @@ function StatisticsCharts({ stockData, zoomRange }) {
       </div>
     )
   }
-
-  // Color scheme for average change charts
-  const avgColors = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#d1fae5', '#6366f1', '#8b5cf6']
 
   return (
     <div className="space-y-6">
@@ -253,11 +275,11 @@ function StatisticsCharts({ stockData, zoomRange }) {
 
       {/* All Average Charts in Single Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 overflow-x-auto">
-        {renderChart('Weekday Avg % Change', weekdayStats, 'avgChange', '%', avgColors, yAxisDomain)}
-        {renderChart('Quarter Avg % Change', quarterStats, 'avgChange', '%', avgColors, yAxisDomain)}
-        {renderChart('Month Avg % Change', monthStats, 'avgChange', '%', avgColors, yAxisDomain)}
-        {renderChart('Year Avg % Change', yearStats, 'avgChange', '%', avgColors, yAxisDomain)}
-        {renderChart("Month's Week Avg % Change", monthWeekStats, 'avgChange', '%', avgColors, yAxisDomain)}
+        {renderChart('Weekday Avg % Change', weekdayStats, 'avgChange', '%', null, yAxisDomain)}
+        {renderChart('Quarter Avg % Change', quarterStats, 'avgChange', '%', null, yAxisDomain)}
+        {renderChart('Month Avg % Change', monthStats, 'avgChange', '%', null, yAxisDomain)}
+        {renderChart('Year Avg % Change', yearStats, 'avgChange', '%', null, yAxisDomain)}
+        {renderChart("Month's Week Avg % Change", monthWeekStats, 'avgChange', '%', null, yAxisDomain)}
       </div>
     </div>
   )
