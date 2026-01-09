@@ -198,10 +198,10 @@ function StatisticsCharts({ stockData, zoomRange }) {
 
   // Render a single chart
   const renderChart = (title, data, metricKey, yAxisLabel, colors, domain) => {
-    // Get min and max values from data for color scaling
-    const values = data.map(item => item[metricKey])
-    const minValue = Math.min(...values)
-    const maxValue = Math.max(...values)
+    // Get min and max count values from data for color scaling
+    const countValues = data.map(item => item.count)
+    const minCount = Math.min(...countValues)
+    const maxCount = Math.max(...countValues)
 
     return (
       <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
@@ -230,7 +230,7 @@ function StatisticsCharts({ stockData, zoomRange }) {
               {data.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
-                  fill={getColorForValue(entry[metricKey], minValue, maxValue)}
+                  fill={getColorForValue(entry.count, minCount, maxCount)}
                 />
               ))}
               <LabelList
