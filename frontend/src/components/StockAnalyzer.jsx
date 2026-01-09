@@ -718,9 +718,16 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     }
   }
 
-  const simulateComprehensive = async (chartId, smaIndex, prices) => {
+  const simulateComprehensive = async (chartId, smaIndex, prices, chart) => {
     // Find optimal SMA period AND upper/lower bounds that touch the most turning points
     if (!prices || prices.length === 0) return null
+
+    // Get which bounds are enabled from the current period
+    const currentPeriod = chart.smaPeriods[smaIndex]
+    const enabledBounds = {
+      upper: chart.smaChannelUpperEnabled?.[currentPeriod] ?? false,
+      lower: chart.smaChannelLowerEnabled?.[currentPeriod] ?? false
+    }
 
     // Test SMA periods: use common values
     const testPeriods = [5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100, 120, 150, 200]
@@ -744,8 +751,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
         }
       }
 
-      // Find optimal bounds for this period
-      const result = simulateSmaChannelPercent(chartId, period, prices, smaData)
+      // Find optimal bounds for this period, only for enabled bounds
+      const result = simulateSmaChannelPercent(chartId, period, prices, smaData, enabledBounds)
 
       // Count total touches for this configuration
       const tolerance = getTolerance(period)
@@ -819,7 +826,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     // Run simulation asynchronously
     setTimeout(async () => {
       try {
-        const result = await simulateComprehensive(chartId, smaIndex, chart.data.prices)
+        const result = await simulateComprehensive(chartId, smaIndex, chart.data.prices, chart)
 
         if (result) {
           // Update the SMA period and bounds
@@ -832,10 +839,20 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
 
                 const newUpperPercent = { ...c.smaChannelUpperPercent }
                 const newLowerPercent = { ...c.smaChannelLowerPercent }
+                const newUpperEnabled = { ...c.smaChannelUpperEnabled }
+                const newLowerEnabled = { ...c.smaChannelLowerEnabled }
 
                 // Remove old period entries
                 delete newUpperPercent[oldPeriod]
                 delete newLowerPercent[oldPeriod]
+
+                // Transfer enabled state from old period to new period
+                const wasUpperEnabled = newUpperEnabled[oldPeriod] ?? false
+                const wasLowerEnabled = newLowerEnabled[oldPeriod] ?? false
+                delete newUpperEnabled[oldPeriod]
+                delete newLowerEnabled[oldPeriod]
+                newUpperEnabled[result.period] = wasUpperEnabled
+                newLowerEnabled[result.period] = wasLowerEnabled
 
                 // Add new period entries
                 newUpperPercent[result.period] = result.upper
@@ -862,6 +879,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                   smaVisibility: newVisibility,
                   smaChannelUpperPercent: newUpperPercent,
                   smaChannelLowerPercent: newLowerPercent,
+                  smaChannelUpperEnabled: newUpperEnabled,
+                  smaChannelLowerEnabled: newLowerEnabled,
                   smaOptimalTouches: newOptimalTouches
                 }
               }
