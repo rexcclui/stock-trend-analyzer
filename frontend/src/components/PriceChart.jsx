@@ -28,7 +28,7 @@ import { getVolumeColor } from './PriceChart/utils'
 import { calculateVolumeProfileV3WithSells } from './PriceChart/utils/volumeProfileV3Utils'
 import { calculateVolPrfV2Breakouts } from './PriceChart/utils/volumeProfileV2Utils'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, smaChannelUpperPercent = {}, smaChannelLowerPercent = {}, smaOptimalTouches = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, volumeProfileV2BreakoutThreshold = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RefreshTrigger = 0, volumeProfileV3RegressionThreshold = 6, onVolumeProfileV3RegressionThresholdChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, linearRegressionEnabled = false, linearRegressionSelections = [], onAddLinearRegressionSelection, onClearLinearRegressionSelections, onRemoveLinearRegressionSelection, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete, simulatingBreakoutThreshold = false, onBreakoutThresholdSimulateComplete }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, smaChannelUpperPercent = {}, smaChannelLowerPercent = {}, smaChannelUpperEnabled = {}, smaChannelLowerEnabled = {}, smaOptimalTouches = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, volumeProfileV2BreakoutThreshold = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RegressionThreshold = 6, volumeProfileV3RefreshTrigger = 0, onVolumeProfileV3RegressionThresholdChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, linearRegressionEnabled = false, linearRegressionSelections = [], onAddLinearRegressionSelection, onClearLinearRegressionSelections, onRemoveLinearRegressionSelection, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete, simulatingBreakoutThreshold = false, onBreakoutThresholdSimulateComplete }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -2206,8 +2206,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       const smaData = smaCache[period]
       const upperPercent = smaChannelUpperPercent?.[period] ?? 0
       const lowerPercent = smaChannelLowerPercent?.[period] ?? 0
+      const upperEnabled = smaChannelUpperEnabled?.[period] ?? false
+      const lowerEnabled = smaChannelLowerEnabled?.[period] ?? false
 
-      if (!smaData || upperPercent === 0 && lowerPercent === 0) {
+      if (!smaData || (!upperEnabled && !lowerEnabled)) {
         touchData[period] = { upper: 0, lower: 0 }
         return
       }
@@ -2242,7 +2244,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         }
 
         // Local maximum - check upper bound
-        if (isMaximum && upperPercent > 0) {
+        if (isMaximum && upperEnabled && upperPercent > 0) {
           const upperBound = smaData[i] * (1 + upperPercent / 100)
           const variance = Math.abs(upperBound - curr) / curr * 100
           if (variance <= tolerance) {
@@ -2250,7 +2252,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           }
         }
         // Local minimum - check lower bound
-        else if (isMinimum && lowerPercent > 0) {
+        else if (isMinimum && lowerEnabled && lowerPercent > 0) {
           const lowerBound = smaData[i] * (1 - lowerPercent / 100)
           const variance = Math.abs(lowerBound - curr) / curr * 100
           if (variance <= tolerance) {
@@ -2263,7 +2265,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     })
 
     return touchData
-  }, [displayPrices, smaCache, smaPeriods, smaChannelUpperPercent, smaChannelLowerPercent])
+  }, [displayPrices, smaCache, smaPeriods, smaChannelUpperPercent, smaChannelLowerPercent, smaChannelUpperEnabled, smaChannelLowerEnabled])
 
   // Build a map of SPY volumes by date for quick lookup
   const spyVolumeByDate = (() => {
@@ -3484,10 +3486,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     smaPeriods.forEach(period => {
       const upperPercent = smaChannelUpperPercent?.[period] ?? 0
       const lowerPercent = smaChannelLowerPercent?.[period] ?? 0
+      const upperEnabled = smaChannelUpperEnabled?.[period] ?? false
+      const lowerEnabled = smaChannelLowerEnabled?.[period] ?? false
       const isVisible = smaVisibility[period]
       const smaKey = `sma${period}`
 
-      if ((!upperPercent && !lowerPercent) || !isVisible) {
+      if (!isVisible || (!upperEnabled && !lowerEnabled)) {
         return
       }
 
@@ -3518,7 +3522,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
           if (!isMaximum && !isMinimum) break
         }
 
-        if (isMaximum && upperPercent > 0) {
+        if (isMaximum && upperEnabled && upperPercent > 0) {
           const upperBound = smaValue * (1 + upperPercent / 100)
           const variance = Math.abs(upperBound - curr) / curr * 100
           if (variance <= tolerance) {
@@ -3529,7 +3533,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
               period
             })
           }
-        } else if (isMinimum && lowerPercent > 0) {
+        } else if (isMinimum && lowerEnabled && lowerPercent > 0) {
           const lowerBound = smaValue * (1 - lowerPercent / 100)
           const variance = Math.abs(lowerBound - curr) / curr * 100
           if (variance <= tolerance) {
@@ -3550,6 +3554,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     smaPeriods,
     smaChannelUpperPercent,
     smaChannelLowerPercent,
+    smaChannelUpperEnabled,
+    smaChannelLowerEnabled,
     smaVisibility
   ])
 
@@ -5542,9 +5548,11 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                           const optimalData = smaOptimalTouches?.[period]
                           const upperPercent = smaChannelUpperPercent?.[period] ?? 0
                           const lowerPercent = smaChannelLowerPercent?.[period] ?? 0
+                          const upperEnabled = smaChannelUpperEnabled?.[period] ?? false
+                          const lowerEnabled = smaChannelLowerEnabled?.[period] ?? false
                           const isVisible = smaVisibility[period]
 
-                          if (!isVisible || (upperPercent === 0 && lowerPercent === 0)) return null
+                          if (!isVisible || (!upperEnabled && !lowerEnabled)) return null
 
                           const yPos = offset.top + 10 + (idx * 40)
                           const xPos = offset.left + 10
@@ -5573,7 +5581,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                                 SMA {period}
                               </text>
                               {/* Upper Touches */}
-                              {upperPercent > 0 && (
+                              {upperEnabled && upperPercent > 0 && (
                                 <text
                                   x={xPos + 8}
                                   y={yPos + 28}
@@ -5584,7 +5592,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                                 </text>
                               )}
                               {/* Lower Touches */}
-                              {lowerPercent > 0 && (
+                              {lowerEnabled && lowerPercent > 0 && (
                                 <text
                                   x={xPos + 105}
                                   y={yPos + 28}

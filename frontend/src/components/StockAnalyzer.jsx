@@ -260,6 +260,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
             smaVisibility: defaultSMAVisibility,
             smaChannelUpperPercent: defaultSMAs.reduce((acc, period) => ({ ...acc, [period]: 5 }), {}),
             smaChannelLowerPercent: defaultSMAs.reduce((acc, period) => ({ ...acc, [period]: 5 }), {}),
+            smaChannelUpperEnabled: {}, // Track which SMAs have upper bound enabled
+            smaChannelLowerEnabled: {}, // Track which SMAs have lower bound enabled
             smaOptimalTouches: {}, // Stores optimal touch counts from simulation: { period: { upper: N, lower: M, total: N+M } }
             volumeColorEnabled: false,
             volumeColorMode: 'absolute',
@@ -369,11 +371,15 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
           const newVisibility = {}
           const newUpperPercent = {}
           const newLowerPercent = {}
+          const newUpperEnabled = {}
+          const newLowerEnabled = {}
           const newOptimalTouches = {}
           newPeriods.forEach(period => {
             newVisibility[period] = chart.smaVisibility?.[period] ?? true
             newUpperPercent[period] = chart.smaChannelUpperPercent?.[period] ?? 5
             newLowerPercent[period] = chart.smaChannelLowerPercent?.[period] ?? 5
+            newUpperEnabled[period] = chart.smaChannelUpperEnabled?.[period] ?? false
+            newLowerEnabled[period] = chart.smaChannelLowerEnabled?.[period] ?? false
             if (chart.smaOptimalTouches?.[period]) {
               newOptimalTouches[period] = chart.smaOptimalTouches[period]
             }
@@ -384,6 +390,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
             smaVisibility: newVisibility,
             smaChannelUpperPercent: newUpperPercent,
             smaChannelLowerPercent: newLowerPercent,
+            smaChannelUpperEnabled: newUpperEnabled,
+            smaChannelLowerEnabled: newLowerEnabled,
             smaOptimalTouches: newOptimalTouches
           }
         }
@@ -475,10 +483,14 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
           const newVisibility = { ...chart.smaVisibility }
           const newUpperPercent = { ...chart.smaChannelUpperPercent }
           const newLowerPercent = { ...chart.smaChannelLowerPercent }
+          const newUpperEnabled = { ...chart.smaChannelUpperEnabled }
+          const newLowerEnabled = { ...chart.smaChannelLowerEnabled }
           const newOptimalTouches = { ...chart.smaOptimalTouches }
           delete newVisibility[period]
           delete newUpperPercent[period]
           delete newLowerPercent[period]
+          delete newUpperEnabled[period]
+          delete newLowerEnabled[period]
           delete newOptimalTouches[period]
           return {
             ...chart,
@@ -486,6 +498,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
             smaVisibility: newVisibility,
             smaChannelUpperPercent: newUpperPercent,
             smaChannelLowerPercent: newLowerPercent,
+            smaChannelUpperEnabled: newUpperEnabled,
+            smaChannelLowerEnabled: newLowerEnabled,
             smaOptimalTouches: newOptimalTouches
           }
         }
@@ -521,6 +535,31 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     )
   }
 
+  const toggleSmaChannelBound = (chartId, period, boundType) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          if (boundType === 'upper') {
+            const newEnabled = { ...chart.smaChannelUpperEnabled }
+            newEnabled[period] = !newEnabled[period]
+            return {
+              ...chart,
+              smaChannelUpperEnabled: newEnabled
+            }
+          } else {
+            const newEnabled = { ...chart.smaChannelLowerEnabled }
+            newEnabled[period] = !newEnabled[period]
+            return {
+              ...chart,
+              smaChannelLowerEnabled: newEnabled
+            }
+          }
+        }
+        return chart
+      })
+    )
+  }
+
   const getTolerance = (smaPeriod) => {
     // Dynamic tolerance based on SMA period
     if (smaPeriod < 5) return 0.1
@@ -534,12 +573,13 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     return 3 // 100 and above
   }
 
-  const simulateSmaChannelPercent = (chartId, period, prices, smaData) => {
+  const simulateSmaChannelPercent = (chartId, period, prices, smaData, enabledBounds = { upper: true, lower: true }) => {
     // Find optimal upper and lower percentages that touch the most turning points
     // "Touch" means the bound is within tolerance% absolute variance of the price
     // Tolerance is dynamic based on SMA period
+    // enabledBounds specifies which bounds to optimize (upper, lower, or both)
     if (!prices || !smaData || prices.length === 0 || smaData.length === 0) {
-      return { upper: 5, lower: 5 }
+      return { upper: 5, lower: 5, upperTouches: 0, lowerTouches: 0, totalTouches: 0 }
     }
 
     const tolerance = getTolerance(period)
@@ -582,7 +622,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     }
 
     if (turningPoints.length === 0) {
-      return { upper: 5, lower: 5 }
+      return { upper: 5, lower: 5, upperTouches: 0, lowerTouches: 0, totalTouches: 0 }
     }
 
     // Separate maxima and minima
@@ -604,8 +644,12 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
 
     // Test combinations of upper and lower bounds
     // Find the combination that maximizes touches while keeping 75%+ prices within channel
-    testPercentages.forEach(upperPct => {
-      testPercentages.forEach(lowerPct => {
+    // Only test bounds that are enabled
+    const upperPercentagesToTest = enabledBounds.upper ? testPercentages : [bestUpper]
+    const lowerPercentagesToTest = enabledBounds.lower ? testPercentages : [bestLower]
+
+    upperPercentagesToTest.forEach(upperPct => {
+      lowerPercentagesToTest.forEach(lowerPct => {
         // Check if at least 75% of prices are within the channel
         let pricesWithinChannel = 0
         let totalValidPrices = 0
@@ -2574,6 +2618,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                     smaVisibility={chart.smaVisibility}
                     smaChannelUpperPercent={chart.smaChannelUpperPercent}
                     smaChannelLowerPercent={chart.smaChannelLowerPercent}
+                    smaChannelUpperEnabled={chart.smaChannelUpperEnabled}
+                    smaChannelLowerEnabled={chart.smaChannelLowerEnabled}
                     smaOptimalTouches={chart.smaOptimalTouches}
                     onToggleSma={(period) => toggleSmaVisibility(chart.id, period)}
                     onDeleteSma={(period) => deleteSma(chart.id, period)}
@@ -2717,58 +2763,111 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                             </button>
                             <span className="text-xs text-slate-400 w-7 text-right">{period}</span>
 
+                            {/* Add UpperBound Button */}
+                            {!chart.smaChannelUpperEnabled?.[period] && (
+                              <button
+                                onClick={() => toggleSmaChannelBound(chart.id, period, 'upper')}
+                                className="px-2 py-1 text-xs rounded font-medium bg-green-600/70 text-white hover:bg-green-600 transition-colors whitespace-nowrap"
+                                title="Add upper bound channel"
+                              >
+                                Add UpperBound
+                              </button>
+                            )}
+
                             {/* Upper % Control */}
-                            <span className="text-xs text-slate-400 w-10 ml-2">Up%</span>
-                            <input
-                              type="range"
-                              min="0"
-                              max="50"
-                              step="0.5"
-                              value={upperPercent}
-                              onChange={(e) => {
-                                updateSmaChannelPercent(chart.id, period, 'upper', parseFloat(e.target.value))
-                              }}
-                              className="w-20 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb"
-                            />
-                            <span className="text-xs text-slate-400 w-9 text-right">{upperPercent.toFixed(1)}%</span>
+                            {chart.smaChannelUpperEnabled?.[period] && (
+                              <>
+                                <span className="text-xs text-slate-400 w-10 ml-2">Up%</span>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="50"
+                                  step="0.5"
+                                  value={upperPercent}
+                                  onChange={(e) => {
+                                    updateSmaChannelPercent(chart.id, period, 'upper', parseFloat(e.target.value))
+                                  }}
+                                  className="w-20 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb"
+                                />
+                                <span className="text-xs text-slate-400 w-9 text-right">{upperPercent.toFixed(1)}%</span>
+                                <button
+                                  onClick={() => toggleSmaChannelBound(chart.id, period, 'upper')}
+                                  className="p-1 text-slate-400 hover:text-red-400 hover:bg-slate-600 rounded transition-colors"
+                                  title="Remove upper bound"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </>
+                            )}
+
+                            {/* Add LowerBound Button */}
+                            {!chart.smaChannelLowerEnabled?.[period] && (
+                              <button
+                                onClick={() => toggleSmaChannelBound(chart.id, period, 'lower')}
+                                className="px-2 py-1 text-xs rounded font-medium bg-red-600/70 text-white hover:bg-red-600 transition-colors whitespace-nowrap"
+                                title="Add lower bound channel"
+                              >
+                                Add LowerBound
+                              </button>
+                            )}
 
                             {/* Lower % Control */}
-                            <span className="text-xs text-slate-400 w-10">Lw%</span>
-                            <input
-                              type="range"
-                              min="0"
-                              max="50"
-                              step="0.5"
-                              value={lowerPercent}
-                              onChange={(e) => {
-                                updateSmaChannelPercent(chart.id, period, 'lower', parseFloat(e.target.value))
-                              }}
-                              className="w-20 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb"
-                            />
-                            <span className="text-xs text-slate-400 w-9 text-right">{lowerPercent.toFixed(1)}%</span>
+                            {chart.smaChannelLowerEnabled?.[period] && (
+                              <>
+                                <span className="text-xs text-slate-400 w-10">Lw%</span>
+                                <input
+                                  type="range"
+                                  min="0"
+                                  max="50"
+                                  step="0.5"
+                                  value={lowerPercent}
+                                  onChange={(e) => {
+                                    updateSmaChannelPercent(chart.id, period, 'lower', parseFloat(e.target.value))
+                                  }}
+                                  className="w-20 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer slider-thumb"
+                                />
+                                <span className="text-xs text-slate-400 w-9 text-right">{lowerPercent.toFixed(1)}%</span>
+                                <button
+                                  onClick={() => toggleSmaChannelBound(chart.id, period, 'lower')}
+                                  className="p-1 text-slate-400 hover:text-red-400 hover:bg-slate-600 rounded transition-colors"
+                                  title="Remove lower bound"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </>
+                            )}
 
-                            {/* Sim Bound Button - optimizes bounds only */}
-                            <button
-                              onClick={() => {
-                                const chartData = charts.find(c => c.id === chart.id)
-                                if (chartData && chartData.data && chartData.data.prices) {
-                                  // Calculate SMA data
-                                  const prices = chartData.data.prices
-                                  const smaData = []
-                                  for (let i = 0; i < prices.length; i++) {
-                                    if (i + period - 1 >= prices.length) {
-                                      smaData.push(null)
-                                    } else {
-                                      let sum = 0
-                                      for (let j = 0; j < period; j++) {
-                                        sum += prices[i + j].close
+                            {/* Sim Bound Button - optimizes bounds only (only show if at least one bound is enabled) */}
+                            {(chart.smaChannelUpperEnabled?.[period] || chart.smaChannelLowerEnabled?.[period]) && (
+                              <button
+                                onClick={() => {
+                                  const chartData = charts.find(c => c.id === chart.id)
+                                  if (chartData && chartData.data && chartData.data.prices) {
+                                    // Calculate SMA data
+                                    const prices = chartData.data.prices
+                                    const smaData = []
+                                    for (let i = 0; i < prices.length; i++) {
+                                      if (i + period - 1 >= prices.length) {
+                                        smaData.push(null)
+                                      } else {
+                                        let sum = 0
+                                        for (let j = 0; j < period; j++) {
+                                          sum += prices[i + j].close
+                                        }
+                                        smaData.push(sum / period)
                                       }
-                                      smaData.push(sum / period)
                                     }
-                                  }
-                                  const result = simulateSmaChannelPercent(chart.id, period, prices, smaData)
-                                  updateSmaChannelPercent(chart.id, period, 'upper', result.upper)
-                                  updateSmaChannelPercent(chart.id, period, 'lower', result.lower)
+                                    const enabledBounds = {
+                                      upper: chart.smaChannelUpperEnabled?.[period] ?? false,
+                                      lower: chart.smaChannelLowerEnabled?.[period] ?? false
+                                    }
+                                    const result = simulateSmaChannelPercent(chart.id, period, prices, smaData, enabledBounds)
+                                    if (enabledBounds.upper) {
+                                      updateSmaChannelPercent(chart.id, period, 'upper', result.upper)
+                                    }
+                                    if (enabledBounds.lower) {
+                                      updateSmaChannelPercent(chart.id, period, 'lower', result.lower)
+                                    }
                                   // Save optimal touch counts
                                   setCharts(prevCharts =>
                                     prevCharts.map(c => {
@@ -2790,14 +2889,15 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                                   )
                                 }
                               }}
-                              className="px-2 py-1 text-xs rounded font-medium bg-green-600 text-white hover:bg-green-700 transition-colors whitespace-nowrap"
-                              title={`Simulate optimal channel % to touch most turning points (${getTolerance(period)}% tolerance for SMA${period})`}
-                            >
-                              Sim Bound
-                            </button>
+                                className="px-2 py-1 text-xs rounded font-medium bg-green-600 text-white hover:bg-green-700 transition-colors whitespace-nowrap"
+                                title={`Simulate optimal channel % to touch most turning points (${getTolerance(period)}% tolerance for SMA${period})`}
+                              >
+                                Sim Bound
+                              </button>
+                            )}
 
-                            {/* Comprehensive Sim Button - optimizes SMA period AND bounds */}
-                            {(() => {
+                            {/* Comprehensive Sim Button - optimizes SMA period AND bounds (only show if at least one bound is enabled) */}
+                            {(chart.smaChannelUpperEnabled?.[period] || chart.smaChannelLowerEnabled?.[period]) && (() => {
                               const compKey = `${chart.id}-${index}`
                               const isSimulatingComp = simulatingComprehensive[compKey]
                               return (
