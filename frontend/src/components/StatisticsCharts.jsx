@@ -148,7 +148,10 @@ function StatisticsCharts({ stockData, zoomRange }) {
   const allAvgChanges = allStats.map(stat => stat.avgChange)
   const globalMin = Math.min(...allAvgChanges)
   const globalMax = Math.max(...allAvgChanges)
-  const yAxisDomain = [Math.floor(globalMin), Math.ceil(globalMax)]
+  // Add 10% padding: max * 1.1, min * 1.1 (if negative, becomes more negative for padding)
+  const yAxisMax = globalMax * 1.1
+  const yAxisMin = globalMin < 0 ? globalMin * 1.1 : globalMin * -1.1
+  const yAxisDomain = [yAxisMin, yAxisMax]
 
   // Custom tooltip
   const CustomTooltip = ({ active, payload, label }) => {
