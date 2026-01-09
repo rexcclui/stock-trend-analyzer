@@ -1,4 +1,4 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, LabelList } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, LabelList, ReferenceLine } from 'recharts'
 import { useState, useEffect } from 'react'
 
 function StatisticsCharts({ stockData, zoomRange }) {
@@ -312,8 +312,10 @@ function StatisticsCharts({ stockData, zoomRange }) {
               stroke="#475569"
               width={isMobile ? 35 : 50}
               label={{ value: 'Count', angle: -90, position: 'insideLeft', fill: '#94a3b8', fontSize: isMobile ? 9 : 11 }}
+              domain={['auto', 'auto']}
             />
             <Tooltip content={<CustomTooltip />} />
+            <ReferenceLine y={0} stroke="#94a3b8" strokeWidth={2} />
             {/* Max bars (positive, orange/gold) */}
             <Bar dataKey="maxCount" radius={[4, 4, 0, 0]} fill="#f59e0b">
               <LabelList
