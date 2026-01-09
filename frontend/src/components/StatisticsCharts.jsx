@@ -291,7 +291,12 @@ function StatisticsCharts({ stockData, zoomRange }) {
       <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
         <h5 className="text-sm font-semibold mb-3 text-slate-200 text-center">{title}</h5>
         <ResponsiveContainer width="100%" height={250}>
-          <BarChart data={transformedData} margin={{ top: 5, right: 10, left: isMobile ? -10 : 10, bottom: 5 }}>
+          <BarChart
+            data={transformedData}
+            margin={{ top: 5, right: 10, left: isMobile ? -10 : 10, bottom: 5 }}
+            barGap={-100}
+            barCategoryGap="20%"
+          >
             <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
             <XAxis
               dataKey="name"
