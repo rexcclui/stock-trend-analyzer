@@ -143,6 +143,13 @@ function StatisticsCharts({ stockData, zoomRange }) {
   const yearStats = groupByYear()
   const monthWeekStats = groupByMonthWeek()
 
+  // Calculate global min/max for y-axis alignment across all charts
+  const allStats = [...weekdayStats, ...quarterStats, ...monthStats, ...yearStats, ...monthWeekStats]
+  const allAvgChanges = allStats.map(stat => stat.avgChange)
+  const globalMin = Math.min(...allAvgChanges)
+  const globalMax = Math.max(...allAvgChanges)
+  const yAxisDomain = [Math.floor(globalMin), Math.ceil(globalMax)]
+
   // Custom tooltip
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -164,7 +171,7 @@ function StatisticsCharts({ stockData, zoomRange }) {
   }
 
   // Render a single chart
-  const renderChart = (title, data, metricKey, yAxisLabel, colors) => {
+  const renderChart = (title, data, metricKey, yAxisLabel, colors, domain) => {
     return (
       <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
         <h5 className="text-sm font-semibold mb-3 text-slate-200 text-center">{title}</h5>
@@ -184,6 +191,7 @@ function StatisticsCharts({ stockData, zoomRange }) {
               stroke="#475569"
               width={isMobile ? 35 : 50}
               label={{ value: yAxisLabel, angle: -90, position: 'insideLeft', fill: '#94a3b8', fontSize: isMobile ? 9 : 11 }}
+              domain={domain}
             />
             <Tooltip content={<CustomTooltip />} />
             <Bar dataKey={metricKey} radius={[4, 4, 0, 0]}>
@@ -209,11 +217,11 @@ function StatisticsCharts({ stockData, zoomRange }) {
     <div className="space-y-6">
       {/* All Average Charts in Single Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 overflow-x-auto">
-        {renderChart('Weekday Avg % Change', weekdayStats, 'avgChange', '%', avgColors)}
-        {renderChart('Quarter Avg % Change', quarterStats, 'avgChange', '%', avgColors)}
-        {renderChart('Month Avg % Change', monthStats, 'avgChange', '%', avgColors)}
-        {renderChart('Year Avg % Change', yearStats, 'avgChange', '%', avgColors)}
-        {renderChart("Month's Week Avg % Change", monthWeekStats, 'avgChange', '%', avgColors)}
+        {renderChart('Weekday Avg % Change', weekdayStats, 'avgChange', '%', avgColors, yAxisDomain)}
+        {renderChart('Quarter Avg % Change', quarterStats, 'avgChange', '%', avgColors, yAxisDomain)}
+        {renderChart('Month Avg % Change', monthStats, 'avgChange', '%', avgColors, yAxisDomain)}
+        {renderChart('Year Avg % Change', yearStats, 'avgChange', '%', avgColors, yAxisDomain)}
+        {renderChart("Month's Week Avg % Change", monthWeekStats, 'avgChange', '%', avgColors, yAxisDomain)}
       </div>
     </div>
   )
