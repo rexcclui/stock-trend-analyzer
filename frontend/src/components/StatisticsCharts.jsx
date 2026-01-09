@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 
 function StatisticsCharts({ stockData, zoomRange }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const [filterThreshold, setFilterThreshold] = useState(0)
 
   // Track window resize for mobile detection
   useEffect(() => {
@@ -47,6 +48,11 @@ function StatisticsCharts({ stockData, zoomRange }) {
     return dayOfWeek !== 0 && dayOfWeek !== 6
   })
 
+  // Apply threshold filter - only include data where absolute % change > threshold
+  const filteredData = weekdayData.filter(item => {
+    return Math.abs(item.percentChange) > filterThreshold
+  })
+
   // Helper function to aggregate statistics
   const aggregateStats = (groupedData) => {
     return Object.entries(groupedData).map(([key, items]) => {
@@ -68,7 +74,7 @@ function StatisticsCharts({ stockData, zoomRange }) {
     const grouped = {}
     weekdays.forEach(day => grouped[day] = [])
 
-    weekdayData.forEach(item => {
+    filteredData.forEach(item => {
       const dayOfWeek = item.date.getDay()
       // Map day number to weekday name (1=Monday, 2=Tuesday, etc.)
       if (dayOfWeek >= 1 && dayOfWeek <= 5) {
@@ -84,7 +90,7 @@ function StatisticsCharts({ stockData, zoomRange }) {
   const groupByQuarter = () => {
     const grouped = { 'Q1': [], 'Q2': [], 'Q3': [], 'Q4': [] }
 
-    weekdayData.forEach(item => {
+    filteredData.forEach(item => {
       const month = item.date.getMonth()
       const quarter = `Q${Math.floor(month / 3) + 1}`
       grouped[quarter].push(item)
@@ -99,7 +105,7 @@ function StatisticsCharts({ stockData, zoomRange }) {
     const grouped = {}
     months.forEach(month => grouped[month] = [])
 
-    weekdayData.forEach(item => {
+    filteredData.forEach(item => {
       const monthName = months[item.date.getMonth()]
       grouped[monthName].push(item)
     })
@@ -111,7 +117,7 @@ function StatisticsCharts({ stockData, zoomRange }) {
   const groupByYear = () => {
     const grouped = {}
 
-    weekdayData.forEach(item => {
+    filteredData.forEach(item => {
       const year = item.date.getFullYear().toString()
       if (!grouped[year]) grouped[year] = []
       grouped[year].push(item)
@@ -124,7 +130,7 @@ function StatisticsCharts({ stockData, zoomRange }) {
   const groupByMonthWeek = () => {
     const grouped = { 'Week 1': [], 'Week 2': [], 'Week 3': [], 'Week 4': [], 'Week 5': [] }
 
-    weekdayData.forEach(item => {
+    filteredData.forEach(item => {
       const dayOfMonth = item.date.getDate()
       const weekNum = Math.ceil(dayOfMonth / 7)
       const weekKey = `Week ${weekNum}`
@@ -218,6 +224,32 @@ function StatisticsCharts({ stockData, zoomRange }) {
 
   return (
     <div className="space-y-6">
+      {/* Filter Control */}
+      <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+          <label className="text-slate-200 font-medium whitespace-nowrap">
+            Filter by Absolute Daily Change:
+          </label>
+          <div className="flex items-center gap-4 flex-1">
+            <input
+              type="range"
+              min="0"
+              max="20"
+              step="0.5"
+              value={filterThreshold}
+              onChange={(e) => setFilterThreshold(parseFloat(e.target.value))}
+              className="flex-1 h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider"
+            />
+            <span className="text-slate-200 font-semibold min-w-[80px] text-right">
+              &gt; {filterThreshold.toFixed(1)}%
+            </span>
+          </div>
+        </div>
+        <p className="text-sm text-slate-400 mt-2">
+          Only include days where absolute % change exceeds the threshold. Total filtered data: {filteredData.length} days
+        </p>
+      </div>
+
       {/* All Average Charts in Single Row */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 overflow-x-auto">
         {renderChart('Weekday Avg % Change', weekdayStats, 'avgChange', '%', avgColors, yAxisDomain)}
