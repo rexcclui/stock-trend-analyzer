@@ -294,7 +294,8 @@ function StatisticsCharts({ stockData, zoomRange }) {
           <BarChart
             data={transformedData}
             margin={{ top: 5, right: 10, left: isMobile ? -10 : 10, bottom: 5 }}
-            barGap={-100}
+            barSize={40}
+            barGap={-40}
             barCategoryGap="20%"
           >
             <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
