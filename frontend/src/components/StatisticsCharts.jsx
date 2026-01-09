@@ -215,6 +215,12 @@ function StatisticsCharts({ stockData, zoomRange }) {
                   Bottom 5% Count: {entry.value}
                 </p>
               )
+            } else if (entry.dataKey === 'minCountNegative') {
+              return (
+                <p key={index} className="text-sm" style={{ color: entry.color }}>
+                  Bottom 5% Count: {dataPoint.minCount}
+                </p>
+              )
             }
             return null
           })}
@@ -223,7 +229,7 @@ function StatisticsCharts({ stockData, zoomRange }) {
               Threshold: ≥{top5PercentThreshold.toFixed(2)}%
             </p>
           )}
-          {metricName === 'minCount' && (
+          {(metricName === 'minCount' || metricName === 'minCountNegative') && (
             <p className="text-xs text-slate-400 mt-1">
               Threshold: ≤{bottom5PercentThreshold.toFixed(2)}%
             </p>
@@ -273,6 +279,57 @@ function StatisticsCharts({ stockData, zoomRange }) {
     )
   }
 
+  // Render combined max/min chart with negative min bars
+  const renderCombinedChart = (title, data) => {
+    // Transform data to include negative minCount values
+    const transformedData = data.map(item => ({
+      ...item,
+      minCountNegative: -item.minCount
+    }))
+
+    return (
+      <div className="bg-slate-800 p-4 rounded-lg border border-slate-700">
+        <h5 className="text-sm font-semibold mb-3 text-slate-200 text-center">{title}</h5>
+        <ResponsiveContainer width="100%" height={250}>
+          <BarChart data={transformedData} margin={{ top: 5, right: 10, left: isMobile ? -10 : 10, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
+            <XAxis
+              dataKey="name"
+              tick={{ fontSize: isMobile ? 9 : 11, fill: '#94a3b8' }}
+              angle={isMobile ? -45 : 0}
+              textAnchor={isMobile ? 'end' : 'middle'}
+              height={isMobile ? 60 : 30}
+              stroke="#475569"
+            />
+            <YAxis
+              tick={{ fill: '#94a3b8', fontSize: isMobile ? 9 : 11 }}
+              stroke="#475569"
+              width={isMobile ? 35 : 50}
+              label={{ value: 'Count', angle: -90, position: 'insideLeft', fill: '#94a3b8', fontSize: isMobile ? 9 : 11 }}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            {/* Max bars (positive, orange/gold) */}
+            <Bar dataKey="maxCount" radius={[4, 4, 0, 0]} fill="#f59e0b">
+              <LabelList
+                dataKey="maxCount"
+                position="inside"
+                style={{ fill: '#ffffff', fontSize: isMobile ? 10 : 12, fontWeight: 'bold' }}
+              />
+            </Bar>
+            {/* Min bars (negative, red) */}
+            <Bar dataKey="minCountNegative" radius={[0, 0, 4, 4]} fill="#ef4444">
+              <LabelList
+                dataKey="minCount"
+                position="inside"
+                style={{ fill: '#ffffff', fontSize: isMobile ? 10 : 12, fontWeight: 'bold' }}
+              />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    )
+  }
+
   // Color schemes for different metrics
   const avgColors = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#d1fae5', '#6366f1', '#8b5cf6']
   const maxColors = ['#f59e0b', '#fbbf24', '#fcd34d', '#fde68a', '#fef3c7', '#fb923c', '#fdba74']
@@ -297,13 +354,12 @@ function StatisticsCharts({ stockData, zoomRange }) {
         ))}
       </div>
 
-      {/* Charts - 3 per row with count labels */}
+      {/* Charts - 2 per row with count labels */}
       <div>
         <h4 className="text-lg font-semibold mb-4 text-slate-100">Group by {activeGroup.title}</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {renderChart(`Avg % Change`, activeGroup.data, 'avgChange', '%', avgColors)}
-          {renderChart(`Top 5% Count (≥${top5PercentThreshold.toFixed(2)}%)`, activeGroup.data, 'maxCount', 'Count', maxColors)}
-          {renderChart(`Bottom 5% Count (≤${bottom5PercentThreshold.toFixed(2)}%)`, activeGroup.data, 'minCount', 'Count', minColors)}
+          {renderCombinedChart(`Max/Min Count (Top 5%: ≥${top5PercentThreshold.toFixed(2)}% | Bottom 5%: ≤${bottom5PercentThreshold.toFixed(2)}%)`, activeGroup.data)}
         </div>
       </div>
     </div>
