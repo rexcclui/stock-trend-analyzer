@@ -48,21 +48,38 @@ function StatisticsCharts({ stockData, zoomRange }) {
     return dayOfWeek !== 0 && dayOfWeek !== 6
   })
 
-  // Helper function to aggregate statistics
+  // Helper function to calculate percentile
+  const calculatePercentile = (values, percentile) => {
+    if (values.length === 0) return 0
+    const sorted = [...values].sort((a, b) => a - b)
+    const index = Math.ceil((percentile / 100) * sorted.length) - 1
+    return sorted[Math.max(0, index)]
+  }
+
+  // Calculate 95th percentile (top 5%) and 5th percentile (bottom 5%)
+  const allValidChanges = weekdayData.filter(item => item.percentChange !== 0).map(item => item.percentChange)
+  const top5PercentThreshold = calculatePercentile(allValidChanges, 95)
+  const bottom5PercentThreshold = calculatePercentile(allValidChanges, 5)
+
+  // Helper function to aggregate statistics with percentile-based counts
   const aggregateStats = (groupedData) => {
     return Object.entries(groupedData).map(([key, items]) => {
       const validChanges = items.filter(item => item.percentChange !== 0)
       const count = validChanges.length
       const avgChange = count > 0 ? validChanges.reduce((sum, item) => sum + item.percentChange, 0) / count : 0
-      const maxChange = count > 0 ? Math.max(...validChanges.map(item => item.percentChange)) : 0
-      const minChange = count > 0 ? Math.min(...validChanges.map(item => item.percentChange)) : 0
+
+      // Count items in top 5% (>= 95th percentile)
+      const maxCount = validChanges.filter(item => item.percentChange >= top5PercentThreshold).length
+
+      // Count items in bottom 5% (<= 5th percentile)
+      const minCount = validChanges.filter(item => item.percentChange <= bottom5PercentThreshold).length
 
       return {
         name: key,
         count,
         avgChange: parseFloat(avgChange.toFixed(2)),
-        maxChange: parseFloat(maxChange.toFixed(2)),
-        minChange: parseFloat(minChange.toFixed(2))
+        maxCount,
+        minCount
       }
     })
   }
@@ -171,17 +188,46 @@ function StatisticsCharts({ stockData, zoomRange }) {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const dataPoint = payload[0].payload
+      const metricName = payload[0].dataKey
+
       return (
         <div className="bg-slate-900 border border-slate-600 p-3 rounded shadow-lg">
           <p className="text-slate-200 font-semibold mb-1">{label}</p>
           <p className="text-sm text-slate-300">
-            Count: {dataPoint.count}
+            Total Count: {dataPoint.count}
           </p>
-          {payload.map((entry, index) => (
-            <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.name}: {entry.value}%
+          {payload.map((entry, index) => {
+            if (entry.dataKey === 'avgChange') {
+              return (
+                <p key={index} className="text-sm" style={{ color: entry.color }}>
+                  Avg Change: {entry.value}%
+                </p>
+              )
+            } else if (entry.dataKey === 'maxCount') {
+              return (
+                <p key={index} className="text-sm" style={{ color: entry.color }}>
+                  Top 5% Count: {entry.value}
+                </p>
+              )
+            } else if (entry.dataKey === 'minCount') {
+              return (
+                <p key={index} className="text-sm" style={{ color: entry.color }}>
+                  Bottom 5% Count: {entry.value}
+                </p>
+              )
+            }
+            return null
+          })}
+          {metricName === 'maxCount' && (
+            <p className="text-xs text-slate-400 mt-1">
+              Threshold: ≥{top5PercentThreshold.toFixed(2)}%
             </p>
-          ))}
+          )}
+          {metricName === 'minCount' && (
+            <p className="text-xs text-slate-400 mt-1">
+              Threshold: ≤{bottom5PercentThreshold.toFixed(2)}%
+            </p>
+          )}
         </div>
       )
     }
@@ -256,8 +302,8 @@ function StatisticsCharts({ stockData, zoomRange }) {
         <h4 className="text-lg font-semibold mb-4 text-slate-100">Group by {activeGroup.title}</h4>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {renderChart(`Avg % Change`, activeGroup.data, 'avgChange', '%', avgColors)}
-          {renderChart(`Max % Change`, activeGroup.data, 'maxChange', '%', maxColors)}
-          {renderChart(`Min % Change`, activeGroup.data, 'minChange', '%', minColors)}
+          {renderChart(`Top 5% Count (≥${top5PercentThreshold.toFixed(2)}%)`, activeGroup.data, 'maxCount', 'Count', maxColors)}
+          {renderChart(`Bottom 5% Count (≤${bottom5PercentThreshold.toFixed(2)}%)`, activeGroup.data, 'minCount', 'Count', minColors)}
         </div>
       </div>
     </div>
