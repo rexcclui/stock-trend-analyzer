@@ -2785,7 +2785,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                         const upperPercent = chart.smaChannelUpperPercent?.[period] ?? 5
                         const lowerPercent = chart.smaChannelLowerPercent?.[period] ?? 5
                         return (
-                          <div key={index} className="flex items-center gap-2 bg-slate-700/50 p-2 rounded w-full">
+                          <div key={index} className="flex items-center gap-2 bg-slate-700/50 p-2 rounded flex-1 min-w-fit">
                             {/* SMA Period Control */}
                             <span className="text-sm text-slate-300 w-12">SMA</span>
                             <button
