@@ -573,13 +573,24 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     return 3 // 100 and above
   }
 
-  const simulateSmaChannelPercent = (chartId, period, prices, smaData, enabledBounds = { upper: true, lower: true }) => {
+  const simulateSmaChannelPercent = (chartId, period, prices, smaData, enabledBounds = { upper: true, lower: true }, visibleRange = null) => {
     // Find optimal upper and lower percentages that touch the most turning points
     // "Touch" means the bound is within tolerance% absolute variance of the price
     // Tolerance is dynamic based on SMA period
     // enabledBounds specifies which bounds to optimize (upper, lower, or both)
+    // visibleRange specifies the data range to use (null = use all data)
     if (!prices || !smaData || prices.length === 0 || smaData.length === 0) {
       return { upper: 5, lower: 5, upperTouches: 0, lowerTouches: 0, totalTouches: 0 }
+    }
+
+    // Apply visible range filter if provided
+    let filteredPrices = prices
+    let filteredSmaData = smaData
+    if (visibleRange) {
+      const start = visibleRange.start || 0
+      const end = visibleRange.end || prices.length
+      filteredPrices = prices.slice(start, end)
+      filteredSmaData = smaData.slice(start, end)
     }
 
     const tolerance = getTolerance(period)
@@ -587,10 +598,10 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
 
     // Identify turning points (local maxima and minima)
     const turningPoints = []
-    for (let i = windowSize; i < prices.length - windowSize; i++) {
-      if (!smaData[i] || smaData[i] <= 0) continue
+    for (let i = windowSize; i < filteredPrices.length - windowSize; i++) {
+      if (!filteredSmaData[i] || filteredSmaData[i] <= 0) continue
 
-      const curr = prices[i].close
+      const curr = filteredPrices[i].close
 
       // Check if this is a local maximum within the window
       let isMaximum = true
@@ -599,7 +610,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
       for (let j = i - windowSize; j <= i + windowSize; j++) {
         if (j === i) continue // Skip the current point itself
 
-        const comparePrice = prices[j].close
+        const comparePrice = filteredPrices[j].close
         if (comparePrice >= curr) {
           isMaximum = false
         }
@@ -613,11 +624,11 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
 
       // Local maximum (Higher than all points in the N-day window)
       if (isMaximum) {
-        turningPoints.push({ index: i, type: 'max', price: curr, sma: smaData[i] })
+        turningPoints.push({ index: i, type: 'max', price: curr, sma: filteredSmaData[i] })
       }
       // Local minimum (Lower than all points in the N-day window)
       else if (isMinimum) {
-        turningPoints.push({ index: i, type: 'min', price: curr, sma: smaData[i] })
+        turningPoints.push({ index: i, type: 'min', price: curr, sma: filteredSmaData[i] })
       }
     }
 
@@ -656,13 +667,13 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
         let pricesWithinChannel = 0
         let totalValidPrices = 0
 
-        for (let i = 0; i < prices.length; i++) {
-          if (!smaData[i] || smaData[i] <= 0) continue
+        for (let i = 0; i < filteredPrices.length; i++) {
+          if (!filteredSmaData[i] || filteredSmaData[i] <= 0) continue
 
           totalValidPrices++
-          const price = prices[i].close
-          const upperBound = smaData[i] * (1 + upperPct / 100)
-          const lowerBound = smaData[i] * (1 - lowerPct / 100)
+          const price = filteredPrices[i].close
+          const upperBound = filteredSmaData[i] * (1 + upperPct / 100)
+          const lowerBound = filteredSmaData[i] * (1 - lowerPct / 100)
 
           // Price is within channel if it's between lower and upper bounds
           if (price >= lowerBound && price <= upperBound) {
@@ -723,9 +734,17 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     }
   }
 
-  const simulateComprehensive = async (chartId, smaIndex, prices, chart, forcedEnabledBounds = null) => {
+  const simulateComprehensive = async (chartId, smaIndex, prices, chart, forcedEnabledBounds = null, visibleRange = null) => {
     // Find optimal SMA period AND upper/lower bounds that touch the most turning points
     if (!prices || prices.length === 0) return null
+
+    // Apply visible range filter if provided
+    let filteredPrices = prices
+    if (visibleRange) {
+      const start = visibleRange.start || 0
+      const end = visibleRange.end || prices.length
+      filteredPrices = prices.slice(start, end)
+    }
 
     // Get which bounds are enabled from the current period or use forced bounds
     const currentPeriod = chart.smaPeriods[smaIndex]
@@ -743,29 +762,29 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     for (const period of testPeriods) {
       // Calculate SMA for this period (Newest -> Oldest direction)
       const smaData = []
-      for (let i = 0; i < prices.length; i++) {
+      for (let i = 0; i < filteredPrices.length; i++) {
         // We need 'period' number of points from i to i + period - 1
-        if (i + period - 1 >= prices.length) {
+        if (i + period - 1 >= filteredPrices.length) {
           smaData.push(null) // Not enough older data to calculate SMA
         } else {
           let sum = 0
           for (let j = 0; j < period; j++) {
-            sum += prices[i + j].close
+            sum += filteredPrices[i + j].close
           }
           smaData.push(sum / period)
         }
       }
 
-      // Find optimal bounds for this period, only for enabled bounds
-      const result = simulateSmaChannelPercent(chartId, period, prices, smaData, enabledBounds)
+      // Find optimal bounds for this period, only for enabled bounds (no need to pass visibleRange as we already filtered)
+      const result = simulateSmaChannelPercent(chartId, period, filteredPrices, smaData, enabledBounds)
 
       // Calculate containment rate for this configuration
       let pricesWithinChannel = 0
       let totalValidPrices = 0
-      for (let i = 0; i < prices.length; i++) {
+      for (let i = 0; i < filteredPrices.length; i++) {
         if (!smaData[i] || smaData[i] <= 0) continue
         totalValidPrices++
-        const price = prices[i].close
+        const price = filteredPrices[i].close
         const upperBound = smaData[i] * (1 + result.upper / 100)
         const lowerBound = smaData[i] * (1 - result.lower / 100)
         if (price >= lowerBound && price <= upperBound) {
@@ -778,10 +797,10 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
       const tolerance = getTolerance(period)
       const windowSize = 5 // N days before and after
       const turningPoints = []
-      for (let i = windowSize; i < prices.length - windowSize; i++) {
+      for (let i = windowSize; i < filteredPrices.length - windowSize; i++) {
         if (!smaData[i] || smaData[i] <= 0) continue
 
-        const curr = prices[i].close
+        const curr = filteredPrices[i].close
 
         // Check if this is a local maximum/minimum within the window
         let isMaximum = true
@@ -790,7 +809,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
         for (let j = i - windowSize; j <= i + windowSize; j++) {
           if (j === i) continue
 
-          const comparePrice = prices[j].close
+          const comparePrice = filteredPrices[j].close
           if (comparePrice >= curr) {
             isMaximum = false
           }
@@ -839,7 +858,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     return bestResult
   }
 
-  const handleComprehensiveSimulation = async (chartId, smaIndex, forcedEnabledBounds = null) => {
+  const handleComprehensiveSimulation = async (chartId, smaIndex, forcedEnabledBounds = null, visibleRange = null) => {
     const chart = charts.find(c => c.id === chartId)
     if (!chart || !chart.data || !chart.data.prices) return
 
@@ -849,7 +868,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     // Run simulation asynchronously
     setTimeout(async () => {
       try {
-        const result = await simulateComprehensive(chartId, smaIndex, chart.data.prices, chart, forcedEnabledBounds)
+        const result = await simulateComprehensive(chartId, smaIndex, chart.data.prices, chart, forcedEnabledBounds, visibleRange)
 
         if (result) {
           // Update the SMA period and bounds
@@ -2638,10 +2657,10 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                             // Trigger comprehensive simulation for both new SMAs with explicit bounds
                             setTimeout(() => {
                               // First SMA (with upper bound) - index is currentLength
-                              handleComprehensiveSimulation(chart.id, currentLength, { upper: true, lower: false })
+                              handleComprehensiveSimulation(chart.id, currentLength, { upper: true, lower: false }, globalZoomRange)
                               // Second SMA (with lower bound) - index is currentLength + 1
                               setTimeout(() => {
-                                handleComprehensiveSimulation(chart.id, currentLength + 1, { upper: false, lower: true })
+                                handleComprehensiveSimulation(chart.id, currentLength + 1, { upper: false, lower: true }, globalZoomRange)
                               }, 200)
                             }, 100)
                           }
@@ -2956,7 +2975,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                                       upper: chart.smaChannelUpperEnabled?.[period] ?? false,
                                       lower: chart.smaChannelLowerEnabled?.[period] ?? false
                                     }
-                                    const result = simulateSmaChannelPercent(chart.id, period, prices, smaData, enabledBounds)
+                                    const result = simulateSmaChannelPercent(chart.id, period, prices, smaData, enabledBounds, globalZoomRange)
                                     if (enabledBounds.upper) {
                                       updateSmaChannelPercent(chart.id, period, 'upper', result.upper)
                                     }
@@ -2997,7 +3016,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                               const isSimulatingComp = simulatingComprehensive[compKey]
                               return (
                                 <button
-                                  onClick={() => handleComprehensiveSimulation(chart.id, index)}
+                                  onClick={() => handleComprehensiveSimulation(chart.id, index, null, globalZoomRange)}
                                   disabled={isSimulatingComp}
                                   className={`px-2 py-1 text-xs rounded font-medium transition-colors whitespace-nowrap ${isSimulatingComp
                                     ? 'bg-purple-600 text-white cursor-wait'
