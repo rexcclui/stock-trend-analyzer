@@ -641,9 +641,11 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     let bestLower = 5
     let bestLowerTouches = 0
     let bestTotalTouches = 0
+    let bestContainmentRate = 0
 
     // Test combinations of upper and lower bounds
     // Find the combination that maximizes touches while keeping 75%+ prices within channel
+    // If touches are equal, prefer higher containment rate
     // Only test bounds that are enabled
     const upperPercentagesToTest = enabledBounds.upper ? testPercentages : [bestUpper]
     const lowerPercentagesToTest = enabledBounds.lower ? testPercentages : [bestLower]
@@ -698,12 +700,15 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
         const totalTouches = upperTouches + lowerTouches
 
         // Keep the combination with the most total touches
-        if (totalTouches > bestTotalTouches) {
+        // If touches are equal, prefer higher containment rate (more data within bounds)
+        if (totalTouches > bestTotalTouches ||
+            (totalTouches === bestTotalTouches && containmentRate > bestContainmentRate)) {
           bestTotalTouches = totalTouches
           bestUpperTouches = upperTouches
           bestLowerTouches = lowerTouches
           bestUpper = upperPct
           bestLower = lowerPct
+          bestContainmentRate = containmentRate
         }
       })
     })
@@ -732,7 +737,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     // Test SMA periods: use common values
     const testPeriods = [5, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100, 120, 150, 200]
 
-    let bestResult = { period: 10, upper: 5, lower: 5, totalTouches: 0 }
+    let bestResult = { period: 10, upper: 5, lower: 5, totalTouches: 0, containmentRate: 0 }
 
     // For each SMA period, find optimal bounds
     for (const period of testPeriods) {
@@ -753,6 +758,21 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
 
       // Find optimal bounds for this period, only for enabled bounds
       const result = simulateSmaChannelPercent(chartId, period, prices, smaData, enabledBounds)
+
+      // Calculate containment rate for this configuration
+      let pricesWithinChannel = 0
+      let totalValidPrices = 0
+      for (let i = 0; i < prices.length; i++) {
+        if (!smaData[i] || smaData[i] <= 0) continue
+        totalValidPrices++
+        const price = prices[i].close
+        const upperBound = smaData[i] * (1 + result.upper / 100)
+        const lowerBound = smaData[i] * (1 - result.lower / 100)
+        if (price >= lowerBound && price <= upperBound) {
+          pricesWithinChannel++
+        }
+      }
+      const containmentRate = totalValidPrices > 0 ? pricesWithinChannel / totalValidPrices : 0
 
       // Count total touches for this configuration
       const tolerance = getTolerance(period)
@@ -801,14 +821,17 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
         }
       })
 
-      if (totalTouches > bestResult.totalTouches) {
+      // Prefer more touches, but if equal, prefer higher containment rate
+      if (totalTouches > bestResult.totalTouches ||
+          (totalTouches === bestResult.totalTouches && containmentRate > bestResult.containmentRate)) {
         bestResult = {
           period,
           upper: result.upper,
           lower: result.lower,
           upperTouches: result.upperTouches,
           lowerTouches: result.lowerTouches,
-          totalTouches
+          totalTouches,
+          containmentRate
         }
       }
     }
