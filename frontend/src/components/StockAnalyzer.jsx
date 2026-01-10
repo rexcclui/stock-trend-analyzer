@@ -900,8 +900,14 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
   }
 
   const handleComprehensiveSimulation = async (chartId, smaIndex, forcedEnabledBounds = null, visibleRange = null) => {
-    const chart = charts.find(c => c.id === chartId)
-    if (!chart || !chart.data || !chart.data.prices) return
+    // Use setCharts to access the latest chart state (not stale closure)
+    let latestChart = null
+    setCharts(prevCharts => {
+      latestChart = prevCharts.find(c => c.id === chartId)
+      return prevCharts // Don't modify, just read
+    })
+
+    if (!latestChart || !latestChart.data || !latestChart.data.prices) return
 
     const smaKey = `${chartId}-${smaIndex}`
     setSimulatingComprehensive(prev => ({ ...prev, [smaKey]: true }))
@@ -909,7 +915,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     // Run simulation asynchronously
     setTimeout(async () => {
       try {
-        const result = await simulateComprehensive(chartId, smaIndex, chart.data.prices, chart, forcedEnabledBounds, visibleRange)
+        const result = await simulateComprehensive(chartId, smaIndex, latestChart.data.prices, latestChart, forcedEnabledBounds, visibleRange)
 
         if (result) {
           // Update the SMA period and bounds
