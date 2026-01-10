@@ -2570,14 +2570,62 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                         onClick={() => {
                           const defaultPeriods = [10, 20, 50, 100, 200]
                           const currentLength = chart.smaPeriods?.length || 0
-                          if (currentLength < 5) {
-                            const defaultPeriod = defaultPeriods[currentLength] || 30
-                            const newPeriods = [...(chart.smaPeriods || []), defaultPeriod]
-                            updateSmaPeriods(chart.id, newPeriods)
+
+                          // Add two SMAs at once
+                          if (currentLength < 4) {  // Changed from < 5 to < 4 since we're adding 2
+                            const firstPeriod = defaultPeriods[currentLength] || 30
+                            const secondPeriod = defaultPeriods[currentLength + 1] || 50
+                            const newPeriods = [...(chart.smaPeriods || []), firstPeriod, secondPeriod]
+
+                            // Update the chart with new periods
+                            setCharts(prevCharts =>
+                              prevCharts.map(c => {
+                                if (c.id === chart.id) {
+                                  const newVisibility = {}
+                                  const newUpperPercent = { ...c.smaChannelUpperPercent }
+                                  const newLowerPercent = { ...c.smaChannelLowerPercent }
+                                  const newUpperEnabled = { ...c.smaChannelUpperEnabled }
+                                  const newLowerEnabled = { ...c.smaChannelLowerEnabled }
+
+                                  newPeriods.forEach(period => {
+                                    newVisibility[period] = c.smaVisibility?.[period] ?? true
+                                    newUpperPercent[period] = c.smaChannelUpperPercent?.[period] ?? 5
+                                    newLowerPercent[period] = c.smaChannelLowerPercent?.[period] ?? 5
+                                  })
+
+                                  // Enable lower bound on first new SMA
+                                  newLowerEnabled[firstPeriod] = true
+                                  // Enable upper bound on second new SMA
+                                  newUpperEnabled[secondPeriod] = true
+
+                                  return {
+                                    ...c,
+                                    smaPeriods: newPeriods,
+                                    smaVisibility: newVisibility,
+                                    smaChannelUpperPercent: newUpperPercent,
+                                    smaChannelLowerPercent: newLowerPercent,
+                                    smaChannelUpperEnabled: newUpperEnabled,
+                                    smaChannelLowerEnabled: newLowerEnabled
+                                  }
+                                }
+                                return c
+                              })
+                            )
+
+                            // Trigger comprehensive simulation for both new SMAs
+                            setTimeout(() => {
+                              // First SMA (with lower bound) - index is currentLength
+                              handleComprehensiveSimulation(chart.id, currentLength)
+
+                              // Second SMA (with upper bound) - index is currentLength + 1
+                              setTimeout(() => {
+                                handleComprehensiveSimulation(chart.id, currentLength + 1)
+                              }, 150)
+                            }, 100)
                           }
                         }}
                         className="px-3 py-1 text-sm bg-slate-700 text-slate-300 rounded hover:bg-slate-600 transition-colors flex items-center gap-1"
-                        title="Add SMA Line"
+                        title="Add two SMA lines with auto-optimized bounds"
                       >
                         <Plus className="w-4 h-4" />
                         Add SMA
