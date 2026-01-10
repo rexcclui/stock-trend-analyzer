@@ -666,30 +666,49 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
 
     upperPercentagesToTest.forEach(upperPct => {
       lowerPercentagesToTest.forEach(lowerPct => {
-        // Check if at least 75% of prices are within the channel
-        let pricesWithinChannel = 0
-        let totalValidPrices = 0
+        // Check containment rules separately for upper and lower bounds
+        // Upper bound: 75% of prices ABOVE SMA should be within upper bound
+        // Lower bound: 75% of prices BELOW SMA should be within lower bound
+        let pricesAboveSma = 0
+        let pricesAboveSmaWithinUpperBound = 0
+        let pricesBelowSma = 0
+        let pricesBelowSmaWithinLowerBound = 0
 
         for (let i = 0; i < filteredPrices.length; i++) {
           if (!filteredSmaData[i] || filteredSmaData[i] <= 0) continue
 
-          totalValidPrices++
           const price = filteredPrices[i].close
-          const upperBound = filteredSmaData[i] * (1 + upperPct / 100)
-          const lowerBound = filteredSmaData[i] * (1 - lowerPct / 100)
+          const sma = filteredSmaData[i]
+          const upperBound = sma * (1 + upperPct / 100)
+          const lowerBound = sma * (1 - lowerPct / 100)
 
-          // Price is within channel if it's between lower and upper bounds
-          if (price >= lowerBound && price <= upperBound) {
-            pricesWithinChannel++
+          if (price > sma) {
+            pricesAboveSma++
+            if (price <= upperBound) {
+              pricesAboveSmaWithinUpperBound++
+            }
+          } else if (price < sma) {
+            pricesBelowSma++
+            if (price >= lowerBound) {
+              pricesBelowSmaWithinLowerBound++
+            }
           }
         }
 
-        const containmentRate = totalValidPrices > 0 ? pricesWithinChannel / totalValidPrices : 0
+        // Calculate containment rates
+        const upperContainmentRate = pricesAboveSma > 0 ? pricesAboveSmaWithinUpperBound / pricesAboveSma : 1
+        const lowerContainmentRate = pricesBelowSma > 0 ? pricesBelowSmaWithinLowerBound / pricesBelowSma : 1
 
-        // Only consider this combination if at least 75% of prices are within the channel
-        if (containmentRate < 0.75) {
-          return // Skip this combination
+        // Check if containment rules are satisfied
+        if (enabledBounds.upper && upperContainmentRate < 0.75) {
+          return // Skip if upper bound doesn't contain 75% of prices above SMA
         }
+        if (enabledBounds.lower && lowerContainmentRate < 0.75) {
+          return // Skip if lower bound doesn't contain 75% of prices below SMA
+        }
+
+        // Calculate overall containment rate for tiebreaker (average of both)
+        const containmentRate = (upperContainmentRate + lowerContainmentRate) / 2
 
         // Count touches for this combination
         let upperTouches = 0
@@ -782,19 +801,38 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
       const result = simulateSmaChannelPercent(chartId, period, filteredPrices, smaData, enabledBounds)
 
       // Calculate containment rate for this configuration
-      let pricesWithinChannel = 0
-      let totalValidPrices = 0
+      // Upper bound: 75% of prices ABOVE SMA should be within upper bound
+      // Lower bound: 75% of prices BELOW SMA should be within lower bound
+      let pricesAboveSma = 0
+      let pricesAboveSmaWithinUpperBound = 0
+      let pricesBelowSma = 0
+      let pricesBelowSmaWithinLowerBound = 0
+
       for (let i = 0; i < filteredPrices.length; i++) {
         if (!smaData[i] || smaData[i] <= 0) continue
-        totalValidPrices++
+
         const price = filteredPrices[i].close
-        const upperBound = smaData[i] * (1 + result.upper / 100)
-        const lowerBound = smaData[i] * (1 - result.lower / 100)
-        if (price >= lowerBound && price <= upperBound) {
-          pricesWithinChannel++
+        const sma = smaData[i]
+        const upperBound = sma * (1 + result.upper / 100)
+        const lowerBound = sma * (1 - result.lower / 100)
+
+        if (price > sma) {
+          pricesAboveSma++
+          if (price <= upperBound) {
+            pricesAboveSmaWithinUpperBound++
+          }
+        } else if (price < sma) {
+          pricesBelowSma++
+          if (price >= lowerBound) {
+            pricesBelowSmaWithinLowerBound++
+          }
         }
       }
-      const containmentRate = totalValidPrices > 0 ? pricesWithinChannel / totalValidPrices : 0
+
+      // Calculate containment rates
+      const upperContainmentRate = pricesAboveSma > 0 ? pricesAboveSmaWithinUpperBound / pricesAboveSma : 1
+      const lowerContainmentRate = pricesBelowSma > 0 ? pricesBelowSmaWithinLowerBound / pricesBelowSma : 1
+      const containmentRate = (upperContainmentRate + lowerContainmentRate) / 2
 
       // Count total touches for this configuration
       const tolerance = getTolerance(period)
