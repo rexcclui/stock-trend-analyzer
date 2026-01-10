@@ -6,7 +6,7 @@ import VolumeLegendPills from './VolumeLegendPills'
 
 const TOP_SYMBOL_CACHE_KEY_PREFIX = 'stockFilteringTopSymbols'
 const RESULT_CACHE_KEY_PREFIX = 'stockFilteringResults'
-const SCHEDULE_CONFIG_KEY = 'stockFilteringScheduleConfig'
+const SCHEDULE_QUEUE_KEY = 'stockFilteringScheduleQueue'
 const TOP_SYMBOL_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 1 month cache
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -305,10 +305,12 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
   const [sortDirection, setSortDirection] = useState('asc')
   const [toastMessage, setToastMessage] = useState('')
   const [selectedRows, setSelectedRows] = useState(new Set())
-  const [scheduleEnabled, setScheduleEnabled] = useState(false)
-  const [scheduleTime, setScheduleTime] = useState('09:00')
-  const [nextScheduledRun, setNextScheduledRun] = useState(null)
-  const [lastScheduledRun, setLastScheduledRun] = useState(null)
+  const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const [showQueueModal, setShowQueueModal] = useState(false)
+  const [scheduleTime, setScheduleTime] = useState('')
+  const [scheduleDate, setScheduleDate] = useState('')
+  const [scheduleQueue, setScheduleQueue] = useState([])
+  const [editingJobId, setEditingJobId] = useState(null)
   const scanQueueRef = useRef([])
   const isScanningRef = useRef(false)
   const isPausedRef = useRef(false)
@@ -378,51 +380,45 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
     showToast(`Added ${newEntries.length} stock${newEntries.length !== 1 ? 's' : ''} to scan queue`)
   }, [bulkImport])
 
-  // Load schedule config on mount
+  // Load schedule queue on mount
   useEffect(() => {
     try {
-      const cached = localStorage.getItem(SCHEDULE_CONFIG_KEY)
+      const cached = localStorage.getItem(SCHEDULE_QUEUE_KEY)
       if (cached) {
-        const config = JSON.parse(cached)
-        setScheduleEnabled(config.enabled || false)
-        setScheduleTime(config.time || '09:00')
-        setLastScheduledRun(config.lastRun || null)
-        if (config.enabled) {
-          calculateNextScheduledRun(config.time)
-        }
+        const queue = JSON.parse(cached)
+        setScheduleQueue(Array.isArray(queue) ? queue : [])
       }
     } catch (error) {
-      console.error('Failed to load schedule config', error)
+      console.error('Failed to load schedule queue', error)
     }
 
     // Request notification permission
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission()
     }
+
+    // Set default date/time for schedule modal
+    const now = new Date()
+    now.setHours(now.getHours() + 1, 0, 0, 0) // Default to next hour
+    setScheduleDate(now.toISOString().split('T')[0])
+    setScheduleTime(now.toTimeString().slice(0, 5))
   }, [])
 
-  // Save schedule config when it changes
+  // Save schedule queue when it changes
   useEffect(() => {
     try {
-      const config = {
-        enabled: scheduleEnabled,
-        time: scheduleTime,
-        lastRun: lastScheduledRun
-      }
-      localStorage.setItem(SCHEDULE_CONFIG_KEY, JSON.stringify(config))
+      localStorage.setItem(SCHEDULE_QUEUE_KEY, JSON.stringify(scheduleQueue))
     } catch (error) {
-      console.error('Failed to save schedule config', error)
+      console.error('Failed to save schedule queue', error)
     }
-  }, [scheduleEnabled, scheduleTime, lastScheduledRun])
+  }, [scheduleQueue])
 
-  // Set up schedule checker
+  // Set up schedule checker to run queued jobs
   useEffect(() => {
-    if (scheduleEnabled) {
-      calculateNextScheduledRun(scheduleTime)
-
-      // Check every minute if it's time to run
+    if (scheduleQueue.length > 0) {
+      // Check every minute if any job should run
       scheduleCheckIntervalRef.current = setInterval(() => {
-        checkAndRunScheduledTask()
+        checkAndRunQueuedJobs()
       }, 60000) // Check every minute
 
       return () => {
@@ -435,9 +431,8 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
         clearInterval(scheduleCheckIntervalRef.current)
         scheduleCheckIntervalRef.current = null
       }
-      setNextScheduledRun(null)
     }
-  }, [scheduleEnabled, scheduleTime])
+  }, [scheduleQueue])
 
   const showToast = (message) => {
     setToastMessage(message)
@@ -458,127 +453,202 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
     setToastMessage('')
   }
 
-  const calculateNextScheduledRun = (time) => {
-    const [hours, minutes] = time.split(':').map(Number)
-    const now = new Date()
-    const scheduled = new Date()
-    scheduled.setHours(hours, minutes, 0, 0)
-
-    // If the scheduled time has passed today, schedule for tomorrow
-    if (scheduled <= now) {
-      scheduled.setDate(scheduled.getDate() + 1)
-    }
-
-    setNextScheduledRun(scheduled.toISOString())
-  }
-
   const sendNotification = (title, body) => {
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification(title, { body, icon: '/favicon.ico' })
     }
   }
 
-  const checkAndRunScheduledTask = () => {
-    if (!scheduleEnabled || !nextScheduledRun) return
-
+  const checkAndRunQueuedJobs = () => {
     const now = new Date()
-    const scheduledTime = new Date(nextScheduledRun)
+    const jobsToRun = scheduleQueue.filter(job => {
+      const scheduledTime = new Date(job.scheduledTime)
+      // If current time is past the scheduled time (within 1 minute window)
+      return now >= scheduledTime && (now - scheduledTime) < 60000
+    })
 
-    // If current time is past the scheduled time (within 1 minute window)
-    if (now >= scheduledTime && (now - scheduledTime) < 60000) {
-      handleScheduledLoadHeavyVol()
-    }
+    jobsToRun.forEach(job => {
+      handleScheduledJobRun(job)
+    })
   }
 
-  const handleScheduledLoadHeavyVol = async () => {
-    if (loading || scanning) return
+  const handleScheduledJobRun = async (job) => {
+    if (loading || scanning) {
+      // If already running, delay this job by 5 minutes
+      const newTime = new Date(job.scheduledTime)
+      newTime.setMinutes(newTime.getMinutes() + 5)
+      setScheduleQueue(prev => prev.map(j =>
+        j.id === job.id ? { ...j, scheduledTime: newTime.toISOString() } : j
+      ))
+      return
+    }
 
     const startTime = Date.now()
     const initialResultsCount = results.length
+
+    // Set the job's settings
+    setSelectedMarket(job.market)
+    setSelectedPeriod(job.period)
+    setSelectedThreshold(job.threshold)
+    setStockLimit(job.stockLimit)
 
     setLoading(true)
     setPaused(false)
     isPausedRef.current = false
 
     try {
-      const symbols = await loadTopSymbols()
+      const market = markets.find(m => m.value === job.market)
+      if (!market) {
+        removeJobFromQueue(job.id)
+        return
+      }
+
+      // Load symbols for this market
+      const cacheKey = `${TOP_SYMBOL_CACHE_KEY_PREFIX}_${job.market}`
+      const cached = localStorage.getItem(cacheKey)
+      let symbols = []
+
+      if (cached) {
+        const { symbols: cachedSymbols, timestamp } = JSON.parse(cached)
+        if (Date.now() - timestamp < TOP_SYMBOL_TTL_MS) {
+          symbols = cachedSymbols
+        }
+      }
+
+      if (symbols.length === 0) {
+        const params = { limit: market.limit }
+        if (market.exchange) {
+          params.exchange = market.exchange
+        }
+        const response = await axios.get(joinUrl(API_URL, '/top-market-cap'), { params })
+        const payload = response.data
+        symbols = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.symbols)
+          ? payload.symbols
+          : []
+        symbols = symbols
+          .map(item => (typeof item === 'string' ? item : item?.symbol))
+          .filter(Boolean)
+          .map(symbol => symbol.toUpperCase())
+        localStorage.setItem(cacheKey, JSON.stringify({ symbols, timestamp: Date.now() }))
+      }
 
       if (symbols.length === 0) {
         const runTime = ((Date.now() - startTime) / 1000).toFixed(1)
         sendNotification(
-          'Scheduled Heavy Vol Scan Failed',
+          `Scheduled Scan Failed (${job.market})`,
           `No symbols loaded. Run time: ${runTime}s`
         )
-        setLastScheduledRun(new Date().toISOString())
-        calculateNextScheduledRun(scheduleTime)
+        removeJobFromQueue(job.id)
+        setLoading(false)
         return
       }
 
-      // Get existing symbols to skip them
       const existingSymbols = new Set(results.map(r => r.symbol))
-
-      // Create scan queue, excluding already scanned symbols
       scanQueueRef.current = symbols
         .filter(symbol => !existingSymbols.has(symbol))
         .map(symbol => ({
           symbol,
-          days: selectedPeriod
+          days: job.period
         }))
 
       if (scanQueueRef.current.length === 0) {
         const runTime = ((Date.now() - startTime) / 1000).toFixed(1)
         sendNotification(
-          'Scheduled Heavy Vol Scan Complete',
+          `Scheduled Scan Complete (${job.market})`,
           `All symbols already scanned. Run time: ${runTime}s`
         )
+        removeJobFromQueue(job.id)
         setLoading(false)
-        setLastScheduledRun(new Date().toISOString())
-        calculateNextScheduledRun(scheduleTime)
         return
       }
 
-      // Store metrics for the scheduled run
+      // Store metrics and job info for the scheduled run
       scheduledRunMetricsRef.current = {
         startTime,
-        initialCount: initialResultsCount
+        initialCount: initialResultsCount,
+        jobId: job.id,
+        market: job.market
       }
 
       abortControllerRef.current = new AbortController()
       setScanning(true)
       setLoading(false)
 
-      // Process the queue - metrics will be sent in processScanQueue when done
       processScanQueue()
     } catch (error) {
-      console.error('Failed to run scheduled heavy vol', error)
+      console.error('Failed to run scheduled job', error)
       const runTime = ((Date.now() - startTime) / 1000).toFixed(1)
       sendNotification(
-        'Scheduled Heavy Vol Scan Failed',
+        `Scheduled Scan Failed (${job.market})`,
         `Error occurred. Run time: ${runTime}s`
       )
       setLoading(false)
-      setLastScheduledRun(new Date().toISOString())
-      calculateNextScheduledRun(scheduleTime)
+      removeJobFromQueue(job.id)
       scheduledRunMetricsRef.current = null
     }
   }
 
-  const handleToggleSchedule = (enabled) => {
-    setScheduleEnabled(enabled)
-    if (enabled) {
-      calculateNextScheduledRun(scheduleTime)
-      showToast(`Scheduled daily at ${scheduleTime}`)
-    } else {
-      showToast('Schedule disabled')
-    }
+  const handleOpenScheduleModal = () => {
+    setEditingJobId(null)
+    const now = new Date()
+    now.setHours(now.getHours() + 1, 0, 0, 0)
+    setScheduleDate(now.toISOString().split('T')[0])
+    setScheduleTime(now.toTimeString().slice(0, 5))
+    setShowScheduleModal(true)
   }
 
-  const handleScheduleTimeChange = (time) => {
-    setScheduleTime(time)
-    if (scheduleEnabled) {
-      calculateNextScheduledRun(time)
-      showToast(`Schedule updated to ${time}`)
+  const handleQueueJob = () => {
+    const scheduledDateTime = new Date(`${scheduleDate}T${scheduleTime}`)
+
+    if (scheduledDateTime <= new Date()) {
+      showToast('Scheduled time must be in the future')
+      return
     }
+
+    const job = {
+      id: editingJobId || Date.now().toString(),
+      market: selectedMarket,
+      period: selectedPeriod,
+      threshold: selectedThreshold,
+      stockLimit: stockLimit,
+      scheduledTime: scheduledDateTime.toISOString(),
+      createdAt: editingJobId ? scheduleQueue.find(j => j.id === editingJobId)?.createdAt : new Date().toISOString()
+    }
+
+    if (editingJobId) {
+      setScheduleQueue(prev => prev.map(j => j.id === editingJobId ? job : j))
+      showToast('Scheduled job updated')
+    } else {
+      setScheduleQueue(prev => [...prev, job])
+      showToast('Job added to queue')
+    }
+
+    setShowScheduleModal(false)
+    setEditingJobId(null)
+  }
+
+  const handleEditJob = (job) => {
+    setEditingJobId(job.id)
+    const scheduledDate = new Date(job.scheduledTime)
+    setScheduleDate(scheduledDate.toISOString().split('T')[0])
+    setScheduleTime(scheduledDate.toTimeString().slice(0, 5))
+    setSelectedMarket(job.market)
+    setSelectedPeriod(job.period)
+    setSelectedThreshold(job.threshold)
+    setStockLimit(job.stockLimit)
+    setShowQueueModal(false)
+    setShowScheduleModal(true)
+  }
+
+  const removeJobFromQueue = (jobId) => {
+    setScheduleQueue(prev => prev.filter(j => j.id !== jobId))
+  }
+
+  const handleDeleteJob = (jobId) => {
+    removeJobFromQueue(jobId)
+    showToast('Job removed from queue')
   }
 
   const loadTopSymbols = async () => {
@@ -841,19 +911,18 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
     setProgress({ current: 0, total: 0 })
     setCurrentStock('')
 
-    // If this was a scheduled run, send notification with metrics
+    // If this was a scheduled run, send notification with metrics and remove job from queue
     if (scheduledRunMetricsRef.current) {
       const metrics = scheduledRunMetricsRef.current
-      const finalCount = newResults.length + (metrics.initialCount || 0)
+      const finalCount = results.length
       const runTime = ((Date.now() - metrics.startTime) / 1000).toFixed(1)
 
       sendNotification(
-        'Scheduled Heavy Vol Scan Complete',
+        `Scheduled Scan Complete (${metrics.market})`,
         `Stocks added: ${newResults.length}\nTotal stocks: ${finalCount}\nRun time: ${runTime}s`
       )
 
-      setLastScheduledRun(new Date().toISOString())
-      calculateNextScheduledRun(scheduleTime)
+      removeJobFromQueue(metrics.jobId)
       scheduledRunMetricsRef.current = null
     }
   }
@@ -1181,89 +1250,6 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
 
   return (
     <div className="space-y-6">
-      {/* Scheduling Panel */}
-      <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <Clock className="w-5 h-5 text-purple-400" />
-            <h3 className="text-lg font-semibold text-slate-200">Schedule Daily Heavy Vol Scan</h3>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={scheduleEnabled}
-              onChange={(e) => handleToggleSchedule(e.target.checked)}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
-            <span className="ml-3 text-sm font-medium text-slate-300">
-              {scheduleEnabled ? 'Enabled' : 'Disabled'}
-            </span>
-          </label>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Time Picker */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Daily Run Time
-            </label>
-            <input
-              type="time"
-              value={scheduleTime}
-              onChange={(e) => handleScheduleTimeChange(e.target.value)}
-              disabled={!scheduleEnabled}
-              className="w-full bg-slate-700 text-white px-4 py-2 rounded border border-slate-600 focus:border-purple-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-          </div>
-
-          {/* Next Scheduled Run */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Next Scheduled Run
-            </label>
-            <div className="bg-slate-700 text-slate-300 px-4 py-2 rounded border border-slate-600 min-h-[42px] flex items-center">
-              {nextScheduledRun ? (
-                <span className="text-green-400">
-                  {new Date(nextScheduledRun).toLocaleString()}
-                </span>
-              ) : (
-                <span className="text-slate-500">Not scheduled</span>
-              )}
-            </div>
-          </div>
-
-          {/* Last Scheduled Run */}
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">
-              Last Scheduled Run
-            </label>
-            <div className="bg-slate-700 text-slate-300 px-4 py-2 rounded border border-slate-600 min-h-[42px] flex items-center">
-              {lastScheduledRun ? (
-                <span className="text-blue-400">
-                  {formatLastRunTime(lastScheduledRun)}
-                </span>
-              ) : (
-                <span className="text-slate-500">Never</span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {scheduleEnabled && (
-          <div className="mt-4 p-3 bg-purple-900/20 border border-purple-700/50 rounded-lg">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-purple-400 mt-0.5" />
-              <div className="text-sm text-purple-300">
-                <strong>Note:</strong> Scheduled scans will run automatically at {scheduleTime} daily.
-                You'll receive a browser notification with a summary when complete (stocks added and run time).
-                Make sure to keep this tab open and allow notifications.
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
       {/* Control Panel */}
       <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
         <div className="flex flex-wrap items-end gap-4">
@@ -1412,14 +1398,36 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                 </button>
               </>
             ) : (
-              <button
-                onClick={handleLoadHeavyVol}
-                disabled={loading}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-                Load Heavy Vol
-              </button>
+              <>
+                <button
+                  onClick={handleLoadHeavyVol}
+                  disabled={loading}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  Load Heavy Vol
+                </button>
+                <button
+                  onClick={handleOpenScheduleModal}
+                  disabled={loading || scanning}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <Clock className="w-4 h-4" />
+                  Schedule
+                </button>
+                <button
+                  onClick={() => setShowQueueModal(true)}
+                  className="bg-slate-600 hover:bg-slate-700 text-white px-6 py-2 rounded font-medium transition-colors flex items-center gap-2 relative"
+                >
+                  <Database className="w-4 h-4" />
+                  Show Queue
+                  {scheduleQueue.length > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                      {scheduleQueue.length}
+                    </span>
+                  )}
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -1921,6 +1929,209 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
             >
               ×
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-lg p-6 border border-slate-700 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold text-slate-200">
+                {editingJobId ? 'Edit Scheduled Job' : 'Schedule Heavy Vol Scan'}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowScheduleModal(false)
+                  setEditingJobId(null)
+                }}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Current Settings Display */}
+              <div className="bg-slate-700/50 p-4 rounded-lg space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Market:</span>
+                  <span className="text-white font-medium">{selectedMarket}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Period:</span>
+                  <span className="text-white font-medium">{periods.find(p => p.value === selectedPeriod)?.label}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Volume Filter:</span>
+                  <span className="text-white font-medium">{selectedThreshold}%</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Stock Limit:</span>
+                  <span className="text-white font-medium">{stockLimit === -1 ? 'ALL' : stockLimit}</span>
+                </div>
+              </div>
+
+              {/* Date Picker */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full bg-slate-700 text-white px-4 py-2 rounded border border-slate-600 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Time Picker */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Time
+                </label>
+                <input
+                  type="time"
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                  className="w-full bg-slate-700 text-white px-4 py-2 rounded border border-slate-600 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Info */}
+              <div className="p-3 bg-blue-900/20 border border-blue-700/50 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-xs text-blue-300">
+                    This job will run once at the scheduled time with the current settings shown above.
+                    You'll receive a notification when complete.
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowScheduleModal(false)
+                    setEditingJobId(null)
+                  }}
+                  className="flex-1 bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleQueueJob}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-medium transition-colors"
+                >
+                  {editingJobId ? 'Update Job' : 'Queue Job'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Show Queue Modal */}
+      {showQueueModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-lg p-6 border border-slate-700 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold text-slate-200">
+                Scheduled Jobs Queue ({scheduleQueue.length})
+              </h3>
+              <button
+                onClick={() => setShowQueueModal(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {scheduleQueue.length === 0 ? (
+              <div className="text-center py-12 text-slate-400">
+                <Database className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No scheduled jobs in queue</p>
+                <p className="text-sm mt-1">Click "Schedule" to add a job</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {scheduleQueue
+                  .sort((a, b) => new Date(a.scheduledTime) - new Date(b.scheduledTime))
+                  .map(job => {
+                    const scheduledDate = new Date(job.scheduledTime)
+                    const isPast = scheduledDate < new Date()
+                    return (
+                      <div
+                        key={job.id}
+                        className={`bg-slate-700/50 p-4 rounded-lg border ${
+                          isPast ? 'border-yellow-600/50' : 'border-slate-600'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                            <div>
+                              <div className="text-slate-400 text-xs mb-1">Market</div>
+                              <div className="text-white font-medium">{job.market}</div>
+                            </div>
+                            <div>
+                              <div className="text-slate-400 text-xs mb-1">Period</div>
+                              <div className="text-white font-medium">
+                                {periods.find(p => p.value === job.period)?.label || job.period}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-slate-400 text-xs mb-1">Threshold</div>
+                              <div className="text-white font-medium">{job.threshold}%</div>
+                            </div>
+                            <div>
+                              <div className="text-slate-400 text-xs mb-1">Stock Limit</div>
+                              <div className="text-white font-medium">
+                                {job.stockLimit === -1 ? 'ALL' : job.stockLimit}
+                              </div>
+                            </div>
+                            <div className="col-span-2">
+                              <div className="text-slate-400 text-xs mb-1">Scheduled Time</div>
+                              <div className={`font-medium ${isPast ? 'text-yellow-400' : 'text-green-400'}`}>
+                                {scheduledDate.toLocaleString()}
+                                {isPast && ' (Pending execution)'}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleEditJob(job)}
+                              className="text-blue-400 hover:text-blue-300 transition-colors"
+                              title="Edit job"
+                            >
+                              <Settings className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteJob(job.id)}
+                              className="text-red-400 hover:text-red-300 transition-colors"
+                              title="Delete job"
+                            >
+                              <X className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+            )}
+
+            <div className="mt-4 p-3 bg-purple-900/20 border border-purple-700/50 rounded-lg">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-purple-400 mt-0.5 flex-shrink-0" />
+                <div className="text-xs text-purple-300">
+                  Jobs will run automatically at their scheduled time. Keep this browser tab open for scheduled scans to execute.
+                  Each job runs once and is removed from the queue after completion.
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
