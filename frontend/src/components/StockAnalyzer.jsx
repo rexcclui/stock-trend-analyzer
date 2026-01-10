@@ -2702,13 +2702,24 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                             )
 
                             // Trigger comprehensive simulation for both new SMAs with explicit bounds
+                            // Use setTimeout to ensure React state has updated
                             setTimeout(() => {
-                              // First SMA (with upper bound) - index is currentLength
-                              handleComprehensiveSimulation(chart.id, currentLength, { upper: true, lower: false }, globalZoomRange)
-                              // Second SMA (with lower bound) - index is currentLength + 1
-                              setTimeout(() => {
-                                handleComprehensiveSimulation(chart.id, currentLength + 1, { upper: false, lower: true }, globalZoomRange)
-                              }, 200)
+                              // Double-check the state has updated by reading it fresh
+                              setCharts(prevCharts => {
+                                const updatedChart = prevCharts.find(c => c.id === chart.id)
+                                if (updatedChart && updatedChart.smaPeriods.length >= currentLength + 2) {
+                                  // State has updated, now trigger simulations
+                                  setTimeout(() => {
+                                    // First SMA (with upper bound) - index is currentLength
+                                    handleComprehensiveSimulation(chart.id, currentLength, { upper: true, lower: false }, globalZoomRange)
+                                    // Second SMA (with lower bound) - index is currentLength + 1
+                                    setTimeout(() => {
+                                      handleComprehensiveSimulation(chart.id, currentLength + 1, { upper: false, lower: true }, globalZoomRange)
+                                    }, 300)
+                                  }, 50)
+                                }
+                                return prevCharts // Don't modify, just read
+                              })
                             }, 100)
                           }
                         }}
