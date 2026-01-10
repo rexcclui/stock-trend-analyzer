@@ -6,6 +6,7 @@ import VolumeLegendPills from './VolumeLegendPills'
 
 const TOP_SYMBOL_CACHE_KEY_PREFIX = 'stockFilteringTopSymbols'
 const RESULT_CACHE_KEY_PREFIX = 'stockFilteringResults'
+const SCHEDULE_CONFIG_KEY = 'stockFilteringScheduleConfig'
 const TOP_SYMBOL_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 1 month cache
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -304,11 +305,17 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
   const [sortDirection, setSortDirection] = useState('asc')
   const [toastMessage, setToastMessage] = useState('')
   const [selectedRows, setSelectedRows] = useState(new Set())
+  const [scheduleEnabled, setScheduleEnabled] = useState(false)
+  const [scheduleTime, setScheduleTime] = useState('09:00')
+  const [nextScheduledRun, setNextScheduledRun] = useState(null)
+  const [lastScheduledRun, setLastScheduledRun] = useState(null)
   const scanQueueRef = useRef([])
   const isScanningRef = useRef(false)
   const isPausedRef = useRef(false)
   const abortControllerRef = useRef(null)
   const toastTimeoutRef = useRef(null)
+  const scheduleCheckIntervalRef = useRef(null)
+  const scheduledRunMetricsRef = useRef(null)
 
   // Load cached results on mount (all markets together)
   useEffect(() => {
@@ -371,6 +378,67 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
     showToast(`Added ${newEntries.length} stock${newEntries.length !== 1 ? 's' : ''} to scan queue`)
   }, [bulkImport])
 
+  // Load schedule config on mount
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem(SCHEDULE_CONFIG_KEY)
+      if (cached) {
+        const config = JSON.parse(cached)
+        setScheduleEnabled(config.enabled || false)
+        setScheduleTime(config.time || '09:00')
+        setLastScheduledRun(config.lastRun || null)
+        if (config.enabled) {
+          calculateNextScheduledRun(config.time)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load schedule config', error)
+    }
+
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+  }, [])
+
+  // Save schedule config when it changes
+  useEffect(() => {
+    try {
+      const config = {
+        enabled: scheduleEnabled,
+        time: scheduleTime,
+        lastRun: lastScheduledRun
+      }
+      localStorage.setItem(SCHEDULE_CONFIG_KEY, JSON.stringify(config))
+    } catch (error) {
+      console.error('Failed to save schedule config', error)
+    }
+  }, [scheduleEnabled, scheduleTime, lastScheduledRun])
+
+  // Set up schedule checker
+  useEffect(() => {
+    if (scheduleEnabled) {
+      calculateNextScheduledRun(scheduleTime)
+
+      // Check every minute if it's time to run
+      scheduleCheckIntervalRef.current = setInterval(() => {
+        checkAndRunScheduledTask()
+      }, 60000) // Check every minute
+
+      return () => {
+        if (scheduleCheckIntervalRef.current) {
+          clearInterval(scheduleCheckIntervalRef.current)
+        }
+      }
+    } else {
+      if (scheduleCheckIntervalRef.current) {
+        clearInterval(scheduleCheckIntervalRef.current)
+        scheduleCheckIntervalRef.current = null
+      }
+      setNextScheduledRun(null)
+    }
+  }, [scheduleEnabled, scheduleTime])
+
   const showToast = (message) => {
     setToastMessage(message)
     if (toastTimeoutRef.current) {
@@ -388,6 +456,129 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
       toastTimeoutRef.current = null
     }
     setToastMessage('')
+  }
+
+  const calculateNextScheduledRun = (time) => {
+    const [hours, minutes] = time.split(':').map(Number)
+    const now = new Date()
+    const scheduled = new Date()
+    scheduled.setHours(hours, minutes, 0, 0)
+
+    // If the scheduled time has passed today, schedule for tomorrow
+    if (scheduled <= now) {
+      scheduled.setDate(scheduled.getDate() + 1)
+    }
+
+    setNextScheduledRun(scheduled.toISOString())
+  }
+
+  const sendNotification = (title, body) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '/favicon.ico' })
+    }
+  }
+
+  const checkAndRunScheduledTask = () => {
+    if (!scheduleEnabled || !nextScheduledRun) return
+
+    const now = new Date()
+    const scheduledTime = new Date(nextScheduledRun)
+
+    // If current time is past the scheduled time (within 1 minute window)
+    if (now >= scheduledTime && (now - scheduledTime) < 60000) {
+      handleScheduledLoadHeavyVol()
+    }
+  }
+
+  const handleScheduledLoadHeavyVol = async () => {
+    if (loading || scanning) return
+
+    const startTime = Date.now()
+    const initialResultsCount = results.length
+
+    setLoading(true)
+    setPaused(false)
+    isPausedRef.current = false
+
+    try {
+      const symbols = await loadTopSymbols()
+
+      if (symbols.length === 0) {
+        const runTime = ((Date.now() - startTime) / 1000).toFixed(1)
+        sendNotification(
+          'Scheduled Heavy Vol Scan Failed',
+          `No symbols loaded. Run time: ${runTime}s`
+        )
+        setLastScheduledRun(new Date().toISOString())
+        calculateNextScheduledRun(scheduleTime)
+        return
+      }
+
+      // Get existing symbols to skip them
+      const existingSymbols = new Set(results.map(r => r.symbol))
+
+      // Create scan queue, excluding already scanned symbols
+      scanQueueRef.current = symbols
+        .filter(symbol => !existingSymbols.has(symbol))
+        .map(symbol => ({
+          symbol,
+          days: selectedPeriod
+        }))
+
+      if (scanQueueRef.current.length === 0) {
+        const runTime = ((Date.now() - startTime) / 1000).toFixed(1)
+        sendNotification(
+          'Scheduled Heavy Vol Scan Complete',
+          `All symbols already scanned. Run time: ${runTime}s`
+        )
+        setLoading(false)
+        setLastScheduledRun(new Date().toISOString())
+        calculateNextScheduledRun(scheduleTime)
+        return
+      }
+
+      // Store metrics for the scheduled run
+      scheduledRunMetricsRef.current = {
+        startTime,
+        initialCount: initialResultsCount
+      }
+
+      abortControllerRef.current = new AbortController()
+      setScanning(true)
+      setLoading(false)
+
+      // Process the queue - metrics will be sent in processScanQueue when done
+      processScanQueue()
+    } catch (error) {
+      console.error('Failed to run scheduled heavy vol', error)
+      const runTime = ((Date.now() - startTime) / 1000).toFixed(1)
+      sendNotification(
+        'Scheduled Heavy Vol Scan Failed',
+        `Error occurred. Run time: ${runTime}s`
+      )
+      setLoading(false)
+      setLastScheduledRun(new Date().toISOString())
+      calculateNextScheduledRun(scheduleTime)
+      scheduledRunMetricsRef.current = null
+    }
+  }
+
+  const handleToggleSchedule = (enabled) => {
+    setScheduleEnabled(enabled)
+    if (enabled) {
+      calculateNextScheduledRun(scheduleTime)
+      showToast(`Scheduled daily at ${scheduleTime}`)
+    } else {
+      showToast('Schedule disabled')
+    }
+  }
+
+  const handleScheduleTimeChange = (time) => {
+    setScheduleTime(time)
+    if (scheduleEnabled) {
+      calculateNextScheduledRun(time)
+      showToast(`Schedule updated to ${time}`)
+    }
   }
 
   const loadTopSymbols = async () => {
@@ -649,6 +840,22 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
     isPausedRef.current = false
     setProgress({ current: 0, total: 0 })
     setCurrentStock('')
+
+    // If this was a scheduled run, send notification with metrics
+    if (scheduledRunMetricsRef.current) {
+      const metrics = scheduledRunMetricsRef.current
+      const finalCount = newResults.length + (metrics.initialCount || 0)
+      const runTime = ((Date.now() - metrics.startTime) / 1000).toFixed(1)
+
+      sendNotification(
+        'Scheduled Heavy Vol Scan Complete',
+        `Stocks added: ${newResults.length}\nTotal stocks: ${finalCount}\nRun time: ${runTime}s`
+      )
+
+      setLastScheduledRun(new Date().toISOString())
+      calculateNextScheduledRun(scheduleTime)
+      scheduledRunMetricsRef.current = null
+    }
   }
 
   const handleLoadHeavyVol = async () => {
@@ -974,6 +1181,89 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
 
   return (
     <div className="space-y-6">
+      {/* Scheduling Panel */}
+      <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <Clock className="w-5 h-5 text-purple-400" />
+            <h3 className="text-lg font-semibold text-slate-200">Schedule Daily Heavy Vol Scan</h3>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={scheduleEnabled}
+              onChange={(e) => handleToggleSchedule(e.target.checked)}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-slate-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+            <span className="ml-3 text-sm font-medium text-slate-300">
+              {scheduleEnabled ? 'Enabled' : 'Disabled'}
+            </span>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Time Picker */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Daily Run Time
+            </label>
+            <input
+              type="time"
+              value={scheduleTime}
+              onChange={(e) => handleScheduleTimeChange(e.target.value)}
+              disabled={!scheduleEnabled}
+              className="w-full bg-slate-700 text-white px-4 py-2 rounded border border-slate-600 focus:border-purple-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            />
+          </div>
+
+          {/* Next Scheduled Run */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Next Scheduled Run
+            </label>
+            <div className="bg-slate-700 text-slate-300 px-4 py-2 rounded border border-slate-600 min-h-[42px] flex items-center">
+              {nextScheduledRun ? (
+                <span className="text-green-400">
+                  {new Date(nextScheduledRun).toLocaleString()}
+                </span>
+              ) : (
+                <span className="text-slate-500">Not scheduled</span>
+              )}
+            </div>
+          </div>
+
+          {/* Last Scheduled Run */}
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Last Scheduled Run
+            </label>
+            <div className="bg-slate-700 text-slate-300 px-4 py-2 rounded border border-slate-600 min-h-[42px] flex items-center">
+              {lastScheduledRun ? (
+                <span className="text-blue-400">
+                  {formatLastRunTime(lastScheduledRun)}
+                </span>
+              ) : (
+                <span className="text-slate-500">Never</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {scheduleEnabled && (
+          <div className="mt-4 p-3 bg-purple-900/20 border border-purple-700/50 rounded-lg">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-purple-400 mt-0.5" />
+              <div className="text-sm text-purple-300">
+                <strong>Note:</strong> Scheduled scans will run automatically at {scheduleTime} daily.
+                You'll receive a browser notification with a summary when complete (stocks added and run time).
+                Make sure to keep this tab open and allow notifications.
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Control Panel */}
       <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
         <div className="flex flex-wrap items-end gap-4">
