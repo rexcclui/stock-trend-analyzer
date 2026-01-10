@@ -2593,10 +2593,10 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                                     newLowerPercent[period] = c.smaChannelLowerPercent?.[period] ?? 5
                                   })
 
-                                  // Enable upper bound on first new SMA
-                                  newUpperEnabled[firstPeriod] = true
-                                  // Enable lower bound on second new SMA
-                                  newLowerEnabled[secondPeriod] = true
+                                  // Enable lower bound on first new SMA
+                                  newLowerEnabled[firstPeriod] = true
+                                  // Enable upper bound on second new SMA
+                                  newUpperEnabled[secondPeriod] = true
 
                                   return {
                                     ...c,
