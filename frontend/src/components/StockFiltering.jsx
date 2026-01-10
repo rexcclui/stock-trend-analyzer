@@ -1679,8 +1679,14 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                     <ArrowUpDown className="w-3 h-3" />
                   </button>
                 </th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300" title="Volume Legend: Visual distribution of volume across price levels">
-                  <Waves className="w-4 h-4" />
+                <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300" title="Volume Legend: Visual distribution of volume across price levels (sorted by current weight)">
+                  <button
+                    onClick={() => handleSort('currentWeight')}
+                    className="flex items-center gap-1 hover:text-white transition-colors"
+                  >
+                    <Waves className="w-4 h-4" />
+                    <ArrowUpDown className="w-3 h-3" />
+                  </button>
                 </th>
                 <th className="px-4 py-3 text-center text-sm font-semibold text-slate-300" title="Actions: View chart, add to backtest, reload, or remove stock">
                   <div className="flex justify-center">
