@@ -3683,12 +3683,12 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             return null
           })}
 
-          {smaPeriods.map(period => {
+          {smaPeriods.map((period, idx) => {
             const smaKey = `sma${period}`
             const smaValue = data[smaKey]
             if (smaValue && smaVisibility[period]) {
               return (
-                <p key={period} className="text-sm" style={{ color: getSmaColor(period) }}>
+                <p key={`sma-tooltip-${idx}-${period}`} className="text-sm" style={{ color: getSmaColor(period) }}>
                   SMA{period}: ${smaValue.toFixed(2)}
                 </p>
               )
@@ -5558,7 +5558,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                           const xPos = offset.left + 10
 
                           return (
-                            <g key={period}>
+                            <g key={`sma-display-${idx}-${period}`}>
                               {/* Background */}
                               <rect
                                 x={xPos}
@@ -6099,7 +6099,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   const hasChannels = upperPercent > 0 || lowerPercent > 0
 
                   return (
-                    <React.Fragment key={`sma-${period}`}>
+                    <React.Fragment key={`sma-${index}-${period}`}>
                       <Line
                         key={smaKey}
                         type="monotone"
