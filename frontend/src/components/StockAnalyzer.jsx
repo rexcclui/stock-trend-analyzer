@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
-import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp, RefreshCw, Filter, Menu, ZoomIn, LineChart } from 'lucide-react'
+import { Plus, Minus, Loader2, TrendingUp, TrendingDown, AlertCircle, X, Settings, ChevronDown, ChevronUp, RefreshCw, Filter, Menu, ZoomIn, LineChart, ArrowUp, ArrowDown } from 'lucide-react'
 import PriceChart from './PriceChart'
 import IndicatorsChart from './IndicatorsChart'
 import StatisticsCharts from './StatisticsCharts'
@@ -2796,7 +2796,10 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                             {/* Upper % Control */}
                             {chart.smaChannelUpperEnabled?.[period] && (
                               <>
-                                <span className="text-xs text-slate-400 w-10 ml-2">Up%</span>
+                                <div className="flex items-center gap-1 ml-2">
+                                  <ArrowUp className="w-3 h-3 text-green-400" />
+                                  <span className="text-xs text-slate-400">Upper</span>
+                                </div>
                                 <input
                                   type="range"
                                   min="0"
@@ -2833,7 +2836,10 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                             {/* Lower % Control */}
                             {chart.smaChannelLowerEnabled?.[period] && (
                               <>
-                                <span className="text-xs text-slate-400 w-10">Lw%</span>
+                                <div className="flex items-center gap-1">
+                                  <ArrowDown className="w-3 h-3 text-red-400" />
+                                  <span className="text-xs text-slate-400">Lower</span>
+                                </div>
                                 <input
                                   type="range"
                                   min="0"
