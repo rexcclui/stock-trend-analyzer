@@ -718,13 +718,13 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     }
   }
 
-  const simulateComprehensive = async (chartId, smaIndex, prices, chart) => {
+  const simulateComprehensive = async (chartId, smaIndex, prices, chart, forcedEnabledBounds = null) => {
     // Find optimal SMA period AND upper/lower bounds that touch the most turning points
     if (!prices || prices.length === 0) return null
 
-    // Get which bounds are enabled from the current period
+    // Get which bounds are enabled from the current period or use forced bounds
     const currentPeriod = chart.smaPeriods[smaIndex]
-    const enabledBounds = {
+    const enabledBounds = forcedEnabledBounds || {
       upper: chart.smaChannelUpperEnabled?.[currentPeriod] ?? false,
       lower: chart.smaChannelLowerEnabled?.[currentPeriod] ?? false
     }
@@ -816,7 +816,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     return bestResult
   }
 
-  const handleComprehensiveSimulation = async (chartId, smaIndex) => {
+  const handleComprehensiveSimulation = async (chartId, smaIndex, forcedEnabledBounds = null) => {
     const chart = charts.find(c => c.id === chartId)
     if (!chart || !chart.data || !chart.data.prices) return
 
@@ -826,7 +826,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     // Run simulation asynchronously
     setTimeout(async () => {
       try {
-        const result = await simulateComprehensive(chartId, smaIndex, chart.data.prices, chart)
+        const result = await simulateComprehensive(chartId, smaIndex, chart.data.prices, chart, forcedEnabledBounds)
 
         if (result) {
           // Update the SMA period and bounds
@@ -2612,15 +2612,14 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                               })
                             )
 
-                            // Trigger comprehensive simulation for both new SMAs
+                            // Trigger comprehensive simulation for both new SMAs with explicit bounds
                             setTimeout(() => {
-                              // First SMA (with lower bound) - index is currentLength
-                              handleComprehensiveSimulation(chart.id, currentLength)
-
-                              // Second SMA (with upper bound) - index is currentLength + 1
+                              // First SMA (with upper bound) - index is currentLength
+                              handleComprehensiveSimulation(chart.id, currentLength, { upper: true, lower: false })
+                              // Second SMA (with lower bound) - index is currentLength + 1
                               setTimeout(() => {
-                                handleComprehensiveSimulation(chart.id, currentLength + 1)
-                              }, 150)
+                                handleComprehensiveSimulation(chart.id, currentLength + 1, { upper: false, lower: true })
+                              }, 200)
                             }, 100)
                           }
                         }}
