@@ -483,6 +483,12 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
       return
     }
 
+    // Send notification when job starts
+    sendNotification(
+      `Scheduled Scan Starting (${job.market})`,
+      `Period: ${periods.find(p => p.value === job.period)?.label || job.period}, Threshold: ${job.threshold}%, Limit: ${job.stockLimit === -1 ? 'ALL' : job.stockLimit}`
+    )
+
     const startTime = Date.now()
     const initialResultsCount = results.length
 
