@@ -535,6 +535,7 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, onF
   const [hasHydratedCache, setHasHydratedCache] = useState(() => initialHydratedResultsRef.current !== null)
   const [toastMessage, setToastMessage] = useState('')
   const [selectedRows, setSelectedRows] = useState(new Set())
+  const [showInfoModal, setShowInfoModal] = useState(false)
   const toastTimeoutRef = useRef(null)
   const activeScanSymbolRef = useRef(null)
   const importInputRef = useRef(null)
@@ -2517,6 +2518,14 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, onF
                     ))}
                   </div>
                 )}
+                <button
+                  onClick={() => setShowInfoModal(true)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white transition-colors text-sm"
+                  title="View backtest logic explanation"
+                >
+                  <Info className="w-4 h-4" />
+                  Info
+                </button>
                 <div className="flex items-center gap-1 pl-2 border-l border-slate-700">
                   <button
                     onClick={scrollTableToTop}
@@ -2855,6 +2864,147 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, onF
               <div><span className="font-semibold">Days Ago:</span> <span className="text-green-400">Green ≤3d</span>, <span className="text-yellow-400">Yellow ≤7d</span>, Gray &gt;7d</div>
               <div><span className="font-semibold">Optimal Params:</span> Th=Threshold%, LB=Lookback Zones</div>
               <div className="col-span-full text-purple-300">💡 Click any row to load stock in chart with optimized parameters</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Info Modal */}
+      {showInfoModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-lg p-6 border border-slate-700 max-w-3xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold text-slate-200 flex items-center gap-2">
+                <Info className="w-6 h-6 text-cyan-400" />
+                V3 Backtest Logic
+              </h3>
+              <button
+                onClick={() => setShowInfoModal(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-sm text-slate-300">
+              {/* Overview */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-2">Overview</h4>
+                <p>
+                  V3 Backtest is an enhanced version that includes both buy and sell strategies based on Volume Profile analysis.
+                  It identifies both breakout opportunities (buys) and breakdown situations (sells) to simulate a more complete trading strategy.
+                </p>
+              </div>
+
+              {/* How It Works */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-2">How It Works</h4>
+                <ol className="list-decimal list-inside space-y-2 ml-2">
+                  <li><strong>Volume Profile Creation:</strong> Price range is divided into zones with volume accumulated for each zone</li>
+                  <li><strong>Dual Resistance Detection:</strong> Identifies resistance zones both below (for buys) and above (for sells) current price</li>
+                  <li><strong>Buy Signal:</strong> When price breaks above a high-volume resistance zone with sufficient strength</li>
+                  <li><strong>Sell Signal:</strong> When price breaks below a high-volume support zone, indicating potential weakness</li>
+                  <li><strong>Trade Simulation:</strong> Executes virtual buy and sell trades based on signals</li>
+                  <li><strong>Parameter Optimization:</strong> Tests multiple threshold and lookback combinations for both buy and sell strategies</li>
+                </ol>
+              </div>
+
+              {/* Key Metrics */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-2">Key Metrics Explained</h4>
+                <div className="space-y-2 ml-2">
+                  <div>
+                    <strong className="text-cyan-400">Vol Weight:</strong> Volume percentage at current price zone
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Resist Vol:</strong> Volume percentage of strongest resistance zone
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Diff:</strong> Strength of breakout/breakdown signal (current zone vs resistance zone volume)
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Days Ago:</strong> Time since most recent signal (buy or sell)
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Buy P/L:</strong> Profit/loss from buy-only strategy
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Sell P/L:</strong> Profit/loss from sell-only strategy (short positions)
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Combined P/L:</strong> Total P/L from both buy and sell strategies
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Win Rate:</strong> Percentage of profitable trades (both buys and sells)
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Annual P/L%:</strong> Annualized return from combined strategy
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Signals:</strong> Total number of buy and sell signals generated
+                  </div>
+                </div>
+              </div>
+
+              {/* Strategy Logic */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-2">Strategy Logic</h4>
+                <div className="space-y-2 ml-2">
+                  <div>
+                    <strong className="text-green-400">Buy Strategy:</strong>
+                    <ul className="list-disc list-inside ml-4 mt-1">
+                      <li>Entry: Price breaks above high-volume resistance zone</li>
+                      <li>Exit: Price falls below entry resistance or SMA signals exit</li>
+                      <li>Goal: Capture upward momentum after volume accumulation</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <strong className="text-red-400">Sell Strategy (Short):</strong>
+                    <ul className="list-disc list-inside ml-4 mt-1">
+                      <li>Entry: Price breaks below high-volume support zone</li>
+                      <li>Exit: Price recovers above entry support or SMA signals exit</li>
+                      <li>Goal: Profit from downward pressure after distribution</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <strong>Parameters:</strong>
+                    <ul className="list-disc list-inside ml-4 mt-1">
+                      <li>Threshold: Minimum Diff required for signal (3-7%)</li>
+                      <li>Lookback: Historical zones to analyze (4-10 zones)</li>
+                      <li>Position Sizing: Equal capital for each trade</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Filtering Options */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-2">Filtering Options</h4>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li><strong>Recent Signals:</strong> Show only stocks with signals in the last 10 days</li>
+                  <li><strong>Combined P/L > Market:</strong> Show only stocks where strategy beats buy-and-hold</li>
+                  <li><strong>High Win Rate:</strong> Show only stocks with >70% win rate</li>
+                  <li><strong>Signal Count:</strong> Hide stocks with fewer than 5 total signals</li>
+                  <li><strong>Vol% Filter:</strong> Hide stocks with high current volume weight (>4%)</li>
+                  <li><strong>Diff Filter:</strong> Hide stocks with weak signals (Diff <6%)</li>
+                  <li><strong>Market/Period Filters:</strong> Focus on specific markets or time periods</li>
+                </ul>
+              </div>
+
+              {/* Usage Tips */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-2">Usage Tips</h4>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li>V3 is ideal for traders who can execute both long and short positions</li>
+                  <li>Combined P/L shows the power of bi-directional trading</li>
+                  <li>Recent sell signals (red indicator) suggest shorting opportunities</li>
+                  <li>Recent buy signals (green indicator) suggest long entry points</li>
+                  <li>Compare Buy P/L vs Sell P/L to see which strategy performs better for each stock</li>
+                  <li>High win rates with positive combined P/L indicate robust patterns</li>
+                  <li>Click rows to view detailed chart with volume profile and signals</li>
+                  <li>Bookmark stocks showing consistent performance in both directions</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
