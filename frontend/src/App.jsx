@@ -151,6 +151,11 @@ function App() {
     }
   }, [])
 
+  // Load schedule queues on mount to show badge count
+  useEffect(() => {
+    loadAllScheduleQueues()
+  }, [])
+
   const exportLocalStorage = () => {
     if (typeof window === 'undefined') return
 
@@ -278,14 +283,11 @@ function App() {
           >
             <Database className="w-4 h-4" />
             Show Queue
-            {(() => {
-              const totalJobs = loadAllScheduleQueues().length
-              return totalJobs > 0 ? (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                  {totalJobs}
-                </span>
-              ) : null
-            })()}
+            {allScheduleJobs.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                {allScheduleJobs.length}
+              </span>
+            )}
           </button>
           <button
             onClick={exportLocalStorage}
