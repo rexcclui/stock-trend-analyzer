@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown, BarChart2, AlertCircle, RefreshCw, TrendingUp, Database, TrendingDown, Minus, DollarSign, Scale, ArrowDown, ArrowUp, ArrowLeftRight, Settings, Clock, Waves } from 'lucide-react'
+import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown, BarChart2, AlertCircle, RefreshCw, TrendingUp, Database, TrendingDown, Minus, DollarSign, Scale, ArrowDown, ArrowUp, ArrowLeftRight, Settings, Clock, Waves, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 import VolumeLegendPills from './VolumeLegendPills'
 
@@ -1640,8 +1640,8 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                     className="flex items-center gap-1 hover:text-white transition-colors"
                     title="Lower 2 Sum: Current slot + lower lower slot volume weight (%)"
                   >
-                    <ArrowDown className="w-4 h-4" />
-                    <ArrowDown className="w-3 h-3" />
+                    <ChevronsDown className="w-5 h-5" />
+                    <ArrowUpDown className="w-3 h-3" />
                   </button>
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
@@ -1650,7 +1650,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                     className="flex items-center gap-1 hover:text-white transition-colors"
                     title="Lower Sum: Current slot + immediate lower slot volume weight (%)"
                   >
-                    <ArrowDown className="w-4 h-4" />
+                    <ChevronDown className="w-5 h-5" />
                     <ArrowUpDown className="w-3 h-3" />
                   </button>
                 </th>
@@ -1660,7 +1660,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                     className="flex items-center gap-1 hover:text-white transition-colors"
                     title="Upper Sum: Current slot + immediate upper slot volume weight (%)"
                   >
-                    <ArrowUp className="w-4 h-4" />
+                    <ChevronUp className="w-5 h-5" />
                     <ArrowUpDown className="w-3 h-3" />
                   </button>
                 </th>
@@ -1670,8 +1670,8 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                     className="flex items-center gap-1 hover:text-white transition-colors"
                     title="Upper 2 Sum: Current slot + upper upper slot volume weight (%)"
                   >
-                    <ArrowUp className="w-4 h-4" />
-                    <ArrowUp className="w-3 h-3" />
+                    <ChevronsUp className="w-5 h-5" />
+                    <ArrowUpDown className="w-3 h-3" />
                   </button>
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
