@@ -272,9 +272,9 @@ function formatLastRunTime(isoString) {
   const diffDays = Math.floor(diffMs / 86400000)
 
   if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins} min${diffMins !== 1 ? 's' : ''} ago`
-  if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`
-  if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}hr ago`
+  if (diffDays < 7) return `${diffDays}d ago`
 
   return runTime.toLocaleDateString() + ' ' + runTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
