@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import axios from 'axios'
-import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2, RotateCw, Upload, Download, Filter, Waves, Hash, Clock3, ChevronUp, ChevronDown, Info } from 'lucide-react'
+import { Search, Loader2, TrendingUp, TrendingDown, DollarSign, Target, Percent, AlertCircle, X, RefreshCcw, Pause, Play, DownloadCloud, Bookmark, BookmarkCheck, ArrowUpDown, Eraser, Trash2, RotateCw, Upload, Download, Filter, Waves, Hash, Clock3, ChevronUp, ChevronDown, Info, Clock, Database } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 import { calculateVolumeProfileV3WithSells } from './PriceChart/utils/volumeProfileV3Utils'
 import { apiCache } from '../utils/apiCache'
@@ -9,6 +9,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 const STOCK_HISTORY_KEY = 'stockSearchHistory'
 const BACKTEST_RESULTS_KEY = 'v3BacktestResults'
 const SCAN_QUEUE_KEY = 'v3BacktestScanQueue'
+const SCHEDULE_QUEUE_KEY = 'v3BacktestScheduleQueue'
 const INVALID_FIVE_CHAR_LENGTH = 5
 const BLOCKED_SUFFIX = '.TO'
 const HYPHEN = '-'
@@ -536,7 +537,15 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, onF
   const [toastMessage, setToastMessage] = useState('')
   const [selectedRows, setSelectedRows] = useState(new Set())
   const [showInfoModal, setShowInfoModal] = useState(false)
+  const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const [scheduleTime, setScheduleTime] = useState('')
+  const [scheduleDate, setScheduleDate] = useState('')
+  const [scheduleQueue, setScheduleQueue] = useState([])
+  const [editingJobId, setEditingJobId] = useState(null)
+  const [scheduleMarket, setScheduleMarket] = useState('manual') // 'manual', 'US2000', 'HK500', 'CN500'
   const toastTimeoutRef = useRef(null)
+  const scheduleCheckIntervalRef = useRef(null)
+  const scheduledRunMetricsRef = useRef(null)
   const activeScanSymbolRef = useRef(null)
   const importInputRef = useRef(null)
   const tableScrollRef = useRef(null)
@@ -1989,11 +1998,292 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, onF
     setToastMessage('')
   }
 
+  const sendNotification = (title, body) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body, icon: '/favicon.ico' })
+    }
+  }
+
+  const checkAndRunQueuedJobs = () => {
+    const now = new Date()
+    const jobsToRun = scheduleQueue.filter(job => {
+      const scheduledTime = new Date(job.scheduledTime)
+      return now >= scheduledTime && (now - scheduledTime) < 60000
+    })
+
+    jobsToRun.forEach(job => {
+      handleScheduledJobRun(job)
+    })
+  }
+
+  const handleScheduledJobRun = async (job) => {
+    if (loading || isScanning) {
+      const newTime = new Date(job.scheduledTime)
+      newTime.setMinutes(newTime.getMinutes() + 5)
+      setScheduleQueue(prev => prev.map(j =>
+        j.id === job.id ? { ...j, scheduledTime: newTime.toISOString() } : j
+      ))
+      return
+    }
+
+    const startTime = Date.now()
+    const marketLabel = job.market || 'manual'
+    sendNotification(
+      'Scheduled V3 Backtest Starting',
+      `Market: ${marketLabel}, Period: ${formatPeriod(job.days)}, Limit: ${job.scanLimit === -1 ? 'ALL' : job.scanLimit}`
+    )
+
+    try {
+      setLoading(true)
+
+      // If market is specified (not 'manual'), load market data
+      if (job.market && job.market !== 'manual') {
+        let symbolsArr = []
+
+        if (job.market === 'US2000') {
+          const response = await axios.get(joinUrl(API_URL, '/top-market-cap'), {
+            params: { limit: 2000 }
+          })
+          const payload = response.data
+          const symbols = Array.isArray(payload) ? payload : Array.isArray(payload?.symbols) ? payload.symbols : []
+          symbolsArr = symbols
+            .map(item => (typeof item === 'string' ? item : item?.symbol))
+            .filter(Boolean)
+            .map(symbol => symbol.toUpperCase())
+            .filter(symbol => !/^4\d{3}\.HK$/.test(symbol))
+            .filter(symbol => !isDisallowedSymbol(symbol))
+        } else if (job.market === 'HK500') {
+          const response = await axios.get(joinUrl(API_URL, '/top-market-cap'), {
+            params: { limit: 500, exchange: 'HKG' }
+          })
+          const payload = response.data
+          const symbols = Array.isArray(payload) ? payload : Array.isArray(payload?.symbols) ? payload.symbols : []
+          symbolsArr = symbols
+            .map(item => (typeof item === 'string' ? item : item?.symbol))
+            .filter(Boolean)
+            .map(symbol => symbol.toUpperCase())
+            .filter(symbol => !/^4\d{3}\.HK$/.test(symbol))
+            .filter(symbol => !isDisallowedSymbol(symbol))
+        } else if (job.market === 'CN500') {
+          const response = await axios.get(joinUrl(API_URL, '/top-market-cap'), {
+            params: { limit: 400, exchange: 'CN' }
+          })
+          const payload = response.data
+          const symbols = Array.isArray(payload) ? payload : Array.isArray(payload?.symbols) ? payload.symbols : []
+          symbolsArr = symbols
+            .map(item => (typeof item === 'string' ? item : item?.symbol))
+            .filter(Boolean)
+            .map(symbol => symbol.toUpperCase())
+            .filter(symbol => !/^3\d{5}\.(SZ|SS)$/.test(symbol))
+            .filter(symbol => !isDisallowedSymbol(symbol))
+        }
+
+        if (symbolsArr.length === 0) {
+          setLoading(false)
+          removeJobFromQueue(job.id)
+          sendNotification('Scheduled V3 Backtest Failed', 'No symbols loaded from market')
+          return
+        }
+
+        ensureEntries(symbolsArr)
+
+        const entriesToQueue = results
+          .filter(r => symbolsArr.includes(r.symbol) && (r.status === 'pending' || r.status === 'queued'))
+          .map(r => getEntryKey(r.symbol, r.days))
+
+        scheduledRunMetricsRef.current = {
+          startTime,
+          initialCount: results.length,
+          jobId: job.id
+        }
+
+        setScanQueue(prev => {
+          const existingKeys = new Set(prev)
+          const filtered = entriesToQueue.filter(key => !existingKeys.has(key))
+          return [...prev, ...filtered]
+        })
+
+        setScanTotal(prev => prev + entriesToQueue.length)
+        setIsScanning(true)
+        setIsPaused(false)
+        setLoading(false)
+        return
+      }
+
+      // Manual mode: use symbols from job
+      const symbolsArr = job.symbols.split(/[\n,;]+/)
+        .map(s => s.trim())
+        .filter(s => s.length > 0)
+
+      if (symbolsArr.length === 0) {
+        setLoading(false)
+        removeJobFromQueue(job.id)
+        return
+      }
+
+      const newScanQueue = symbolsArr
+        .map(sym => getEntryKey(sym, job.days))
+        .filter(key => {
+          const existing = results.find(r => r.key === key)
+          return !existing || existing.status === 'error'
+        })
+
+      if (newScanQueue.length === 0) {
+        const runTime = ((Date.now() - startTime) / 1000).toFixed(1)
+        sendNotification(
+          'Scheduled V3 Backtest Complete',
+          `All symbols already scanned. Run time: ${runTime}s`
+        )
+        removeJobFromQueue(job.id)
+        setLoading(false)
+        return
+      }
+
+      scheduledRunMetricsRef.current = {
+        startTime,
+        initialCount: results.length,
+        jobId: job.id
+      }
+
+      setScanQueue(prev => {
+        const existingKeys = new Set(prev)
+        const filtered = newScanQueue.filter(key => !existingKeys.has(key))
+        return [...prev, ...filtered]
+      })
+
+      setScanTotal(prev => {
+        const newTotal = prev + newScanQueue.length
+        return newTotal
+      })
+
+      setIsScanning(true)
+      setIsPaused(false)
+      setLoading(false)
+    } catch (error) {
+      console.error('Failed to run scheduled job', error)
+      const runTime = ((Date.now() - startTime) / 1000).toFixed(1)
+      sendNotification(
+        'Scheduled V3 Backtest Failed',
+        `Error occurred. Run time: ${runTime}s`
+      )
+      setLoading(false)
+      removeJobFromQueue(job.id)
+      scheduledRunMetricsRef.current = null
+    }
+  }
+
+  const handleOpenScheduleModal = () => {
+    setEditingJobId(null)
+    setScheduleMarket('manual')
+    const now = new Date()
+    now.setHours(now.getHours() + 1, 0, 0, 0)
+    setScheduleDate(now.toISOString().split('T')[0])
+    setScheduleTime(now.toTimeString().slice(0, 5))
+    setShowScheduleModal(true)
+  }
+
+  const handleQueueJob = () => {
+    const scheduledDateTime = new Date(`${scheduleDate}T${scheduleTime}`)
+
+    if (scheduledDateTime <= new Date()) {
+      showToast('Scheduled time must be in the future')
+      return
+    }
+
+    const job = {
+      id: editingJobId || Date.now().toString(),
+      symbols: symbols,
+      days: days,
+      scanLimit: scanLimit,
+      market: scheduleMarket,
+      scheduledTime: scheduledDateTime.toISOString(),
+      createdAt: editingJobId ? scheduleQueue.find(j => j.id === editingJobId)?.createdAt : new Date().toISOString()
+    }
+
+    if (editingJobId) {
+      setScheduleQueue(prev => prev.map(j => j.id === editingJobId ? job : j))
+      showToast('Scheduled job updated')
+    } else {
+      setScheduleQueue(prev => [...prev, job])
+      showToast('Job added to queue')
+    }
+
+    setShowScheduleModal(false)
+    setEditingJobId(null)
+  }
+
+  const handleEditJob = (job) => {
+    setEditingJobId(job.id)
+    const scheduledDate = new Date(job.scheduledTime)
+    setScheduleDate(scheduledDate.toISOString().split('T')[0])
+    setScheduleTime(scheduledDate.toTimeString().slice(0, 5))
+    setSymbols(job.symbols)
+    setDays(job.days)
+    setScanLimit(job.scanLimit)
+    setScheduleMarket(job.market || 'manual')
+    setShowScheduleModal(true)
+  }
+
+  const removeJobFromQueue = (jobId) => {
+    setScheduleQueue(prev => prev.filter(j => j.id !== jobId))
+  }
+
   useEffect(() => () => {
     if (toastTimeoutRef.current) {
       clearTimeout(toastTimeoutRef.current)
     }
   }, [])
+
+  // Load schedule queue on mount
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem(SCHEDULE_QUEUE_KEY)
+      if (cached) {
+        const queue = JSON.parse(cached)
+        setScheduleQueue(Array.isArray(queue) ? queue : [])
+      }
+    } catch (error) {
+      console.error('Failed to load schedule queue', error)
+    }
+
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+
+    const now = new Date()
+    now.setHours(now.getHours() + 1, 0, 0, 0)
+    setScheduleDate(now.toISOString().split('T')[0])
+    setScheduleTime(now.toTimeString().slice(0, 5))
+  }, [])
+
+  // Save schedule queue when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(SCHEDULE_QUEUE_KEY, JSON.stringify(scheduleQueue))
+    } catch (error) {
+      console.error('Failed to save schedule queue', error)
+    }
+  }, [scheduleQueue])
+
+  // Set up schedule checker
+  useEffect(() => {
+    if (scheduleQueue.length > 0) {
+      scheduleCheckIntervalRef.current = setInterval(() => {
+        checkAndRunQueuedJobs()
+      }, 60000)
+
+      return () => {
+        if (scheduleCheckIntervalRef.current) {
+          clearInterval(scheduleCheckIntervalRef.current)
+        }
+      }
+    } else {
+      if (scheduleCheckIntervalRef.current) {
+        clearInterval(scheduleCheckIntervalRef.current)
+        scheduleCheckIntervalRef.current = null
+      }
+    }
+  }, [scheduleQueue.length])
 
   const loadingContent = (
     <div className="flex items-center justify-center min-h-[400px]">
@@ -2196,6 +2486,15 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, onF
               <option value={100}>100</option>
               <option value="ALL">ALL</option>
             </select>
+            <button
+              onClick={handleOpenScheduleModal}
+              disabled={loading}
+              className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              title="Schedule V3 Backtest to run at a specific time"
+            >
+              <Clock className="w-5 h-5" />
+              <span className="text-sm font-medium">Schedule</span>
+            </button>
             <button
               onClick={scanAllQueued}
               disabled={results.length === 0 || isScanActive}
@@ -3004,6 +3303,122 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, onF
                   <li>Click rows to view detailed chart with volume profile and signals</li>
                   <li>Bookmark stocks showing consistent performance in both directions</li>
                 </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Schedule Modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-lg p-6 border border-slate-700 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold text-slate-200">
+                {editingJobId ? 'Edit Scheduled Job' : 'Schedule V3 Backtest'}
+              </h3>
+              <button
+                onClick={() => {
+                  setShowScheduleModal(false)
+                  setEditingJobId(null)
+                }}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Market Selection */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Market Source
+                </label>
+                <select
+                  value={scheduleMarket}
+                  onChange={(e) => setScheduleMarket(e.target.value)}
+                  className="w-full bg-slate-700 text-white px-4 py-2 rounded border border-slate-600 focus:border-blue-500 focus:outline-none"
+                >
+                  <option value="manual">Manual Input (Use symbols below)</option>
+                  <option value="US2000">US2000 (Top 2000 US stocks)</option>
+                  <option value="HK500">HK500 (Top 500 Hong Kong stocks)</option>
+                  <option value="CN500">CN500 (Top 400 Chinese stocks)</option>
+                </select>
+              </div>
+
+              {/* Current Settings Display */}
+              <div className="p-3 bg-slate-700/50 rounded-lg space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Period:</span>
+                  <span className="text-white font-medium">{formatPeriod(days)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Scan Limit:</span>
+                  <span className="text-white font-medium">{scanLimit === -1 ? 'ALL' : scanLimit}</span>
+                </div>
+                {scheduleMarket === 'manual' && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Symbols:</span>
+                    <span className="text-white font-medium">{symbols.split(/[\n,;]+/).filter(s => s.trim()).length} stocks</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Date Picker */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full bg-slate-700 text-white px-4 py-2 rounded border border-slate-600 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Time Picker */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Time
+                </label>
+                <input
+                  type="time"
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                  className="w-full bg-slate-700 text-white px-4 py-2 rounded border border-slate-600 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Info */}
+              <div className="p-3 bg-blue-900/20 border border-blue-700/50 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div className="text-xs text-blue-300">
+                    This job will run once at the scheduled time with the current settings shown above.
+                    You'll receive a notification when complete.
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowScheduleModal(false)
+                    setEditingJobId(null)
+                  }}
+                  className="flex-1 px-4 py-2 bg-slate-700 text-white rounded hover:bg-slate-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleQueueJob}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors font-medium"
+                >
+                  {editingJobId ? 'Update' : 'Schedule'}
+                </button>
               </div>
             </div>
           </div>
