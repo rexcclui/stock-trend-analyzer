@@ -484,10 +484,15 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
     }
 
     // Send notification when job starts
+    const startMessage = `${job.market} scan starting: ${periods.find(p => p.value === job.period)?.label || job.period}, ${job.threshold}%, limit ${job.stockLimit === -1 ? 'ALL' : job.stockLimit}`
+
     sendNotification(
       `Scheduled Scan Starting (${job.market})`,
       `Period: ${periods.find(p => p.value === job.period)?.label || job.period}, Threshold: ${job.threshold}%, Limit: ${job.stockLimit === -1 ? 'ALL' : job.stockLimit}`
     )
+
+    // In-app toast notification
+    showToast(startMessage)
 
     const startTime = Date.now()
     const initialResultsCount = results.length
@@ -923,10 +928,16 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
       const finalCount = results.length
       const runTime = ((Date.now() - metrics.startTime) / 1000).toFixed(1)
 
+      const completionMessage = `${metrics.market} scan complete: ${newResults.length} stocks added, ${finalCount} total, ${runTime}s runtime`
+
+      // Browser notification
       sendNotification(
         `Scheduled Scan Complete (${metrics.market})`,
         `Stocks added: ${newResults.length}\nTotal stocks: ${finalCount}\nRun time: ${runTime}s`
       )
+
+      // In-app toast notification
+      showToast(completionMessage)
 
       removeJobFromQueue(metrics.jobId)
       scheduledRunMetricsRef.current = null
