@@ -1503,8 +1503,8 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
 
       {/* Search and Bulk Actions */}
       <div className="bg-slate-800 rounded-lg p-4 border border-slate-700 space-y-3">
-        <div className="flex gap-3 items-center">
-          <div className="relative flex-1">
+        <div className="flex gap-3 items-center flex-wrap">
+          <div className="relative flex-1 min-w-[250px]">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
               type="text"
@@ -1514,6 +1514,56 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
               className="w-full bg-slate-700 text-white pl-10 pr-4 py-2 rounded border border-slate-600 focus:border-purple-500 focus:outline-none"
             />
           </div>
+
+          {/* Market Filter */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setMarketFilter('ALL')}
+              className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                marketFilter === 'ALL'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              }`}
+            >
+              ALL
+            </button>
+            <button
+              onClick={() => setMarketFilter('US')}
+              className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                marketFilter === 'US'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              }`}
+            >
+              US
+            </button>
+            <button
+              onClick={() => setMarketFilter('HK')}
+              className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                marketFilter === 'HK'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              }`}
+            >
+              HK
+            </button>
+            <button
+              onClick={() => setMarketFilter('CN')}
+              className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                marketFilter === 'CN'
+                  ? 'bg-red-600 text-white'
+                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+              }`}
+            >
+              CN
+            </button>
+            {marketFilter !== 'ALL' && (
+              <span className="text-xs text-slate-400 whitespace-nowrap">
+                ({filteredResults.length} of {results.length})
+              </span>
+            )}
+          </div>
+
           <button
             onClick={() => setShowInfoModal(true)}
             className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded font-medium transition-colors flex items-center gap-2"
@@ -1549,58 +1599,6 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
             <Database className="w-5 h-5" />
             Clear Cache
           </button>
-        </div>
-
-        {/* Market Filter */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-400">Filter by Market:</span>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setMarketFilter('ALL')}
-              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                marketFilter === 'ALL'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-              }`}
-            >
-              ALL
-            </button>
-            <button
-              onClick={() => setMarketFilter('US')}
-              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                marketFilter === 'US'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-              }`}
-            >
-              US
-            </button>
-            <button
-              onClick={() => setMarketFilter('HK')}
-              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                marketFilter === 'HK'
-                  ? 'bg-purple-600 text-white'
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-              }`}
-            >
-              HK
-            </button>
-            <button
-              onClick={() => setMarketFilter('CN')}
-              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                marketFilter === 'CN'
-                  ? 'bg-red-600 text-white'
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-              }`}
-            >
-              CN
-            </button>
-          </div>
-          {marketFilter !== 'ALL' && (
-            <span className="text-xs text-slate-400">
-              ({filteredResults.length} of {results.length} stocks)
-            </span>
-          )}
         </div>
 
         {/* Bulk Actions */}
