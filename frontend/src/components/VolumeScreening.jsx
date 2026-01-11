@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search, Clock3, BarChart2, BarChart3, ArrowUpToLine, ArrowDownToLine, AlertCircle } from 'lucide-react'
+import { Plus, RefreshCcw, Activity, Loader2, Eraser, Trash2, DownloadCloud, UploadCloud, Pause, Play, Star, X, Search, Clock3, BarChart2, BarChart3, ArrowUpToLine, ArrowDownToLine, AlertCircle, Info } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 import VolumeLegendPills from './VolumeLegendPills'
 
@@ -802,6 +802,7 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
   const [hasHydratedCache, setHasHydratedCache] = useState(false)
   const [lastAddedId, setLastAddedId] = useState(null)
   const [toastMessage, setToastMessage] = useState('')
+  const [showInfoModal, setShowInfoModal] = useState(false)
   const activeScanIdRef = useRef(null)
   const importInputRef = useRef(null)
   const tableScrollRef = useRef(null)
@@ -2620,6 +2621,14 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
                 ))}
               </div>
             )}
+            <button
+              onClick={() => setShowInfoModal(true)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white transition-colors text-sm"
+              title="View volume screening logic explanation"
+            >
+              <Info className="w-4 h-4" />
+              Info
+            </button>
             <div className="flex items-center gap-1 border border-slate-700 rounded-lg px-2 py-1">
               <span className="text-xs text-slate-400" title="Visible / total rows">Rows: {visibleEntries.length}/{entries.length}</span>
               {entries.length !== visibleEntries.length && (
@@ -2980,6 +2989,197 @@ function VolumeScreening({ onStockSelect, triggerSymbol, onSymbolProcessed, onBa
           >
             ×
           </button>
+        </div>
+      </div>
+    )}
+
+    {/* Info Modal */}
+    {showInfoModal && (
+      <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50" onClick={() => setShowInfoModal(false)}>
+        <div className="bg-slate-900 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-slate-700" onClick={(e) => e.stopPropagation()}>
+          <div className="sticky top-0 bg-slate-900 border-b border-slate-700 px-6 py-4 flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+              <Info className="w-6 h-6 text-cyan-400" />
+              Volume Screening Logic
+            </h2>
+            <button
+              onClick={() => setShowInfoModal(false)}
+              className="text-slate-400 hover:text-white transition-colors"
+            >
+              <span className="text-2xl">×</span>
+            </button>
+          </div>
+
+          <div className="px-6 py-6 space-y-6 text-slate-300">
+            {/* Overview */}
+            <section>
+              <h3 className="text-xl font-semibold text-white mb-3">Overview</h3>
+              <p className="leading-relaxed">
+                Volume Screening analyzes stocks by examining their volume distribution across different price levels.
+                It identifies potential breakout opportunities by detecting resistance zones and monitoring volume accumulation patterns.
+              </p>
+            </section>
+
+            {/* Volume Profile Analysis */}
+            <section>
+              <h3 className="text-xl font-semibold text-white mb-3">Volume Profile Analysis</h3>
+              <div className="space-y-2">
+                <p className="leading-relaxed">
+                  <strong className="text-cyan-400">Price Range Division:</strong> The entire price range is divided into equal slots (default: 50 slots).
+                  Each slot represents a specific price level where volume is accumulated.
+                </p>
+                <p className="leading-relaxed">
+                  <strong className="text-cyan-400">Volume Accumulation:</strong> For each trading bar, volume is distributed to the slot(s)
+                  based on whether the bar is within a slot, spans multiple slots, or partially overlaps.
+                </p>
+                <p className="leading-relaxed">
+                  <strong className="text-cyan-400">Slot Weighting:</strong> Each slot accumulates volume over time, creating a profile that
+                  shows where most trading activity occurred during the selected period.
+                </p>
+              </div>
+            </section>
+
+            {/* Resistance Zones */}
+            <section>
+              <h3 className="text-xl font-semibold text-white mb-3">Resistance Zone Identification</h3>
+              <div className="space-y-2">
+                <p className="leading-relaxed">
+                  <strong className="text-cyan-400">Bottom Resistance:</strong> Identifies the strongest volume accumulation zone in the
+                  lower portion of the price range. High volume at lower prices often acts as support.
+                </p>
+                <p className="leading-relaxed">
+                  <strong className="text-cyan-400">Upper Resistance:</strong> Identifies the strongest volume accumulation zone in the
+                  upper portion of the price range. Price must break through this zone for a bullish continuation.
+                </p>
+                <p className="leading-relaxed">
+                  <strong className="text-cyan-400">Close Resistance:</strong> When the current price is within 5% of a resistance zone
+                  (highlighted in sky blue), it indicates the price is testing that level.
+                </p>
+              </div>
+            </section>
+
+            {/* Breakout Detection */}
+            <section>
+              <h3 className="text-xl font-semibold text-white mb-3">Breakout Detection Logic</h3>
+              <div className="space-y-2">
+                <p className="leading-relaxed">
+                  <strong className="text-cyan-400">Break Direction:</strong> Indicates whether the current price has broken above
+                  upper resistance ("UP") or below bottom resistance ("DOWN"), or is between them ("—").
+                </p>
+                <p className="leading-relaxed">
+                  <strong className="text-cyan-400">Volume Confirmation:</strong> Strong breakouts are often accompanied by above-average
+                  volume, indicating institutional participation.
+                </p>
+                <p className="leading-relaxed">
+                  <strong className="text-cyan-400">Previous Slot Difference:</strong> Shows the volume change between current price slot
+                  and previous period's slot. Green indicates increasing accumulation at current level.
+                </p>
+              </div>
+            </section>
+
+            {/* Key Metrics */}
+            <section>
+              <h3 className="text-xl font-semibold text-white mb-3">Key Metrics</h3>
+              <div className="bg-slate-800 rounded-lg p-4 space-y-3">
+                <div>
+                  <strong className="text-emerald-400">Period:</strong>
+                  <span className="ml-2">Time range for analysis (e.g., 30d, 60d, 180d)</span>
+                </div>
+                <div>
+                  <strong className="text-emerald-400">Price Range:</strong>
+                  <span className="ml-2">Total price movement during the period, showing volatility</span>
+                </div>
+                <div>
+                  <strong className="text-emerald-400">Bottom Resist:</strong>
+                  <span className="ml-2">Price level of strongest support (high volume accumulation below current price)</span>
+                </div>
+                <div>
+                  <strong className="text-emerald-400">Upper Resist:</strong>
+                  <span className="ml-2">Price level of strongest resistance (high volume accumulation above current price)</span>
+                </div>
+                <div>
+                  <strong className="text-emerald-400">Break:</strong>
+                  <span className="ml-2">Current price position relative to resistance zones (UP/DOWN/—)</span>
+                </div>
+                <div>
+                  <strong className="text-emerald-400">Prev Slot Diff:</strong>
+                  <span className="ml-2">Change in volume accumulation at current price level compared to previous period</span>
+                </div>
+                <div>
+                  <strong className="text-emerald-400">Down/Up Volume Diff:</strong>
+                  <span className="ml-2">Shows volume changes in lower/upper resistance zones, helping identify accumulation shifts</span>
+                </div>
+              </div>
+            </section>
+
+            {/* Search & Filtering */}
+            <section>
+              <h3 className="text-xl font-semibold text-white mb-3">Search & Filtering</h3>
+              <div className="space-y-2">
+                <p className="leading-relaxed">
+                  <strong className="text-cyan-400">Symbol Search:</strong> Type any part of a stock symbol to filter the results table
+                </p>
+                <p className="leading-relaxed">
+                  <strong className="text-cyan-400">Add Symbols:</strong> Add specific symbols to analyze by entering them in the input field
+                </p>
+                <p className="leading-relaxed">
+                  <strong className="text-cyan-400">Period Selection:</strong> Choose the lookback period for volume analysis (7d to 365d)
+                </p>
+                <p className="leading-relaxed">
+                  <strong className="text-cyan-400">Slots Configuration:</strong> Adjust the number of price slots (more slots = finer granularity)
+                </p>
+              </div>
+            </section>
+
+            {/* Usage Tips */}
+            <section>
+              <h3 className="text-xl font-semibold text-white mb-3">Usage Tips</h3>
+              <div className="bg-slate-800 rounded-lg p-4 space-y-2">
+                <p className="leading-relaxed">
+                  • <strong className="text-yellow-400">Look for Sky Blue Resistance:</strong> When resistance levels are highlighted,
+                  the price is testing important volume zones
+                </p>
+                <p className="leading-relaxed">
+                  • <strong className="text-yellow-400">Monitor Break Direction:</strong> "UP" breaks above upper resistance can signal
+                  bullish momentum, especially with volume confirmation
+                </p>
+                <p className="leading-relaxed">
+                  • <strong className="text-yellow-400">Check Previous Slot Diff:</strong> Green values indicate increasing volume
+                  accumulation at current price level
+                </p>
+                <p className="leading-relaxed">
+                  • <strong className="text-yellow-400">Compare Multiple Periods:</strong> Add the same symbol with different periods
+                  (30d, 60d, 180d) to see how volume patterns evolve
+                </p>
+                <p className="leading-relaxed">
+                  • <strong className="text-yellow-400">Adjust Slots for Different Securities:</strong> Low-volatility stocks may need
+                  fewer slots; high-volatility stocks benefit from more granular analysis
+                </p>
+                <p className="leading-relaxed">
+                  • <strong className="text-yellow-400">Use Scan to Update:</strong> Click the refresh icon to re-scan a symbol
+                  with latest market data
+                </p>
+              </div>
+            </section>
+
+            {/* Note */}
+            <section className="bg-amber-900/20 border border-amber-700/50 rounded-lg p-4">
+              <p className="text-amber-200 text-sm leading-relaxed">
+                <strong>Note:</strong> Volume Screening is a technical analysis tool that helps identify potential trading opportunities.
+                Always combine with other forms of analysis (fundamental, sentiment, etc.) and proper risk management.
+                Past volume patterns do not guarantee future price movements.
+              </p>
+            </section>
+          </div>
+
+          <div className="sticky bottom-0 bg-slate-900 border-t border-slate-700 px-6 py-4">
+            <button
+              onClick={() => setShowInfoModal(false)}
+              className="w-full px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg transition-colors font-medium"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
     )}

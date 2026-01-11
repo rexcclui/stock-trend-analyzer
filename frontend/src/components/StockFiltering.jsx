@@ -278,6 +278,31 @@ function formatLastRunTime(isoString) {
   return runTime.toLocaleDateString() + ' ' + runTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
+function getMarketFromSymbol(symbol) {
+  if (!symbol) return 'US'
+
+  const upperSymbol = symbol.toUpperCase()
+
+  if (upperSymbol.endsWith('.HK')) {
+    return 'HK'
+  }
+  if (upperSymbol.endsWith('.SS') || upperSymbol.endsWith('.SZ')) {
+    return 'CN'
+  }
+  return 'US'
+}
+
+function isRecentRun(isoString) {
+  if (!isoString) return false
+
+  const now = new Date()
+  const runTime = new Date(isoString)
+  const diffMs = now - runTime
+  const diffHours = diffMs / 3600000
+
+  return diffHours <= 8
+}
+
 function isValidSymbol(symbol) {
   // Filter out symbols with ≥5 characters that don't contain a '.'
   // This excludes long ticker symbols without exchange suffixes (e.g., .HK, .L, .SS, .SZ)
@@ -1242,7 +1267,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
       return false
     }
     // Apply market filter
-    if (marketFilter !== 'ALL' && result.market !== marketFilter) {
+    if (marketFilter !== 'ALL' && getMarketFromSymbol(result.symbol) !== marketFilter) {
       return false
     }
     return true
@@ -1823,16 +1848,18 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                        result.market === 'US' ? 'bg-blue-600 text-white' :
-                        result.market === 'HK' ? 'bg-purple-600 text-white' :
-                        result.market === 'CN' ? 'bg-red-600 text-white' :
+                        getMarketFromSymbol(result.symbol) === 'US' ? 'bg-blue-600 text-white' :
+                        getMarketFromSymbol(result.symbol) === 'HK' ? 'bg-purple-600 text-white' :
+                        getMarketFromSymbol(result.symbol) === 'CN' ? 'bg-red-600 text-white' :
                         'bg-slate-600 text-white'
                       }`}>
-                        {result.market}
+                        {getMarketFromSymbol(result.symbol)}
                       </span>
                     </td>
                     <td
-                      className="px-4 py-3 text-slate-300 cursor-help"
+                      className={`px-4 py-3 cursor-help ${
+                        isRecentRun(result.lastRunTime) ? 'text-emerald-400 font-semibold' : 'text-slate-300'
+                      }`}
                       title={formatDateRange(result.startDate, result.endDate)}
                     >
                       {result.period}
