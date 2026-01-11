@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown, BarChart2, AlertCircle, RefreshCw, TrendingUp, Database, TrendingDown, Minus, DollarSign, Scale, ArrowDown, ArrowUp, ArrowLeftRight, Settings, Clock, Waves, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp } from 'lucide-react'
+import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown, BarChart2, AlertCircle, RefreshCw, TrendingUp, Database, TrendingDown, Minus, DollarSign, Scale, ArrowDown, ArrowUp, ArrowLeftRight, Settings, Clock, Waves, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Info } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 import VolumeLegendPills from './VolumeLegendPills'
 
@@ -307,6 +307,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
   const [selectedRows, setSelectedRows] = useState(new Set())
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [showQueueModal, setShowQueueModal] = useState(false)
+  const [showInfoModal, setShowInfoModal] = useState(false)
   const [scheduleTime, setScheduleTime] = useState('')
   const [scheduleDate, setScheduleDate] = useState('')
   const [scheduleQueue, setScheduleQueue] = useState([])
@@ -1506,6 +1507,14 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
             />
           </div>
           <button
+            onClick={() => setShowInfoModal(true)}
+            className="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded font-medium transition-colors flex items-center gap-2"
+            title="View filtering logic explanation"
+          >
+            <Info className="w-5 h-5" />
+            Info
+          </button>
+          <button
             onClick={handleReloadAll}
             disabled={results.length === 0 || scanning}
             className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded font-medium transition-colors flex items-center gap-2"
@@ -2174,6 +2183,121 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                   Jobs will run automatically at their scheduled time. Keep this browser tab open for scheduled scans to execute.
                   Each job runs once and is removed from the queue after completion.
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Info Modal */}
+      {showInfoModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-lg p-6 border border-slate-700 max-w-3xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold text-slate-200 flex items-center gap-2">
+                <Info className="w-6 h-6 text-cyan-400" />
+                Stock Filtering Logic
+              </h3>
+              <button
+                onClick={() => setShowInfoModal(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-sm text-slate-300">
+              {/* Overview */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-2">Overview</h4>
+                <p>
+                  This tool identifies stocks with volume distribution patterns that diverge from price movement,
+                  potentially indicating accumulation or distribution phases.
+                </p>
+              </div>
+
+              {/* How It Works */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-2">How It Works</h4>
+                <ol className="list-decimal list-inside space-y-2 ml-2">
+                  <li><strong>Price Range Division:</strong> The price range is divided into 20-40 adaptive slots based on the stock's volatility</li>
+                  <li><strong>Volume Calculation:</strong> Trading volume is accumulated for each price slot over the selected period (1Y/3Y/5Y)</li>
+                  <li><strong>Current Position:</strong> Identifies which price slot contains the current stock price</li>
+                  <li><strong>Divergence Detection:</strong> Compares volume concentration with recent price direction to find divergence</li>
+                </ol>
+              </div>
+
+              {/* Volume Metrics */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-2">Volume Metrics Explained</h4>
+                <div className="space-y-2 ml-2">
+                  <div>
+                    <strong className="text-cyan-400">Current Weight:</strong> Percentage of total volume at the current price level
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Lower Sum:</strong> Current slot + immediate lower slot (support level)
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Upper Sum:</strong> Current slot + immediate upper slot (resistance level)
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Lower 2 Sum:</strong> Current slot + 2 slots below (extended support)
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Upper 2 Sum:</strong> Current slot + 2 slots above (extended resistance)
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Diff (U-L):</strong> Upper Sum - Lower Sum (indicates volume bias direction)
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Diff2:</strong> Upper 2 Sum - Lower 2 Sum (extended bias)
+                  </div>
+                </div>
+              </div>
+
+              {/* Filtering Criteria */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-2">Filtering Criteria</h4>
+                <p className="mb-2">Stocks must pass ALL of these filters:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li><strong>Minimum Data Points:</strong> At least 250 trading days of data</li>
+                  <li><strong>Minimum Volume:</strong> Average daily volume ≥ 100,000 shares</li>
+                  <li><strong>Minimum Liquidity:</strong> Average transaction value ≥ $10 million (volume × price)</li>
+                  <li><strong>Volume Threshold:</strong> Either |Diff| or |Diff2| must meet your selected threshold (5%-35%)</li>
+                  <li>
+                    <strong>Divergence Requirement:</strong> Price change direction (7-day) must be OPPOSITE to volume bias
+                    <ul className="list-disc list-inside ml-4 mt-1 text-slate-400">
+                      <li>If price up + volume bias down = potential distribution (selling pressure)</li>
+                      <li>If price down + volume bias up = potential accumulation (buying support)</li>
+                    </ul>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Volume Legend */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-2">Volume Legend</h4>
+                <p className="mb-2">Visual representation of volume distribution across 17 price slots centered on current price:</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-3 py-1 rounded-full text-xs" style={{backgroundColor: '#fef9c3', color: '#0f172a'}}>0-2.5%</span>
+                  <span className="px-3 py-1 rounded-full text-xs" style={{backgroundColor: '#f97316', color: '#f8fafc'}}>2.5-5%</span>
+                  <span className="px-3 py-1 rounded-full text-xs" style={{backgroundColor: '#ef4444', color: '#f8fafc'}}>5-10%</span>
+                  <span className="px-3 py-1 rounded-full text-xs" style={{backgroundColor: '#a855f7', color: '#f8fafc'}}>10-15%</span>
+                  <span className="px-3 py-1 rounded-full text-xs" style={{backgroundColor: '#3b82f6', color: '#f8fafc'}}>15-20%</span>
+                  <span className="px-3 py-1 rounded-full text-xs" style={{backgroundColor: '#22c55e', color: '#f8fafc'}}>20%+</span>
+                </div>
+              </div>
+
+              {/* Usage Tips */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-2">Usage Tips</h4>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li>Higher thresholds (25-35%) find stronger divergence signals but fewer stocks</li>
+                  <li>Lower thresholds (5-15%) find more opportunities but may include weaker signals</li>
+                  <li>Use 5Y period for long-term patterns, 1Y for recent changes</li>
+                  <li>Schedule regular scans to catch new opportunities across different markets</li>
+                  <li>Review the Volume Legend to understand where major trading activity occurred</li>
+                </ul>
               </div>
             </div>
           </div>
