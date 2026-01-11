@@ -539,10 +539,12 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
   const [scheduleDate, setScheduleDate] = useState('')
   const [scheduleQueue, setScheduleQueue] = useState([])
   const [editingJobId, setEditingJobId] = useState(null)
+  const [scheduleMarket, setScheduleMarket] = useState('manual') // 'manual', 'US2000', 'HK500', 'CN500'
   const toastTimeoutRef = useRef(null)
   const scheduleCheckIntervalRef = useRef(null)
   const scheduledRunMetricsRef = useRef(null)
   const activeScanSymbolRef = useRef(null)
+  const currentMarketScanTypeRef = useRef(null) // Track market scan type for filtering
   const importInputRef = useRef(null)
   const tableScrollRef = useRef(null)
   const previousSortRef = useRef(sortConfig)
@@ -1212,7 +1214,36 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     }
   }
 
-  const queueSymbols = (symbolList, { startScan = true } = {}) => {
+  // Helper function to check if entry has resistance or breakout data
+  const hasResistanceOrBreakout = (entry) => {
+    if (!entry || entry.status !== 'completed') return true // Keep loading/pending entries
+
+    // Check if has upResistance or downResistance or originalBreakout with break price
+    const hasUpResist = entry.upResist && Array.isArray(entry.upResist) && entry.upResist.length > 0
+    const hasDownResist = entry.downResist && Array.isArray(entry.downResist) && entry.downResist.length > 0
+    const hasBreakout = entry.originalBreakout && entry.originalBreakout.breakPrice != null
+
+    return hasUpResist || hasDownResist || hasBreakout
+  }
+
+  // Load market symbols with auto-scan and filtering
+  const loadAndScanMarket = (symbolList, marketType) => {
+    if (!Array.isArray(symbolList) || symbolList.length === 0) return
+
+    const allowedSymbols = symbolList.filter(symbol => !isDisallowedSymbol(symbol))
+    if (allowedSymbols.length === 0) return
+
+    // Track that this is a market scan for filtering
+    currentMarketScanTypeRef.current = marketType
+
+    // Add entries to table
+    ensureEntries(allowedSymbols)
+
+    // Queue and start scanning
+    queueSymbols(allowedSymbols, { startScan: true, marketType })
+  }
+
+  const queueSymbols = (symbolList, { startScan = true, marketType = null } = {}) => {
     if (!Array.isArray(symbolList) || symbolList.length === 0) return
 
     const allowedSymbols = symbolList.filter(symbol => !isDisallowedSymbol(symbol))
@@ -1276,7 +1307,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
         .filter(symbol => !/^4\d{3}\.HK$/.test(symbol))
         .filter(symbol => !isDisallowedSymbol(symbol))
 
-      ensureEntries(normalized)
+      loadAndScanMarket(normalized, 'US2000')
     } catch (err) {
       console.error('Failed to load top market cap symbols', err)
       setError('Failed to load top market cap symbols')
@@ -1318,7 +1349,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
       if (normalized.length === 0) {
         setError('No HK stocks returned from API. The exchange parameter might be incorrect.')
       } else {
-        ensureEntries(normalized)
+        loadAndScanMarket(normalized, 'HK500')
       }
     } catch (err) {
       console.error('Failed to load top HK market cap symbols', err)
@@ -1361,7 +1392,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
       if (normalized.length === 0) {
         setError('No Chinese stocks returned from API. The exchange parameter might be incorrect.')
       } else {
-        ensureEntries(normalized)
+        loadAndScanMarket(normalized, 'CN500')
       }
     } catch (err) {
       console.error('Failed to load top CN market cap symbols', err)
@@ -1503,6 +1534,25 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
       setIsScanning(false)
       setIsPaused(false)
       setLoading(false)
+
+      // If this was a market scan, filter out entries without resistance/breakout data
+      if (currentMarketScanTypeRef.current) {
+        const marketType = currentMarketScanTypeRef.current
+        currentMarketScanTypeRef.current = null
+
+        setResults(prev => {
+          const filtered = prev.filter(entry => hasResistanceOrBreakout(entry))
+          const removed = prev.length - filtered.length
+
+          if (removed > 0) {
+            setTimeout(() => {
+              showToast(`${marketType}: Removed ${removed} stock${removed > 1 ? 's' : ''} without resistance/breakout data`)
+            }, 500)
+          }
+
+          return filtered
+        })
+      }
     }
   }, [isScanning, scanQueue.length])
 
@@ -1949,14 +1999,92 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     }
 
     const startTime = Date.now()
+    const marketLabel = job.market || 'manual'
     sendNotification(
       'Scheduled V2 Backtest Starting',
-      `Period: ${formatPeriod(job.days)}, Limit: ${job.scanLimit === -1 ? 'ALL' : job.scanLimit}`
+      `Market: ${marketLabel}, Period: ${formatPeriod(job.days)}, Limit: ${job.scanLimit === -1 ? 'ALL' : job.scanLimit}`
     )
 
     try {
       setLoading(true)
 
+      // If market is specified (not 'manual'), load market data
+      if (job.market && job.market !== 'manual') {
+        let symbolsArr = []
+
+        if (job.market === 'US2000') {
+          const response = await axios.get(joinUrl(API_URL, '/top-market-cap'), {
+            params: { limit: 2000 }
+          })
+          const payload = response.data
+          const symbols = Array.isArray(payload) ? payload : Array.isArray(payload?.symbols) ? payload.symbols : []
+          symbolsArr = symbols
+            .map(item => (typeof item === 'string' ? item : item?.symbol))
+            .filter(Boolean)
+            .map(symbol => symbol.toUpperCase())
+            .filter(symbol => !/^4\d{3}\.HK$/.test(symbol))
+            .filter(symbol => !isDisallowedSymbol(symbol))
+        } else if (job.market === 'HK500') {
+          const response = await axios.get(joinUrl(API_URL, '/top-market-cap'), {
+            params: { limit: 500, exchange: 'HKG' }
+          })
+          const payload = response.data
+          const symbols = Array.isArray(payload) ? payload : Array.isArray(payload?.symbols) ? payload.symbols : []
+          symbolsArr = symbols
+            .map(item => (typeof item === 'string' ? item : item?.symbol))
+            .filter(Boolean)
+            .map(symbol => symbol.toUpperCase())
+            .filter(symbol => !/^4\d{3}\.HK$/.test(symbol))
+            .filter(symbol => !isDisallowedSymbol(symbol))
+        } else if (job.market === 'CN500') {
+          const response = await axios.get(joinUrl(API_URL, '/top-market-cap'), {
+            params: { limit: 400, exchange: 'CN' }
+          })
+          const payload = response.data
+          const symbols = Array.isArray(payload) ? payload : Array.isArray(payload?.symbols) ? payload.symbols : []
+          symbolsArr = symbols
+            .map(item => (typeof item === 'string' ? item : item?.symbol))
+            .filter(Boolean)
+            .map(symbol => symbol.toUpperCase())
+            .filter(symbol => !/^3\d{5}\.(SZ|SS)$/.test(symbol))
+            .filter(symbol => !isDisallowedSymbol(symbol))
+        }
+
+        if (symbolsArr.length === 0) {
+          setLoading(false)
+          removeJobFromQueue(job.id)
+          sendNotification('Scheduled V2 Backtest Failed', 'No symbols loaded from market')
+          return
+        }
+
+        // Track this as a market scan for filtering
+        currentMarketScanTypeRef.current = job.market
+        ensureEntries(symbolsArr)
+
+        const entriesToQueue = results
+          .filter(r => symbolsArr.includes(r.symbol) && (r.status === 'pending' || r.status === 'queued'))
+          .map(r => getEntryKey(r.symbol, r.days))
+
+        scheduledRunMetricsRef.current = {
+          startTime,
+          initialCount: results.length,
+          jobId: job.id
+        }
+
+        setScanQueue(prev => {
+          const existingKeys = new Set(prev)
+          const filtered = entriesToQueue.filter(key => !existingKeys.has(key))
+          return [...prev, ...filtered]
+        })
+
+        setScanTotal(prev => prev + entriesToQueue.length)
+        setIsScanning(true)
+        setIsPaused(false)
+        setLoading(false)
+        return
+      }
+
+      // Manual mode: use symbols from job
       const symbolsArr = job.symbols.split(/[\n,;]+/)
         .map(s => s.trim())
         .filter(s => s.length > 0)
@@ -2020,6 +2148,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
 
   const handleOpenScheduleModal = () => {
     setEditingJobId(null)
+    setScheduleMarket('manual')
     const now = new Date()
     now.setHours(now.getHours() + 1, 0, 0, 0)
     setScheduleDate(now.toISOString().split('T')[0])
@@ -2040,6 +2169,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
       symbols: symbols,
       days: days,
       scanLimit: scanLimit,
+      market: scheduleMarket,
       scheduledTime: scheduledDateTime.toISOString(),
       createdAt: editingJobId ? scheduleQueue.find(j => j.id === editingJobId)?.createdAt : new Date().toISOString()
     }
@@ -2064,6 +2194,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
     setSymbols(job.symbols)
     setDays(job.days)
     setScanLimit(job.scanLimit)
+    setScheduleMarket(job.market || 'manual')
     setShowQueueModal(false)
     setShowScheduleModal(true)
   }
@@ -3105,6 +3236,23 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
             </div>
 
             <div className="space-y-4">
+              {/* Market Selection */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Market Source
+                </label>
+                <select
+                  value={scheduleMarket}
+                  onChange={(e) => setScheduleMarket(e.target.value)}
+                  className="w-full bg-slate-700 text-white px-4 py-2 rounded border border-slate-600 focus:border-blue-500 focus:outline-none"
+                >
+                  <option value="manual">Manual Input (Use symbols below)</option>
+                  <option value="US2000">US2000 (Top 2000 US stocks)</option>
+                  <option value="HK500">HK500 (Top 500 Hong Kong stocks)</option>
+                  <option value="CN500">CN500 (Top 400 Chinese stocks)</option>
+                </select>
+              </div>
+
               {/* Current Settings Display */}
               <div className="p-3 bg-slate-700/50 rounded-lg space-y-2 text-sm">
                 <div className="flex justify-between">
@@ -3115,10 +3263,12 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
                   <span className="text-slate-400">Scan Limit:</span>
                   <span className="text-white font-medium">{scanLimit === -1 ? 'ALL' : scanLimit}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Symbols:</span>
-                  <span className="text-white font-medium">{symbols.split(/[\n,;]+/).filter(s => s.trim()).length} stocks</span>
-                </div>
+                {scheduleMarket === 'manual' && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Symbols:</span>
+                    <span className="text-white font-medium">{symbols.split(/[\n,;]+/).filter(s => s.trim()).length} stocks</span>
+                  </div>
+                )}
               </div>
 
               {/* Date Picker */}
