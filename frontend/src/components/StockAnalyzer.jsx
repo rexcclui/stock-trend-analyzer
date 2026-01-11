@@ -277,6 +277,12 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
             volumeProfileV3Enabled: params?.volumeProfileV3Enabled || false,
             volumeProfileV3RefreshTrigger: 0,
             volumeProfileV3RegressionThreshold: params?.regressionThreshold ?? 6,
+            volumeStatsEnabled: false,
+            volumeStatsShowPOC: true,
+            volumeStatsShowVA: true,
+            volumeStatsShowHVN: true,
+            volumeStatsShowLVN: false,
+            volumeStatsNumBins: 50,
             spyData: null,
             performanceComparisonEnabled: false,
             performanceComparisonBenchmark: 'SPY',
@@ -1555,6 +1561,20 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     )
   }
 
+  const toggleVolumeStats = (chartId) => {
+    setCharts(prevCharts =>
+      prevCharts.map(chart => {
+        if (chart.id === chartId) {
+          return {
+            ...chart,
+            volumeStatsEnabled: !chart.volumeStatsEnabled
+          }
+        }
+        return chart
+      })
+    )
+  }
+
   const refreshVolumeProfileV3 = (chartId) => {
     setCharts(prevCharts =>
       prevCharts.map(chart => {
@@ -2228,6 +2248,19 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                       <div className="flex gap-1 items-center">
                         <button
                           type="button"
+                          onClick={() => toggleVolumeStats(chart.id)}
+                          className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.volumeStatsEnabled
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            }`}
+                          title="Volume Profile Statistics: POC, Value Area, HVN, LVN"
+                        >
+                          Vol Stats
+                        </button>
+                      </div>
+                      <div className="flex gap-1 items-center">
+                        <button
+                          type="button"
                           onClick={() => {
                             setCharts(prevCharts =>
                               prevCharts.map(c =>
@@ -2808,6 +2841,12 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                     volumeProfileV3RefreshTrigger={chart.volumeProfileV3RefreshTrigger}
                     volumeProfileV3RegressionThreshold={chart.volumeProfileV3RegressionThreshold}
                     onVolumeProfileV3RegressionThresholdChange={(value) => updateVolumeProfileV3RegressionThreshold(chart.id, value)}
+                    volumeStatsEnabled={chart.volumeStatsEnabled}
+                    volumeStatsShowPOC={chart.volumeStatsShowPOC}
+                    volumeStatsShowVA={chart.volumeStatsShowVA}
+                    volumeStatsShowHVN={chart.volumeStatsShowHVN}
+                    volumeStatsShowLVN={chart.volumeStatsShowLVN}
+                    volumeStatsNumBins={chart.volumeStatsNumBins}
                     spyData={chart.spyData}
                     performanceComparisonEnabled={chart.performanceComparisonEnabled}
                     performanceComparisonBenchmark={chart.performanceComparisonBenchmark}

@@ -27,8 +27,10 @@ import VolumeLegendPills from './VolumeLegendPills'
 import { getVolumeColor } from './PriceChart/utils'
 import { calculateVolumeProfileV3WithSells } from './PriceChart/utils/volumeProfileV3Utils'
 import { calculateVolPrfV2Breakouts } from './PriceChart/utils/volumeProfileV2Utils'
+import { calculateVolumeProfileStatistics } from './PriceChart/utils/volumeProfileStatisticalAnalysis'
+import { CustomVolumeProfileStatisticalOverlay } from './PriceChart/components/VolumeProfileStatisticalOverlay'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, smaChannelUpperPercent = {}, smaChannelLowerPercent = {}, smaChannelUpperEnabled = {}, smaChannelLowerEnabled = {}, smaOptimalTouches = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, volumeProfileV2BreakoutThreshold = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RegressionThreshold = 6, volumeProfileV3RefreshTrigger = 0, onVolumeProfileV3RegressionThresholdChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, linearRegressionEnabled = false, linearRegressionSelections = [], onAddLinearRegressionSelection, onClearLinearRegressionSelections, onRemoveLinearRegressionSelection, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete, simulatingBreakoutThreshold = false, onBreakoutThresholdSimulateComplete }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, smaChannelUpperPercent = {}, smaChannelLowerPercent = {}, smaChannelUpperEnabled = {}, smaChannelLowerEnabled = {}, smaOptimalTouches = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, volumeProfileV2BreakoutThreshold = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RegressionThreshold = 6, volumeProfileV3RefreshTrigger = 0, onVolumeProfileV3RegressionThresholdChange, volumeStatsEnabled = false, volumeStatsShowPOC = true, volumeStatsShowVA = true, volumeStatsShowHVN = true, volumeStatsShowLVN = false, volumeStatsNumBins = 50, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, linearRegressionEnabled = false, linearRegressionSelections = [], onAddLinearRegressionSelection, onClearLinearRegressionSelections, onRemoveLinearRegressionSelection, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete, simulatingBreakoutThreshold = false, onBreakoutThresholdSimulateComplete }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -2171,6 +2173,20 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   // This prevents mismatch when period changes and indicators haven't updated yet
   const displayPrices = useMemo(() => prices.slice(0, dataLength), [prices, dataLength])
   const displayIndicators = useMemo(() => (indicators || []).slice(0, dataLength), [indicators, dataLength])
+
+  // Calculate Volume Profile Statistics
+  const volumeProfileStats = useMemo(() => {
+    if (!volumeStatsEnabled || !displayPrices || displayPrices.length === 0) {
+      return null
+    }
+
+    return calculateVolumeProfileStatistics(displayPrices, {
+      numBins: volumeStatsNumBins,
+      valueAreaPercent: 0.70,
+      hvnThreshold: 1.5,
+      lvnThreshold: 0.5
+    })
+  }, [volumeStatsEnabled, displayPrices, volumeStatsNumBins])
 
   // Pre-calculate all SMAs
   // displayPrices is in newest→oldest order, but calculateSMA expects oldest→newest
@@ -6269,6 +6285,22 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
                 {/* Third Volume Zone Line - Support/Resistance in opposite direction */}
                 <Customized component={(props) => <ImportedCustomThirdVolZoneLine {...props} chartDataWithZones={chartDataWithZones} resLnEnabled={resLnEnabled} />} />
+
+                {/* Volume Profile Statistics Overlay */}
+                {volumeStatsEnabled && volumeProfileStats && (
+                  <Customized
+                    component={(props) => (
+                      <CustomVolumeProfileStatisticalOverlay
+                        {...props}
+                        volumeStats={volumeProfileStats}
+                        showPOC={volumeStatsShowPOC}
+                        showValueArea={volumeStatsShowVA}
+                        showHVN={volumeStatsShowHVN}
+                        showLVN={volumeStatsShowLVN}
+                      />
+                    )}
+                  />
+                )}
               </ComposedChart>
             </ResponsiveContainer>
           </div>
