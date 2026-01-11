@@ -531,6 +531,7 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
   const [searchFilter, setSearchFilter] = useState('')
   const [hasHydratedCache, setHasHydratedCache] = useState(() => initialHydratedResultsRef.current !== null)
   const [toastMessage, setToastMessage] = useState('')
+  const [showInfoModal, setShowInfoModal] = useState(false)
   const toastTimeoutRef = useRef(null)
   const activeScanSymbolRef = useRef(null)
   const importInputRef = useRef(null)
@@ -2397,6 +2398,14 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
                     ))}
                   </div>
                 )}
+                <button
+                  onClick={() => setShowInfoModal(true)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-white transition-colors text-sm"
+                  title="View backtest logic explanation"
+                >
+                  <Info className="w-4 h-4" />
+                  Info
+                </button>
                 <div className="flex items-center gap-1 pl-2 border-l border-slate-700">
                   <button
                     onClick={scrollTableToTop}
@@ -2733,6 +2742,124 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
               <div><span className="font-semibold">Days Ago:</span> <span className="text-green-400">Green ≤3d</span>, <span className="text-yellow-400">Yellow ≤7d</span>, Gray &gt;7d</div>
               <div><span className="font-semibold">Optimal Params:</span> Th=Threshold%, LB=Lookback Zones</div>
               <div className="col-span-full text-purple-300">💡 Click any row to load stock in chart with optimized parameters</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Info Modal */}
+      {showInfoModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-lg p-6 border border-slate-700 max-w-3xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold text-slate-200 flex items-center gap-2">
+                <Info className="w-6 h-6 text-cyan-400" />
+                V2 Backtest Logic
+              </h3>
+              <button
+                onClick={() => setShowInfoModal(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 text-sm text-slate-300">
+              {/* Overview */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-2">Overview</h4>
+                <p>
+                  V2 Backtest uses Volume Profile analysis to identify breakout opportunities. It scans historical price data
+                  to find moments when price breaks through significant volume resistance zones, then simulates trades
+                  to evaluate performance.
+                </p>
+              </div>
+
+              {/* How It Works */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-2">How It Works</h4>
+                <ol className="list-decimal list-inside space-y-2 ml-2">
+                  <li><strong>Volume Profile Creation:</strong> Price range is divided into zones, and trading volume is accumulated for each zone</li>
+                  <li><strong>Resistance Identification:</strong> The highest volume zone below current price is identified as the resistance level</li>
+                  <li><strong>Breakout Detection:</strong> When price crosses above a high-volume resistance zone, a potential breakout is detected</li>
+                  <li><strong>Trade Simulation:</strong> Virtual trades are executed at breakout points with configurable exit strategies</li>
+                  <li><strong>Parameter Optimization:</strong> System tests multiple threshold and lookback combinations to find optimal settings</li>
+                </ol>
+              </div>
+
+              {/* Key Metrics */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-2">Key Metrics Explained</h4>
+                <div className="space-y-2 ml-2">
+                  <div>
+                    <strong className="text-cyan-400">Vol Weight:</strong> Percentage of total volume at current price zone
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Resist Vol:</strong> Volume percentage of the strongest resistance zone below current price
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Diff:</strong> Difference between current zone and resistance zone volume (breakout strength indicator)
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Days Ago:</strong> How many days since the most recent breakout signal
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Total P/L:</strong> Cumulative profit/loss from all simulated trades
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Win Rate:</strong> Percentage of profitable trades
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Annual P/L%:</strong> Annualized return percentage
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Market Change:</strong> Buy-and-hold performance over the same period for comparison
+                  </div>
+                  <div>
+                    <strong className="text-cyan-400">Optimal Params:</strong> Best-performing threshold (Th) and lookback zones (LB) combination
+                  </div>
+                </div>
+              </div>
+
+              {/* Strategy Logic */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-2">Strategy Logic</h4>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li><strong>Entry:</strong> When price breaks above a volume resistance zone with sufficient strength (Diff)</li>
+                  <li><strong>Exit:</strong> Uses dynamic SMAs (21/50 period) or when price falls below entry resistance</li>
+                  <li><strong>Threshold:</strong> Minimum Diff required for breakout (tested: 3%, 4%, 5%, 6%, 7%)</li>
+                  <li><strong>Lookback:</strong> Number of historical zones to consider (tested: 4, 6, 8, 10 zones)</li>
+                  <li><strong>Position Sizing:</strong> Each simulated trade uses equal capital allocation</li>
+                </ul>
+              </div>
+
+              {/* Filtering Options */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-2">Filtering Options</h4>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li><strong>Recent Breakouts:</strong> Show only stocks with breakouts in the last 10 days</li>
+                  <li><strong>P/L Beats Market:</strong> Show only stocks where strategy outperforms buy-and-hold</li>
+                  <li><strong>High Win Rate:</strong> Show only stocks with >70% win rate</li>
+                  <li><strong>Signal Count:</strong> Hide stocks with fewer than 5 total signals</li>
+                  <li><strong>Vol% Filter:</strong> Hide stocks with current volume weight >4%</li>
+                  <li><strong>Diff Filter:</strong> Hide stocks with Diff below 6%</li>
+                  <li><strong>Market/Period Filters:</strong> Filter by specific markets (US/HK/CN) or time periods</li>
+                </ul>
+              </div>
+
+              {/* Usage Tips */}
+              <div>
+                <h4 className="text-lg font-semibold text-white mb-2">Usage Tips</h4>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li>Look for stocks with positive Annual P/L% that beats Market Change%</li>
+                  <li>Recent breakouts (green indicator) suggest immediate opportunities</li>
+                  <li>Higher Diff values indicate stronger breakouts</li>
+                  <li>Win rates above 60% combined with positive P/L are favorable</li>
+                  <li>Use filtering to focus on high-conviction setups</li>
+                  <li>Click any row to view detailed chart analysis with volume profile</li>
+                  <li>Bookmark promising stocks for tracking</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
