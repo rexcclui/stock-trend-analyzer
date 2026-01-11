@@ -2986,7 +2986,7 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, onF
                   <li><strong>High Win Rate:</strong> Show only stocks with >70% win rate</li>
                   <li><strong>Signal Count:</strong> Hide stocks with fewer than 5 total signals</li>
                   <li><strong>Vol% Filter:</strong> Hide stocks with high current volume weight (>4%)</li>
-                  <li><strong>Diff Filter:</strong> Hide stocks with weak signals (Diff <6%)</li>
+                  <li><strong>Diff Filter:</strong> Hide stocks with weak signals (Diff {'<'}6%)</li>
                   <li><strong>Market/Period Filters:</strong> Focus on specific markets or time periods</li>
                 </ul>
               </div>

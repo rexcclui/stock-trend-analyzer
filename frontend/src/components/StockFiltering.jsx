@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import axios from 'axios'
-import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown, BarChart2, AlertCircle, RefreshCw, TrendingUp, Database, TrendingDown, Minus, DollarSign, Scale, ArrowDown, ArrowUp, ArrowLeftRight, Settings, Clock, Waves, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Info } from 'lucide-react'
+import { Loader2, Search, Filter, Pause, Play, X, ArrowUpDown, BarChart2, AlertCircle, RefreshCw, TrendingUp, Database, TrendingDown, Minus, DollarSign, Scale, ArrowDown, ArrowUp, ArrowLeftRight, Settings, Clock, Waves, ChevronDown, ChevronUp, ChevronsDown, ChevronsUp, Info, Bookmark } from 'lucide-react'
 import { joinUrl } from '../utils/urlHelper'
 import VolumeLegendPills from './VolumeLegendPills'
 
 const TOP_SYMBOL_CACHE_KEY_PREFIX = 'stockFilteringTopSymbols'
 const RESULT_CACHE_KEY_PREFIX = 'stockFilteringResults'
 const SCHEDULE_QUEUE_KEY = 'stockFilteringScheduleQueue'
+const BOOKMARKS_KEY = 'stockFilteringBookmarks'
 const TOP_SYMBOL_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 1 month cache
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -338,6 +339,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
   const [scheduleDate, setScheduleDate] = useState('')
   const [scheduleQueue, setScheduleQueue] = useState([])
   const [editingJobId, setEditingJobId] = useState(null)
+  const [bookmarkedSymbols, setBookmarkedSymbols] = useState(new Set())
   const scanQueueRef = useRef([])
   const isScanningRef = useRef(false)
   const isPausedRef = useRef(false)
@@ -371,6 +373,30 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
       }
     }
   }, [results])
+
+  // Load bookmarks from localStorage on mount
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem(BOOKMARKS_KEY)
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Array.isArray(parsed)) {
+          setBookmarkedSymbols(new Set(parsed))
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load bookmarks', error)
+    }
+  }, [])
+
+  // Save bookmarks to localStorage when they change
+  useEffect(() => {
+    try {
+      localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(Array.from(bookmarkedSymbols)))
+    } catch (error) {
+      console.error('Failed to save bookmarks', error)
+    }
+  }, [bookmarkedSymbols])
 
   // Handle bulk import from other tabs
   useEffect(() => {
@@ -1124,6 +1150,18 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
     }
   }
 
+  const toggleBookmark = (symbol) => {
+    setBookmarkedSymbols(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(symbol)) {
+        newSet.delete(symbol)
+      } else {
+        newSet.add(symbol)
+      }
+      return newSet
+    })
+  }
+
   const handleToggleRow = (symbol) => {
     setSelectedRows(prev => {
       const newSet = new Set(prev)
@@ -1669,6 +1707,9 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                     title="Select all"
                   />
                 </th>
+                <th className="px-4 py-3 text-center text-sm font-semibold text-slate-300" title="Bookmark">
+                  <Bookmark className="w-4 h-4 mx-auto" />
+                </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
                   <button
                     onClick={() => handleSort('symbol')}
@@ -1825,7 +1866,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
             <tbody>
               {sortedResults.length === 0 ? (
                 <tr>
-                  <td colSpan="14" className="px-4 py-8 text-center text-slate-400">
+                  <td colSpan="15" className="px-4 py-8 text-center text-slate-400">
                     {scanning ? 'Scanning stocks...' : 'No results. Click "Load Heavy Vol" to start scanning.'}
                   </td>
                 </tr>
@@ -1842,6 +1883,19 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                         onChange={() => handleToggleRow(result.symbol)}
                         className="w-4 h-4 cursor-pointer"
                       />
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button
+                        onClick={() => toggleBookmark(result.symbol)}
+                        className={`transition-colors ${
+                          bookmarkedSymbols.has(result.symbol)
+                            ? 'text-yellow-400 hover:text-yellow-500'
+                            : 'text-slate-500 hover:text-slate-400'
+                        }`}
+                        title={bookmarkedSymbols.has(result.symbol) ? 'Remove bookmark' : 'Add bookmark'}
+                      >
+                        <Bookmark className={`w-5 h-5 ${bookmarkedSymbols.has(result.symbol) ? 'fill-current' : ''}`} />
+                      </button>
                     </td>
                     <td className="px-4 py-3 text-white font-medium">
                       {result.symbol}
