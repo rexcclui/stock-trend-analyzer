@@ -26,11 +26,11 @@ function App() {
 
     // Load from Stock Filter
     try {
-      const filterQueue = localStorage.getItem('stockFilterScheduleQueue')
+      const filterQueue = localStorage.getItem('stockFilteringScheduleQueue')
       if (filterQueue) {
         const parsed = JSON.parse(filterQueue)
         if (Array.isArray(parsed)) {
-          queues.push(...parsed.map(job => ({ ...job, source: 'Stock Filter', sourceKey: 'stockFilterScheduleQueue' })))
+          queues.push(...parsed.map(job => ({ ...job, source: 'Stock Filter', sourceKey: 'stockFilteringScheduleQueue' })))
         }
       }
     } catch (error) {
