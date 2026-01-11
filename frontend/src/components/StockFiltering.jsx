@@ -1700,6 +1700,7 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                     className="flex items-center gap-1 hover:text-white transition-colors"
                     title="7-Day Percentage Change: Price change over last 7 trading days"
                   >
+                    7d
                     <TrendingUp className="w-4 h-4" />
                     <ArrowUpDown className="w-3 h-3" />
                   </button>
