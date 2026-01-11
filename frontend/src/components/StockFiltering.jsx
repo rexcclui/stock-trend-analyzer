@@ -1257,6 +1257,13 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
         : bVal.localeCompare(aVal)
     }
 
+    // Handle date comparison for lastRunTime
+    if (sortField === 'lastRunTime') {
+      const aTime = aVal ? new Date(aVal).getTime() : 0
+      const bTime = bVal ? new Date(bVal).getTime() : 0
+      return sortDirection === 'asc' ? aTime - bTime : bTime - aTime
+    }
+
     // Handle numeric comparison
     if (sortDirection === 'asc') {
       return aVal - bVal
@@ -1589,7 +1596,14 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                   </button>
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
-                  Period
+                  <button
+                    onClick={() => handleSort('days')}
+                    className="flex items-center gap-1 hover:text-white transition-colors"
+                    title="Sort by period (in days)"
+                  >
+                    Period
+                    <ArrowUpDown className="w-3 h-3" />
+                  </button>
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300">
                   <button
@@ -1705,7 +1719,13 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                   </div>
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-slate-300" title="Last Run: When this stock was last analyzed">
-                  <Clock className="w-4 h-4" />
+                  <button
+                    onClick={() => handleSort('lastRunTime')}
+                    className="flex items-center gap-1 hover:text-white transition-colors"
+                  >
+                    <Clock className="w-4 h-4" />
+                    <ArrowUpDown className="w-3 h-3" />
+                  </button>
                 </th>
               </tr>
             </thead>
