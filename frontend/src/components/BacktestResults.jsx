@@ -2394,18 +2394,6 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
                   <Download className="w-5 h-5" />
                 </button>
                 <button
-                  onClick={() => setShowQueueModal(true)}
-                  className="p-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors relative"
-                  title="Show scheduled jobs queue"
-                >
-                  <Database className="w-5 h-5" />
-                  {scheduleQueue.length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                      {scheduleQueue.length}
-                    </span>
-                  )}
-                </button>
-                <button
                   onClick={handleOpenScheduleModal}
                   disabled={loading || isScanning}
                   className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors"

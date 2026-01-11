@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { TrendingUp, BarChart3, Activity, Waves, Bug, BarChart2, Filter } from 'lucide-react'
+import { TrendingUp, BarChart3, Activity, Waves, Bug, BarChart2, Filter, Database, X, AlertCircle, Trash2, RefreshCcw, Clock } from 'lucide-react'
 import StockAnalyzer from './components/StockAnalyzer'
 import BacktestResults from './components/BacktestResults'
 import V3BacktestResults from './components/V3BacktestResults'
@@ -18,6 +18,81 @@ function App() {
   const [filterImport, setFilterImport] = useState(null)
   const [storageUsage, setStorageUsage] = useState(null)
   const [storageQuota, setStorageQuota] = useState(null)
+  const [showGlobalQueueModal, setShowGlobalQueueModal] = useState(false)
+  const [allScheduleJobs, setAllScheduleJobs] = useState([])
+
+  const loadAllScheduleQueues = () => {
+    const queues = []
+
+    // Load from Stock Filter
+    try {
+      const filterQueue = localStorage.getItem('stockFilterScheduleQueue')
+      if (filterQueue) {
+        const parsed = JSON.parse(filterQueue)
+        if (Array.isArray(parsed)) {
+          queues.push(...parsed.map(job => ({ ...job, source: 'Stock Filter', sourceKey: 'stockFilterScheduleQueue' })))
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load Stock Filter schedule queue', error)
+    }
+
+    // Load from V2 Backtest
+    try {
+      const backtestQueue = localStorage.getItem('backtestScheduleQueue')
+      if (backtestQueue) {
+        const parsed = JSON.parse(backtestQueue)
+        if (Array.isArray(parsed)) {
+          queues.push(...parsed.map(job => ({ ...job, source: 'V2 Backtest', sourceKey: 'backtestScheduleQueue' })))
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load V2 Backtest schedule queue', error)
+    }
+
+    // Load from V3 Backtest
+    try {
+      const v3Queue = localStorage.getItem('v3BacktestScheduleQueue')
+      if (v3Queue) {
+        const parsed = JSON.parse(v3Queue)
+        if (Array.isArray(parsed)) {
+          queues.push(...parsed.map(job => ({ ...job, source: 'V3 Backtest', sourceKey: 'v3BacktestScheduleQueue' })))
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load V3 Backtest schedule queue', error)
+    }
+
+    // Load from Volume Screening
+    try {
+      const volumeQueue = localStorage.getItem('volumeScreeningScheduleQueue')
+      if (volumeQueue) {
+        const parsed = JSON.parse(volumeQueue)
+        if (Array.isArray(parsed)) {
+          queues.push(...parsed.map(job => ({ ...job, source: 'Volume Screening', sourceKey: 'volumeScreeningScheduleQueue' })))
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load Volume Screening schedule queue', error)
+    }
+
+    setAllScheduleJobs(queues)
+    return queues
+  }
+
+  const removeJobFromGlobalQueue = (job) => {
+    try {
+      const queueData = localStorage.getItem(job.sourceKey)
+      if (queueData) {
+        const queue = JSON.parse(queueData)
+        const filtered = queue.filter(j => j.id !== job.id)
+        localStorage.setItem(job.sourceKey, JSON.stringify(filtered))
+        loadAllScheduleQueues()
+      }
+    } catch (error) {
+      console.error('Failed to remove job from queue', error)
+    }
+  }
 
   const measureLocalStorageUsage = () => {
     if (typeof window === 'undefined' || !window.localStorage) return null
@@ -191,15 +266,37 @@ function App() {
           </div>
         </div>
 
-        <button
-          onClick={exportLocalStorage}
-          className="absolute right-0 top-0 flex items-center gap-1 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-md px-2.5 py-1.5 shadow-md transition-colors"
-          title="Export LocalStorage contents"
-          aria-label="Export LocalStorage contents"
-        >
-          <Bug className="w-4 h-4" />
-          Debug export
-        </button>
+        <div className="absolute right-0 top-0 flex items-center gap-2">
+          <button
+            onClick={() => {
+              loadAllScheduleQueues()
+              setShowGlobalQueueModal(true)
+            }}
+            className="flex items-center gap-1 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-md px-2.5 py-1.5 shadow-md transition-colors relative"
+            title="Show all scheduled jobs from all tabs"
+            aria-label="Show all scheduled jobs"
+          >
+            <Database className="w-4 h-4" />
+            Show Queue
+            {(() => {
+              const totalJobs = loadAllScheduleQueues().length
+              return totalJobs > 0 ? (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  {totalJobs}
+                </span>
+              ) : null
+            })()}
+          </button>
+          <button
+            onClick={exportLocalStorage}
+            className="flex items-center gap-1 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-md px-2.5 py-1.5 shadow-md transition-colors"
+            title="Export LocalStorage contents"
+            aria-label="Export LocalStorage contents"
+          >
+            <Bug className="w-4 h-4" />
+            Debug export
+          </button>
+        </div>
         {storageUsageLabel && (
           <div className="absolute right-0 top-10 text-[10px] text-slate-300 bg-slate-800 border border-slate-700 rounded px-2 py-1 shadow-md">
             LocalStorage size: {storageUsageLabel}
@@ -320,6 +417,155 @@ function App() {
           <p>Data provided by Financial Modeling Prep | For educational purposes only</p>
         </div>
       </div>
+
+      {/* Global Schedule Queue Modal */}
+      {showGlobalQueueModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-slate-800 rounded-lg p-6 border border-slate-700 max-w-5xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold text-slate-200">
+                All Scheduled Jobs ({allScheduleJobs.length})
+              </h3>
+              <button
+                onClick={() => setShowGlobalQueueModal(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {allScheduleJobs.length === 0 ? (
+              <div className="text-center py-12 text-slate-400">
+                <Database className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No scheduled jobs in queue</p>
+                <p className="text-sm mt-1">Schedule jobs from Stock Filter, V2 Backtest, V3 Backtest, or Volume Screening tabs</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {allScheduleJobs
+                  .sort((a, b) => new Date(a.scheduledTime) - new Date(b.scheduledTime))
+                  .map((job) => {
+                    const scheduledDate = new Date(job.scheduledTime)
+                    const isPast = scheduledDate < new Date()
+
+                    return (
+                      <div
+                        key={`${job.sourceKey}-${job.id}`}
+                        className={`bg-slate-700/50 p-4 rounded-lg border ${
+                          isPast ? 'border-yellow-600/50' : 'border-slate-600'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 space-y-2">
+                            {/* Source Badge */}
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-600/30 border border-purple-500/50 rounded text-xs font-medium text-purple-300">
+                                {job.source === 'Stock Filter' && <Filter className="w-3 h-3" />}
+                                {job.source === 'V2 Backtest' && <BarChart3 className="w-3 h-3" />}
+                                {job.source === 'V3 Backtest' && <Waves className="w-3 h-3" />}
+                                {job.source === 'Volume Screening' && <Activity className="w-3 h-3" />}
+                                {job.source}
+                              </span>
+                              <span className={`text-xs font-medium ${isPast ? 'text-yellow-400' : 'text-green-400'}`}>
+                                <Clock className="w-3 h-3 inline mr-1" />
+                                {scheduledDate.toLocaleString()}
+                                {isPast && ' (Pending execution)'}
+                              </span>
+                            </div>
+
+                            {/* Job Details */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                              {/* Stock Filter specific */}
+                              {job.market && (
+                                <>
+                                  <div>
+                                    <div className="text-slate-400 text-xs mb-1">Market</div>
+                                    <div className="text-white font-medium">{job.market}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-slate-400 text-xs mb-1">Period</div>
+                                    <div className="text-white font-medium">{job.period}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-slate-400 text-xs mb-1">Threshold</div>
+                                    <div className="text-white font-medium">{job.threshold}%</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-slate-400 text-xs mb-1">Stock Limit</div>
+                                    <div className="text-white font-medium">
+                                      {job.stockLimit === -1 ? 'ALL' : job.stockLimit}
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+
+                              {/* V2/V3 Backtest specific */}
+                              {job.days && (
+                                <>
+                                  <div>
+                                    <div className="text-slate-400 text-xs mb-1">Period</div>
+                                    <div className="text-white font-medium">
+                                      {job.days >= 1825 ? '5Y' : job.days >= 730 ? '2Y' : job.days >= 365 ? '1Y' : `${job.days}D`}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div className="text-slate-400 text-xs mb-1">Scan Limit</div>
+                                    <div className="text-white font-medium">
+                                      {job.scanLimit === -1 ? 'ALL' : job.scanLimit}
+                                    </div>
+                                  </div>
+                                  {job.symbols && (
+                                    <div>
+                                      <div className="text-slate-400 text-xs mb-1">Symbols</div>
+                                      <div className="text-white font-medium">
+                                        {job.symbols.split(/[\n,;]+/).filter(s => s.trim()).length} stocks
+                                      </div>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+
+                              {/* Volume Screening specific */}
+                              {job.symbolsList && (
+                                <div className="col-span-2">
+                                  <div className="text-slate-400 text-xs mb-1">Symbols</div>
+                                  <div className="text-white font-medium">
+                                    {job.symbolsList.length} stocks
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => removeJobFromGlobalQueue(job)}
+                              className="text-red-400 hover:text-red-300 transition-colors"
+                              title="Remove job"
+                            >
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+            )}
+
+            <div className="mt-4 p-3 bg-blue-900/20 border border-blue-700/50 rounded-lg">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                <div className="text-xs text-blue-300">
+                  Jobs will run automatically at their scheduled time. Keep this browser tab open for scheduled scans to execute.
+                  Each job runs once and is removed from the queue after completion. To edit a job, delete it here and reschedule from the respective tab.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

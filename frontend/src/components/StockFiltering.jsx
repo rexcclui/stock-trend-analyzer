@@ -1504,18 +1504,6 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                   Load Heavy Vol
                 </button>
                 <button
-                  onClick={() => setShowQueueModal(true)}
-                  className="bg-slate-600 hover:bg-slate-700 text-white px-6 py-2 rounded font-medium transition-colors flex items-center gap-2 relative"
-                >
-                  <Database className="w-4 h-4" />
-                  Show Queue
-                  {scheduleQueue.length > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-                      {scheduleQueue.length}
-                    </span>
-                  )}
-                </button>
-                <button
                   onClick={handleOpenScheduleModal}
                   disabled={loading || scanning}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
