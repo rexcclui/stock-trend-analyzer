@@ -1504,14 +1504,6 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                   Load Heavy Vol
                 </button>
                 <button
-                  onClick={handleOpenScheduleModal}
-                  disabled={loading || scanning}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  <Clock className="w-4 h-4" />
-                  Schedule
-                </button>
-                <button
                   onClick={() => setShowQueueModal(true)}
                   className="bg-slate-600 hover:bg-slate-700 text-white px-6 py-2 rounded font-medium transition-colors flex items-center gap-2 relative"
                 >
@@ -1522,6 +1514,14 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
                       {scheduleQueue.length}
                     </span>
                   )}
+                </button>
+                <button
+                  onClick={handleOpenScheduleModal}
+                  disabled={loading || scanning}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <Clock className="w-4 h-4" />
+                  Schedule
                 </button>
               </>
             )}
