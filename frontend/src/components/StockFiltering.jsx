@@ -1305,10 +1305,24 @@ function StockFiltering({ onV3BacktestSelect, onAnalyzeWithVolProf, onV2Backtest
       return false
     }
     // Apply market filter
-    if (marketFilter !== 'ALL' && getMarketFromSymbol(result.symbol) !== marketFilter) {
-      return false
+    if (marketFilter !== 'ALL') {
+      const symbolMarket = getMarketFromSymbol(result.symbol)
+      if (symbolMarket !== marketFilter) {
+        return false
+      }
     }
     return true
+  })
+
+  // Debug logging
+  console.log('[StockFiltering] Filter state:', {
+    marketFilter,
+    totalResults: results.length,
+    filteredCount: filteredResults.length,
+    sampleSymbols: results.slice(0, 5).map(r => ({
+      symbol: r.symbol,
+      market: getMarketFromSymbol(r.symbol)
+    }))
   })
 
   const normalizedResults = filteredResults.map(normalizeResult)
