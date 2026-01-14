@@ -3190,9 +3190,9 @@ function BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, trigg
                 <ul className="list-disc list-inside space-y-1 ml-2">
                   <li><strong>Recent Breakouts:</strong> Show only stocks with breakouts in the last 10 days</li>
                   <li><strong>P/L Beats Market:</strong> Show only stocks where strategy outperforms buy-and-hold</li>
-                  <li><strong>High Win Rate:</strong> Show only stocks with >70% win rate</li>
+                  <li><strong>High Win Rate:</strong> Show only stocks with {'>'}70% win rate</li>
                   <li><strong>Signal Count:</strong> Hide stocks with fewer than 5 total signals</li>
-                  <li><strong>Vol% Filter:</strong> Hide stocks with current volume weight >4%</li>
+                  <li><strong>Vol% Filter:</strong> Hide stocks with current volume weight {'>'}4%</li>
                   <li><strong>Diff Filter:</strong> Hide stocks with Diff below 6%</li>
                   <li><strong>Market/Period Filters:</strong> Filter by specific markets (US/HK/CN) or time periods</li>
                 </ul>

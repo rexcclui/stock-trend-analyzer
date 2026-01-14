@@ -3281,10 +3281,10 @@ function V3BacktestResults({ onStockSelect, onVolumeSelect, onVolumeBulkAdd, onF
                 <h4 className="text-lg font-semibold text-white mb-2">Filtering Options</h4>
                 <ul className="list-disc list-inside space-y-1 ml-2">
                   <li><strong>Recent Signals:</strong> Show only stocks with signals in the last 10 days</li>
-                  <li><strong>Combined P/L > Market:</strong> Show only stocks where strategy beats buy-and-hold</li>
-                  <li><strong>High Win Rate:</strong> Show only stocks with >70% win rate</li>
+                  <li><strong>Combined P/L {'>'} Market:</strong> Show only stocks where strategy beats buy-and-hold</li>
+                  <li><strong>High Win Rate:</strong> Show only stocks with {'>'}70% win rate</li>
                   <li><strong>Signal Count:</strong> Hide stocks with fewer than 5 total signals</li>
-                  <li><strong>Vol% Filter:</strong> Hide stocks with high current volume weight (>4%)</li>
+                  <li><strong>Vol% Filter:</strong> Hide stocks with high current volume weight ({'>'}4%)</li>
                   <li><strong>Diff Filter:</strong> Hide stocks with weak signals (Diff {'<'}6%)</li>
                   <li><strong>Market/Period Filters:</strong> Focus on specific markets or time periods</li>
                 </ul>
