@@ -699,7 +699,13 @@ function getVolumeDiffTooltip(entry, direction = 'up') {
   const neighborRange = formatPriceRange(result.neighbor.start, result.neighbor.end)
   const currentRange = formatPriceRange(result.current.start, result.current.end)
   const directionLabel = direction === 'up' ? 'next upper' : 'next lower'
-  return `${directionLabel} slot ${neighborRange} @ ${result.neighbor.weight.toFixed(1)}% versus current ${currentRange} @ ${result.current.weight.toFixed(1)}%`
+  const neighborWeight = Number.isFinite(result.neighbor.weight)
+    ? result.neighbor.weight.toFixed(1)
+    : '—'
+  const currentWeight = Number.isFinite(result.current.weight)
+    ? result.current.weight.toFixed(1)
+    : '—'
+  return `${directionLabel} slot ${neighborRange} @ ${neighborWeight}% versus current ${currentRange} @ ${currentWeight}%`
 }
 
 function meetsPotentialBreakCriteria(entry) {
