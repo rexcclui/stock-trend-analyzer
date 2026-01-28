@@ -105,6 +105,24 @@ function getFetchPeriod(displayDays) {
   return String(displayDays)
 }
 
+// Helper function to calculate percentage change for visible range
+// Data is in newest→oldest order, so index 0 is the most recent price
+function calculateVisibleRangeChange(prices, zoomRange) {
+  if (!prices || prices.length === 0) return null
+
+  const endIndex = zoomRange.end === null ? prices.length : zoomRange.end
+  const visiblePrices = prices.slice(zoomRange.start, endIndex)
+
+  if (visiblePrices.length < 2) return null
+
+  const newestPrice = visiblePrices[0]?.close
+  const oldestPrice = visiblePrices[visiblePrices.length - 1]?.close
+
+  if (!newestPrice || !oldestPrice || oldestPrice === 0) return null
+
+  return ((newestPrice - oldestPrice) / oldestPrice) * 100
+}
+
 function StockAnalyzer({ selectedSymbol, selectedParams }) {
   const [symbol, setSymbol] = useState('')
   const [days, setDays] = useState('365')
@@ -2066,7 +2084,19 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
 
                 <div className="flex items-center justify-between pr-24">
                   <div className="flex items-center gap-3">
-                    <h3 className="text-lg font-semibold text-slate-100">{chart.symbol}</h3>
+                    <h3 className="text-lg font-semibold text-slate-100">
+                      {chart.symbol}
+                      {(() => {
+                        const percentChange = calculateVisibleRangeChange(chart.data?.prices, globalZoomRange)
+                        if (percentChange === null) return null
+                        const isPositive = percentChange >= 0
+                        return (
+                          <span className={`ml-2 text-sm font-medium ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
+                            {isPositive ? '+' : ''}{percentChange.toFixed(2)}%
+                          </span>
+                        )
+                      })()}
+                    </h3>
                     {/* Mobile controls toggle button */}
                     {!chart.collapsed && (
                       <button
