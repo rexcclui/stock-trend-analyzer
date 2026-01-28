@@ -2098,7 +2098,14 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                 <div className="flex items-center justify-between pr-24">
                   <div className="flex items-center gap-3">
                     <h3 className="text-lg font-semibold text-slate-100">
-                      {chart.symbol}
+                      <a
+                        href={`https://www.tradingview.com/symbols/${chart.symbol}/financials-overview/`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-blue-400 transition-colors"
+                      >
+                        {chart.symbol}
+                      </a>
                       {(() => {
                         const result = calculateVisibleRangeChange(chart.data?.prices, globalZoomRange)
                         if (result === null) return null
