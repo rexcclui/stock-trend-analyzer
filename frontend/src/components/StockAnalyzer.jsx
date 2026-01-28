@@ -107,6 +107,7 @@ function getFetchPeriod(displayDays) {
 
 // Helper function to calculate percentage change for visible range
 // Data is in newest→oldest order, so index 0 is the most recent price
+// Returns { percentChange, days } or null
 function calculateVisibleRangeChange(prices, zoomRange) {
   if (!prices || prices.length === 0) return null
 
@@ -117,10 +118,22 @@ function calculateVisibleRangeChange(prices, zoomRange) {
 
   const newestPrice = visiblePrices[0]?.close
   const oldestPrice = visiblePrices[visiblePrices.length - 1]?.close
+  const newestDate = visiblePrices[0]?.date
+  const oldestDate = visiblePrices[visiblePrices.length - 1]?.date
 
   if (!newestPrice || !oldestPrice || oldestPrice === 0) return null
 
-  return ((newestPrice - oldestPrice) / oldestPrice) * 100
+  const percentChange = ((newestPrice - oldestPrice) / oldestPrice) * 100
+
+  // Calculate days between oldest and newest dates
+  let days = visiblePrices.length // Default to number of data points
+  if (newestDate && oldestDate) {
+    const newest = new Date(newestDate)
+    const oldest = new Date(oldestDate)
+    days = Math.round((newest - oldest) / (1000 * 60 * 60 * 24))
+  }
+
+  return { percentChange, days }
 }
 
 function StockAnalyzer({ selectedSymbol, selectedParams }) {
@@ -2087,12 +2100,13 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                     <h3 className="text-lg font-semibold text-slate-100">
                       {chart.symbol}
                       {(() => {
-                        const percentChange = calculateVisibleRangeChange(chart.data?.prices, globalZoomRange)
-                        if (percentChange === null) return null
+                        const result = calculateVisibleRangeChange(chart.data?.prices, globalZoomRange)
+                        if (result === null) return null
+                        const { percentChange, days } = result
                         const isPositive = percentChange >= 0
                         return (
                           <span className={`ml-2 text-sm font-medium ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
-                            {isPositive ? '+' : ''}{percentChange.toFixed(2)}%
+                            {isPositive ? '+' : ''}{percentChange.toFixed(2)}% <span className="text-slate-400">({days}d)</span>
                           </span>
                         )
                       })()}
