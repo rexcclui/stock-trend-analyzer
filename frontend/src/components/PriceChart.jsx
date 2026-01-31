@@ -28,7 +28,7 @@ import { getVolumeColor } from './PriceChart/utils'
 import { calculateVolumeProfileV3WithSells } from './PriceChart/utils/volumeProfileV3Utils'
 import { calculateVolPrfV2Breakouts } from './PriceChart/utils/volumeProfileV2Utils'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, smaChannelUpperPercent = {}, smaChannelLowerPercent = {}, smaChannelUpperEnabled = {}, smaChannelLowerEnabled = {}, smaOptimalTouches = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, volumeProfileV2BreakoutThreshold = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RegressionThreshold = 6, volumeProfileV3RefreshTrigger = 0, onVolumeProfileV3RegressionThresholdChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, linearRegressionEnabled = false, linearRegressionSelections = [], onAddLinearRegressionSelection, onClearLinearRegressionSelections, onRemoveLinearRegressionSelection, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete, simulatingBreakoutThreshold = false, onBreakoutThresholdSimulateComplete }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, smaChannelUpperPercent = {}, smaChannelLowerPercent = {}, smaChannelUpperEnabled = {}, smaChannelLowerEnabled = {}, smaOptimalTouches = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, volumeProfileV2BreakoutThreshold = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RegressionThreshold = 6, volumeProfileV3RefreshTrigger = 0, onVolumeProfileV3RegressionThresholdChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, linearRegressionEnabled = false, linearRegressionSelections = [], onAddLinearRegressionSelection, onClearLinearRegressionSelections, onRemoveLinearRegressionSelection, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete, simulatingBreakoutThreshold = false, onBreakoutThresholdSimulateComplete, rsiSimulationResult = null }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -3480,6 +3480,56 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     return data
   }, [chartData, zoomRange.start, zoomRange.end, comparisonMode, comparisonStocks])
 
+  // RSI Strategy: Enhanced chart data with holding status for colored price line
+  const rsiEnhancedChartData = useMemo(() => {
+    if (!rsiSimulationResult || !rsiSimulationResult.tradeDetails || rsiSimulationResult.tradeDetails.length === 0) {
+      return visibleChartData
+    }
+
+    // Create a set of dates when we're holding a position
+    const holdingDates = new Set()
+    rsiSimulationResult.tradeDetails.forEach(trade => {
+      let inTrade = false
+      for (const dataPoint of visibleChartData) {
+        if (dataPoint.date === trade.buyDate) {
+          inTrade = true
+        }
+        if (inTrade) {
+          holdingDates.add(dataPoint.date)
+        }
+        // For open trades, sellDate contains " (open)" so we check
+        if (trade.sellDate && dataPoint.date === trade.sellDate.replace(' (open)', '')) {
+          inTrade = false
+        }
+      }
+    })
+
+    return visibleChartData.map(d => ({
+      ...d,
+      closeHolding: holdingDates.has(d.date) ? d.close : null,
+      closeNotHolding: !holdingDates.has(d.date) ? d.close : null
+    }))
+  }, [visibleChartData, rsiSimulationResult])
+
+  // RSI Strategy: Buy/Sell signal points for markers on price chart
+  const rsiBuyPoints = useMemo(() => {
+    if (!rsiSimulationResult?.buySignals) return []
+    // Find price for each buy signal date
+    return rsiSimulationResult.buySignals.map(signal => {
+      const pricePoint = visibleChartData.find(d => d.date === signal.date)
+      return pricePoint ? { date: signal.date, price: pricePoint.close } : null
+    }).filter(Boolean)
+  }, [rsiSimulationResult, visibleChartData])
+
+  const rsiSellPoints = useMemo(() => {
+    if (!rsiSimulationResult?.sellSignals) return []
+    // Find price for each sell signal date
+    return rsiSimulationResult.sellSignals.map(signal => {
+      const pricePoint = visibleChartData.find(d => d.date === signal.date)
+      return pricePoint ? { date: signal.date, price: pricePoint.close } : null
+    }).filter(Boolean)
+  }, [rsiSimulationResult, visibleChartData])
+
   const smaTouchPointMarkers = useMemo(() => {
     const markers = []
 
@@ -4627,8 +4677,8 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   }
 
 
-  // Use visible chart data directly (zones are now added during chartData creation)
-  const chartDataWithZones = visibleChartData
+  // Use RSI enhanced chart data if simulation is active, otherwise visible chart data
+  const chartDataWithZones = rsiSimulationResult?.tradeDetails?.length > 0 ? rsiEnhancedChartData : visibleChartData
 
   // Custom component to render zone lines with labels
   const CustomZoneLines = (props) => {
@@ -5996,14 +6046,73 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                   )
                 })}
 
-                <Line
-                  type="monotone"
-                  dataKey="close"
-                  stroke="#8b5cf6"
-                  strokeWidth={2}
-                  dot={false}
-                  name="Close Price"
-                />
+                {/* Price line - show holding status if RSI simulation is active */}
+                {rsiSimulationResult?.tradeDetails?.length > 0 ? (
+                  <>
+                    {/* Price line when NOT holding - purple */}
+                    <Line
+                      type="monotone"
+                      dataKey="closeNotHolding"
+                      stroke="#8b5cf6"
+                      strokeWidth={2}
+                      dot={false}
+                      name="Close Price"
+                      connectNulls={false}
+                    />
+                    {/* Price line when holding - orange */}
+                    <Line
+                      type="monotone"
+                      dataKey="closeHolding"
+                      stroke="#f59e0b"
+                      strokeWidth={2}
+                      dot={false}
+                      name="Holding Position"
+                      connectNulls={false}
+                    />
+                    {/* Thin connecting line for continuity */}
+                    <Line
+                      type="monotone"
+                      dataKey="close"
+                      stroke="#8b5cf6"
+                      strokeWidth={0.5}
+                      strokeOpacity={0.3}
+                      dot={false}
+                      legendType="none"
+                    />
+                  </>
+                ) : (
+                  <Line
+                    type="monotone"
+                    dataKey="close"
+                    stroke="#8b5cf6"
+                    strokeWidth={2}
+                    dot={false}
+                    name="Close Price"
+                  />
+                )}
+                {/* RSI Strategy Buy/Sell Markers */}
+                {rsiBuyPoints.map((point, idx) => (
+                  <ReferenceDot
+                    key={`rsi-buy-${idx}`}
+                    x={point.date}
+                    y={point.price}
+                    r={6}
+                    fill="#10b981"
+                    stroke="#059669"
+                    strokeWidth={1}
+                  />
+                ))}
+                {rsiSellPoints.map((point, idx) => (
+                  <ReferenceDot
+                    key={`rsi-sell-${idx}`}
+                    x={point.date}
+                    y={point.price}
+                    r={6}
+                    fill="#ef4444"
+                    stroke="#dc2626"
+                    strokeWidth={1}
+                  />
+                ))}
                 {volumeColorEnabled && (
                   <>
                     <Line

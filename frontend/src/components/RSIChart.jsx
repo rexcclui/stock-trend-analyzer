@@ -1,8 +1,8 @@
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, ReferenceDot } from 'recharts'
-import { useRef, useEffect, useCallback, useState, useMemo } from 'react'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { useRef, useEffect, useCallback, useState } from 'react'
 import RSIStrategyPanel from './RSIStrategyPanel'
 
-function RSIChart({ indicators, prices, syncedMouseDate, setSyncedMouseDate, zoomRange, onZoomChange, onExtendPeriod }) {
+function RSIChart({ indicators, prices, syncedMouseDate, setSyncedMouseDate, zoomRange, onZoomChange, onExtendPeriod, onSimulationResult }) {
   const chartRef = useRef(null)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const [strategyParams, setStrategyParams] = useState({
@@ -10,7 +10,6 @@ function RSIChart({ indicators, prices, syncedMouseDate, setSyncedMouseDate, zoo
     overbought: 70,
     oversold: 30
   })
-  const [simulationResult, setSimulationResult] = useState(null)
 
   // Ensure data is properly reversed and matches expected format (chronological - oldest first)
   const chartData = indicators.slice().reverse().map(ind => ({
@@ -27,56 +26,6 @@ function RSIChart({ indicators, prices, syncedMouseDate, setSyncedMouseDate, zoo
   // Apply zoom range to chart data
   const endIndex = zoomRange.end === null ? chartData.length : zoomRange.end
   const visibleChartData = chartData.slice(zoomRange.start, endIndex)
-
-  // Create chart data with holding status for colored line segments
-  const enhancedChartData = useMemo(() => {
-    if (!simulationResult || !simulationResult.tradeDetails) {
-      return visibleChartData.map(d => ({ ...d, holding: false }))
-    }
-
-    // Create a map of dates when we're holding
-    const holdingDates = new Set()
-    simulationResult.tradeDetails.forEach(trade => {
-      // Find all dates between buy and sell
-      let inTrade = false
-      for (const dataPoint of visibleChartData) {
-        if (dataPoint.date === trade.buyDate) {
-          inTrade = true
-        }
-        if (inTrade) {
-          holdingDates.add(dataPoint.date)
-        }
-        // For open trades, sellDate contains " (open)" so we check startsWith
-        if (trade.sellDate && dataPoint.date === trade.sellDate.replace(' (open)', '')) {
-          inTrade = false
-        }
-      }
-    })
-
-    return visibleChartData.map(d => ({
-      ...d,
-      holding: holdingDates.has(d.date),
-      rsiHolding: holdingDates.has(d.date) ? d.rsi : null,
-      rsiNotHolding: !holdingDates.has(d.date) ? d.rsi : null
-    }))
-  }, [visibleChartData, simulationResult])
-
-  // Get buy/sell signal points for markers
-  const buyPoints = useMemo(() => {
-    if (!simulationResult?.buySignals) return []
-    return simulationResult.buySignals.map(signal => ({
-      date: signal.date,
-      rsi: signal.rsi
-    }))
-  }, [simulationResult])
-
-  const sellPoints = useMemo(() => {
-    if (!simulationResult?.sellSignals) return []
-    return simulationResult.sellSignals.map(signal => ({
-      date: signal.date,
-      rsi: signal.rsi
-    }))
-  }, [simulationResult])
 
   // Handle mouse wheel for zoom
   const handleWheel = useCallback((e) => {
@@ -186,36 +135,11 @@ function RSIChart({ indicators, prices, syncedMouseDate, setSyncedMouseDate, zoo
   }, [])
 
   const handleSimulationResult = useCallback((result) => {
-    setSimulationResult(result)
-  }, [])
-
-  // Custom dot renderer for buy signals
-  const renderBuyDot = (props) => {
-    const { cx, cy } = props
-    if (cx === undefined || cy === undefined) return null
-    return (
-      <polygon
-        points={`${cx},${cy - 8} ${cx - 6},${cy + 4} ${cx + 6},${cy + 4}`}
-        fill="#10b981"
-        stroke="#059669"
-        strokeWidth={1}
-      />
-    )
-  }
-
-  // Custom dot renderer for sell signals
-  const renderSellDot = (props) => {
-    const { cx, cy } = props
-    if (cx === undefined || cy === undefined) return null
-    return (
-      <polygon
-        points={`${cx},${cy + 8} ${cx - 6},${cy - 4} ${cx + 6},${cy - 4}`}
-        fill="#ef4444"
-        stroke="#dc2626"
-        strokeWidth={1}
-      />
-    )
-  }
+    // Pass simulation result to parent for display on price chart
+    if (onSimulationResult) {
+      onSimulationResult(result)
+    }
+  }, [onSimulationResult])
 
   return (
     <div ref={chartRef}>
@@ -231,7 +155,7 @@ function RSIChart({ indicators, prices, syncedMouseDate, setSyncedMouseDate, zoo
 
         <ResponsiveContainer width="100%" height={200}>
           <LineChart
-            data={enhancedChartData}
+            data={visibleChartData}
             margin={{ top: 5, right: 30, left: isMobile ? 0 : 20, bottom: 5 }}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
@@ -240,7 +164,7 @@ function RSIChart({ indicators, prices, syncedMouseDate, setSyncedMouseDate, zoo
             <XAxis
               dataKey="date"
               tick={{ fontSize: 12, fill: '#94a3b8' }}
-              interval={Math.floor(enhancedChartData.length / 10)}
+              interval={Math.floor(visibleChartData.length / 10)}
               stroke="#475569"
             />
             <YAxis domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: isMobile ? 10 : 12 }} stroke="#475569" width={isMobile ? 40 : 60} />
@@ -266,55 +190,14 @@ function RSIChart({ indicators, prices, syncedMouseDate, setSyncedMouseDate, zoo
                 strokeDasharray="3 3"
               />
             )}
-            {/* RSI line when NOT holding - purple */}
-            <Line
-              type="monotone"
-              dataKey="rsiNotHolding"
-              stroke="#8b5cf6"
-              strokeWidth={2}
-              dot={false}
-              name="RSI"
-              connectNulls={false}
-            />
-            {/* RSI line when holding - orange/yellow */}
-            <Line
-              type="monotone"
-              dataKey="rsiHolding"
-              stroke="#f59e0b"
-              strokeWidth={2}
-              dot={false}
-              name="RSI (holding)"
-              connectNulls={false}
-              legendType="none"
-            />
-            {/* Full RSI line for continuity (very thin, same as not holding) */}
             <Line
               type="monotone"
               dataKey="rsi"
               stroke="#8b5cf6"
-              strokeWidth={0.5}
-              strokeOpacity={0.3}
+              strokeWidth={2}
               dot={false}
-              legendType="none"
+              name="RSI"
             />
-            {/* Buy signal markers */}
-            {buyPoints.map((point, idx) => (
-              <ReferenceDot
-                key={`buy-${idx}`}
-                x={point.date}
-                y={point.rsi}
-                shape={renderBuyDot}
-              />
-            ))}
-            {/* Sell signal markers */}
-            {sellPoints.map((point, idx) => (
-              <ReferenceDot
-                key={`sell-${idx}`}
-                x={point.date}
-                y={point.rsi}
-                shape={renderSellDot}
-              />
-            ))}
           </LineChart>
         </ResponsiveContainer>
       </div>
