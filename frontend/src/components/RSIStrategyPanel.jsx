@@ -8,13 +8,14 @@ import { useRSIStrategy } from '../hooks/useRSIStrategy'
  *
  * Strategy:
  * - BUY: When RSI crosses above oversold threshold (no position held)
- * - SELL: When RSI crosses below overbought threshold (position held)
+ * - SELL: When RSI crosses above overbought threshold (position held)
  *
  * @param {Array} priceData - Array of price data with {date, close} (chronological order - oldest first)
  * @param {Object} zoomRange - Current zoom range {start, end}
  * @param {function} onParametersChange - Callback when RSI parameters change (period, overbought, oversold)
+ * @param {function} onSimulationResult - Callback when simulation completes with result data
  */
-function RSIStrategyPanel({ priceData, zoomRange, onParametersChange }) {
+function RSIStrategyPanel({ priceData, zoomRange, onParametersChange, onSimulationResult }) {
   const [isExpanded, setIsExpanded] = useState(true)
   const [isSimulating, setIsSimulating] = useState(false)
 
@@ -69,6 +70,13 @@ function RSIStrategyPanel({ priceData, zoomRange, onParametersChange }) {
       })
     }
   }, [rsiPeriod, overboughtThreshold, oversoldThreshold, onParametersChange])
+
+  // Notify parent of simulation result changes
+  useEffect(() => {
+    if (onSimulationResult) {
+      onSimulationResult(simulationResult)
+    }
+  }, [simulationResult, onSimulationResult])
 
   const formatPL = (pl) => {
     if (pl === undefined || pl === null) return '-'
@@ -149,24 +157,6 @@ function RSIStrategyPanel({ priceData, zoomRange, onParametersChange }) {
             max={35}
             steps={thresholdSteps}
           />
-
-          {/* Trade details (optional expandable) */}
-          {simulationResult?.tradeDetails && simulationResult.tradeDetails.length > 0 && (
-            <div className="mt-2 pt-2 border-t border-slate-600">
-              <div className="text-xs text-slate-400 mb-1">Trade History:</div>
-              <div className="max-h-32 overflow-y-auto space-y-1">
-                {simulationResult.tradeDetails.map((trade, idx) => (
-                  <div key={idx} className="text-xs flex justify-between text-slate-300">
-                    <span>#{idx + 1} {trade.buyDate.slice(5)}</span>
-                    <span className={trade.plPercent >= 0 ? 'text-emerald-400' : 'text-red-400'}>
-                      {formatPL(trade.plPercent)}
-                      {trade.isOpen && <span className="text-amber-400 ml-1">(open)</span>}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
