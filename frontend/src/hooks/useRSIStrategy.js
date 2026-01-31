@@ -4,8 +4,8 @@ import { useState, useCallback, useMemo } from 'react'
  * Custom hook for RSI-based buy/sell strategy simulation
  *
  * Strategy Logic:
- * - BUY: When RSI rises above oversold threshold (crossing up) and no position held
- * - SELL: When RSI drops below overbought threshold (crossing down) and position held
+ * - BUY: When RSI crosses UP through oversold threshold (recovering from oversold) and no position held
+ * - SELL: When RSI crosses UP through overbought threshold (becoming overbought) and position held
  *
  * @param {Array} priceData - Array of price data with {date, close} fields
  * @param {number} defaultPeriod - Default RSI period (default: 14)
@@ -97,8 +97,8 @@ export function useRSIStrategy(priceData, defaultPeriod = 14, defaultOverbought 
         }
         buySignals.push({ date: current.date, price: current.close, rsi: current.rsi })
       }
-      // SELL: RSI crosses below overbought threshold (has position)
-      else if (position && previous.rsi >= overboughtThreshold && current.rsi < overboughtThreshold) {
+      // SELL: RSI crosses above overbought threshold (has position) - take profit when overbought
+      else if (position && previous.rsi < overboughtThreshold && current.rsi >= overboughtThreshold) {
         const pl = ((current.close - position.buyPrice) / position.buyPrice) * 100
         totalPL += pl
         trades.push({
