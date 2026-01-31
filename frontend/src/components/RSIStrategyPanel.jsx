@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import StepSlider from './StepSlider'
 import { useRSIStrategy } from '../hooks/useRSIStrategy'
 
@@ -16,7 +16,6 @@ import { useRSIStrategy } from '../hooks/useRSIStrategy'
  * @param {function} onSimulationResult - Callback when simulation completes with result data
  */
 function RSIStrategyPanel({ priceData, zoomRange, onParametersChange, onSimulationResult }) {
-  const [isExpanded, setIsExpanded] = useState(true)
   const [isSimulating, setIsSimulating] = useState(false)
 
   const {
@@ -28,7 +27,6 @@ function RSIStrategyPanel({ priceData, zoomRange, onParametersChange, onSimulati
     setOversoldThreshold,
     simulationResult,
     runSimulation,
-    resetSimulation
   } = useRSIStrategy(priceData)
 
   // Step configurations for sliders
@@ -85,80 +83,69 @@ function RSIStrategyPanel({ priceData, zoomRange, onParametersChange, onSimulati
   }
 
   return (
-    <div className="absolute top-0 left-0 z-10 bg-slate-800/95 rounded-lg border border-slate-600 shadow-lg min-w-[200px]">
-      {/* Header with results */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-600">
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="text-slate-400 hover:text-slate-200 transition-colors"
-        >
-          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </button>
+    <div className="flex items-center gap-4 flex-wrap">
+      {/* Sliders */}
+      <div className="flex items-center gap-3">
+        <StepSlider
+          label="Period"
+          value={rsiPeriod}
+          onChange={setRsiPeriod}
+          min={9}
+          max={50}
+          steps={periodSteps}
+          className="w-32"
+        />
 
-        <div className="flex items-center gap-3 text-sm">
-          <span className="text-slate-400">RSI</span>
-          <span className="text-slate-500 text-xs">
-            ({rsiPeriod}/{oversoldThreshold}/{overboughtThreshold})
-          </span>
-          {simulationResult && !simulationResult.error && (
-            <>
-              <span className="text-slate-300">
-                Trades: <span className="font-medium text-white">{simulationResult.trades}</span>
-              </span>
-              <span className={`font-medium ${simulationResult.plPercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                P/L: {formatPL(simulationResult.plPercent)}
-              </span>
-            </>
-          )}
-          {simulationResult?.error && (
-            <span className="text-amber-400 text-xs">{simulationResult.error}</span>
-          )}
-          {!simulationResult && (
-            <span className="text-slate-500 text-xs">Click refresh</span>
-          )}
-        </div>
+        <StepSlider
+          label="Overbought"
+          value={overboughtThreshold}
+          onChange={setOverboughtThreshold}
+          min={65}
+          max={95}
+          steps={thresholdSteps}
+          className="w-32"
+        />
 
-        <button
-          onClick={handleRefresh}
-          disabled={isSimulating}
-          className="ml-auto p-1.5 rounded bg-violet-600 hover:bg-violet-500 disabled:opacity-50 transition-colors"
-          title="Run simulation"
-        >
-          <RefreshCw size={14} className={`text-white ${isSimulating ? 'animate-spin' : ''}`} />
-        </button>
+        <StepSlider
+          label="Oversold"
+          value={oversoldThreshold}
+          onChange={setOversoldThreshold}
+          min={5}
+          max={35}
+          steps={thresholdSteps}
+          className="w-32"
+        />
       </div>
 
-      {/* Expanded controls */}
-      {isExpanded && (
-        <div className="p-3 space-y-3">
-          <StepSlider
-            label="RSI Period"
-            value={rsiPeriod}
-            onChange={setRsiPeriod}
-            min={9}
-            max={50}
-            steps={periodSteps}
-          />
+      {/* Refresh button */}
+      <button
+        onClick={handleRefresh}
+        disabled={isSimulating}
+        className="p-1.5 rounded bg-violet-600 hover:bg-violet-500 disabled:opacity-50 transition-colors"
+        title="Run simulation"
+      >
+        <RefreshCw size={14} className={`text-white ${isSimulating ? 'animate-spin' : ''}`} />
+      </button>
 
-          <StepSlider
-            label="Overbought"
-            value={overboughtThreshold}
-            onChange={setOverboughtThreshold}
-            min={65}
-            max={95}
-            steps={thresholdSteps}
-          />
-
-          <StepSlider
-            label="Oversold"
-            value={oversoldThreshold}
-            onChange={setOversoldThreshold}
-            min={5}
-            max={35}
-            steps={thresholdSteps}
-          />
-        </div>
-      )}
+      {/* Results */}
+      <div className="flex items-center gap-3 text-sm">
+        {simulationResult && !simulationResult.error && (
+          <>
+            <span className="text-slate-300">
+              Trades: <span className="font-medium text-white">{simulationResult.trades}</span>
+            </span>
+            <span className={`font-medium ${simulationResult.plPercent >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              P/L: {formatPL(simulationResult.plPercent)}
+            </span>
+          </>
+        )}
+        {simulationResult?.error && (
+          <span className="text-amber-400 text-xs">{simulationResult.error}</span>
+        )}
+        {!simulationResult && (
+          <span className="text-slate-500 text-xs">Click refresh to simulate</span>
+        )}
+      </div>
     </div>
   )
 }

@@ -143,64 +143,64 @@ function RSIChart({ indicators, prices, syncedMouseDate, setSyncedMouseDate, zoo
 
   return (
     <div ref={chartRef}>
-      <h4 className="text-md font-semibold mb-2 text-slate-200">RSI (Relative Strength Index)</h4>
-      <div className="relative">
-        {/* Strategy Panel - positioned top left of chart */}
+      {/* Title and controls in one row */}
+      <div className="flex items-center gap-4 mb-2 flex-wrap">
+        <h4 className="text-md font-semibold text-slate-200">RSI (Relative Strength Index)</h4>
         <RSIStrategyPanel
           priceData={priceData}
           zoomRange={zoomRange}
           onParametersChange={handleParametersChange}
           onSimulationResult={handleSimulationResult}
         />
-
-        <ResponsiveContainer width="100%" height={200}>
-          <LineChart
-            data={visibleChartData}
-            margin={{ top: 5, right: 30, left: isMobile ? 0 : 20, bottom: 5 }}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 12, fill: '#94a3b8' }}
-              interval={Math.floor(visibleChartData.length / 10)}
-              stroke="#475569"
-            />
-            <YAxis domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: isMobile ? 10 : 12 }} stroke="#475569" width={isMobile ? 40 : 60} />
-            <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', color: '#e2e8f0' }} />
-            <Legend wrapperStyle={{ color: '#94a3b8' }} />
-            <ReferenceLine
-              y={strategyParams.overbought}
-              stroke="#ef4444"
-              strokeDasharray="3 3"
-              label={{ value: `Overbought (${strategyParams.overbought})`, fill: '#94a3b8', fontSize: 11 }}
-            />
-            <ReferenceLine
-              y={strategyParams.oversold}
-              stroke="#10b981"
-              strokeDasharray="3 3"
-              label={{ value: `Oversold (${strategyParams.oversold})`, fill: '#94a3b8', fontSize: 11 }}
-            />
-            {syncedMouseDate && (
-              <ReferenceLine
-                x={syncedMouseDate}
-                stroke="#94a3b8"
-                strokeWidth={1}
-                strokeDasharray="3 3"
-              />
-            )}
-            <Line
-              type="monotone"
-              dataKey="rsi"
-              stroke="#8b5cf6"
-              strokeWidth={2}
-              dot={false}
-              name="RSI"
-            />
-          </LineChart>
-        </ResponsiveContainer>
       </div>
+
+      <ResponsiveContainer width="100%" height={200}>
+        <LineChart
+          data={visibleChartData}
+          margin={{ top: 5, right: 30, left: isMobile ? 0 : 20, bottom: 5 }}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+        >
+          <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
+          <XAxis
+            dataKey="date"
+            tick={{ fontSize: 12, fill: '#94a3b8' }}
+            interval={Math.floor(visibleChartData.length / 10)}
+            stroke="#475569"
+          />
+          <YAxis domain={[0, 100]} tick={{ fill: '#94a3b8', fontSize: isMobile ? 10 : 12 }} stroke="#475569" width={isMobile ? 40 : 60} />
+          <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569', color: '#e2e8f0' }} />
+          <Legend wrapperStyle={{ color: '#94a3b8' }} />
+          <ReferenceLine
+            y={strategyParams.overbought}
+            stroke="#ef4444"
+            strokeDasharray="3 3"
+            label={{ value: `Overbought (${strategyParams.overbought})`, fill: '#94a3b8', fontSize: 11 }}
+          />
+          <ReferenceLine
+            y={strategyParams.oversold}
+            stroke="#10b981"
+            strokeDasharray="3 3"
+            label={{ value: `Oversold (${strategyParams.oversold})`, fill: '#94a3b8', fontSize: 11 }}
+          />
+          {syncedMouseDate && (
+            <ReferenceLine
+              x={syncedMouseDate}
+              stroke="#94a3b8"
+              strokeWidth={1}
+              strokeDasharray="3 3"
+            />
+          )}
+          <Line
+            type="monotone"
+            dataKey="rsi"
+            stroke="#8b5cf6"
+            strokeWidth={2}
+            dot={false}
+            name="RSI"
+          />
+        </LineChart>
+      </ResponsiveContainer>
     </div>
   )
 }
