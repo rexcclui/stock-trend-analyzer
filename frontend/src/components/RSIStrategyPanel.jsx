@@ -58,7 +58,7 @@ function RSIStrategyPanel({ priceData, zoomRange, onParametersChange, onSimulati
     setTimeout(() => setIsSimulating(false), 300)
   }, [getVisiblePrices, runSimulation])
 
-  // Notify parent of parameter changes
+  // Notify parent of parameter changes and auto-trigger simulation
   useEffect(() => {
     if (onParametersChange) {
       onParametersChange({
@@ -67,7 +67,12 @@ function RSIStrategyPanel({ priceData, zoomRange, onParametersChange, onSimulati
         oversold: oversoldThreshold
       })
     }
-  }, [rsiPeriod, overboughtThreshold, oversoldThreshold, onParametersChange])
+    // Auto-trigger simulation when parameters change
+    const visiblePrices = getVisiblePrices()
+    if (visiblePrices.length > 0) {
+      runSimulation(visiblePrices)
+    }
+  }, [rsiPeriod, overboughtThreshold, oversoldThreshold, onParametersChange, getVisiblePrices, runSimulation])
 
   // Notify parent of simulation result changes
   useEffect(() => {
