@@ -3308,6 +3308,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                   <h3 className="text-lg font-semibold mb-4 text-slate-100">Technical Indicators</h3>
                   <IndicatorsChart
                     indicators={chart.data.indicators}
+                    prices={chart.data.prices}
                     showRSI={chart.showRSI}
                     showMACD={chart.showMACD}
                     syncedMouseDate={syncedMouseDate}
