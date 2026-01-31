@@ -88,7 +88,10 @@ function RSIStrategyPanel({ priceData, zoomRange, onParametersChange }) {
         </button>
 
         <div className="flex items-center gap-3 text-sm">
-          <span className="text-slate-400">RSI Strategy</span>
+          <span className="text-slate-400">RSI</span>
+          <span className="text-slate-500 text-xs">
+            ({rsiPeriod}/{oversoldThreshold}/{overboughtThreshold})
+          </span>
           {simulationResult && !simulationResult.error && (
             <>
               <span className="text-slate-300">
@@ -103,7 +106,7 @@ function RSIStrategyPanel({ priceData, zoomRange, onParametersChange }) {
             <span className="text-amber-400 text-xs">{simulationResult.error}</span>
           )}
           {!simulationResult && (
-            <span className="text-slate-500 text-xs">Click refresh to simulate</span>
+            <span className="text-slate-500 text-xs">Click refresh</span>
           )}
         </div>
 
