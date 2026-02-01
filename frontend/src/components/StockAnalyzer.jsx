@@ -180,7 +180,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
 
   // Track breakout threshold simulation state (chartId that is simulating)
   const [simulatingBreakoutThreshold, setSimulatingBreakoutThreshold] = useState({})
-  const [rsiSimulationResult, setRsiSimulationResult] = useState(null)
+  const [rsiSimulationResults, setRsiSimulationResults] = useState({})
 
   // Load stock history from localStorage on mount
   useEffect(() => {
@@ -2902,7 +2902,7 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                     zoomRange={globalZoomRange}
                     onZoomChange={updateGlobalZoom}
                     onExtendPeriod={extendTimePeriod}
-                    rsiSimulationResult={rsiSimulationResult}
+                    rsiSimulationResult={rsiSimulationResults[chart.id]}
                     chartId={chart.id}
                     simulatingSma={simulatingSma}
                     onSimulateComplete={(smaIndex, optimalValue) => {
@@ -3318,7 +3318,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                     zoomRange={globalZoomRange}
                     onZoomChange={updateGlobalZoom}
                     onExtendPeriod={extendTimePeriod}
-                    onRSISimulationResult={setRsiSimulationResult}
+                    chartId={chart.id}
+                    onRSISimulationResult={(result) => setRsiSimulationResults(prev => ({ ...prev, [chart.id]: result }))}
                   />
                 </div>
               )}
