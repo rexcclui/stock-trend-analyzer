@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Zap } from 'lucide-react'
 import StepSlider from './StepSlider'
 import { useRSIStrategy } from '../hooks/useRSIStrategy'
 
@@ -27,6 +27,8 @@ function RSIStrategyPanel({ priceData, zoomRange, onParametersChange, onSimulati
     setOversoldThreshold,
     simulationResult,
     runSimulation,
+    isOptimizing,
+    optimizeParameters,
   } = useRSIStrategy(priceData)
 
   // Step configurations for sliders
@@ -57,6 +59,12 @@ function RSIStrategyPanel({ priceData, zoomRange, onParametersChange, onSimulati
     runSimulation(visiblePrices)
     setTimeout(() => setIsSimulating(false), 300)
   }, [getVisiblePrices, runSimulation])
+
+  // Handle optimize button click - find best parameters
+  const handleOptimize = useCallback(() => {
+    const visiblePrices = getVisiblePrices()
+    optimizeParameters(visiblePrices, 2) // Minimum 2 trades per year
+  }, [getVisiblePrices, optimizeParameters])
 
   // Notify parent of parameter changes and auto-trigger simulation
   useEffect(() => {
@@ -125,11 +133,22 @@ function RSIStrategyPanel({ priceData, zoomRange, onParametersChange, onSimulati
       {/* Refresh button */}
       <button
         onClick={handleRefresh}
-        disabled={isSimulating}
+        disabled={isSimulating || isOptimizing}
         className="p-1.5 rounded bg-violet-600 hover:bg-violet-500 disabled:opacity-50 transition-colors"
         title="Run simulation"
       >
         <RefreshCw size={14} className={`text-white ${isSimulating ? 'animate-spin' : ''}`} />
+      </button>
+
+      {/* Optimize (Sim) button */}
+      <button
+        onClick={handleOptimize}
+        disabled={isOptimizing || isSimulating}
+        className="px-2 py-1 rounded bg-amber-600 hover:bg-amber-500 disabled:opacity-50 transition-colors text-xs font-medium text-white flex items-center gap-1"
+        title="Find optimal parameters (min 2 trades/year)"
+      >
+        <Zap size={12} className={isOptimizing ? 'animate-pulse' : ''} />
+        {isOptimizing ? 'Optimizing...' : 'Sim'}
       </button>
 
       {/* Results */}
@@ -148,7 +167,7 @@ function RSIStrategyPanel({ priceData, zoomRange, onParametersChange, onSimulati
           <span className="text-amber-400 text-xs">{simulationResult.error}</span>
         )}
         {!simulationResult && (
-          <span className="text-slate-500 text-xs">Click refresh to simulate</span>
+          <span className="text-slate-500 text-xs">Adjust sliders or click Sim</span>
         )}
       </div>
     </div>

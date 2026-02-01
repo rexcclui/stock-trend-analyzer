@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback } from 'react'
 
 /**
  * Custom hook for RSI-based buy/sell strategy simulation
@@ -18,6 +18,7 @@ export function useRSIStrategy(priceData, defaultPeriod = 14, defaultOverbought 
   const [oversoldThreshold, setOversoldThreshold] = useState(defaultOversold)
   const [simulationResult, setSimulationResult] = useState(null)
   const [lastSimulatedRange, setLastSimulatedRange] = useState(null)
+  const [isOptimizing, setIsOptimizing] = useState(false)
 
   // Calculate RSI for a given dataset
   const calculateRSI = useCallback((prices, period) => {
@@ -60,24 +61,16 @@ export function useRSIStrategy(priceData, defaultPeriod = 14, defaultOverbought 
     return rsiValues
   }, [])
 
-  // Run the strategy simulation
-  const runSimulation = useCallback((visiblePrices) => {
-    if (!visiblePrices || visiblePrices.length < rsiPeriod + 2) {
-      setSimulationResult({
-        trades: 0,
-        plPercent: 0,
-        buySignals: [],
-        sellSignals: [],
-        error: 'Insufficient data for simulation'
-      })
-      return
+  // Run simulation with specific parameters (used for optimization)
+  const runSimulationWithParams = useCallback((visiblePrices, period, overbought, oversold) => {
+    if (!visiblePrices || visiblePrices.length < period + 2) {
+      return null
     }
 
-    // Calculate RSI for the visible range
-    const rsiData = calculateRSI(visiblePrices, rsiPeriod)
+    const rsiData = calculateRSI(visiblePrices, period)
 
     const trades = []
-    let position = null // { buyPrice, buyDate, buyIndex }
+    let position = null
     let totalPL = 0
     const buySignals = []
     const sellSignals = []
@@ -89,7 +82,7 @@ export function useRSIStrategy(priceData, defaultPeriod = 14, defaultOverbought 
       if (current.rsi === null || previous.rsi === null) continue
 
       // BUY: RSI crosses above oversold threshold (no position)
-      if (!position && previous.rsi <= oversoldThreshold && current.rsi > oversoldThreshold) {
+      if (!position && previous.rsi <= oversold && current.rsi > oversold) {
         position = {
           buyPrice: current.close,
           buyDate: current.date,
@@ -97,8 +90,8 @@ export function useRSIStrategy(priceData, defaultPeriod = 14, defaultOverbought 
         }
         buySignals.push({ date: current.date, price: current.close, rsi: current.rsi })
       }
-      // SELL: RSI crosses above overbought threshold (has position) - take profit when overbought
-      else if (position && previous.rsi < overboughtThreshold && current.rsi >= overboughtThreshold) {
+      // SELL: RSI crosses above overbought threshold (has position)
+      else if (position && previous.rsi < overbought && current.rsi >= overbought) {
         const pl = ((current.close - position.buyPrice) / position.buyPrice) * 100
         totalPL += pl
         trades.push({
@@ -113,7 +106,7 @@ export function useRSIStrategy(priceData, defaultPeriod = 14, defaultOverbought 
       }
     }
 
-    // If still holding at end, close at last price for P/L calculation
+    // If still holding at end, close at last price
     if (position && rsiData.length > 0) {
       const lastData = rsiData[rsiData.length - 1]
       const pl = ((lastData.close - position.buyPrice) / position.buyPrice) * 100
@@ -128,7 +121,7 @@ export function useRSIStrategy(priceData, defaultPeriod = 14, defaultOverbought 
       })
     }
 
-    const result = {
+    return {
       trades: trades.length,
       plPercent: totalPL,
       buySignals,
@@ -136,14 +129,127 @@ export function useRSIStrategy(priceData, defaultPeriod = 14, defaultOverbought 
       tradeDetails: trades,
       rsiData
     }
+  }, [calculateRSI])
 
-    setSimulationResult(result)
-    setLastSimulatedRange(visiblePrices.length)
+  // Run the strategy simulation with current parameters
+  const runSimulation = useCallback((visiblePrices) => {
+    if (!visiblePrices || visiblePrices.length < rsiPeriod + 2) {
+      setSimulationResult({
+        trades: 0,
+        plPercent: 0,
+        buySignals: [],
+        sellSignals: [],
+        error: 'Insufficient data for simulation'
+      })
+      return
+    }
+
+    const result = runSimulationWithParams(visiblePrices, rsiPeriod, overboughtThreshold, oversoldThreshold)
+    if (result) {
+      setSimulationResult(result)
+      setLastSimulatedRange(visiblePrices.length)
+    }
 
     return result
-  }, [rsiPeriod, overboughtThreshold, oversoldThreshold, calculateRSI])
+  }, [rsiPeriod, overboughtThreshold, oversoldThreshold, runSimulationWithParams])
 
-  // Reset simulation (used when refresh is clicked)
+  // Generate all parameter combinations based on slider step rules
+  const generateParameterCombinations = useCallback(() => {
+    const combinations = []
+
+    // Period: 9-50, increment 1 below 14, 2 below 20, 4 below 50
+    const periods = []
+    for (let p = 9; p <= 50; ) {
+      periods.push(p)
+      if (p < 14) p += 1
+      else if (p < 20) p += 2
+      else p += 4
+    }
+
+    // Overbought: 65-95, increment 3
+    const overboughts = []
+    for (let o = 65; o <= 95; o += 3) {
+      overboughts.push(o)
+    }
+
+    // Oversold: 5-35, increment 3
+    const oversolds = []
+    for (let o = 5; o <= 35; o += 3) {
+      oversolds.push(o)
+    }
+
+    // Generate all combinations
+    for (const period of periods) {
+      for (const overbought of overboughts) {
+        for (const oversold of oversolds) {
+          // Only valid if oversold < overbought
+          if (oversold < overbought) {
+            combinations.push({ period, overbought, oversold })
+          }
+        }
+      }
+    }
+
+    return combinations
+  }, [])
+
+  // Optimize parameters to find best P/L with minimum trades per year
+  const optimizeParameters = useCallback((visiblePrices, minTradesPerYear = 2) => {
+    if (!visiblePrices || visiblePrices.length < 10) {
+      return null
+    }
+
+    setIsOptimizing(true)
+
+    // Calculate the time span in years
+    const firstDate = new Date(visiblePrices[0].date)
+    const lastDate = new Date(visiblePrices[visiblePrices.length - 1].date)
+    const yearSpan = (lastDate - firstDate) / (365.25 * 24 * 60 * 60 * 1000)
+
+    const combinations = generateParameterCombinations()
+    let bestResult = null
+    let bestParams = null
+    let bestPL = -Infinity
+
+    for (const { period, overbought, oversold } of combinations) {
+      const result = runSimulationWithParams(visiblePrices, period, overbought, oversold)
+
+      if (!result) continue
+
+      // Calculate trades per year
+      const tradesPerYear = yearSpan > 0 ? result.trades / yearSpan : result.trades
+
+      // Skip if not enough trades per year
+      if (tradesPerYear < minTradesPerYear) continue
+
+      // Check if this is the best P/L so far
+      if (result.plPercent > bestPL) {
+        bestPL = result.plPercent
+        bestResult = result
+        bestParams = { period, overbought, oversold }
+      }
+    }
+
+    setIsOptimizing(false)
+
+    if (bestParams) {
+      // Update the parameters to optimal values
+      setRsiPeriod(bestParams.period)
+      setOverboughtThreshold(bestParams.overbought)
+      setOversoldThreshold(bestParams.oversold)
+      setSimulationResult(bestResult)
+      setLastSimulatedRange(visiblePrices.length)
+
+      return {
+        params: bestParams,
+        result: bestResult
+      }
+    }
+
+    return null
+  }, [generateParameterCombinations, runSimulationWithParams])
+
+  // Reset simulation
   const resetSimulation = useCallback(() => {
     setSimulationResult(null)
     setLastSimulatedRange(null)
@@ -163,6 +269,10 @@ export function useRSIStrategy(priceData, defaultPeriod = 14, defaultOverbought 
     runSimulation,
     resetSimulation,
     lastSimulatedRange,
+
+    // Optimization
+    isOptimizing,
+    optimizeParameters,
 
     // Utility
     calculateRSI
