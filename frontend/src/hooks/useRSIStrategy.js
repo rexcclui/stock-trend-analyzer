@@ -61,6 +61,9 @@ export function useRSIStrategy(priceData, defaultPeriod = 14, defaultOverbought 
     return rsiValues
   }, [])
 
+  // Transaction cost per trade (buy or sell)
+  const TRANSACTION_COST_PERCENT = 0.15
+
   // Run simulation with specific parameters (used for optimization)
   const runSimulationWithParams = useCallback((visiblePrices, period, overbought, oversold) => {
     if (!visiblePrices || visiblePrices.length < period + 2) {
@@ -74,6 +77,8 @@ export function useRSIStrategy(priceData, defaultPeriod = 14, defaultOverbought 
     let totalPL = 0
     const buySignals = []
     const sellSignals = []
+    // Total cost per round trip (buy + sell)
+    const roundTripCost = TRANSACTION_COST_PERCENT * 2
 
     for (let i = 1; i < rsiData.length; i++) {
       const current = rsiData[i]
@@ -92,7 +97,8 @@ export function useRSIStrategy(priceData, defaultPeriod = 14, defaultOverbought 
       }
       // SELL: RSI drops below overbought threshold (was overbought, now dropping)
       else if (position && previous.rsi >= overbought && current.rsi < overbought) {
-        const pl = ((current.close - position.buyPrice) / position.buyPrice) * 100
+        const grossPL = ((current.close - position.buyPrice) / position.buyPrice) * 100
+        const pl = grossPL - roundTripCost // Deduct transaction costs (buy + sell)
         totalPL += pl
         trades.push({
           buyDate: position.buyDate,
@@ -109,7 +115,9 @@ export function useRSIStrategy(priceData, defaultPeriod = 14, defaultOverbought 
     // If still holding at end, close at last price
     if (position && rsiData.length > 0) {
       const lastData = rsiData[rsiData.length - 1]
-      const pl = ((lastData.close - position.buyPrice) / position.buyPrice) * 100
+      const grossPL = ((lastData.close - position.buyPrice) / position.buyPrice) * 100
+      // Only charge buy cost for open positions (sell hasn't happened yet)
+      const pl = grossPL - TRANSACTION_COST_PERCENT
       totalPL += pl
       trades.push({
         buyDate: position.buyDate,
