@@ -3216,26 +3216,27 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   })()
 
   // Helper function to get color for vs SPY vol change
-  // Yellow at 0, Cyan/Blue when positive (increasing), Magenta/Red when negative (decreasing)
+  // Green at ±10%, Blue when positive (increasing), Red when negative (decreasing)
   const getVsSpyVolColor = (change, maxAbsChange) => {
-    if (change === null || maxAbsChange === 0) return null
+    if (change === null) return null
 
-    // Normalize change to -1 to 1 range
-    const normalizedChange = Math.max(-1, Math.min(1, change / (maxAbsChange || 1)))
+    // Use actual percentage change for green zone (±10%)
+    if (Math.abs(change) <= 10) {
+      // Within ±10% - green
+      return '#22c55e' // green-500
+    } else if (change > 0) {
+      // Positive (increasing) - interpolate from green to cyan to blue
+      // Map 10% to 0 intensity, maxAbsChange to 1 intensity
+      const range = Math.max(maxAbsChange - 10, 1)
+      const intensity = Math.min(1, (change - 10) / range)
 
-    if (Math.abs(normalizedChange) < 0.08) {
-      // Near zero - bright yellow
-      return '#facc15' // yellow-400
-    } else if (normalizedChange > 0) {
-      // Positive (increasing) - interpolate from yellow to cyan/blue
-      const intensity = Math.min(1, normalizedChange * 1.5) // Faster transition
-      // Yellow (#facc15) -> Cyan (#06b6d4) -> Blue (#3b82f6)
+      // Green (#22c55e) -> Cyan (#06b6d4) -> Blue (#3b82f6)
       if (intensity < 0.5) {
-        // Yellow to Cyan
+        // Green to Cyan
         const t = intensity * 2
-        const r = Math.round(250 * (1 - t) + 6 * t)
-        const g = Math.round(204 * (1 - t) + 182 * t)
-        const b = Math.round(21 * (1 - t) + 212 * t)
+        const r = Math.round(34 * (1 - t) + 6 * t)
+        const g = Math.round(197 * (1 - t) + 182 * t)
+        const b = Math.round(94 * (1 - t) + 212 * t)
         return `rgb(${r}, ${g}, ${b})`
       } else {
         // Cyan to Blue
@@ -3246,15 +3247,18 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
         return `rgb(${r}, ${g}, ${b})`
       }
     } else {
-      // Negative (decreasing) - interpolate from yellow to orange/red
-      const intensity = Math.min(1, Math.abs(normalizedChange) * 1.5) // Faster transition
-      // Yellow (#facc15) -> Orange (#f97316) -> Red (#dc2626)
+      // Negative (decreasing) - interpolate from green to orange to red
+      // Map -10% to 0 intensity, -maxAbsChange to 1 intensity
+      const range = Math.max(maxAbsChange - 10, 1)
+      const intensity = Math.min(1, (Math.abs(change) - 10) / range)
+
+      // Green (#22c55e) -> Orange (#f97316) -> Red (#dc2626)
       if (intensity < 0.5) {
-        // Yellow to Orange
+        // Green to Orange
         const t = intensity * 2
-        const r = Math.round(250 * (1 - t) + 249 * t)
-        const g = Math.round(204 * (1 - t) + 115 * t)
-        const b = Math.round(21 * (1 - t) + 22 * t)
+        const r = Math.round(34 * (1 - t) + 249 * t)
+        const g = Math.round(197 * (1 - t) + 115 * t)
+        const b = Math.round(94 * (1 - t) + 22 * t)
         return `rgb(${r}, ${g}, ${b})`
       } else {
         // Orange to Red

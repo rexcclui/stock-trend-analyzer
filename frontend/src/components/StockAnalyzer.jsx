@@ -2245,27 +2245,38 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                           Vs SPY vol
                         </button>
                         {chart.vsSpyVolEnabled && (
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="range"
-                              min="5"
-                              max="100"
-                              value={chart.vsSpyVolBackDays}
-                              onChange={(e) => {
-                                const value = parseInt(e.target.value)
-                                setCharts(prevCharts =>
-                                  prevCharts.map(c =>
-                                    c.id === chart.id
-                                      ? { ...c, vsSpyVolBackDays: value }
-                                      : c
+                          <>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="range"
+                                min="5"
+                                max="100"
+                                value={chart.vsSpyVolBackDays}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value)
+                                  setCharts(prevCharts =>
+                                    prevCharts.map(c =>
+                                      c.id === chart.id
+                                        ? { ...c, vsSpyVolBackDays: value }
+                                        : c
+                                    )
                                   )
-                                )
-                              }}
-                              className="w-20 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                              title="Control back days for comparison"
-                            />
-                            <span className="text-xs text-slate-300 w-8 text-right">{chart.vsSpyVolBackDays}d</span>
-                          </div>
+                                }}
+                                className="w-20 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                                title="Control back days for comparison"
+                              />
+                              <span className="text-xs text-slate-300 w-8 text-right">{chart.vsSpyVolBackDays}d</span>
+                            </div>
+                            {/* Color Legend */}
+                            <div className="flex items-center gap-1 ml-2 px-2 py-1 bg-slate-700/50 rounded text-xs">
+                              <span className="text-slate-400">Vol:</span>
+                              <span className="px-1 rounded" style={{ backgroundColor: '#dc2626', color: 'white' }}>↓</span>
+                              <span className="px-1 rounded" style={{ backgroundColor: '#f97316', color: 'white' }}>-</span>
+                              <span className="px-1 rounded" style={{ backgroundColor: '#22c55e', color: 'white' }}>±10%</span>
+                              <span className="px-1 rounded" style={{ backgroundColor: '#06b6d4', color: 'white' }}>+</span>
+                              <span className="px-1 rounded" style={{ backgroundColor: '#3b82f6', color: 'white' }}>↑</span>
+                            </div>
+                          </>
                         )}
                       </div>
                       <div className="flex gap-1 items-center">
