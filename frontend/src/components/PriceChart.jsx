@@ -3216,30 +3216,54 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
   })()
 
   // Helper function to get color for vs SPY vol change
-  // Green at 0, Blue when positive (increasing), Red when negative (decreasing)
+  // Yellow at 0, Cyan/Blue when positive (increasing), Magenta/Red when negative (decreasing)
   const getVsSpyVolColor = (change, maxAbsChange) => {
     if (change === null || maxAbsChange === 0) return null
 
     // Normalize change to -1 to 1 range
     const normalizedChange = Math.max(-1, Math.min(1, change / (maxAbsChange || 1)))
 
-    if (Math.abs(normalizedChange) < 0.05) {
-      // Near zero - green
-      return '#22c55e' // green-500
+    if (Math.abs(normalizedChange) < 0.08) {
+      // Near zero - bright yellow
+      return '#facc15' // yellow-400
     } else if (normalizedChange > 0) {
-      // Positive (increasing) - interpolate from green to blue
-      const intensity = normalizedChange
-      const r = Math.round(34 * (1 - intensity)) // from green (34) to blue (59)
-      const g = Math.round(197 * (1 - intensity) + 130 * intensity) // from green (197) to blue (130)
-      const b = Math.round(94 * (1 - intensity) + 246 * intensity) // from green (94) to blue (246)
-      return `rgb(${r}, ${g}, ${b})`
+      // Positive (increasing) - interpolate from yellow to cyan/blue
+      const intensity = Math.min(1, normalizedChange * 1.5) // Faster transition
+      // Yellow (#facc15) -> Cyan (#06b6d4) -> Blue (#3b82f6)
+      if (intensity < 0.5) {
+        // Yellow to Cyan
+        const t = intensity * 2
+        const r = Math.round(250 * (1 - t) + 6 * t)
+        const g = Math.round(204 * (1 - t) + 182 * t)
+        const b = Math.round(21 * (1 - t) + 212 * t)
+        return `rgb(${r}, ${g}, ${b})`
+      } else {
+        // Cyan to Blue
+        const t = (intensity - 0.5) * 2
+        const r = Math.round(6 * (1 - t) + 59 * t)
+        const g = Math.round(182 * (1 - t) + 130 * t)
+        const b = Math.round(212 * (1 - t) + 246 * t)
+        return `rgb(${r}, ${g}, ${b})`
+      }
     } else {
-      // Negative (decreasing) - interpolate from green to red
-      const intensity = Math.abs(normalizedChange)
-      const r = Math.round(34 * (1 - intensity) + 239 * intensity) // from green (34) to red (239)
-      const g = Math.round(197 * (1 - intensity) + 68 * intensity) // from green (197) to red (68)
-      const b = Math.round(94 * (1 - intensity) + 68 * intensity) // from green (94) to red (68)
-      return `rgb(${r}, ${g}, ${b})`
+      // Negative (decreasing) - interpolate from yellow to orange/red
+      const intensity = Math.min(1, Math.abs(normalizedChange) * 1.5) // Faster transition
+      // Yellow (#facc15) -> Orange (#f97316) -> Red (#dc2626)
+      if (intensity < 0.5) {
+        // Yellow to Orange
+        const t = intensity * 2
+        const r = Math.round(250 * (1 - t) + 249 * t)
+        const g = Math.round(204 * (1 - t) + 115 * t)
+        const b = Math.round(21 * (1 - t) + 22 * t)
+        return `rgb(${r}, ${g}, ${b})`
+      } else {
+        // Orange to Red
+        const t = (intensity - 0.5) * 2
+        const r = Math.round(249 * (1 - t) + 220 * t)
+        const g = Math.round(115 * (1 - t) + 38 * t)
+        const b = Math.round(22 * (1 - t) + 38 * t)
+        return `rgb(${r}, ${g}, ${b})`
+      }
     }
   }
 
