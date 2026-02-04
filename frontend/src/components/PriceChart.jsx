@@ -3217,7 +3217,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Helper function to get color for vs SPY vol change
   // Green at ±10%, Blue when positive (increasing), Red when negative (decreasing)
-  // Uses fixed scale: 10-30% = transition, 30%+ = full color
+  // Scale: ±10% green, 10-30% transition, 30-50% full color, 50%+ deep color
   const getVsSpyVolColor = (change) => {
     if (change === null) return null
 
@@ -3228,44 +3228,52 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       return '#22c55e' // green-500
     }
 
-    // Calculate intensity based on fixed scale:
-    // 10% = 0 intensity, 30% = 0.5 intensity (cyan/orange), 50%+ = 1.0 intensity (blue/red)
-    const intensity = Math.min(1, (absChange - 10) / 40)
-
     if (change > 0) {
-      // Positive (increasing) - interpolate from green to cyan to blue
-      // Green (#22c55e) -> Cyan (#06b6d4) -> Blue (#3b82f6)
-      if (intensity < 0.5) {
-        // Green to Cyan
-        const t = intensity * 2
+      // Positive (increasing)
+      if (absChange <= 30) {
+        // 10-30%: Green (#22c55e) -> Cyan (#06b6d4)
+        const t = (absChange - 10) / 20
         const r = Math.round(34 * (1 - t) + 6 * t)
         const g = Math.round(197 * (1 - t) + 182 * t)
         const b = Math.round(94 * (1 - t) + 212 * t)
         return `rgb(${r}, ${g}, ${b})`
-      } else {
-        // Cyan to Blue
-        const t = (intensity - 0.5) * 2
+      } else if (absChange <= 50) {
+        // 30-50%: Cyan (#06b6d4) -> Blue (#3b82f6)
+        const t = (absChange - 30) / 20
         const r = Math.round(6 * (1 - t) + 59 * t)
         const g = Math.round(182 * (1 - t) + 130 * t)
         const b = Math.round(212 * (1 - t) + 246 * t)
         return `rgb(${r}, ${g}, ${b})`
+      } else {
+        // 50-100%+: Blue (#3b82f6) -> Deep Blue (#1e3a8a)
+        const t = Math.min(1, (absChange - 50) / 50)
+        const r = Math.round(59 * (1 - t) + 30 * t)
+        const g = Math.round(130 * (1 - t) + 58 * t)
+        const b = Math.round(246 * (1 - t) + 138 * t)
+        return `rgb(${r}, ${g}, ${b})`
       }
     } else {
-      // Negative (decreasing) - interpolate from green to orange to red
-      // Green (#22c55e) -> Orange (#f97316) -> Red (#dc2626)
-      if (intensity < 0.5) {
-        // Green to Orange
-        const t = intensity * 2
+      // Negative (decreasing)
+      if (absChange <= 30) {
+        // 10-30%: Green (#22c55e) -> Orange (#f97316)
+        const t = (absChange - 10) / 20
         const r = Math.round(34 * (1 - t) + 249 * t)
         const g = Math.round(197 * (1 - t) + 115 * t)
         const b = Math.round(94 * (1 - t) + 22 * t)
         return `rgb(${r}, ${g}, ${b})`
-      } else {
-        // Orange to Red
-        const t = (intensity - 0.5) * 2
+      } else if (absChange <= 50) {
+        // 30-50%: Orange (#f97316) -> Red (#dc2626)
+        const t = (absChange - 30) / 20
         const r = Math.round(249 * (1 - t) + 220 * t)
         const g = Math.round(115 * (1 - t) + 38 * t)
         const b = Math.round(22 * (1 - t) + 38 * t)
+        return `rgb(${r}, ${g}, ${b})`
+      } else {
+        // 50%+: Red (#dc2626) -> Deep Red (#7f1d1d)
+        const t = Math.min(1, (absChange - 50) / 50)
+        const r = Math.round(220 * (1 - t) + 127 * t)
+        const g = Math.round(38 * (1 - t) + 29 * t)
+        const b = Math.round(38 * (1 - t) + 29 * t)
         return `rgb(${r}, ${g}, ${b})`
       }
     }
