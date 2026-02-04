@@ -3217,19 +3217,23 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
   // Helper function to get color for vs SPY vol change
   // Green at ±10%, Blue when positive (increasing), Red when negative (decreasing)
-  const getVsSpyVolColor = (change, maxAbsChange) => {
+  // Uses fixed scale: 10-30% = transition, 30%+ = full color
+  const getVsSpyVolColor = (change) => {
     if (change === null) return null
 
-    // Use actual percentage change for green zone (±10%)
-    if (Math.abs(change) <= 10) {
-      // Within ±10% - green
-      return '#22c55e' // green-500
-    } else if (change > 0) {
-      // Positive (increasing) - interpolate from green to cyan to blue
-      // Map 10% to 0 intensity, maxAbsChange to 1 intensity
-      const range = Math.max(maxAbsChange - 10, 1)
-      const intensity = Math.min(1, (change - 10) / range)
+    const absChange = Math.abs(change)
 
+    // Within ±10% - green
+    if (absChange <= 10) {
+      return '#22c55e' // green-500
+    }
+
+    // Calculate intensity based on fixed scale:
+    // 10% = 0 intensity, 30% = 0.5 intensity (cyan/orange), 50%+ = 1.0 intensity (blue/red)
+    const intensity = Math.min(1, (absChange - 10) / 40)
+
+    if (change > 0) {
+      // Positive (increasing) - interpolate from green to cyan to blue
       // Green (#22c55e) -> Cyan (#06b6d4) -> Blue (#3b82f6)
       if (intensity < 0.5) {
         // Green to Cyan
@@ -3248,10 +3252,6 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       }
     } else {
       // Negative (decreasing) - interpolate from green to orange to red
-      // Map -10% to 0 intensity, -maxAbsChange to 1 intensity
-      const range = Math.max(maxAbsChange - 10, 1)
-      const intensity = Math.min(1, (Math.abs(change) - 10) / range)
-
       // Green (#22c55e) -> Orange (#f97316) -> Red (#dc2626)
       if (intensity < 0.5) {
         // Green to Orange
@@ -3329,7 +3329,7 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
 
     // Get vs SPY vol data
     const vsSpyVolChange = vsSpyVolData.changes[index]
-    const vsSpyVolColor = vsSpyVolEnabled ? getVsSpyVolColor(vsSpyVolChange, vsSpyVolData.maxAbsChange) : null
+    const vsSpyVolColor = vsSpyVolEnabled ? getVsSpyVolColor(vsSpyVolChange) : null
 
     const dataPoint = {
       date: price.date,
