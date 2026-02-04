@@ -340,6 +340,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
             resLnEnabled: false,
             resLnRange: 100,
             resLnRefreshTrigger: 0,
+            vsSpyVolEnabled: false,
+            vsSpyVolBackDays: 30,
             collapsed: false
           }
           newCharts.push(newChart)
@@ -1751,6 +1753,60 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
     }
   }
 
+  const toggleVsSpyVol = async (chartId) => {
+    const chart = charts.find(c => c.id === chartId)
+    if (!chart) return
+
+    const newState = !chart.vsSpyVolEnabled
+
+    // Toggle the enabled state
+    setCharts(prevCharts =>
+      prevCharts.map(c => {
+        if (c.id === chartId) {
+          return {
+            ...c,
+            vsSpyVolEnabled: newState
+          }
+        }
+        return c
+      })
+    )
+
+    // If enabling and we don't have SPY data, fetch it
+    if (newState && !chart.spyData) {
+      try {
+        // Check cache first
+        let spyData = apiCache.get('SPY', days)
+
+        if (!spyData) {
+          const response = await axios.get(joinUrl(API_URL, '/analyze'), {
+            params: {
+              symbol: 'SPY',
+              days: days
+            }
+          })
+          spyData = response.data
+          apiCache.set('SPY', days, spyData)
+        }
+
+        setCharts(prevCharts =>
+          prevCharts.map(c => {
+            if (c.id === chartId) {
+              return {
+                ...c,
+                spyData: spyData
+              }
+            }
+            return c
+          })
+        )
+      } catch (err) {
+        console.error('Failed to fetch SPY data:', err)
+        setError('Failed to fetch SPY data for volume comparison')
+      }
+    }
+  }
+
   const addComparisonStock = async (chartId, symbol) => {
     const chart = charts.find(c => c.id === chartId)
     if (!chart) return
@@ -1858,8 +1914,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
       const displayDays = newDays
       const fetchDays = getFetchPeriod(newDays)
 
-      // Check if any chart needs SPY data (for volume comparison, performance comparison, or mkt gap open)
-      const needsSpy = charts.some(chart => chart.volumeColorMode === 'relative-spy' || chart.performanceComparisonEnabled || chart.mktGapOpenEnabled)
+      // Check if any chart needs SPY data (for volume comparison, performance comparison, mkt gap open, or vs SPY vol)
+      const needsSpy = charts.some(chart => chart.volumeColorMode === 'relative-spy' || chart.performanceComparisonEnabled || chart.mktGapOpenEnabled || chart.vsSpyVolEnabled)
       let spyDataForPeriod = null
 
       if (needsSpy) {
@@ -1907,8 +1963,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
           const updatedData = results.find(r => r.id === chart.id)
           const updates = { data: updatedData.data }
 
-          // Update SPY data if chart is in relative-spy mode, performance comparison mode, or mkt gap open mode
-          if ((chart.volumeColorMode === 'relative-spy' || chart.performanceComparisonEnabled || chart.mktGapOpenEnabled) && spyDataForPeriod) {
+          // Update SPY data if chart is in relative-spy mode, performance comparison mode, mkt gap open mode, or vs SPY vol mode
+          if ((chart.volumeColorMode === 'relative-spy' || chart.performanceComparisonEnabled || chart.mktGapOpenEnabled || chart.vsSpyVolEnabled) && spyDataForPeriod) {
             updates.spyData = spyDataForPeriod
           }
 
@@ -2174,6 +2230,42 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                           >
                             {chart.volumeColorMode === 'absolute' ? 'ABS' : 'vs SPY'}
                           </button>
+                        )}
+                      </div>
+                      <div className="flex gap-1 items-center">
+                        <button
+                          type="button"
+                          onClick={() => toggleVsSpyVol(chart.id)}
+                          className={`px-3 py-1 text-sm rounded font-medium transition-colors ${chart.vsSpyVolEnabled
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            }`}
+                          title="Show volume ratio relative to SPY (5-day MA) compared to historical value"
+                        >
+                          Vs SPY vol
+                        </button>
+                        {chart.vsSpyVolEnabled && (
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="range"
+                              min="5"
+                              max="100"
+                              value={chart.vsSpyVolBackDays}
+                              onChange={(e) => {
+                                const value = parseInt(e.target.value)
+                                setCharts(prevCharts =>
+                                  prevCharts.map(c =>
+                                    c.id === chart.id
+                                      ? { ...c, vsSpyVolBackDays: value }
+                                      : c
+                                  )
+                                )
+                              }}
+                              className="w-20 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                              title="Control back days for comparison"
+                            />
+                            <span className="text-xs text-slate-300 w-8 text-right">{chart.vsSpyVolBackDays}d</span>
+                          </div>
                         )}
                       </div>
                       <div className="flex gap-1 items-center">
@@ -2897,6 +2989,8 @@ function StockAnalyzer({ selectedSymbol, selectedParams }) {
                     resLnEnabled={chart.resLnEnabled}
                     resLnRange={chart.resLnRange}
                     resLnRefreshTrigger={chart.resLnRefreshTrigger}
+                    vsSpyVolEnabled={chart.vsSpyVolEnabled}
+                    vsSpyVolBackDays={chart.vsSpyVolBackDays}
                     chartHeight={chartHeight}
                     days={days}
                     zoomRange={globalZoomRange}

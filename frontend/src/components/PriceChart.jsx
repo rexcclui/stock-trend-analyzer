@@ -28,7 +28,7 @@ import { getVolumeColor } from './PriceChart/utils'
 import { calculateVolumeProfileV3WithSells } from './PriceChart/utils/volumeProfileV3Utils'
 import { calculateVolPrfV2Breakouts } from './PriceChart/utils/volumeProfileV2Utils'
 
-function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, smaChannelUpperPercent = {}, smaChannelLowerPercent = {}, smaChannelUpperEnabled = {}, smaChannelLowerEnabled = {}, smaOptimalTouches = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, volumeProfileV2BreakoutThreshold = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RegressionThreshold = 6, volumeProfileV3RefreshTrigger = 0, onVolumeProfileV3RegressionThresholdChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, linearRegressionEnabled = false, linearRegressionSelections = [], onAddLinearRegressionSelection, onClearLinearRegressionSelections, onRemoveLinearRegressionSelection, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete, simulatingBreakoutThreshold = false, onBreakoutThresholdSimulateComplete, rsiSimulationResult = null }) {
+function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMouseDate, smaPeriods = [], smaVisibility = {}, smaChannelUpperPercent = {}, smaChannelLowerPercent = {}, smaChannelUpperEnabled = {}, smaChannelLowerEnabled = {}, smaOptimalTouches = {}, onToggleSma, onDeleteSma, volumeColorEnabled = false, volumeColorMode = 'absolute', volumeProfileEnabled = false, volumeProfileMode = 'auto', volumeProfileManualRanges = [], onVolumeProfileManualRangeChange, onVolumeProfileRangeRemove, volumeProfileV2Enabled = false, volumeProfileV2StartDate = null, volumeProfileV2EndDate = null, volumeProfileV2RefreshTrigger = 0, volumeProfileV2Params = null, volumeProfileV2BreakoutThreshold = null, onVolumeProfileV2StartChange, onVolumeProfileV2EndChange, volumeProfileV3Enabled = false, volumeProfileV3RegressionThreshold = 6, volumeProfileV3RefreshTrigger = 0, onVolumeProfileV3RegressionThresholdChange, spyData = null, performanceComparisonEnabled = false, performanceComparisonBenchmark = 'SPY', performanceComparisonDays = 30, comparisonMode = 'line', comparisonStocks = [], slopeChannelEnabled = false, slopeChannelVolumeWeighted = false, slopeChannelZones = 8, slopeChannelDataPercent = 30, slopeChannelWidthMultiplier = 2.5, onSlopeChannelParamsChange, revAllChannelEnabled = false, revAllChannelEndIndex = null, onRevAllChannelEndChange, revAllChannelRefreshTrigger = 0, revAllChannelVolumeFilterEnabled = false, manualChannelEnabled = false, manualChannelDragMode = false, zoomMode = false, linearRegressionEnabled = false, linearRegressionSelections = [], onAddLinearRegressionSelection, onClearLinearRegressionSelections, onRemoveLinearRegressionSelection, bestChannelEnabled = false, bestChannelVolumeFilterEnabled = false, bestStdevEnabled = false, bestStdevVolumeFilterEnabled = false, bestStdevRefreshTrigger = 0, mktGapOpenEnabled = false, mktGapOpenCount = 5, mktGapOpenRefreshTrigger = 0, loadingMktGap = false, resLnEnabled = false, resLnRange = 100, resLnRefreshTrigger = 0, chartHeight = 400, days = '365', zoomRange = { start: 0, end: null }, onZoomChange, onExtendPeriod, chartId, simulatingSma = {}, onSimulateComplete, simulatingBreakoutThreshold = false, onBreakoutThresholdSimulateComplete, rsiSimulationResult = null, vsSpyVolEnabled = false, vsSpyVolBackDays = 30 }) {
   const chartContainerRef = useRef(null)
   const [controlsVisible, setControlsVisible] = useState(false)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
@@ -3135,6 +3135,114 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
     }
   })()
 
+  // Calculate Vol Relative to SPY with 5-period SMA
+  const vsSpyVolData = (() => {
+    if (!vsSpyVolEnabled || !spyData || !spyData.prices) return { ratios: [], changes: [], maxAbsChange: 0 }
+
+    const smaPeriod = 5
+
+    // Build SPY volume map by date
+    const spyVolumeByDate = {}
+    spyData.prices.forEach(p => {
+      spyVolumeByDate[p.date] = p.volume || 0
+    })
+
+    // Calculate 5-period SMA of volumes for each date
+    // Data is in reverse chronological order (newest first)
+    const stockVolSMA = []
+    const spyVolSMA = []
+
+    for (let i = 0; i < displayPrices.length; i++) {
+      // For SMA, we need to look at indices i to i+(smaPeriod-1) (which are older dates)
+      if (i + smaPeriod - 1 >= displayPrices.length) {
+        stockVolSMA[i] = null
+        spyVolSMA[i] = null
+        continue
+      }
+
+      let stockSum = 0
+      let spySum = 0
+      let validCount = 0
+
+      for (let j = 0; j < smaPeriod; j++) {
+        const point = displayPrices[i + j]
+        const spyVol = spyVolumeByDate[point.date]
+        if (point.volume && spyVol) {
+          stockSum += point.volume
+          spySum += spyVol
+          validCount++
+        }
+      }
+
+      if (validCount === smaPeriod && spySum > 0) {
+        stockVolSMA[i] = stockSum / smaPeriod
+        spyVolSMA[i] = spySum / smaPeriod
+      } else {
+        stockVolSMA[i] = null
+        spyVolSMA[i] = null
+      }
+    }
+
+    // Calculate ratios (stock vol SMA / SPY vol SMA)
+    const ratios = []
+    for (let i = 0; i < displayPrices.length; i++) {
+      if (stockVolSMA[i] !== null && spyVolSMA[i] !== null && spyVolSMA[i] > 0) {
+        ratios[i] = stockVolSMA[i] / spyVolSMA[i]
+      } else {
+        ratios[i] = null
+      }
+    }
+
+    // Calculate change from vsSpyVolBackDays ago
+    // In reverse chronological order, index 0 is newest, so we compare to index + backDays
+    const changes = []
+    let maxAbsChange = 0
+
+    for (let i = 0; i < displayPrices.length; i++) {
+      const backIndex = i + vsSpyVolBackDays
+      if (ratios[i] !== null && backIndex < ratios.length && ratios[backIndex] !== null && ratios[backIndex] !== 0) {
+        // Calculate percentage change from back days ago
+        const change = ((ratios[i] - ratios[backIndex]) / ratios[backIndex]) * 100
+        changes[i] = change
+        if (Math.abs(change) > maxAbsChange) {
+          maxAbsChange = Math.abs(change)
+        }
+      } else {
+        changes[i] = null
+      }
+    }
+
+    return { ratios, changes, maxAbsChange }
+  })()
+
+  // Helper function to get color for vs SPY vol change
+  // Green at 0, Blue when positive (increasing), Red when negative (decreasing)
+  const getVsSpyVolColor = (change, maxAbsChange) => {
+    if (change === null || maxAbsChange === 0) return null
+
+    // Normalize change to -1 to 1 range
+    const normalizedChange = Math.max(-1, Math.min(1, change / (maxAbsChange || 1)))
+
+    if (Math.abs(normalizedChange) < 0.05) {
+      // Near zero - green
+      return '#22c55e' // green-500
+    } else if (normalizedChange > 0) {
+      // Positive (increasing) - interpolate from green to blue
+      const intensity = normalizedChange
+      const r = Math.round(34 * (1 - intensity)) // from green (34) to blue (59)
+      const g = Math.round(197 * (1 - intensity) + 130 * intensity) // from green (197) to blue (130)
+      const b = Math.round(94 * (1 - intensity) + 246 * intensity) // from green (94) to blue (246)
+      return `rgb(${r}, ${g}, ${b})`
+    } else {
+      // Negative (decreasing) - interpolate from green to red
+      const intensity = Math.abs(normalizedChange)
+      const r = Math.round(34 * (1 - intensity) + 239 * intensity) // from green (34) to red (239)
+      const g = Math.round(197 * (1 - intensity) + 68 * intensity) // from green (197) to red (68)
+      const b = Math.round(94 * (1 - intensity) + 68 * intensity) // from green (94) to red (68)
+      return `rgb(${r}, ${g}, ${b})`
+    }
+  }
+
   const slopeChannelInfo = slopeChannelEnabled ? calculateSlopeChannel(displayPrices, true, slopeChannelVolumeWeighted) : null
   const zoneColors = slopeChannelEnabled && slopeChannelInfo
     ? calculateZoneColors(displayPrices, slopeChannelInfo, slopeChannelZones)
@@ -3191,6 +3299,10 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       isBottomPerformance = variance <= performanceVarianceThresholds.bottom20
     }
 
+    // Get vs SPY vol data
+    const vsSpyVolChange = vsSpyVolData.changes[index]
+    const vsSpyVolColor = vsSpyVolEnabled ? getVsSpyVolColor(vsSpyVolChange, vsSpyVolData.maxAbsChange) : null
+
     const dataPoint = {
       date: price.date,
       close: price.close,
@@ -3198,6 +3310,9 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
       lowVolumeClose: isLowVolume ? price.close : null, // Only set close value for low volume points
       topPerformanceClose: isTopPerformance ? price.close : null, // Top 20% performance variance
       bottomPerformanceClose: isBottomPerformance ? price.close : null, // Bottom 20% performance variance
+      vsSpyVolClose: vsSpyVolEnabled && vsSpyVolColor ? price.close : null, // Vs SPY vol colored line
+      vsSpyVolColor: vsSpyVolColor, // Color for this point
+      vsSpyVolChange: vsSpyVolChange, // Raw change value for tooltip
     }
 
     // Add SMA data for each period
@@ -3745,6 +3860,13 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
             }
             return null
           })}
+
+          {/* Show vs SPY vol change */}
+          {vsSpyVolEnabled && data.vsSpyVolChange !== null && data.vsSpyVolChange !== undefined && (
+            <p className="text-sm mt-1" style={{ color: data.vsSpyVolColor || '#94a3b8' }}>
+              Vol vs SPY ({vsSpyVolBackDays}d): {data.vsSpyVolChange >= 0 ? '+' : ''}{data.vsSpyVolChange.toFixed(1)}%
+            </p>
+          )}
 
           {/* Show Resistance Line info if enabled */}
           {resLnEnabled && data.highVolZone && data.volumePercent !== undefined && (
@@ -6156,6 +6278,43 @@ function PriceChart({ prices, indicators, signals, syncedMouseDate, setSyncedMou
                       connectNulls={false}
                     />
                   </>
+                )}
+                {vsSpyVolEnabled && (
+                  <Customized
+                    component={({ xAxisMap, yAxisMap, offset }) => {
+                      if (!xAxisMap || !yAxisMap || !chartData || chartData.length < 2) return null
+                      const xAxis = xAxisMap[0]
+                      const yAxis = yAxisMap[0]
+                      if (!xAxis || !yAxis) return null
+
+                      const segments = []
+                      for (let i = 0; i < chartData.length - 1; i++) {
+                        const curr = chartData[i]
+                        const next = chartData[i + 1]
+                        if (curr.vsSpyVolColor && next.vsSpyVolClose !== null && curr.vsSpyVolClose !== null) {
+                          const x1 = xAxis.scale(curr.date)
+                          const y1 = yAxis.scale(curr.close)
+                          const x2 = xAxis.scale(next.date)
+                          const y2 = yAxis.scale(next.close)
+                          if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
+                            segments.push(
+                              <line
+                                key={`vsspy-${i}`}
+                                x1={x1}
+                                y1={y1}
+                                x2={x2}
+                                y2={y2}
+                                stroke={curr.vsSpyVolColor}
+                                strokeWidth={3}
+                                strokeLinecap="round"
+                              />
+                            )
+                          }
+                        }
+                      }
+                      return <g className="vs-spy-vol-overlay">{segments}</g>
+                    }}
+                  />
                 )}
                 {comparisonMode === 'line' && comparisonStocks && comparisonStocks.map((compStock, index) => {
                   const compPositiveKey = `compPos_${compStock.symbol}`

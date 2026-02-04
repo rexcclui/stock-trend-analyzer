@@ -9,6 +9,8 @@ import React from 'react'
  * @param {Array} smaPeriods - SMA periods to display
  * @param {Object} smaVisibility - Visibility state for each SMA
  * @param {Function} getSmaColor - Function to get SMA color
+ * @param {boolean} vsSpyVolEnabled - Whether vs SPY vol is enabled
+ * @param {number} vsSpyVolBackDays - Back days for vs SPY vol comparison
  */
 export const CustomTooltip = ({
   active,
@@ -17,7 +19,9 @@ export const CustomTooltip = ({
   comparisonStocks,
   smaPeriods,
   smaVisibility,
-  getSmaColor
+  getSmaColor,
+  vsSpyVolEnabled = false,
+  vsSpyVolBackDays = 30
 }) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload
@@ -59,6 +63,13 @@ export const CustomTooltip = ({
           }
           return null
         })}
+
+        {/* Show vs SPY vol change */}
+        {vsSpyVolEnabled && data.vsSpyVolChange !== null && data.vsSpyVolChange !== undefined && (
+          <p className="text-sm mt-1" style={{ color: data.vsSpyVolColor || '#94a3b8' }}>
+            Vol vs SPY ({vsSpyVolBackDays}d): {data.vsSpyVolChange >= 0 ? '+' : ''}{data.vsSpyVolChange.toFixed(1)}%
+          </p>
+        )}
       </div>
     )
   }
